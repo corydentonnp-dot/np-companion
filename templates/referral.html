@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Referral Letter Generator — NP Companion{% endblock %}
+{% block page_id %}referral{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Referral Letter Generator</h1>
+    <span class="badge badge--success">F27</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    {# ---- LEFT: Form ---- #}
+    <div>
+        <div class="card">
+            <div class="card-header">New Referral Letter</div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Specialty</label>
+                    <select id="ref-specialty" class="form-input">
+                        <option value="">Select specialty...</option>
+                        {% for s in specialties %}
+                        <option value="{{ s }}">{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reason for Referral</label>
+                    <input type="text" id="ref-reason" class="form-input" placeholder="e.g., Evaluation of suspected rheumatoid arthritis">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Patient Descriptor (no name)</label>
+                    <input type="text" id="ref-patient" class="form-input" placeholder="e.g., 55-year-old female" value="this patient">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Urgency</label>
+                    <select id="ref-urgency" class="form-input">
+                        <option value="routine">Routine</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="emergent">Emergent</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Relevant History</label>
+                    <textarea id="ref-history" class="form-input" rows="3" placeholder="Pertinent medical history..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Key Clinical Findings</label>
+                    <textarea id="ref-findings" class="form-input" rows="2" placeholder="Labs, imaging, exam findings..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Current Medications</label>
+                    <textarea id="ref-meds" class="form-input" rows="2" placeholder="Active medication list..."></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="generateReferral()" id="ref-gen-btn" style="width:100%;">Generate Letter</button>
+            </div>
+        </div>
+    </div>
+
+    {# ---- RIGHT: Letter + Log ---- #}
+    <div>
+        <div class="card" id="letter-card" style="display:none;">
+            <div class="card-header" style="display:flex;justify-content:space-between;">
+                <span>Generated Letter</span>
+                <button class="btn btn-sm btn-outline" onclick="copyLetter()">Copy to Clipboard</button>
+            </div>
+            <div class="card-body">
+                <textarea id="ref-letter" class="form-input" rows="14" style="font-size:13px;line-height:1.6;"></textarea>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+            <div class="card-header">Referral Log ({{ log|length }})</div>
+            <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
+                {% if log %}
+                <table class="schedule-table" style="font-size:12px;">
+                    <thead>
+                        <tr><th>Specialty</th><th>Reason</th><th>Date</th><th>Consult</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for r in log %}
+                        <tr>
+                            <td style="font-weight:500;">{{ r.specialty }}</td>
+                            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.reason[:60] }}</td>
+                            <td>{{ r.referral_date.strftime('%m/%d/%Y') if r.referral_date else '—' }}</td>
+                            <td>
+                                {% if r.consultation_received %}
+                                <span class="badge badge--success">Received</span>
+                                {% elif r.is_overdue %}
+                                <span class="badge badge--danger">Overdue (>6wk)</span>
+                                {% else %}
+                                <span class="badge badge--warning">Pending</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not r.consultation_received %}
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="markReceived({{ r.id }})">Received</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">No referrals logged yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function generateReferral() {
+    var btn = document.getElementById('ref-gen-btn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    var data = {
+        specialty: document.getElementById('ref-specialty').value,
+        reason: document.getElementById('ref-reason').value.trim(),
+        patient_display: document.getElementById('ref-patient').value.trim(),
+        urgency: document.getElementById('ref-urgency').value,
+        relevant_history: document.getElementById('ref-history').value.trim(),
+        key_findings: document.getElementById('ref-findings').value.trim(),
+        current_medications: document.getElementById('ref-meds').value.trim(),
+    };
+    fetch('/referral/generate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            btn.disabled = false; btn.textContent = 'Generate Letter';
+            if (d.error) { alert(d.error); return; }
+            document.getElementById('ref-letter').value = d.letter;
+            document.getElementById('letter-card').style.display = '';
+        })
+        .catch(function(){
+            btn.disabled = false; btn.textContent = 'Generate Letter';
+        });
+}
+function copyLetter() {
+    navigator.clipboard.writeText(document.getElementById('ref-letter').value);
+}
+function markReceived(id) {
+    fetch('/referral/' + id + '/received', {method:'POST'}).then(function(){location.reload();});
+}
+</script>
+{% endblock %}

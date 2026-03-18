@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Follow-Up Tickler — NP Companion{% endblock %}
+{% block page_id %}tickler{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Follow-Up Tickler</h1>
+    <span class="badge badge--success">F24</span>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-tickler-modal').style.display='flex'">+ Add Tickler</button>
+</div>
+
+{# ---- Three-Column Board ---- #}
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+
+    {# OVERDUE (red) #}
+    <div class="card" style="border-top:3px solid var(--color-red,#e74c3c);">
+        <div class="card-header" style="display:flex;justify-content:space-between;">
+            <span style="color:var(--color-red);">Overdue</span>
+            <span class="badge badge--danger">{{ overdue|length }}</span>
+        </div>
+        <div class="card-body" style="padding:8px;max-height:600px;overflow-y:auto;">
+            {% for t in overdue %}
+            {% include '_tickler_card.html' %}
+            {% endfor %}
+            {% if not overdue %}
+            <div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">No overdue items</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# DUE TODAY (yellow) #}
+    <div class="card" style="border-top:3px solid var(--color-warning,#f59e0b);">
+        <div class="card-header" style="display:flex;justify-content:space-between;">
+            <span style="color:var(--color-warning);">Due Today</span>
+            <span class="badge badge--warning">{{ today_items|length }}</span>
+        </div>
+        <div class="card-body" style="padding:8px;max-height:600px;overflow-y:auto;">
+            {% for t in today_items %}
+            {% include '_tickler_card.html' %}
+            {% endfor %}
+            {% if not today_items %}
+            <div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">No items due today</div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# UPCOMING (white) #}
+    <div class="card" style="border-top:3px solid var(--color-teal,#0D7377);">
+        <div class="card-header" style="display:flex;justify-content:space-between;">
+            <span style="color:var(--color-teal);">Upcoming</span>
+            <span class="badge badge--info">{{ upcoming|length }}</span>
+        </div>
+        <div class="card-body" style="padding:8px;max-height:600px;overflow-y:auto;">
+            {% for t in upcoming %}
+            {% include '_tickler_card.html' %}
+            {% endfor %}
+            {% if not upcoming %}
+            <div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">No upcoming items</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---- Add Tickler Modal ---- #}
+<div id="add-tickler-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:480px;max-width:90vw;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin:0;font-size:18px;">Add Follow-Up Tickler</h2>
+            <button class="btn btn-sm btn-outline" onclick="document.getElementById('add-tickler-modal').style.display='none'">&#10005;</button>
+        </div>
+        <form id="tickler-form">
+            <div class="form-group">
+                <label class="form-label">Patient Identifier</label>
+                <input type="text" name="patient_display" class="form-input" placeholder="e.g., DM follow-up, Smith labs" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">MRN (optional)</label>
+                <input type="text" name="mrn" class="form-input" placeholder="For linking to patient chart">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group">
+                    <label class="form-label">Due Date</label>
+                    <input type="date" name="due_date" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <select name="priority" class="form-input">
+                        <option value="routine">Routine</option>
+                        <option value="important">Important</option>
+                        <option value="urgent">Urgent</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Assign To</label>
+                <select name="assigned_to" class="form-input">
+                    <option value="">Unassigned (self)</option>
+                    {% for u in all_users %}
+                    <option value="{{ u.id }}">{{ u.display_name or u.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group">
+                    <label class="toggle-row">
+                        <input type="checkbox" name="is_recurring" id="recurring-check" onchange="document.getElementById('recur-days').style.display=this.checked?'':'none'">
+                        <span>Recurring</span>
+                    </label>
+                </div>
+                <div class="form-group" id="recur-days" style="display:none;">
+                    <label class="form-label">Every N days</label>
+                    <input type="number" name="recurrence_days" class="form-input" value="30" min="1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea name="notes" class="form-input" rows="2" placeholder="Additional details..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Add Tickler</button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('tickler-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var fd = new FormData(this);
+    var data = {};
+    fd.forEach(function(v, k) { data[k] = v; });
+    data.is_recurring = document.getElementById('recurring-check').checked;
+    fetch('/tickler/add', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if (d.success) location.reload();
+            else alert(d.error || 'Failed');
+        });
+});
+function completeTickler(id) {
+    fetch('/tickler/' + id + '/complete', {method:'POST'}).then(function(){location.reload();});
+}
+function snoozeTickler(id) {
+    var days = prompt('Snooze for how many days?', '7');
+    if (!days) return;
+    fetch('/tickler/' + id + '/snooze', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({days:parseInt(days)})})
+        .then(function(){location.reload();});
+}
+</script>
+{% endblock %}

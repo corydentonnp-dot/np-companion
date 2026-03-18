@@ -24,7 +24,10 @@ from flask_login import login_required, current_user
 from models import db
 from models.tools import (
     ControlledSubstanceEntry, CodeFavorite, CodePairing, PriorAuthorization,
+    ReferralLetter,
 )
+from models.tickler import Tickler
+from models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -600,3 +603,245 @@ def pa_generate_appeal(pa_id):
     db.session.commit()
 
     return jsonify({'success': True, 'appeal': appeal})
+
+
+# ======================================================================
+# F24: Follow-Up Tickler System
+# ======================================================================
+
+@tools_bp.route('/tickler')
+@login_required
+def tickler():
+    """Three-column tickler board: overdue, due today, upcoming."""
+    from datetime import date as _date
+    today_start = datetime.combine(_date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+    today_end = datetime.combine(_date.today(), datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    all_open = (
+        Tickler.query
+        .filter_by(user_id=current_user.id, is_completed=False)
+        .order_by(Tickler.due_date, Tickler.priority.desc())
+        .all()
+    )
+    # Also show items assigned to this user by others
+    assigned = (
+        Tickler.query
+        .filter(
+            Tickler.assigned_to_user_id == current_user.id,
+            Tickler.is_completed == False,
+            Tickler.user_id != current_user.id,
+        )
+        .order_by(Tickler.due_date)
+        .all()
+    )
+    all_items = list({t.id: t for t in all_open + assigned}.values())
+
+    overdue = [t for t in all_items if t.due_date and t.due_date < today_start]
+    today_items = [t for t in all_items if t.due_date and today_start <= t.due_date <= today_end]
+    upcoming = [t for t in all_items if t.due_date and t.due_date > today_end]
+
+    all_users = User.query.filter_by(is_active_account=True).order_by(User.display_name).all()
+
+    return render_template(
+        'tickler.html',
+        overdue=overdue,
+        today_items=today_items,
+        upcoming=upcoming,
+        all_users=all_users,
+    )
+
+
+@tools_bp.route('/tickler/add', methods=['POST'])
+@login_required
+def tickler_add():
+    """Add a new tickler item."""
+    data = request.get_json(silent=True) or {}
+
+    due_str = (data.get('due_date') or '').strip()
+    if not due_str:
+        return jsonify({'success': False, 'error': 'Due date required'}), 400
+
+    try:
+        due_dt = datetime.strptime(due_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Invalid date format'}), 400
+
+    assigned_to = data.get('assigned_to', '')
+    assigned_id = int(assigned_to) if assigned_to and assigned_to.isdigit() else None
+
+    t = Tickler(
+        user_id=current_user.id,
+        assigned_to_user_id=assigned_id,
+        mrn=(data.get('mrn') or '').strip(),
+        patient_display=(data.get('patient_display') or '').strip(),
+        due_date=due_dt,
+        priority=(data.get('priority') or 'routine').strip(),
+        notes=(data.get('notes') or '').strip(),
+        is_recurring=bool(data.get('is_recurring')),
+        recurrence_interval_days=int(data.get('recurrence_days') or 0) or None,
+    )
+    db.session.add(t)
+    db.session.commit()
+    return jsonify({'success': True, 'id': t.id})
+
+
+@tools_bp.route('/tickler/<int:tid>/complete', methods=['POST'])
+@login_required
+def tickler_complete(tid):
+    """Mark a tickler as completed. If recurring, create the next one."""
+    t = Tickler.query.filter(
+        Tickler.id == tid,
+        db.or_(Tickler.user_id == current_user.id, Tickler.assigned_to_user_id == current_user.id)
+    ).first()
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    t.is_completed = True
+    t.completed_at = datetime.now(timezone.utc)
+
+    # Auto-create next occurrence if recurring
+    if t.is_recurring and t.recurrence_interval_days:
+        next_due = t.due_date + timedelta(days=t.recurrence_interval_days)
+        next_t = Tickler(
+            user_id=t.user_id,
+            assigned_to_user_id=t.assigned_to_user_id,
+            mrn=t.mrn,
+            patient_display=t.patient_display,
+            due_date=next_due,
+            priority=t.priority,
+            notes=t.notes,
+            is_recurring=True,
+            recurrence_interval_days=t.recurrence_interval_days,
+        )
+        db.session.add(next_t)
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/tickler/<int:tid>/snooze', methods=['POST'])
+@login_required
+def tickler_snooze(tid):
+    """Snooze a tickler to a new date."""
+    t = Tickler.query.filter(
+        Tickler.id == tid,
+        db.or_(Tickler.user_id == current_user.id, Tickler.assigned_to_user_id == current_user.id)
+    ).first()
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    days = int(data.get('days') or 7)
+    t.due_date = datetime.now(timezone.utc) + timedelta(days=days)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# F27: Referral Letter Generator
+# ======================================================================
+
+SPECIALTIES = [
+    'Cardiology', 'Orthopedics', 'Gastroenterology', 'Dermatology',
+    'Endocrinology', 'Neurology', 'Urology', 'Pulmonology',
+    'Nephrology', 'Rheumatology', 'Psychiatry', 'General Surgery',
+    'Ophthalmology', 'ENT/Otolaryngology', 'Allergy/Immunology',
+    'Hematology/Oncology', 'Infectious Disease', 'Pain Management',
+    'Physical Medicine', 'Podiatry', 'Other',
+]
+
+
+@tools_bp.route('/referral')
+@login_required
+def referral():
+    """Referral letter generator and tracking log."""
+    log = (
+        ReferralLetter.query
+        .filter_by(user_id=current_user.id)
+        .order_by(ReferralLetter.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    return render_template('referral.html', log=log, specialties=SPECIALTIES)
+
+
+@tools_bp.route('/referral/generate', methods=['POST'])
+@login_required
+def referral_generate():
+    """Generate a referral letter and save to log."""
+    data = request.get_json(silent=True) or {}
+
+    specialty = (data.get('specialty') or '').strip()
+    reason = (data.get('reason') or '').strip()
+    history = (data.get('relevant_history') or '').strip()
+    findings = (data.get('key_findings') or '').strip()
+    meds = (data.get('current_medications') or '').strip()
+    urgency = (data.get('urgency') or 'routine').strip()
+    patient = (data.get('patient_display') or 'this patient').strip()
+
+    if not specialty or not reason:
+        return jsonify({'success': False, 'error': 'Specialty and reason required'}), 400
+
+    # Get provider name from user profile
+    provider_name = current_user.display_name or current_user.username
+
+    # Generate letter
+    today_str = date.today().strftime('%B %d, %Y')
+    urgency_line = ''
+    if urgency == 'urgent':
+        urgency_line = '\n**URGENT REFERRAL — Please expedite scheduling.**\n'
+    elif urgency == 'emergent':
+        urgency_line = '\n**EMERGENT REFERRAL — Same-day evaluation requested.**\n'
+
+    letter = f"""{today_str}
+
+Dear {specialty} Colleague,
+{urgency_line}
+I am referring {patient} for evaluation of {reason}.
+
+"""
+    if history:
+        letter += f"RELEVANT HISTORY:\n{history}\n\n"
+    if findings:
+        letter += f"KEY CLINICAL FINDINGS:\n{findings}\n\n"
+    if meds:
+        letter += f"CURRENT MEDICATIONS:\n{meds}\n\n"
+
+    letter += f"""I would appreciate your evaluation and recommendations regarding the management of this patient. Please send a consultation note to our office at your earliest convenience.
+
+Thank you for your expertise and timely attention.
+
+Sincerely,
+{provider_name}
+Family Practice Associates of Chesterfield"""
+
+    ref = ReferralLetter(
+        user_id=current_user.id,
+        mrn=(data.get('mrn') or '').strip(),
+        patient_display=patient,
+        specialty=specialty,
+        reason=reason,
+        relevant_history=history,
+        key_findings=findings,
+        current_medications=meds,
+        urgency=urgency,
+        generated_letter=letter,
+        referral_date=date.today(),
+    )
+    db.session.add(ref)
+    db.session.commit()
+
+    return jsonify({'success': True, 'id': ref.id, 'letter': letter})
+
+
+@tools_bp.route('/referral/<int:ref_id>/received', methods=['POST'])
+@login_required
+def referral_received(ref_id):
+    """Mark a referral consultation as received."""
+    ref = ReferralLetter.query.filter_by(id=ref_id, user_id=current_user.id).first()
+    if not ref:
+        return jsonify({'success': False}), 404
+    ref.consultation_received = True
+    ref.follow_up_date = date.today()
+    db.session.commit()
+    return jsonify({'success': True})

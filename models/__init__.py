@@ -45,4 +45,4 @@ from models.patient import (
     PatientNoteDraft, PatientSpecialist, Icd10Cache, RxNormCache,
 )
 from models.billing import BillingOpportunity, BillingRuleCache
-from models.tools import ControlledSubstanceEntry, CodeFavorite, CodePairing, PriorAuthorization
+from models.tools import ControlledSubstanceEntry, CodeFavorite, CodePairing, PriorAuthorization, ReferralLetter
