@@ -383,6 +383,16 @@ def settings_account():
             db.session.commit()
             flash('Intelligence preferences saved.', 'success')
 
+        # ---- Set billing preferences ------------------------------------
+        elif action == 'set_billing_prefs':
+            current_user.set_pref('revenue_display_mode', request.form.get('revenue_display', 'dollars'))
+            current_user.set_pref('opportunity_min_confidence', request.form.get('min_confidence', 'MEDIUM'))
+            current_user.set_pref('billing_insurer_default', request.form.get('insurer_default', 'unknown'))
+            current_user.set_pref('show_billing_widget', 'show_billing_widget' in request.form)
+            current_user.set_pref('show_scheduling_opps', 'show_scheduling_opps' in request.form)
+            db.session.commit()
+            flash('Billing preferences saved.', 'success')
+
         # ---- Set preferred browser --------------------------------------
         elif action == 'set_preferred_browser':
             browser = request.form.get('preferred_browser', 'chrome').strip()

@@ -19,6 +19,21 @@
                     <button class="btn btn-primary btn-sm" onclick="searchDrug()" id="search-btn">Search</button>
                     <button class="btn btn-outline btn-sm" onclick="clearResults()">Clear</button>
                 </div>
+                <div style="margin-bottom:12px;padding:8px;background:var(--bg-muted,#f8fafc);border-radius:6px;">
+                    <div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--text-secondary);text-transform:uppercase;">Patient Context Filters (F10c)</div>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;">
+                        <input type="checkbox" id="filter-pregnancy" onchange="refilterCard()">
+                        Pregnancy — highlight pregnancy/lactation warnings
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;">
+                        <input type="checkbox" id="filter-renal" onchange="refilterCard()">
+                        Renal impairment — highlight renal dosing adjustments
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+                        <input type="checkbox" id="filter-hepatic" onchange="refilterCard()">
+                        Hepatic impairment — highlight hepatic adjustments
+                    </label>
+                </div>
                 <div id="search-suggestions" style="font-size:12px;"></div>
                 <div id="search-history" style="margin-top:12px;font-size:12px;color:var(--text-secondary);">
                     <div style="font-weight:600;margin-bottom:4px;">Recent Searches</div>
@@ -87,6 +102,17 @@ function renderDrugCard(d, container) {
 
     html += '<div class="card-body" style="padding:0;">';
 
+    // F10d: Guideline update flag
+    if (d.guideline_flag) {
+        html += '<div style="padding:12px 16px;background:rgba(245,158,11,0.1);border-bottom:2px solid var(--color-warning,#f59e0b);">';
+        html += '<strong style="color:var(--color-warning);">&#9888; GUIDELINE UPDATE FLAG</strong>';
+        html += '<div style="font-size:13px;margin-top:4px;">' + escapeHtml(d.guideline_flag.message) + '</div>';
+        if (d.guideline_flag.remapped_to) {
+            html += '<div style="font-size:12px;margin-top:4px;color:var(--color-teal);">Remapped to RxCUI: ' + escapeHtml(d.guideline_flag.remapped_to) + '</div>';
+        }
+        html += '</div>';
+    }
+
     // Drug class and basic info
     if (d.drug_class || d.dose_strength || d.dose_form || d.route) {
         html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;gap:12px;flex-wrap:wrap;font-size:13px;">';
@@ -114,13 +140,13 @@ function renderDrugCard(d, container) {
         var content = d.label ? d.label[s.key] : '';
         if (!content) return;
         var bgColor = s.isCritical ? 'rgba(220,38,38,0.06)' : 'transparent';
-        html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);background:' + bgColor + ';">';
-        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+        html += '<div data-section-key="' + s.key + '" style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);background:' + bgColor + ';">';
+        html += '<div class="section-header" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
         html += '<span style="color:' + s.color + ';">' + s.icon + '</span>';
         html += '<strong style="font-size:13px;' + (s.isCritical ? 'color:var(--color-red);text-transform:uppercase;' : '') + '">' + s.title + '</strong>';
         html += '<span style="font-size:11px;color:var(--text-secondary);margin-left:auto;">click to expand</span>';
         html += '</div>';
-        html += '<div style="display:' + (s.isCritical ? 'block' : 'none') + ';font-size:12px;line-height:1.6;max-height:200px;overflow-y:auto;">' + escapeHtml(content).substring(0, 2000) + '</div>';
+        html += '<div class="section-content" style="display:' + (s.isCritical ? 'block' : 'none') + ';font-size:12px;line-height:1.6;max-height:200px;overflow-y:auto;">' + escapeHtml(content).substring(0, 2000) + '</div>';
         html += '</div>';
     });
 
@@ -169,6 +195,38 @@ function renderHistory() {
         html += '<a href="#" onclick="event.preventDefault();document.getElementById(\'drug-search\').value=\'' + escapeHtml(h).replace(/'/g, "\\'") + '\';searchDrug();" style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:10px;background:var(--bg-muted,#f8fafc);font-size:11px;color:var(--text-primary);text-decoration:none;border:1px solid var(--border,#e2e8f0);">' + escapeHtml(h) + '</a>';
     });
     el.innerHTML = html;
+}
+
+function refilterCard() {
+    // When pregnancy/renal/hepatic filters change, re-highlight relevant sections
+    var pregnancy = document.getElementById('filter-pregnancy').checked;
+    var renal = document.getElementById('filter-renal').checked;
+    var hepatic = document.getElementById('filter-hepatic').checked;
+
+    // Find all label sections in the drug card and auto-expand filtered ones
+    var container = document.getElementById('drug-card-container');
+    if (!container) return;
+
+    var sections = container.querySelectorAll('[data-section-key]');
+    sections.forEach(function(sec) {
+        var key = sec.getAttribute('data-section-key');
+        var content = sec.querySelector('.section-content');
+        var header = sec.querySelector('.section-header');
+        var shouldHighlight = false;
+
+        if (pregnancy && (key === 'pregnancy')) shouldHighlight = true;
+        if (renal && (key === 'renal_hepatic')) shouldHighlight = true;
+        if (hepatic && (key === 'renal_hepatic')) shouldHighlight = true;
+
+        if (shouldHighlight) {
+            sec.style.background = 'rgba(220,38,38,0.08)';
+            sec.style.borderLeft = '3px solid var(--color-red,#e74c3c)';
+            if (content) content.style.display = 'block';
+        } else {
+            sec.style.background = '';
+            sec.style.borderLeft = '';
+        }
+    });
 }
 
 function clearResults() {

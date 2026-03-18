@@ -177,6 +177,122 @@ def billing_review(mrn):
 
 
 # ======================================================================
+# F31 Step 2: Note Section Parser (standalone, no AC dependency)
+# ======================================================================
+@intel_bp.route('/api/parse-note', methods=['POST'])
+@login_required
+def parse_note():
+    """
+    Parse free text into clinical note sections.
+    Used by the Note Reformatter wizard and the spell check feature.
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+
+    if not text:
+        return jsonify({'sections': {}, 'summary': 'No text provided'})
+
+    try:
+        from agent.note_parser import parse_note_sections, get_section_summary
+        parsed = parse_note_sections(text)
+        summary = get_section_summary(parsed)
+
+        # Extract metadata before returning
+        meta = parsed.pop('_metadata', {})
+        needs_review = parsed.pop('needs_review', [])
+        unclassified = parsed.pop('unclassified_text', '')
+
+        return jsonify({
+            'sections': parsed,
+            'unclassified_text': unclassified,
+            'needs_review': needs_review,
+            'metadata': meta,
+            'summary': summary,
+        })
+    except Exception as e:
+        logger.debug('Note parse failed: %s', e)
+        return jsonify({'sections': {}, 'error': str(e)})
+
+
+# ======================================================================
+# Scheduling Intelligence — AWV/CCM eligibility analysis
+# ======================================================================
+@intel_bp.route('/api/scheduling-intelligence')
+@login_required
+def scheduling_intelligence():
+    """
+    Analyze the provider's patient panel for scheduling opportunities:
+    - AWV candidates: Medicare patients with >12 months since last AWV
+    - CCM candidates: Patients with 2+ chronic conditions not enrolled in CCM
+    Returns lists of patients who should be scheduled.
+    """
+    from app.api_config import CCM_CHRONIC_CONDITION_PREFIXES
+
+    claimed = PatientRecord.query.filter_by(
+        claimed_by=current_user.id
+    ).all()
+
+    if not claimed:
+        return jsonify({'awv_candidates': [], 'ccm_candidates': [], 'total_panel': 0})
+
+    awv_candidates = []
+    ccm_candidates = []
+
+    for record in claimed:
+        mrn = record.mrn
+        diagnoses = PatientDiagnosis.query.filter_by(
+            user_id=current_user.id, mrn=mrn, status='active'
+        ).all()
+
+        icd_codes = [d.icd10_code or '' for d in diagnoses]
+
+        # AWV check: any patient with insurer_type containing 'medicare'
+        insurer = (getattr(record, 'insurer_type', '') or '').lower()
+        if 'medicare' in insurer or not insurer:
+            last_awv = getattr(record, 'last_awv_date', None)
+            months_since = None
+            if last_awv:
+                from datetime import date as _d
+                delta = _d.today() - last_awv
+                months_since = delta.days / 30.44
+            if last_awv is None or (months_since and months_since >= 11):
+                awv_candidates.append({
+                    'mrn': mrn,
+                    'name': record.patient_name or 'Unknown',
+                    'months_since_awv': round(months_since, 1) if months_since else None,
+                    'reason': 'No AWV on record' if not last_awv else f'{round(months_since, 0):.0f} months since last AWV',
+                })
+
+        # CCM check: 2+ chronic conditions
+        chronic_count = 0
+        chronic_names = []
+        for code in icd_codes:
+            for prefix in CCM_CHRONIC_CONDITION_PREFIXES:
+                if code.upper().startswith(prefix):
+                    chronic_count += 1
+                    dx = next((d for d in diagnoses if d.icd10_code == code), None)
+                    if dx:
+                        chronic_names.append(dx.diagnosis_name or code)
+                    break
+
+        ccm_enrolled = getattr(record, 'ccm_enrolled', False)
+        if chronic_count >= 2 and not ccm_enrolled:
+            ccm_candidates.append({
+                'mrn': mrn,
+                'name': record.patient_name or 'Unknown',
+                'chronic_count': chronic_count,
+                'conditions': chronic_names[:5],
+                'reason': f'{chronic_count} chronic conditions — CCM eligible',
+            })
+
+    return jsonify({
+        'awv_candidates': awv_candidates[:20],
+        'ccm_candidates': ccm_candidates[:20],
+        'total_panel': len(claimed),
+    })
+
+
+# ======================================================================
 # API Setup Guide (accessible to all authenticated users)
 # ======================================================================
 @intel_bp.route('/api-setup-guide')

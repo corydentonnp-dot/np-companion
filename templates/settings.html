@@ -549,6 +549,57 @@ window._applyAccent = function(aid) {
 </script>
 
 {# ================================================================
+   SECTION 4b: Billing Preferences
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Billing Intelligence</h2>
+
+<form method="POST" action="{{ url_for('auth.settings_account') }}">
+    <input type="hidden" name="action" value="set_billing_prefs">
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">Billing Opportunity Display</div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label">Revenue display mode</label>
+                <select name="revenue_display" class="form-input" style="max-width:250px;">
+                    <option value="dollars" {{ 'selected' if current_user.get_pref('revenue_display_mode', 'dollars') == 'dollars' }}>Dollar amounts (~$XX)</option>
+                    <option value="codes_only" {{ 'selected' if current_user.get_pref('revenue_display_mode', 'dollars') == 'codes_only' }}>Code names only (no dollar figures)</option>
+                </select>
+                <p class="form-help">Choose whether billing opportunities show estimated dollar amounts or just code names.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Minimum confidence to show</label>
+                <select name="min_confidence" class="form-input" style="max-width:250px;">
+                    <option value="HIGH" {{ 'selected' if current_user.get_pref('opportunity_min_confidence', 'MEDIUM') == 'HIGH' }}>HIGH only</option>
+                    <option value="MEDIUM" {{ 'selected' if current_user.get_pref('opportunity_min_confidence', 'MEDIUM') == 'MEDIUM' }}>HIGH + MEDIUM</option>
+                    <option value="LOW" {{ 'selected' if current_user.get_pref('opportunity_min_confidence', 'MEDIUM') == 'LOW' }}>All (including LOW)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Default insurer type</label>
+                <select name="insurer_default" class="form-input" style="max-width:250px;">
+                    <option value="unknown" {{ 'selected' if current_user.get_pref('billing_insurer_default', 'unknown') == 'unknown' }}>Auto-detect</option>
+                    <option value="medicare" {{ 'selected' if current_user.get_pref('billing_insurer_default', 'unknown') == 'medicare' }}>Medicare (most patients)</option>
+                    <option value="commercial" {{ 'selected' if current_user.get_pref('billing_insurer_default', 'unknown') == 'commercial' }}>Commercial (most patients)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="show_billing_widget" {{ 'checked' if current_user.get_pref('show_billing_widget', True) }}>
+                    <span>Show billing opportunities in patient chart</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="show_scheduling_opps" {{ 'checked' if current_user.get_pref('show_scheduling_opps', True) }}>
+                    <span>Show AWV/CCM scheduling suggestions in Today View</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary" style="margin-bottom:24px;">Save Billing Preferences</button>
+</form>
+
+{# ================================================================
    SECTION 5: Clinical Intelligence Preferences
    ================================================================ #}
 <h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Clinical Intelligence</h2>

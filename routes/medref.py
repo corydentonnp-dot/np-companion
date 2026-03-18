@@ -193,6 +193,28 @@ def lookup():
     except Exception as e:
         logger.debug('Recall lookup failed: %s', e)
 
+    # 6. F10d: RxNorm history status — check for obsoleted/remapped drugs
+    result['guideline_flag'] = None
+    if rxcui:
+        try:
+            history = _fetch_rxnorm('/rxcui/' + rxcui + '/historystatus.json')
+            if history:
+                status_info = (history.get('rxcuiStatusHistory') or {}).get('metaData') or {}
+                status = (status_info.get('status') or '').lower()
+                if status in ('remapped', 'obsolete', 'retired'):
+                    remapped_to = ''
+                    remapped_data = (history.get('rxcuiStatusHistory') or {}).get('derivedConcepts') or {}
+                    remapped_list = remapped_data.get('remappedConcept', [])
+                    if remapped_list and isinstance(remapped_list, list):
+                        remapped_to = remapped_list[0].get('remappedRxCui', '')
+                    result['guideline_flag'] = {
+                        'status': status,
+                        'message': f'This drug entry has been {status} in the RxNorm database. Prescribing information may be outdated.',
+                        'remapped_to': remapped_to,
+                    }
+        except Exception:
+            pass
+
     # If we got no data at all, return error
     if not result['rxcui'] and not result['label'] and not result['generic_name']:
         return jsonify({'error': f'No results found for "{query}". Try a different spelling or generic name.'})
