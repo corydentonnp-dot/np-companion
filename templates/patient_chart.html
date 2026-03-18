@@ -452,8 +452,45 @@
         <div class="widget-resize-handle"></div>
     </div>
 
+    {# ---- BILLING OPPORTUNITIES WIDGET — async loaded ---- #}
+    <div class="widget fw-widget" data-widget="billing" data-widget-id="billing" data-col="0" data-row="3" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128176; Billing Opportunities</span>
+            <div class="widget-controls">
+                <span id="billing-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-green,#27ae60);color:#fff;font-weight:600;"></span>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" id="billing-body">
+            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
+                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+                Checking billing opportunities...
+            </div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- LAB INTERPRETATION WIDGET (NEW-B) — async loaded ---- #}
+    <div class="widget fw-widget" data-widget="lab-interp" data-widget-id="lab-interp" data-col="1" data-row="3" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128300; Lab Interpretation</span>
+            <div class="widget-controls">
+                <span id="lab-interp-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-red,#e74c3c);color:#fff;font-weight:600;"></span>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" id="lab-interp-body">
+            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
+                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+                Analyzing lab results...
+            </div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
     {# ---- DRUG SAFETY WIDGET (NEW-A + NEW-F) — async loaded ---- #}
-    <div class="widget fw-widget" data-widget="drug-safety" data-widget-id="drug-safety" data-col="0" data-row="3" data-w="1" data-h="1">
+    {% if current_user.get_pref('intel_drug_safety', True) %}
+    <div class="widget fw-widget" data-widget="drug-safety" data-widget-id="drug-safety" data-col="2" data-row="3" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128165; Drug Safety</span>
             <div class="widget-controls">
@@ -469,9 +506,11 @@
         </div>
         <div class="widget-resize-handle"></div>
     </div>
+    {% endif %}
 
     {# ---- PUBMED GUIDELINES WIDGET (NEW-C) — async loaded ---- #}
-    <div class="widget fw-widget" data-widget="guidelines" data-widget-id="guidelines" data-col="1" data-row="3" data-w="1" data-h="1">
+    {% if current_user.get_pref('intel_guidelines', True) %}
+    <div class="widget fw-widget" data-widget="guidelines" data-widget-id="guidelines" data-col="0" data-row="4" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128218; Clinical Guidelines</span>
             <div class="widget-controls">
@@ -486,9 +525,11 @@
         </div>
         <div class="widget-resize-handle"></div>
     </div>
+    {% endif %}
 
     {# ---- FORMULARY GAP DETECTION WIDGET (NEW-D) — async loaded ---- #}
-    <div class="widget fw-widget" data-widget="formulary-gaps" data-widget-id="formulary-gaps" data-col="2" data-row="3" data-w="1" data-h="1">
+    {% if current_user.get_pref('intel_formulary_gaps', True) %}
+    <div class="widget fw-widget" data-widget="formulary-gaps" data-widget-id="formulary-gaps" data-col="1" data-row="4" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128137; Formulary Gaps</span>
             <div class="widget-controls">
@@ -503,9 +544,11 @@
         </div>
         <div class="widget-resize-handle"></div>
     </div>
+    {% endif %}
 
     {# ---- PATIENT EDUCATION WIDGET (NEW-E) — async loaded ---- #}
-    <div class="widget fw-widget" data-widget="education" data-widget-id="education" data-col="0" data-row="4" data-w="1" data-h="1">
+    {% if current_user.get_pref('intel_education', True) %}
+    <div class="widget fw-widget" data-widget="education" data-widget-id="education" data-col="2" data-row="4" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128214; Patient Education</span>
             <div class="widget-controls">
@@ -520,6 +563,7 @@
         </div>
         <div class="widget-resize-handle"></div>
     </div>
+    {% endif %}
 
 </div>
 
@@ -1438,6 +1482,89 @@ document.addEventListener('keydown', function(e) {
 /* ============================================================
    INTELLIGENCE LAYER — Async Widget Loaders
    ============================================================ */
+
+/* Billing Opportunities Widget */
+(function loadBilling() {
+    var el = document.getElementById('billing-body');
+    if (!el) return;
+    fetch('/api/patient/' + MRN + '/billing-opportunities')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var opps = data.opportunities || [];
+            var badge = document.getElementById('billing-badge');
+            if (opps.length > 0 && badge) {
+                var total = 0;
+                opps.forEach(function(o) { total += o.revenue || 0; });
+                badge.textContent = '$' + Math.round(total);
+                badge.style.display = '';
+            }
+            if (opps.length === 0) {
+                el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:12px;">No billing opportunities detected for this visit.<br><span style="font-size:11px;opacity:0.7;">Run overnight prep or verify patient data.</span></div>';
+                return;
+            }
+            var html = '';
+            opps.forEach(function(o) {
+                var conf = o.confidence === 'HIGH' ? 'badge--success' : o.confidence === 'MEDIUM' ? 'badge--warning' : 'badge--muted';
+                html += '<div style="padding:8px;margin:4px 0;background:var(--bg-muted,#f8fafc);border-left:3px solid var(--color-green,#27ae60);border-radius:4px;font-size:12px;">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<strong>' + escHtml(o.type) + '</strong>' +
+                    '<span style="font-weight:700;color:var(--color-green);">~$' + Math.round(o.revenue) + '</span></div>' +
+                    '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">' + escHtml(o.codes) + '</div>' +
+                    '<div style="font-size:11px;margin-top:2px;">' + escHtml(o.basis) + '</div>' +
+                    (o.documentation ? '<div style="font-size:10px;color:var(--color-teal);margin-top:2px;">Doc: ' + escHtml(o.documentation).substring(0,120) + '</div>' : '') +
+                    (o.insurer_caveat ? '<div style="font-size:10px;color:var(--color-warning);margin-top:2px;">' + escHtml(o.insurer_caveat) + '</div>' : '') +
+                    '</div>';
+            });
+            html += '<div style="font-size:10px;color:var(--text-secondary);margin-top:6px;font-style:italic;">Estimates use CY2025 CMS national average non-facility rates.</div>';
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;">Billing data unavailable</p>';
+        });
+})();
+
+/* Lab Interpretation Widget (NEW-B) */
+(function loadLabInterp() {
+    var el = document.getElementById('lab-interp-body');
+    if (!el) return;
+    fetch('/api/patient/' + MRN + '/lab-interpretation')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var items = data.interpretations || [];
+            var badge = document.getElementById('lab-interp-badge');
+            var abnormalCount = items.filter(function(i) { return i.is_abnormal; }).length;
+            if (abnormalCount > 0 && badge) {
+                badge.textContent = abnormalCount + ' abnormal';
+                badge.style.display = '';
+            }
+            if (items.length === 0) {
+                el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--color-green,#27ae60);font-size:13px;">&#10003; All tracked labs within normal range.</div>';
+                return;
+            }
+            var html = '';
+            items.forEach(function(i) {
+                var color = i.is_abnormal ? (i.direction.indexOf('critical') >= 0 ? 'var(--color-red)' : 'var(--color-warning,#f59e0b)') : 'var(--text-primary)';
+                html += '<div style="padding:6px 8px;margin:4px 0;border-left:3px solid ' + color + ';background:var(--bg-muted,#f8fafc);border-radius:4px;font-size:12px;">' +
+                    '<div style="display:flex;justify-content:space-between;"><strong>' + escHtml(i.lab_name) + '</strong><span style="font-weight:600;color:' + color + ';">' + escHtml(i.value) + '</span></div>';
+                if (i.reference_range) {
+                    html += '<div style="font-size:10px;color:var(--text-secondary);">Range: ' + escHtml(i.reference_range) + ' | ' + escHtml(i.date) + '</div>';
+                }
+                if (i.context) {
+                    html += '<div style="font-size:11px;margin-top:2px;font-weight:500;">' + escHtml(i.context) + '</div>';
+                }
+                if (i.drug_context && i.drug_context.length > 0) {
+                    i.drug_context.forEach(function(dc) {
+                        html += '<div style="font-size:10px;color:var(--color-teal);margin-top:1px;">&#128138; ' + escHtml(dc.note) + '</div>';
+                    });
+                }
+                html += '</div>';
+            });
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;">Lab interpretation unavailable</p>';
+        });
+})();
 
 /* Drug Safety Widget (NEW-A + NEW-F) */
 (function loadDrugSafety() {

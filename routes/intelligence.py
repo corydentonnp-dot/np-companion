@@ -111,6 +111,59 @@ def api_setup_guide():
 
 
 # ======================================================================
+# F17b: ICD-10 Specificity Reminder
+# ======================================================================
+@intel_bp.route('/api/icd10/specificity')
+@login_required
+def icd10_specificity():
+    """
+    Check if an ICD-10 code has more specific child codes available.
+    Returns child codes if the current code is non-terminal.
+    """
+    code = request.args.get('code', '').strip().upper()
+    if not code or len(code) < 3:
+        return jsonify({'has_children': False, 'children': []})
+
+    try:
+        from app.services.api.icd10 import ICD10Service
+        svc = ICD10Service(db)
+        children = svc.get_children(code)
+        if children:
+            return jsonify({
+                'has_children': True,
+                'code': code,
+                'children': children[:10],
+                'message': f'More specific code available for {code}',
+            })
+        return jsonify({'has_children': False, 'code': code, 'children': []})
+    except Exception as e:
+        logger.debug('ICD-10 specificity check failed: %s', e)
+        return jsonify({'has_children': False, 'children': []})
+
+
+# ======================================================================
+# LOINC Lab Reference Range Lookup
+# ======================================================================
+@intel_bp.route('/api/loinc/lookup')
+@login_required
+def loinc_lookup():
+    """Look up LOINC code properties including reference ranges."""
+    code = request.args.get('code', '').strip()
+    if not code:
+        return jsonify({'error': 'No LOINC code provided'})
+
+    try:
+        from app.services.api.loinc import LOINCService
+        from app.api_config import LOINC_USERNAME, LOINC_PASSWORD
+        svc = LOINCService(db, username=LOINC_USERNAME, password=LOINC_PASSWORD)
+        result = svc.lookup_code(code)
+        return jsonify(result or {'error': 'Code not found'})
+    except Exception as e:
+        logger.debug('LOINC lookup failed for %s: %s', code, e)
+        return jsonify({'error': 'LOINC service unavailable'})
+
+
+# ======================================================================
 # NEW-B: Abnormal Lab Interpretation Assistant
 # ======================================================================
 @intel_bp.route('/api/patient/<mrn>/lab-interpretation')

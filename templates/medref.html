@@ -1,27 +1,190 @@
 {% extends "base.html" %}
-{% block title %}Med Reference — NP Companion{% endblock %}
+{% block title %}Medication Reference — NP Companion{% endblock %}
 {% block page_id %}medref{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
     <h1 style="margin:0;">Medication Reference</h1>
-    <span class="badge badge--warning">Phase 3 — Coming Soon</span>
+    <span class="badge badge--success">API-Powered</span>
 </div>
 
-<div class="card" style="max-width:640px;">
-    <div class="card-header">Clinical Drug Reference</div>
-    <div class="card-body">
-        <p>The Med Reference module provides a searchable, locally-hosted drug reference:</p>
-        <ul style="margin:8px 0 0 20px;line-height:1.8;">
-            <li>Condition-based lookup — first-line and second-line options</li>
-            <li>Shared formulary notes with author and date</li>
-            <li>Pregnancy and renal filter context bar</li>
-            <li>Contraindication hiding when filters are active</li>
-            <li>Guideline update flag — yellow banner when review is needed</li>
-        </ul>
-        <p style="margin-top:16px;font-size:13px;color:var(--text-secondary);">
-            <strong>Phase 3</strong> — F10. No internet connection required.
-        </p>
+<div style="display:grid;grid-template-columns:360px 1fr;gap:20px;min-height:600px;">
+    {# ---- LEFT: Search Panel ---- #}
+    <div>
+        <div class="card" style="position:sticky;top:16px;">
+            <div class="card-header">Search</div>
+            <div class="card-body">
+                <input type="text" id="drug-search" class="form-input" placeholder="Drug name (e.g., lisinopril, metformin)..." autocomplete="off" style="margin-bottom:12px;">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <button class="btn btn-primary btn-sm" onclick="searchDrug()" id="search-btn">Search</button>
+                    <button class="btn btn-outline btn-sm" onclick="clearResults()">Clear</button>
+                </div>
+                <div id="search-suggestions" style="font-size:12px;"></div>
+                <div id="search-history" style="margin-top:12px;font-size:12px;color:var(--text-secondary);">
+                    <div style="font-weight:600;margin-bottom:4px;">Recent Searches</div>
+                    <div id="history-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- RIGHT: Drug Card ---- #}
+    <div id="drug-card-container">
+        <div class="card" style="min-height:500px;">
+            <div class="card-body" style="display:flex;align-items:center;justify-content:center;color:var(--text-secondary);">
+                <div style="text-align:center;">
+                    <div style="font-size:48px;margin-bottom:16px;">&#128138;</div>
+                    <p style="font-size:16px;margin:0 0 8px;">Search for a medication to view its complete profile</p>
+                    <p style="font-size:13px;">Data from RxNorm (NIH), OpenFDA, and FAERS — no patient data is sent externally.</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+var _searchHistory = JSON.parse(localStorage.getItem('medref_history') || '[]');
+renderHistory();
+
+document.getElementById('drug-search').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') searchDrug();
+});
+
+function searchDrug() {
+    var q = document.getElementById('drug-search').value.trim();
+    if (!q || q.length < 2) return;
+    var btn = document.getElementById('search-btn');
+    btn.disabled = true; btn.textContent = 'Searching...';
+    var container = document.getElementById('drug-card-container');
+    container.innerHTML = '<div class="card" style="min-height:500px;"><div class="card-body" style="text-align:center;padding:60px;"><span class="spinner" style="display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span><p style="margin-top:12px;color:var(--text-secondary);">Looking up ' + escapeHtml(q) + '...</p></div></div>';
+
+    fetch('/api/medref/lookup?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false; btn.textContent = 'Search';
+            if (data.error) {
+                container.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;color:var(--color-red);">' + escapeHtml(data.error) + '</div></div>';
+                return;
+            }
+            addToHistory(q);
+            renderDrugCard(data, container);
+        })
+        .catch(function() {
+            btn.disabled = false; btn.textContent = 'Search';
+            container.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;padding:40px;color:var(--color-red);">Search failed — check your connection.</div></div>';
+        });
+}
+
+function renderDrugCard(d, container) {
+    var html = '<div class="card" style="overflow:visible;">';
+    // Header
+    html += '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">';
+    html += '<div><span style="font-size:18px;font-weight:700;">' + escapeHtml(d.brand_name || d.generic_name || d.query) + '</span>';
+    if (d.generic_name && d.brand_name) html += '<span style="font-size:14px;color:var(--text-secondary);margin-left:8px;">(' + escapeHtml(d.generic_name) + ')</span>';
+    html += '</div>';
+    if (d.rxcui) html += '<span style="font-size:11px;color:var(--text-secondary);">RxCUI: ' + escapeHtml(d.rxcui) + '</span>';
+    html += '</div>';
+
+    html += '<div class="card-body" style="padding:0;">';
+
+    // Drug class and basic info
+    if (d.drug_class || d.dose_strength || d.dose_form || d.route) {
+        html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;gap:12px;flex-wrap:wrap;font-size:13px;">';
+        if (d.dose_strength) html += '<span class="badge badge--info">' + escapeHtml(d.dose_strength) + '</span>';
+        if (d.dose_form) html += '<span class="badge badge--info">' + escapeHtml(d.dose_form) + '</span>';
+        if (d.route) html += '<span class="badge badge--info">' + escapeHtml(d.route) + '</span>';
+        if (d.drug_class) html += '<span class="badge badge--muted">' + escapeHtml(d.drug_class) + '</span>';
+        html += '</div>';
+    }
+
+    // FDA Label sections
+    var sections = [
+        {key: 'indications', title: 'Indications & Usage', icon: '&#10003;', color: 'var(--color-green)'},
+        {key: 'dosage_admin', title: 'Dosage & Administration', icon: '&#128138;', color: 'var(--color-teal)'},
+        {key: 'boxed_warning', title: 'BLACK BOX WARNING', icon: '&#9888;', color: 'var(--color-red)', isCritical: true},
+        {key: 'warnings', title: 'Warnings & Precautions', icon: '&#9888;', color: 'var(--color-warning)'},
+        {key: 'contraindications', title: 'Contraindications', icon: '&#10007;', color: 'var(--color-red)'},
+        {key: 'adverse_reactions', title: 'Adverse Reactions', icon: '&#128165;', color: 'var(--text-secondary)'},
+        {key: 'drug_interactions', title: 'Drug Interactions', icon: '&#9889;', color: 'var(--color-warning)'},
+        {key: 'pregnancy', title: 'Pregnancy & Lactation', icon: '&#128118;', color: 'var(--color-navy)'},
+        {key: 'renal_hepatic', title: 'Renal / Hepatic Impairment', icon: '&#129516;', color: 'var(--color-navy)'},
+    ];
+
+    sections.forEach(function(s) {
+        var content = d.label ? d.label[s.key] : '';
+        if (!content) return;
+        var bgColor = s.isCritical ? 'rgba(220,38,38,0.06)' : 'transparent';
+        html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);background:' + bgColor + ';">';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+        html += '<span style="color:' + s.color + ';">' + s.icon + '</span>';
+        html += '<strong style="font-size:13px;' + (s.isCritical ? 'color:var(--color-red);text-transform:uppercase;' : '') + '">' + s.title + '</strong>';
+        html += '<span style="font-size:11px;color:var(--text-secondary);margin-left:auto;">click to expand</span>';
+        html += '</div>';
+        html += '<div style="display:' + (s.isCritical ? 'block' : 'none') + ';font-size:12px;line-height:1.6;max-height:200px;overflow-y:auto;">' + escapeHtml(content).substring(0, 2000) + '</div>';
+        html += '</div>';
+    });
+
+    // FAERS adverse events
+    if (d.faers && d.faers.length > 0) {
+        html += '<div style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);">';
+        html += '<strong style="font-size:13px;">&#128202; Real-World Side Effects (FDA FAERS, Top 5)</strong>';
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">';
+        d.faers.forEach(function(f) {
+            html += '<span style="font-size:12px;padding:4px 10px;border-radius:12px;background:var(--bg-muted,#f8fafc);border:1px solid var(--border);">' + escapeHtml(f.reaction) + ' <span style="color:var(--text-secondary);font-size:10px;">(' + f.count + ')</span></span>';
+        });
+        html += '</div>';
+        html += '<div style="font-size:10px;color:var(--text-secondary);margin-top:6px;">Source: FDA Adverse Event Reporting System (FAERS). Frequency reflects report volume, not incidence rate.</div>';
+        html += '</div>';
+    }
+
+    // Recall status
+    if (d.recalls && d.recalls.length > 0) {
+        html += '<div style="padding:12px 16px;background:rgba(220,38,38,0.04);border-bottom:1px solid var(--border,#e2e8f0);">';
+        html += '<strong style="font-size:13px;color:var(--color-red);">&#9888; Active FDA Recalls</strong>';
+        d.recalls.forEach(function(r) {
+            html += '<div style="margin-top:6px;font-size:12px;padding:6px 8px;background:rgba(220,38,38,0.06);border-radius:4px;">' +
+                '<strong>' + escapeHtml(r.classification || '') + '</strong>: ' + escapeHtml(r.reason || '').substring(0, 200) + '</div>';
+        });
+        html += '</div>';
+    }
+
+    html += '</div></div>';
+    container.innerHTML = html;
+}
+
+function addToHistory(q) {
+    _searchHistory = _searchHistory.filter(function(h) { return h.toLowerCase() !== q.toLowerCase(); });
+    _searchHistory.unshift(q);
+    if (_searchHistory.length > 10) _searchHistory = _searchHistory.slice(0, 10);
+    localStorage.setItem('medref_history', JSON.stringify(_searchHistory));
+    renderHistory();
+}
+
+function renderHistory() {
+    var el = document.getElementById('history-list');
+    if (!el) return;
+    if (_searchHistory.length === 0) { el.innerHTML = '<span style="color:var(--text-muted);">No recent searches</span>'; return; }
+    var html = '';
+    _searchHistory.forEach(function(h) {
+        html += '<a href="#" onclick="event.preventDefault();document.getElementById(\'drug-search\').value=\'' + escapeHtml(h).replace(/'/g, "\\'") + '\';searchDrug();" style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:10px;background:var(--bg-muted,#f8fafc);font-size:11px;color:var(--text-primary);text-decoration:none;border:1px solid var(--border,#e2e8f0);">' + escapeHtml(h) + '</a>';
+    });
+    el.innerHTML = html;
+}
+
+function clearResults() {
+    document.getElementById('drug-search').value = '';
+    document.getElementById('drug-card-container').innerHTML = '<div class="card" style="min-height:500px;"><div class="card-body" style="display:flex;align-items:center;justify-content:center;color:var(--text-secondary);"><div style="text-align:center;"><div style="font-size:48px;margin-bottom:16px;">&#128138;</div><p style="font-size:16px;margin:0;">Search for a medication to view its profile</p></div></div></div>';
+}
+
+function escapeHtml(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+</script>
+
+<style>
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
 {% endblock %}
