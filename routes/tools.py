@@ -150,6 +150,69 @@ def cs_pdmp_check(entry_id):
     return jsonify({'success': True})
 
 
+@tools_bp.route('/cs-tracker/<int:entry_id>/pdmp-lookup', methods=['POST'])
+@login_required
+def cs_pdmp_lookup(entry_id):
+    """Run an automated PDMP lookup for a CS tracker patient."""
+    entry = ControlledSubstanceEntry.query.filter_by(
+        id=entry_id, user_id=current_user.id
+    ).first()
+    if not entry:
+        return jsonify({'success': False, 'error': 'Entry not found'}), 404
+
+    # Get patient record for name/DOB
+    from models.patient import PatientRecord
+    patient = PatientRecord.query.filter_by(
+        user_id=current_user.id, mrn=entry.mrn
+    ).first() if entry.mrn else None
+
+    if not patient or not patient.patient_name:
+        return jsonify({
+            'success': False,
+            'error': 'Patient name and DOB required for PDMP lookup. Update patient demographics first.',
+        })
+
+    # Parse name into first/last
+    name_parts = (patient.patient_name or '').split(',')
+    if len(name_parts) >= 2:
+        last_name = name_parts[0].strip()
+        first_name = name_parts[1].strip().split()[0] if name_parts[1].strip() else ''
+    else:
+        parts = patient.patient_name.split()
+        first_name = parts[0] if parts else ''
+        last_name = parts[-1] if len(parts) > 1 else ''
+
+    # Parse DOB
+    dob_raw = patient.patient_dob or ''
+    dob_clean = dob_raw.replace('-', '').replace('/', '')
+    if len(dob_clean) >= 8:
+        dob = f'{dob_clean[:4]}-{dob_clean[4:6]}-{dob_clean[6:8]}'
+    else:
+        dob = dob_raw
+
+    if not first_name or not last_name:
+        return jsonify({'success': False, 'error': 'Could not parse patient name'})
+
+    try:
+        import asyncio
+        from flask import current_app
+        from scrapers.pdmp import PDMPScraper
+        scraper = PDMPScraper(current_app._get_current_object())
+        result = asyncio.run(scraper.lookup_patient(first_name, last_name, dob))
+
+        # Record the PDMP check regardless of success
+        entry.last_pdmp_check = date.today()
+        db.session.commit()
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'PDMP lookup failed: {str(e)}',
+            'prescriptions': [],
+        })
+
+
 @tools_bp.route('/cs-tracker/<int:entry_id>/uds', methods=['POST'])
 @login_required
 def cs_uds_check(entry_id):

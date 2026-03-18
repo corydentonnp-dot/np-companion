@@ -177,6 +177,29 @@ def billing_review(mrn):
 
 
 # ======================================================================
+# F31: Note Template Builder
+# ======================================================================
+@intel_bp.route('/reformatter/template')
+@login_required
+def reformatter_template():
+    """Note template builder — drag-drop section ordering."""
+    return render_template('reformatter_template.html')
+
+
+@intel_bp.route('/api/save-note-template', methods=['POST'])
+@login_required
+def save_note_template():
+    """Save user's custom note template to preferences."""
+    data = request.get_json(silent=True) or {}
+    template = data.get('template', {})
+    if template:
+        import json as _json
+        current_user.set_pref('note_template', _json.dumps(template))
+        db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
 # F31: Note Reformatter Wizard (full pipeline)
 # ======================================================================
 @intel_bp.route('/reformatter')

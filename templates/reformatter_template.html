@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Note Template Builder — NP Companion{% endblock %}
+{% block page_id %}reformatter-template{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Note Template Builder</h1>
+    <a href="/reformatter" class="btn btn-outline btn-sm">Back to Reformatter</a>
+</div>
+
+<p style="margin-bottom:24px;color:var(--text-secondary);max-width:700px;font-size:14px;">
+    Define your preferred note structure. Drag sections to reorder them. The Reformatter
+    will map parsed content into this template. Sections can be marked required or optional.
+</p>
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;max-width:1000px;">
+    {# ---- LEFT: Section List (draggable) ---- #}
+    <div>
+        <div class="card">
+            <div class="card-header">Template Sections (drag to reorder)</div>
+            <div class="card-body" style="padding:8px;" id="section-list">
+                {# Populated by JS from saved template or default #}
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+            <button class="btn btn-outline" onclick="resetToDefault()">Reset to Default</button>
+        </div>
+    </div>
+
+    {# ---- RIGHT: Preview ---- #}
+    <div>
+        <div class="card" style="position:sticky;top:16px;">
+            <div class="card-header">Preview</div>
+            <div class="card-body" id="template-preview" style="font-size:13px;font-family:monospace;white-space:pre-wrap;max-height:500px;overflow-y:auto;line-height:1.6;color:var(--text-secondary);"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tmpl-section{padding:10px 12px;margin:4px 0;background:var(--bg-surface,#fff);border:1px solid var(--border);border-radius:6px;cursor:grab;display:flex;align-items:center;gap:10px;transition:box-shadow .1s;}
+.tmpl-section:active{cursor:grabbing;box-shadow:0 4px 12px rgba(0,0,0,.15);}
+.tmpl-section.dragging{opacity:0.5;}
+.tmpl-grip{color:var(--text-muted);font-size:16px;cursor:grab;user-select:none;}
+.tmpl-label{flex:1;font-weight:500;font-size:13px;}
+.tmpl-controls{display:flex;gap:6px;align-items:center;font-size:11px;}
+</style>
+
+<script>
+var DEFAULT_SECTIONS = [
+    {key:'Chief Complaint', label:'Chief Complaint', required:true, boilerplate:'', enabled:true},
+    {key:'History of Present Illness', label:'HPI', required:true, boilerplate:'', enabled:true},
+    {key:'Past Medical History', label:'Past Medical History', required:false, boilerplate:'', enabled:true},
+    {key:'Past Surgical History', label:'Past Surgical History', required:false, boilerplate:'', enabled:true},
+    {key:'Family History', label:'Family History', required:false, boilerplate:'', enabled:true},
+    {key:'Social History', label:'Social History', required:false, boilerplate:'', enabled:true},
+    {key:'Medications', label:'Current Medications', required:true, boilerplate:'', enabled:true},
+    {key:'Allergies', label:'Allergies', required:true, boilerplate:'', enabled:true},
+    {key:'Review of Systems', label:'Review of Systems', required:false, boilerplate:'', enabled:true},
+    {key:'Physical Examination', label:'Physical Examination', required:true, boilerplate:'', enabled:true},
+    {key:'Labs', label:'Labs / Diagnostics', required:false, boilerplate:'', enabled:true},
+    {key:'Assessment', label:'Assessment', required:true, boilerplate:'', enabled:true},
+    {key:'Plan', label:'Plan', required:true, boilerplate:'', enabled:true},
+    {key:'Follow-up', label:'Follow-Up', required:false, boilerplate:'', enabled:true},
+    {key:'Health Maintenance', label:'Health Maintenance', required:false, boilerplate:'', enabled:false},
+    {key:'Immunizations', label:'Immunizations', required:false, boilerplate:'', enabled:false},
+];
+
+var _sections = JSON.parse(localStorage.getItem('note_template') || 'null') || JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
+
+renderSections();
+renderPreview();
+
+function renderSections() {
+    var el = document.getElementById('section-list');
+    var html = '';
+    _sections.forEach(function(s, i) {
+        html += '<div class="tmpl-section" draggable="true" data-idx="' + i + '" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropSection(event)">';
+        html += '<span class="tmpl-grip">&#9776;</span>';
+        html += '<span class="tmpl-label">' + esc(s.label) + ' <span style="font-size:10px;color:var(--text-muted);">(' + esc(s.key) + ')</span></span>';
+        html += '<div class="tmpl-controls">';
+        html += '<label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" ' + (s.enabled ? 'checked' : '') + ' onchange="toggleEnabled(' + i + ',this.checked)"> On</label>';
+        html += '<label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" ' + (s.required ? 'checked' : '') + ' onchange="toggleRequired(' + i + ',this.checked)"> Req</label>';
+        html += '</div></div>';
+    });
+    el.innerHTML = html;
+}
+
+function renderPreview() {
+    var el = document.getElementById('template-preview');
+    var lines = [];
+    _sections.forEach(function(s) {
+        if (!s.enabled) return;
+        lines.push(s.label + ':');
+        lines.push(s.boilerplate || '  [content]');
+        lines.push('');
+    });
+    el.textContent = lines.join('\n') || 'No sections enabled';
+}
+
+// Drag and drop reordering
+var _dragIdx = null;
+function dragStart(e) { _dragIdx = parseInt(e.target.closest('.tmpl-section').getAttribute('data-idx')); e.dataTransfer.effectAllowed = 'move'; }
+function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function dropSection(e) {
+    e.preventDefault();
+    var dropIdx = parseInt(e.target.closest('.tmpl-section').getAttribute('data-idx'));
+    if (_dragIdx === null || _dragIdx === dropIdx) return;
+    var item = _sections.splice(_dragIdx, 1)[0];
+    _sections.splice(dropIdx, 0, item);
+    _dragIdx = null;
+    renderSections();
+    renderPreview();
+}
+
+function toggleEnabled(i, val) { _sections[i].enabled = val; renderPreview(); }
+function toggleRequired(i, val) { _sections[i].required = val; }
+
+function saveTemplate() {
+    localStorage.setItem('note_template', JSON.stringify(_sections));
+    // Also save to server
+    fetch('/api/save-note-template', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({template:{name:'My Template',sections:_sections}})
+    }).then(function(){
+        alert('Template saved!');
+    });
+}
+
+function resetToDefault() {
+    if (!confirm('Reset to default template? Your customizations will be lost.')) return;
+    _sections = JSON.parse(JSON.stringify(DEFAULT_SECTIONS));
+    localStorage.removeItem('note_template');
+    renderSections();
+    renderPreview();
+}
+
+function esc(s) { if(!s)return''; var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+</script>
+{% endblock %}

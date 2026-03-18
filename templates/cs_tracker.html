@@ -65,7 +65,8 @@
                     </td>
                     <td style="white-space:nowrap;">
                         <button class="btn btn-sm btn-primary" onclick="recordFill({{ e.id }})" style="font-size:11px;">Fill</button>
-                        <button class="btn btn-sm btn-outline" onclick="recordPDMP({{ e.id }})" style="font-size:11px;" title="Record PDMP check">PDMP</button>
+                        <button class="btn btn-sm btn-outline" onclick="recordPDMP({{ e.id }})" style="font-size:11px;" title="Record manual PDMP check">PDMP</button>
+                        <button class="btn btn-sm btn-outline" onclick="autoPDMP({{ e.id }})" style="font-size:11px;color:var(--color-teal);" title="Auto-lookup via VA PDMP portal">Auto</button>
                         <button class="btn btn-sm btn-outline" onclick="recordUDS({{ e.id }})" style="font-size:11px;" title="Record UDS">UDS</button>
                     </td>
                 </tr>
@@ -147,6 +148,33 @@ function recordPDMP(id) {
 function recordUDS(id) {
     if (!confirm('Record UDS as of today?')) return;
     fetch('/cs-tracker/' + id + '/uds', {method:'POST'}).then(function(){location.reload();});
+}
+function autoPDMP(id) {
+    if (!confirm('Run automated PDMP lookup for this patient?\nThis will connect to virginia.pmpaware.net.')) return;
+    var btn = event.target;
+    btn.disabled = true; btn.textContent = 'Checking...';
+    fetch('/cs-tracker/' + id + '/pdmp-lookup', {method:'POST',headers:{'Content-Type':'application/json'}})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            btn.disabled = false; btn.textContent = 'Auto';
+            if (d.success && d.prescriptions && d.prescriptions.length > 0) {
+                var msg = 'PDMP Results (' + d.prescriptions.length + ' prescription(s)):\n\n';
+                d.prescriptions.forEach(function(rx) {
+                    msg += rx.date_filled + ' | ' + rx.drug_name + ' | Qty: ' + rx.quantity + ' | ' + rx.days_supply + 'd | ' + rx.prescriber + '\n';
+                });
+                alert(msg);
+                location.reload();
+            } else if (d.success) {
+                alert('PDMP check complete — no controlled substance prescriptions found.');
+                location.reload();
+            } else {
+                alert('PDMP lookup: ' + (d.error || 'Unknown error'));
+            }
+        })
+        .catch(function(){
+            btn.disabled = false; btn.textContent = 'Auto';
+            alert('PDMP connection failed');
+        });
 }
 </script>
 {% endblock %}

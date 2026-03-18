@@ -55,6 +55,126 @@ def admin_dashboard():
 
 
 # ======================================================================
+# GET /admin/practice — Practice-wide analytics (F29)
+# ======================================================================
+@admin_bp.route('/admin/practice')
+@login_required
+@_require_admin
+def practice_overview():
+    """Multi-provider practice analytics dashboard."""
+    from models.patient import PatientRecord, PatientDiagnosis
+    from models.caregap import CareGap
+    from models.labtrack import LabTrack
+    from models.tools import ControlledSubstanceEntry, ReferralLetter
+    from models.billing import BillingOpportunity
+
+    # Aggregate metrics
+    all_providers = User.query.filter_by(is_active_account=True, role='provider').all()
+    if not all_providers:
+        all_providers = User.query.filter_by(is_active_account=True).all()
+
+    total_patients = PatientRecord.query.count()
+    active_providers = len(all_providers)
+
+    all_gaps = CareGap.query.all()
+    total_open_gaps = sum(1 for g in all_gaps if not g.is_addressed)
+    total_addressed = sum(1 for g in all_gaps if g.is_addressed)
+    total_gaps = len(all_gaps)
+    gap_compliance_pct = round(total_addressed / total_gaps * 100) if total_gaps > 0 else 100
+
+    overdue_labs = LabTrack.query.filter(
+        LabTrack.status.in_(['overdue', 'critical'])
+    ).count()
+
+    overdue_referrals = ReferralLetter.query.filter_by(
+        consultation_received=False
+    ).count()
+    # Only count those >6 weeks old
+    from datetime import timedelta as _td
+    cutoff = date.today() - _td(days=42)
+    overdue_referrals = ReferralLetter.query.filter(
+        ReferralLetter.consultation_received == False,
+        ReferralLetter.referral_date.isnot(None),
+        ReferralLetter.referral_date <= cutoff,
+    ).count()
+
+    # Per-provider stats
+    provider_stats = []
+    for prov in all_providers:
+        panel = PatientRecord.query.filter_by(claimed_by=prov.id).count()
+        p_gaps = CareGap.query.filter_by(user_id=prov.id).all()
+        p_open = sum(1 for g in p_gaps if not g.is_addressed)
+        p_total = len(p_gaps)
+        p_compliance = round((p_total - p_open) / p_total * 100) if p_total > 0 else 100
+
+        p_overdue_labs = LabTrack.query.filter(
+            LabTrack.user_id == prov.id,
+            LabTrack.status.in_(['overdue', 'critical'])
+        ).count()
+
+        p_overdue_refs = ReferralLetter.query.filter(
+            ReferralLetter.user_id == prov.id,
+            ReferralLetter.consultation_received == False,
+            ReferralLetter.referral_date.isnot(None),
+            ReferralLetter.referral_date <= cutoff,
+        ).count()
+
+        p_billing = BillingOpportunity.query.filter_by(
+            user_id=prov.id, status='pending'
+        ).count()
+
+        p_cs = ControlledSubstanceEntry.query.filter_by(
+            user_id=prov.id, is_active=True
+        ).count()
+
+        provider_stats.append({
+            'name': prov.display_name or prov.username,
+            'panel_size': panel,
+            'open_gaps': p_open,
+            'gap_compliance': p_compliance,
+            'overdue_labs': p_overdue_labs,
+            'overdue_referrals': p_overdue_refs,
+            'billing_pending': p_billing,
+            'cs_patients': p_cs,
+        })
+
+    # Gap compliance by type
+    gap_types = {}
+    for g in all_gaps:
+        gt = g.gap_type or g.gap_name or 'Unknown'
+        if gt not in gap_types:
+            gap_types[gt] = {'total': 0, 'addressed': 0, 'open': 0}
+        gap_types[gt]['total'] += 1
+        if g.is_addressed:
+            gap_types[gt]['addressed'] += 1
+        else:
+            gap_types[gt]['open'] += 1
+
+    gap_by_type = []
+    for gt, counts in sorted(gap_types.items()):
+        pct = round(counts['addressed'] / counts['total'] * 100) if counts['total'] > 0 else 0
+        gap_by_type.append({
+            'type': gt,
+            'total': counts['total'],
+            'addressed': counts['addressed'],
+            'open': counts['open'],
+            'pct': pct,
+        })
+
+    return render_template(
+        'admin_practice.html',
+        total_patients=total_patients,
+        active_providers=active_providers,
+        total_open_gaps=total_open_gaps,
+        gap_compliance_pct=gap_compliance_pct,
+        overdue_labs=overdue_labs,
+        overdue_referrals=overdue_referrals,
+        provider_stats=provider_stats,
+        gap_by_type=gap_by_type,
+    )
+
+
+# ======================================================================
 # GET /admin/sitemap — Developer Site Map
 # ======================================================================
 @admin_bp.route('/admin/sitemap')
