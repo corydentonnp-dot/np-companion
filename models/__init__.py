@@ -44,3 +44,4 @@ from models.patient import (
     PatientDiagnosis, PatientAllergy, PatientImmunization,
     PatientNoteDraft, PatientSpecialist, Icd10Cache, RxNormCache,
 )
+from models.billing import BillingOpportunity, BillingRuleCache
