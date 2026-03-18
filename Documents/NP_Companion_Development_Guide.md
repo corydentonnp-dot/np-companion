@@ -1935,3 +1935,70 @@ When you get stuck — and you will — paste the error into Claude with this ex
 | You now have everything you need to build this. Start with Phase 1, Feature 1\. One step at a time. |
 | :---: |
 
+---
+
+## ADDENDUM: Feature F32 — Clinical Terminology Spell Check & Fuzzy Matcher
+
+**Added:** 2026-03-18 (CL23 API Intelligence Build)
+**Phase:** 10A (Intelligence Layer)
+**Status:** Implemented
+
+### Overview
+
+Medical-aware spell checking and fuzzy matching for free text in clinical notes. Handles misspelled drug names, diagnoses, medical abbreviations, and clinical slang. Provider-approved corrections prevent silent errors while saving documentation time.
+
+### How It Works
+
+1. **Text Analysis** — When provider clicks "Check Terminology" in the Note Generator widget, all note section text is sent to the spell check service (no PHI leaves the system — only the text content).
+
+2. **Multi-Layer Matching:**
+   - **Layer 1 — Abbreviation Dictionary** (~200 entries): Exact-match medical abbreviations (HTN→hypertension, DM2→type 2 diabetes mellitus, CTAB→clear to auscultation bilaterally, etc.)
+   - **Layer 2 — Known Misspelling Dictionary** (~100 entries): Common clinical misspellings (lisinipril→lisinopril, hypothyriodism→hypothyroidism, etc.)
+   - **Layer 3 — Local Fuzzy Match**: Python `difflib.SequenceMatcher` against combined dictionaries (cutoff 0.75)
+   - **Layer 4 — RxNorm API Fuzzy Match**: For unresolved 6+ character words that look clinical, queries RxNorm `getSpellingSuggestions` endpoint
+
+3. **Confidence Scoring:**
+   - **High (≥85%)** — abbreviation exact matches, known misspelling matches → auto-accept recommended
+   - **Medium (60-85%)** — fuzzy matches → flagged for provider review
+   - **Below 60%** — filtered out to prevent false positives
+
+4. **Provider Approval Workflow:**
+   - Each finding shows: original word, suggested correction, confidence score, context, category
+   - Provider clicks "Accept" to apply correction to note text, or "Ignore" to skip
+   - Corrections are applied in-place to the note textarea content
+
+### Routes
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/spell-check` | POST | Analyze text, return findings with confidence scores |
+| `/api/spell-check/expand` | POST | Expand a single abbreviation |
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `app/services/clinical_spell_check.py` | Core matching engine with dictionaries |
+| `routes/intelligence.py` | API endpoints |
+| `templates/patient_chart.html` | "Check Terminology" button + results UI in Note Generator widget |
+
+### Dictionary Categories
+
+| Category | Count | Examples |
+|----------|-------|---------|
+| Diagnosis abbreviations | ~70 | HTN, DM2, CHF, CKD, COPD, GERD, BPH, OSA |
+| Clinical shorthand | ~50 | yo, hx, sx, tx, rx, dx, prn, bid, tid, qid |
+| Physical exam terms | ~20 | WNL, NAD, CTAB, RRR, NTND, PERRLA, EOMI |
+| Drug abbreviations | ~30 | ASA, APAP, NSAID, ACEI, ARB, CCB, SSRI, PPI |
+| Lab abbreviations | ~30 | CBC, BMP, CMP, LFTs, TFTs, A1c, TSH, INR |
+| Drug misspellings | ~50 | lisinipril, metforman, atorvistatin, gabapenton |
+| Diagnosis misspellings | ~40 | hypertention, diabeties, hypothyriodism, nueropathy |
+
+### Safety Notes
+
+- No patient identifiers are included in the text analysis
+- The spell check service runs locally — no text is sent to external APIs
+- RxNorm fuzzy matching (Layer 4) sends only individual words, never patient context
+- All corrections require explicit provider approval — no auto-correction without consent
+- Abbreviation expansion is informational; original abbreviation is preserved if provider prefers
+

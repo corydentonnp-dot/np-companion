@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Billing Review — NP Companion{% endblock %}
+{% block page_id %}billing-review{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Post-Visit Billing Review</h1>
+    {% if record %}
+    <span style="font-size:14px;color:var(--text-secondary);">{{ record.patient_name or 'Patient' }} (MRN: {{ mrn }})</span>
+    {% endif %}
+    <a href="/patient/{{ mrn }}" class="btn btn-outline btn-sm">Back to Chart</a>
+</div>
+
+{% if opportunities %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        Billing Opportunities
+        <span class="badge badge--info" style="margin-left:8px;">{{ opportunities|length }}</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="schedule-table" style="font-size:13px;">
+            <thead>
+                <tr>
+                    <th>Visit Date</th>
+                    <th>Type</th>
+                    <th>Codes</th>
+                    <th>Est. Revenue</th>
+                    <th>Confidence</th>
+                    <th>Eligibility Basis</th>
+                    <th>Documentation Required</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for opp in opportunities %}
+                <tr>
+                    <td>{{ opp.visit_date.strftime('%m/%d/%Y') if opp.visit_date else '—' }}</td>
+                    <td><span class="badge badge--info">{{ opp.opportunity_type }}</span></td>
+                    <td class="mono" style="font-size:11px;">{{ opp.applicable_codes }}</td>
+                    <td style="font-weight:600;color:var(--color-green,#27ae60);">~${{ "%.0f"|format(opp.estimated_revenue or 0) }}</td>
+                    <td>
+                        {% if opp.confidence_level == 'HIGH' %}
+                        <span class="badge badge--success">HIGH</span>
+                        {% elif opp.confidence_level == 'MEDIUM' %}
+                        <span class="badge badge--warning">MED</span>
+                        {% else %}
+                        <span class="badge badge--muted">LOW</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:12px;">{{ opp.eligibility_basis or '—' }}</td>
+                    <td style="font-size:12px;">{{ opp.documentation_required or '—' }}</td>
+                    <td>
+                        {% if opp.status == 'captured' %}
+                        <span class="badge badge--success">Captured</span>
+                        {% elif opp.status == 'dismissed' %}
+                        <span class="badge badge--muted">Dismissed</span>
+                        {% elif opp.status == 'pending' %}
+                        <span class="badge badge--warning">Pending</span>
+                        {% else %}
+                        <span class="badge badge--info">{{ opp.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        {% if opp.status == 'pending' or opp.status == 'partial' %}
+                        <button class="btn btn-sm btn-primary" style="font-size:11px;" onclick="captureOpp({{ opp.id }})">Capture</button>
+                        <button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="dismissOpp({{ opp.id }})">Dismiss</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div style="font-size:12px;color:var(--text-secondary);max-width:700px;padding:12px;background:var(--bg-muted,#f8fafc);border-radius:6px;">
+    Estimates use CY2025 CMS national average non-facility rates. Actual reimbursement depends on payer contract.
+    This tool provides informational billing suggestions only — all billing decisions require provider review.
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
+        <p style="font-size:16px;margin-bottom:8px;">No billing opportunities found for this patient</p>
+        <p style="font-size:13px;">Billing opportunities are generated during the overnight prep job (8 PM) for next-day appointments.</p>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function captureOpp(id) {
+    fetch('/api/billing/opportunity/' + id + '/capture', {method:'POST',headers:{'Content-Type':'application/json'}})
+        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+}
+function dismissOpp(id) {
+    var reason = prompt('Dismiss reason (optional):');
+    if (reason === null) return;
+    fetch('/api/billing/opportunity/' + id + '/dismiss', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})})
+        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+}
+</script>
+{% endblock %}

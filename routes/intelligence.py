@@ -101,6 +101,82 @@ def patient_billing(mrn):
 
 
 # ======================================================================
+# Clinical Spell Check / Fuzzy Matcher
+# ======================================================================
+@intel_bp.route('/api/spell-check', methods=['POST'])
+@login_required
+def spell_check():
+    """
+    Analyze free text for medical terminology issues: abbreviations,
+    misspellings, drug name fuzzy matches, diagnosis fuzzy matches.
+    Returns findings with confidence scores for provider review.
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+    use_api = data.get('use_api', True)
+
+    if not text:
+        return jsonify({'findings': []})
+
+    try:
+        from app.services.clinical_spell_check import analyze_text
+        findings = analyze_text(text, use_api=use_api)
+        return jsonify({
+            'findings': findings,
+            'total': len(findings),
+            'high_confidence': len([f for f in findings if f['confidence'] >= 0.85]),
+            'needs_review': len([f for f in findings if 0.6 <= f['confidence'] < 0.85]),
+        })
+    except Exception as e:
+        logger.debug('Spell check failed: %s', e)
+        return jsonify({'findings': [], 'error': str(e)})
+
+
+@intel_bp.route('/api/spell-check/expand', methods=['POST'])
+@login_required
+def spell_check_expand():
+    """Expand a single medical abbreviation."""
+    data = request.get_json(silent=True) or {}
+    abbrev = (data.get('abbreviation') or '').strip()
+    if not abbrev:
+        return jsonify({'expansion': None})
+
+    from app.services.clinical_spell_check import expand_abbreviation
+    expansion = expand_abbreviation(abbrev)
+    return jsonify({'abbreviation': abbrev, 'expansion': expansion})
+
+
+# ======================================================================
+# Post-Visit Billing Review
+# ======================================================================
+@intel_bp.route('/billing/review/<mrn>')
+@login_required
+def billing_review(mrn):
+    """Post-visit billing review for a specific patient."""
+    from models.billing import BillingOpportunity
+
+    opportunities = (
+        BillingOpportunity.query
+        .filter_by(user_id=current_user.id)
+        .filter(BillingOpportunity.patient_mrn_hash.like(f'%{mrn[-6:]}%') if len(mrn) > 6 else BillingOpportunity.patient_mrn_hash != '')
+        .order_by(BillingOpportunity.visit_date.desc())
+        .limit(20)
+        .all()
+    )
+
+    record = PatientRecord.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+
+    return render_template(
+        'billing_review.html',
+        mrn=mrn,
+        record=record,
+        opportunities=opportunities,
+    )
+
+
+# ======================================================================
 # API Setup Guide (accessible to all authenticated users)
 # ======================================================================
 @intel_bp.route('/api-setup-guide')

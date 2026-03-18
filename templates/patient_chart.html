@@ -432,11 +432,13 @@
                     </label>
                     {% endfor %}
                 </div>
-                <div style="display:flex;gap:8px;margin-top:10px;">
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
                     <button class="btn btn-primary btn-sm" onclick="generateNote()">&#9881; Generate Selected</button>
                     <button class="btn btn-outline btn-sm" onclick="copyAllSections()">&#128203; Copy All</button>
                     <button class="btn btn-outline btn-sm" onclick="saveDraft()">&#128190; Save Draft</button>
+                    <button class="btn btn-outline btn-sm" onclick="runSpellCheck()" id="spell-check-btn" style="color:var(--color-teal);">&#128300; Check Terminology</button>
                 </div>
+                <div id="spell-check-results" style="display:none;margin-top:10px;padding:10px;background:var(--bg-muted,#f8fafc);border-radius:6px;border:1px solid var(--border);font-size:12px;max-height:300px;overflow-y:auto;"></div>
             </div>
             <div id="note-gen-status" style="display:none;padding:6px 10px;border-radius:4px;margin-top:8px;font-size:12px;"></div>
             <div id="note-sections" style="margin-top:12px;">
@@ -1225,6 +1227,84 @@ function saveDraft() {
     }).then(function(r){ return r.json(); }).then(function(d){
         showNoteStatus(d.success ? 'Draft saved!' : 'Save failed.', d.success ? 'success' : 'error');
     });
+}
+
+/* ---- Clinical Terminology Spell Check ---- */
+function runSpellCheck() {
+    var btn = document.getElementById('spell-check-btn');
+    var resultsEl = document.getElementById('spell-check-results');
+    btn.disabled = true; btn.textContent = 'Checking...';
+
+    // Collect all note section text
+    var allText = '';
+    document.querySelectorAll('#note-sections textarea').forEach(function(ta) {
+        allText += ta.value + '\n';
+    });
+
+    if (!allText.trim()) {
+        btn.disabled = false; btn.textContent = '\u{1F50D} Check Terminology';
+        resultsEl.style.display = 'block';
+        resultsEl.innerHTML = '<div style="color:var(--text-secondary);text-align:center;">No note text to check.</div>';
+        return;
+    }
+
+    fetch('/api/spell-check', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: allText, use_api: true})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false; btn.textContent = '\u{1F50D} Check Terminology';
+        var findings = data.findings || [];
+        resultsEl.style.display = 'block';
+
+        if (findings.length === 0) {
+            resultsEl.innerHTML = '<div style="color:var(--color-green);text-align:center;padding:8px;">\u2713 No terminology issues found. All terms recognized.</div>';
+            return;
+        }
+
+        var html = '<div style="font-weight:600;margin-bottom:8px;">Found ' + findings.length + ' terminology item(s):</div>';
+        html += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">High confidence (\u226585%) items can be auto-accepted. Medium confidence (60-85%) items need your review.</div>';
+
+        findings.forEach(function(f, i) {
+            var confColor = f.confidence >= 0.85 ? 'var(--color-green)' : f.confidence >= 0.7 ? 'var(--color-warning)' : 'var(--text-secondary)';
+            var confPct = Math.round(f.confidence * 100);
+            var catLabel = {'abbreviation':'Abbreviation','misspelling':'Misspelling','drug_fuzzy':'Drug Match','diagnosis_fuzzy':'Diagnosis Match'}[f.category] || f.category;
+
+            html += '<div style="padding:8px;margin:4px 0;background:var(--bg-surface,#fff);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;gap:10px;">';
+            html += '<div style="flex:1;">';
+            html += '<span style="font-weight:600;color:var(--color-red);text-decoration:line-through;">' + escHtml(f.original) + '</span>';
+            html += ' \u2192 <span style="font-weight:600;color:var(--color-green);">' + escHtml(f.suggested) + '</span>';
+            html += '<div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">';
+            html += '<span class="badge" style="font-size:9px;padding:1px 5px;border-radius:6px;background:var(--bg-muted);color:' + confColor + ';">' + catLabel + ' ' + confPct + '%</span>';
+            if (f.context) html += ' <span style="font-style:italic;">"' + escHtml(f.context).substring(0, 60) + '"</span>';
+            html += '</div></div>';
+            html += '<button class="btn btn-sm btn-primary" style="font-size:10px;" onclick="acceptSpellFix(' + i + ',\'' + escHtml(f.original).replace(/'/g, "\\'") + '\',\'' + escHtml(f.suggested).replace(/'/g, "\\'") + '\')">Accept</button>';
+            html += '<button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="this.parentElement.style.display=\'none\'">Ignore</button>';
+            html += '</div>';
+        });
+
+        resultsEl.innerHTML = html;
+    })
+    .catch(function() {
+        btn.disabled = false; btn.textContent = '\u{1F50D} Check Terminology';
+        resultsEl.style.display = 'block';
+        resultsEl.innerHTML = '<div style="color:var(--color-red);text-align:center;">Spell check service unavailable.</div>';
+    });
+}
+
+function acceptSpellFix(idx, original, suggested) {
+    // Replace the original text with the suggestion in all note textareas
+    document.querySelectorAll('#note-sections textarea').forEach(function(ta) {
+        if (ta.value.indexOf(original) !== -1) {
+            ta.value = ta.value.split(original).join(suggested);
+        }
+    });
+    // Remove the finding card
+    var cards = document.querySelectorAll('#spell-check-results > div > div');
+    // Just re-run the check to refresh
+    showNoteStatus('Applied: ' + original + ' \u2192 ' + suggested, 'success');
 }
 
 function showNoteStatus(msg, type) {
