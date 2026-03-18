@@ -329,6 +329,24 @@ def index():
         .all()
     )
 
+    # Billing opportunities for today's scheduled patients
+    billing_opportunities = []
+    total_estimated_revenue = 0.0
+    try:
+        from models.billing import BillingOpportunity
+        billing_opportunities = (
+            BillingOpportunity.query
+            .filter_by(user_id=current_user.id, visit_date=view_date)
+            .filter(BillingOpportunity.status.in_(['pending', 'partial']))
+            .order_by(BillingOpportunity.estimated_revenue.desc())
+            .all()
+        )
+        total_estimated_revenue = sum(
+            o.estimated_revenue or 0 for o in billing_opportunities
+        )
+    except Exception:
+        pass
+
     return render_template(
         'dashboard.html',
         appointments=appointments,
@@ -344,6 +362,8 @@ def index():
         is_today=(view_date == today),
         care_gap_counts=care_gap_counts,
         my_patients=my_patients,
+        billing_opportunities=billing_opportunities,
+        total_estimated_revenue=total_estimated_revenue,
     )
 
 

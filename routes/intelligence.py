@@ -36,6 +36,71 @@ intel_bp = Blueprint('intelligence', __name__)
 
 
 # ======================================================================
+# Billing Opportunity Actions (capture / dismiss)
+# ======================================================================
+@intel_bp.route('/api/billing/opportunity/<int:opp_id>/capture', methods=['POST'])
+@login_required
+def capture_opportunity(opp_id):
+    """Mark a billing opportunity as captured (provider documented and billed)."""
+    from models.billing import BillingOpportunity
+    opp = BillingOpportunity.query.filter_by(
+        id=opp_id, user_id=current_user.id
+    ).first()
+    if not opp:
+        return jsonify({'success': False, 'error': 'Opportunity not found'}), 404
+    opp.mark_captured()
+    db.session.commit()
+    return jsonify({'success': True, 'status': opp.status})
+
+
+@intel_bp.route('/api/billing/opportunity/<int:opp_id>/dismiss', methods=['POST'])
+@login_required
+def dismiss_opportunity(opp_id):
+    """Dismiss a billing opportunity with an optional reason."""
+    from models.billing import BillingOpportunity
+    data = request.get_json(silent=True) or {}
+    opp = BillingOpportunity.query.filter_by(
+        id=opp_id, user_id=current_user.id
+    ).first()
+    if not opp:
+        return jsonify({'success': False, 'error': 'Opportunity not found'}), 404
+    opp.dismiss(reason=data.get('reason', ''))
+    db.session.commit()
+    return jsonify({'success': True, 'status': opp.status})
+
+
+@intel_bp.route('/api/patient/<mrn>/billing-opportunities')
+@login_required
+def patient_billing(mrn):
+    """Return billing opportunities for a specific patient (for chart widget)."""
+    from models.billing import BillingOpportunity
+    from utils import safe_patient_id
+    try:
+        mrn_hash = safe_patient_id(mrn)
+    except ValueError:
+        return jsonify({'opportunities': []})
+
+    opps = BillingOpportunity.query.filter(
+        BillingOpportunity.user_id == current_user.id,
+        BillingOpportunity.patient_mrn_hash == mrn_hash,
+        BillingOpportunity.status.in_(['pending', 'partial']),
+    ).order_by(BillingOpportunity.estimated_revenue.desc()).all()
+
+    return jsonify({
+        'opportunities': [{
+            'id': o.id,
+            'type': o.opportunity_type,
+            'codes': o.applicable_codes,
+            'revenue': o.estimated_revenue or 0,
+            'confidence': o.confidence_level,
+            'basis': o.eligibility_basis or '',
+            'documentation': o.documentation_required or '',
+            'insurer_caveat': o.insurer_caveat or '',
+        } for o in opps]
+    })
+
+
+# ======================================================================
 # API Setup Guide (accessible to all authenticated users)
 # ======================================================================
 @intel_bp.route('/api-setup-guide')
@@ -43,6 +108,120 @@ intel_bp = Blueprint('intelligence', __name__)
 def api_setup_guide():
     """Display the provider-facing API setup instructions."""
     return render_template('api_setup_guide.html')
+
+
+# ======================================================================
+# NEW-B: Abnormal Lab Interpretation Assistant
+# ======================================================================
+@intel_bp.route('/api/patient/<mrn>/lab-interpretation')
+@login_required
+def lab_interpretation(mrn):
+    """
+    Return lab interpretation context: LOINC reference ranges and
+    medication cross-reference for abnormal values.
+    """
+    from models.labtrack import LabTrack
+
+    tracks = LabTrack.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).all()
+
+    if not tracks:
+        return jsonify({'interpretations': []})
+
+    medications = PatientMedication.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).all()
+    med_names = [m.drug_name.split()[0].lower() for m in medications if m.drug_name]
+
+    interpretations = []
+    for track in tracks:
+        # Get latest result
+        latest = None
+        if track.results:
+            sorted_results = sorted(track.results, key=lambda r: r.result_date or datetime.min, reverse=True)
+            latest = sorted_results[0] if sorted_results else None
+
+        if not latest or not latest.result_value:
+            continue
+
+        # Try to parse numeric value
+        try:
+            value = float(latest.result_value.replace(',', '').strip())
+        except (ValueError, TypeError):
+            continue
+
+        interp = {
+            'lab_name': track.lab_name,
+            'value': latest.result_value,
+            'date': latest.result_date.strftime('%m/%d/%Y') if latest.result_date else '',
+            'status': track.status,
+            'is_abnormal': False,
+            'direction': '',
+            'context': '',
+            'reference_range': '',
+            'drug_context': [],
+        }
+
+        # Check against provider-set thresholds
+        if track.alert_low and value < track.alert_low:
+            interp['is_abnormal'] = True
+            interp['direction'] = 'low'
+        elif track.alert_high and value > track.alert_high:
+            interp['is_abnormal'] = True
+            interp['direction'] = 'high'
+        elif track.critical_low and value < track.critical_low:
+            interp['is_abnormal'] = True
+            interp['direction'] = 'critically low'
+        elif track.critical_high and value > track.critical_high:
+            interp['is_abnormal'] = True
+            interp['direction'] = 'critically high'
+
+        if track.alert_low or track.alert_high:
+            lo = str(track.alert_low) if track.alert_low else ''
+            hi = str(track.alert_high) if track.alert_high else ''
+            interp['reference_range'] = f"{lo} – {hi}"
+
+        # Cross-reference with medications for abnormal labs
+        if interp['is_abnormal']:
+            # Common lab-medication associations
+            LAB_DRUG_ASSOCIATIONS = {
+                'potassium': ['lisinopril', 'losartan', 'enalapril', 'spironolactone', 'trimethoprim'],
+                'creatinine': ['lisinopril', 'losartan', 'ibuprofen', 'naproxen', 'metformin'],
+                'glucose': ['metformin', 'glipizide', 'insulin', 'prednisone', 'dexamethasone'],
+                'hemoglobin a1c': ['metformin', 'glipizide', 'insulin', 'semaglutide', 'empagliflozin'],
+                'a1c': ['metformin', 'glipizide', 'insulin', 'semaglutide', 'empagliflozin'],
+                'tsh': ['levothyroxine', 'liothyronine', 'amiodarone', 'lithium'],
+                'alt': ['atorvastatin', 'rosuvastatin', 'simvastatin', 'methotrexate', 'acetaminophen'],
+                'ast': ['atorvastatin', 'rosuvastatin', 'simvastatin', 'methotrexate'],
+                'inr': ['warfarin'],
+                'platelets': ['warfarin', 'heparin', 'valproic acid'],
+                'wbc': ['methotrexate', 'azathioprine', 'clozapine'],
+                'sodium': ['hydrochlorothiazide', 'furosemide', 'carbamazepine', 'desmopressin'],
+                'magnesium': ['omeprazole', 'pantoprazole', 'furosemide'],
+                'lithium': ['lithium'],
+                'digoxin': ['digoxin'],
+            }
+
+            lab_lower = track.lab_name.lower()
+            for lab_key, drugs in LAB_DRUG_ASSOCIATIONS.items():
+                if lab_key in lab_lower:
+                    for drug in drugs:
+                        if drug in med_names:
+                            interp['drug_context'].append({
+                                'drug': drug.title(),
+                                'note': f"Patient is on {drug.title()} which can affect {track.lab_name} levels",
+                            })
+
+            if interp['drug_context']:
+                interp['context'] = f"{track.lab_name} is {interp['direction']} — consider medication effect"
+            else:
+                interp['context'] = f"{track.lab_name} is {interp['direction']} — review clinical significance"
+
+        if interp['is_abnormal'] or track.status in ('critical', 'overdue'):
+            interpretations.append(interp)
+
+    return jsonify({'interpretations': interpretations})
 
 
 # ======================================================================
