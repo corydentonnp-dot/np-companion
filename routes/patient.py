@@ -144,14 +144,11 @@ def _backfill_icd10_codes(user_id, mrn):
     Ensure every PatientDiagnosis for this patient has an NIH-verified
     ICD-10 code.  Resolution order:
       1. Check the local Icd10Cache table (fast, no network).
-      2. If not cached, query the NIH Clinical Tables API and store
-         the result in icd10_cache for future lookups.
+      2. If not cached, query the NIH Clinical Tables API via ICD10Service
+         and store the result in icd10_cache for future lookups.
       3. NIH API codes always supersede codes that came from XML files.
     """
-    import urllib.request
-    import urllib.parse
     import logging
-
     logger = logging.getLogger(__name__)
 
     all_diags = PatientDiagnosis.query.filter(
@@ -161,6 +158,13 @@ def _backfill_icd10_codes(user_id, mrn):
 
     if not all_diags:
         return
+
+    # Lazy-init the ICD10 service (uses BaseAPIClient with caching + retry)
+    try:
+        from app.services.api.icd10 import ICD10Service
+        icd10_svc = ICD10Service(db)
+    except Exception:
+        icd10_svc = None
 
     changed = False
     for diag in all_diags:
@@ -178,32 +182,45 @@ def _backfill_icd10_codes(user_id, mrn):
                 changed = True
             continue
 
-        # 2. Query NIH API
+        # 2. Query NIH API via service (preferred) or raw urllib (fallback)
         try:
-            url = (
-                'https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search'
-                '?sf=code,name&maxList=1&terms='
-                + urllib.parse.quote(name)
-            )
-            req = urllib.request.Request(url, headers={'Accept': 'application/json'})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode())
-                if len(data) >= 4 and data[3] and len(data[3]) > 0:
-                    best = data[3][0]
-                    if len(best) >= 2:
-                        code = best[0]
-                        desc = best[1] if len(best) >= 2 else ''
-                        # Store in global cache
-                        entry = Icd10Cache(
-                            diagnosis_name_lower=name_lower,
-                            icd10_code=code,
-                            icd10_description=desc,
-                            source='nih_api',
-                        )
-                        db.session.add(entry)
-                        # Always apply NIH code (supersedes XML)
-                        diag.icd10_code = code
-                        changed = True
+            code = ''
+            desc = ''
+            if icd10_svc:
+                results = icd10_svc.search(name, max_results=1)
+                if results:
+                    code = results[0].get('code', '')
+                    desc = results[0].get('description', '')
+            else:
+                # Fallback to raw urllib if service import fails
+                import urllib.request
+                import urllib.parse
+                url = (
+                    'https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search'
+                    '?sf=code,name&maxList=1&terms='
+                    + urllib.parse.quote(name)
+                )
+                req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode())
+                    if len(data) >= 4 and data[3] and len(data[3]) > 0:
+                        best = data[3][0]
+                        if len(best) >= 2:
+                            code = best[0]
+                            desc = best[1]
+
+            if code:
+                # Store in global cache
+                entry = Icd10Cache(
+                    diagnosis_name_lower=name_lower,
+                    icd10_code=code,
+                    icd10_description=desc,
+                    source='nih_api',
+                )
+                db.session.add(entry)
+                # Always apply NIH code (supersedes XML)
+                diag.icd10_code = code
+                changed = True
         except Exception as e:
             logger.debug('NIH ICD-10 lookup failed for %s: %s', name, e)
             continue
@@ -309,6 +326,8 @@ def _enrich_rxnorm(rxcui, drug_name_fallback=''):
     Return an RxNormCache row for the given RXCUI.
     Checks local cache first; on miss, queries the NIH API.
     If rxcui is empty, tries approximate match by drug name.
+    Uses RxNormService when available (with caching + retry),
+    falls back to raw urllib.
     """
     import urllib.parse
     import logging
@@ -319,14 +338,26 @@ def _enrich_rxnorm(rxcui, drug_name_fallback=''):
 
     # Fallback: look up by name if no CUI
     if not rxcui and drug_name_fallback:
-        data = _fetch_rxnorm_api(
-            '/rxcui.json?name=' + urllib.parse.quote(drug_name_fallback) + '&search=2'
-        )
-        if data:
-            group = data.get('idGroup', {})
-            rxn_list = group.get('rxnormId', [])
-            if rxn_list:
-                rxcui = rxn_list[0]
+        # Try RxNormService first (has better caching and retry)
+        try:
+            from app.services.api.rxnorm import RxNormService
+            svc = RxNormService(db)
+            result = svc.get_rxcui(drug_name_fallback)
+            if result and result.get('rxcui'):
+                rxcui = result['rxcui']
+        except Exception:
+            pass
+
+        # Fallback to raw API if service didn't resolve
+        if not rxcui:
+            data = _fetch_rxnorm_api(
+                '/rxcui.json?name=' + urllib.parse.quote(drug_name_fallback) + '&search=2'
+            )
+            if data:
+                group = data.get('idGroup', {})
+                rxn_list = group.get('rxnormId', [])
+                if rxn_list:
+                    rxcui = rxn_list[0]
 
     if not rxcui:
         return None
