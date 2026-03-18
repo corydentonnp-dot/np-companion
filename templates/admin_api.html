@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}API Configuration — NP Companion{% endblock %}
+{% block page_id %}admin-api{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">API Intelligence Configuration</h1>
+    <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+</div>
+
+<p style="margin-bottom:24px;color:var(--text-secondary);max-width:700px;">
+    NP Companion uses free government APIs for clinical data enrichment. No patient data
+    (names, MRNs, DOBs) is ever sent to external APIs — only drug names, ICD-10 codes, and
+    clinical vocabulary terms. API keys below are optional and increase rate limits.
+</p>
+
+{# ---- API Status Overview ---- #}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">API Services Status</div>
+    <div class="card-body" style="padding:0;">
+        <table class="schedule-table" style="font-size:13px;">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Tier</th>
+                    <th>Auth</th>
+                    <th>Cache Entries</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set apis = [
+                    ('rxnorm', 'RxNorm (Drug Names)', '1', 'None needed', 'Active'),
+                    ('rxclass', 'RxClass (Drug Classes)', '1', 'None needed', 'Active'),
+                    ('openfda_labels', 'OpenFDA Labels', '1', 'Optional key', 'Active'),
+                    ('openfda_recalls', 'OpenFDA Recalls', '1', 'Optional key', 'Active'),
+                    ('openfda_events', 'OpenFDA FAERS', '1', 'Optional key', 'Active'),
+                    ('icd10', 'ICD-10 (NLM)', '1', 'None needed', 'Active'),
+                    ('loinc', 'LOINC (Lab Codes)', '1', 'Free account', 'Pending setup'),
+                    ('umls', 'UMLS (Terminology)', '2', 'Free API key', 'Pending setup'),
+                    ('healthfinder', 'HealthFinder (USPSTF)', '2', 'None needed', 'Active'),
+                    ('cdc_immunizations', 'CDC Immunizations', '2', 'None needed', 'Active (hardcoded)'),
+                    ('cms_pfs', 'CMS Fee Schedule', 'Billing', 'None needed', 'Active'),
+                    ('pubmed', 'PubMed (Literature)', '3', 'Free API key', 'Active'),
+                    ('medlineplus', 'MedlinePlus (Education)', '3', 'None needed', 'Active'),
+                    ('open_meteo', 'Open-Meteo (Weather)', '4', 'None needed', 'Active'),
+                ] %}
+                {% for api_key, name, tier, auth, status in apis %}
+                {% set stats = cache_stats.get(api_key, {}) %}
+                <tr>
+                    <td style="font-weight:600;">{{ name }}</td>
+                    <td><span class="badge badge--info">Tier {{ tier }}</span></td>
+                    <td style="font-size:12px;">{{ auth }}</td>
+                    <td>{{ stats.get('count', 0) }}</td>
+                    <td>
+                        {% if 'Pending' in status %}
+                        <span class="badge badge--warning">{{ status }}</span>
+                        {% else %}
+                        <span class="badge badge--success">{{ status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if stats.get('count', 0) > 0 %}
+                        <form method="POST" style="display:inline;">
+                            <input type="hidden" name="action" value="flush_cache">
+                            <input type="hidden" name="api_name" value="{{ api_key }}">
+                            <button type="submit" class="btn btn-sm btn-outline" style="font-size:11px;"
+                                    onclick="return confirm('Flush all cached data for {{ name }}?');">
+                                Flush Cache
+                            </button>
+                        </form>
+                        {% else %}
+                        <span style="font-size:11px;color:var(--text-secondary);">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ---- Intelligence Features Status ---- #}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">Intelligence Features</div>
+    <div class="card-body" style="padding:0;">
+        <table class="schedule-table" style="font-size:13px;">
+            <thead>
+                <tr><th>Feature</th><th>APIs Used</th><th>Status</th><th>Location</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-weight:600;">Drug Recall Alerts</td>
+                    <td>OpenFDA Recalls, RxNorm</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Patient Chart → Drug Safety widget</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Drug Interaction Check</td>
+                    <td>OpenFDA Labels</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Patient Chart → Drug Safety widget</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">PubMed Guidelines</td>
+                    <td>PubMed E-utilities</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Patient Chart → Guidelines widget</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Formulary Gap Detection</td>
+                    <td>ICD-10, RxClass</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Patient Chart → Formulary Gaps widget</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Patient Education</td>
+                    <td>MedlinePlus Connect</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Patient Chart → Education widget</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">ICD-10 Auto-Enrichment</td>
+                    <td>NLM Clinical Tables</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Automatic on chart load</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">RxNorm Drug Enrichment</td>
+                    <td>RxNorm REST API</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Automatic on chart load</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Care Gap Engine</td>
+                    <td>HealthFinder (fallback: hardcoded USPSTF)</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td>Patient Chart → USPSTF widget, /caregap</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Morning Briefing</td>
+                    <td>Open-Meteo, OpenFDA Recalls</td>
+                    <td><span class="badge badge--success">Active</span></td>
+                    <td><a href="/briefing">/briefing</a></td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Billing Intelligence</td>
+                    <td>CMS PFS (7 rule categories)</td>
+                    <td><span class="badge badge--info">Backend ready</span></td>
+                    <td>Scheduled overnight prep</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div style="font-size:12px;color:var(--text-secondary);max-width:700px;margin-top:24px;padding:12px;background:var(--bg-muted,#f8fafc);border-radius:6px;">
+    <strong>HIPAA Compliance Note:</strong> This product uses publicly available data from the U.S.
+    Centers for Medicare & Medicaid Services, National Library of Medicine, Food and Drug Administration,
+    and other federal agencies. No protected health information (PHI) is transmitted to any external API.
+    Payment information is provided for informational purposes and does not constitute a guarantee of
+    Medicare reimbursement.
+</div>
+{% endblock %}

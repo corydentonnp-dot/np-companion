@@ -219,6 +219,7 @@ def _register_blueprints(app):
         ('routes.netpractice_admin', 'np_admin_bp'),
         ('routes.patient',   'patient_bp'),
         ('routes.ai_api',    'ai_api_bp'),
+        ('routes.intelligence', 'intel_bp'),
     ]
     for module_path, bp_name in blueprint_map:
         try:

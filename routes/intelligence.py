@@ -1,0 +1,497 @@
+"""
+NP Companion — Clinical Intelligence API Routes
+File: routes/intelligence.py
+
+JSON API endpoints that power the Phase 10 intelligence layer widgets.
+All endpoints return JSON and are called asynchronously from the patient
+chart and dashboard templates.  No PHI is sent to external APIs — only
+drug names, ICD-10 codes, and LOINC codes.
+
+Features powered by this module:
+- NEW-A: Drug Recall Alert System
+- NEW-C: PubMed Guideline Lookup Panel
+- NEW-D: Formulary Gap Detection
+- NEW-E: Patient Education Auto-Draft
+- NEW-F: Drug Safety Panel (interactions + recalls + monitoring)
+- F22:   Morning Briefing data
+"""
+
+import json
+import logging
+from datetime import date, datetime, timezone
+
+from flask import Blueprint, jsonify, request, render_template
+from flask_login import login_required, current_user
+
+from models import db
+from models.patient import (
+    PatientRecord, PatientMedication, PatientDiagnosis,
+    PatientAllergy, PatientImmunization, RxNormCache,
+)
+from models.schedule import Schedule
+
+logger = logging.getLogger(__name__)
+
+intel_bp = Blueprint('intelligence', __name__)
+
+
+# ======================================================================
+# NEW-A + NEW-F: Drug Safety Panel  (recalls + interactions + monitoring)
+# ======================================================================
+@intel_bp.route('/api/patient/<mrn>/drug-safety')
+@login_required
+def drug_safety(mrn):
+    """
+    Return combined drug safety data for a patient:
+      - Active FDA recalls for their medications
+      - Drug interaction flags from FDA labels
+      - Monitoring requirements
+    """
+    medications = PatientMedication.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).all()
+
+    if not medications:
+        return jsonify({'recalls': [], 'interactions': [], 'monitoring': []})
+
+    drug_names = [m.drug_name.split()[0] for m in medications if m.drug_name]
+    rxcuis = [m.rxnorm_cui for m in medications if getattr(m, 'rxnorm_cui', '')]
+
+    recalls = []
+    interactions = []
+    monitoring = []
+
+    # --- Recalls via OpenFDA ---
+    try:
+        from app.services.api.openfda_recalls import OpenFDARecallsService
+        svc = OpenFDARecallsService(db)
+        recall_results = svc.check_drug_list_for_recalls(drug_names)
+        for r in recall_results:
+            recalls.append({
+                'drug_name': r.get('drug_name', ''),
+                'reason': r.get('reason', ''),
+                'classification': r.get('classification', ''),
+                'priority': r.get('priority', 'low'),
+                'status': r.get('status', ''),
+                'recall_date': r.get('recall_initiation_date', ''),
+            })
+    except Exception as e:
+        logger.debug('Recall check failed: %s', e)
+
+    # --- Interactions via OpenFDA Labels ---
+    try:
+        from app.services.api.openfda_labels import OpenFDALabelsService
+        label_svc = OpenFDALabelsService(db)
+        # Check each medication's label for interaction warnings with other meds
+        for med in medications:
+            drug = med.drug_name.split()[0] if med.drug_name else ''
+            if not drug:
+                continue
+            cui = getattr(med, 'rxnorm_cui', '') or ''
+            try:
+                label = label_svc.get_label_by_rxcui(cui) if cui else label_svc.get_label_by_name(drug)
+                if not label:
+                    continue
+                interaction_text = label.get('drug_interactions', '')
+                if interaction_text:
+                    # Check if any OTHER active medication is mentioned
+                    for other in medications:
+                        if other.id == med.id:
+                            continue
+                        other_name = (other.drug_name or '').split()[0].lower()
+                        if other_name and len(other_name) > 3 and other_name in interaction_text.lower():
+                            interactions.append({
+                                'drug_a': drug,
+                                'drug_b': other_name.title(),
+                                'detail': interaction_text[:300],
+                                'severity': 'warning',
+                            })
+
+                # Monitoring requirements
+                monitoring_text = label.get('warnings_and_cautions', '') or ''
+                if any(kw in monitoring_text.lower() for kw in ['monitor', 'check', 'periodic', 'laboratory']):
+                    monitoring.append({
+                        'drug': drug,
+                        'requirement': monitoring_text[:200],
+                    })
+            except Exception:
+                continue
+    except Exception as e:
+        logger.debug('Label interaction check failed: %s', e)
+
+    return jsonify({
+        'recalls': recalls,
+        'interactions': interactions,
+        'monitoring': monitoring,
+        'drug_count': len(medications),
+    })
+
+
+# ======================================================================
+# NEW-C: PubMed Guideline Lookup Panel
+# ======================================================================
+@intel_bp.route('/api/patient/<mrn>/guidelines')
+@login_required
+def guidelines(mrn):
+    """
+    Return recent PubMed clinical guidelines for the patient's
+    top diagnoses. Results are cached per-diagnosis for 30 days.
+    """
+    diagnoses = PatientDiagnosis.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).order_by(PatientDiagnosis.id.desc()).limit(5).all()
+
+    if not diagnoses:
+        return jsonify({'guidelines': [], 'conditions_searched': []})
+
+    results = []
+    conditions_searched = []
+
+    try:
+        from app.services.api.pubmed import PubMedService
+        svc = PubMedService(db)
+
+        for diag in diagnoses[:3]:  # Top 3 diagnoses
+            name = diag.diagnosis_name or ''
+            if not name or len(name) < 3:
+                continue
+            conditions_searched.append(name)
+            articles = svc.search_guidelines(name, max_results=3)
+            for a in articles:
+                results.append({
+                    'condition': name,
+                    'title': a.get('title', ''),
+                    'journal': a.get('journal', ''),
+                    'year': a.get('year', ''),
+                    'authors': a.get('authors', ''),
+                    'pmid': a.get('pmid', ''),
+                    'doi': a.get('doi', ''),
+                    'is_primary_care': a.get('is_primary_care_journal', False),
+                })
+    except Exception as e:
+        logger.debug('PubMed guideline lookup failed: %s', e)
+
+    return jsonify({
+        'guidelines': results,
+        'conditions_searched': conditions_searched,
+    })
+
+
+# ======================================================================
+# NEW-D: Formulary Gap Detection
+# ======================================================================
+@intel_bp.route('/api/patient/<mrn>/formulary-gaps')
+@login_required
+def formulary_gaps(mrn):
+    """
+    Detect chronic conditions that lack expected medication classes.
+    Compares active diagnoses against active medication classes.
+    """
+    diagnoses = PatientDiagnosis.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).all()
+    medications = PatientMedication.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).all()
+
+    if not diagnoses:
+        return jsonify({'gaps': []})
+
+    med_names_lower = set()
+    for m in medications:
+        if m.drug_name:
+            med_names_lower.add(m.drug_name.lower())
+            # Also add first word (generic name often)
+            med_names_lower.add(m.drug_name.split()[0].lower())
+
+    # Condition → expected drug class mappings (evidence-based defaults)
+    CONDITION_DRUG_MAP = {
+        'hypertension': {
+            'icd_prefixes': ['I10', 'I11', 'I12', 'I13', 'I15'],
+            'expected_classes': ['ACE inhibitor', 'ARB', 'calcium channel blocker', 'thiazide', 'beta blocker'],
+            'drug_keywords': ['lisinopril', 'losartan', 'amlodipine', 'hydrochlorothiazide', 'metoprolol',
+                              'enalapril', 'valsartan', 'olmesartan', 'nifedipine', 'atenolol',
+                              'ramipril', 'irbesartan', 'diltiazem', 'chlorthalidone', 'carvedilol',
+                              'benazepril', 'telmisartan', 'felodipine', 'bisoprolol', 'hctz'],
+        },
+        'type 2 diabetes': {
+            'icd_prefixes': ['E11'],
+            'expected_classes': ['metformin', 'SGLT2 inhibitor', 'GLP-1 agonist', 'DPP-4 inhibitor', 'insulin', 'sulfonylurea'],
+            'drug_keywords': ['metformin', 'empagliflozin', 'dapagliflozin', 'canagliflozin',
+                              'semaglutide', 'liraglutide', 'dulaglutide', 'tirzepatide',
+                              'sitagliptin', 'linagliptin', 'saxagliptin',
+                              'glipizide', 'glyburide', 'glimepiride',
+                              'insulin', 'jardiance', 'ozempic', 'mounjaro', 'farxiga', 'januvia',
+                              'trulicity', 'wegovy', 'victoza'],
+        },
+        'hyperlipidemia': {
+            'icd_prefixes': ['E78'],
+            'expected_classes': ['statin', 'PCSK9 inhibitor', 'ezetimibe', 'fibrate'],
+            'drug_keywords': ['atorvastatin', 'rosuvastatin', 'simvastatin', 'pravastatin',
+                              'lovastatin', 'pitavastatin', 'ezetimibe', 'fenofibrate',
+                              'lipitor', 'crestor', 'zetia', 'repatha', 'praluent',
+                              'evolocumab', 'alirocumab', 'gemfibrozil'],
+        },
+        'heart failure': {
+            'icd_prefixes': ['I50'],
+            'expected_classes': ['ACE inhibitor/ARB/ARNI', 'beta blocker', 'mineralocorticoid antagonist', 'SGLT2 inhibitor', 'diuretic'],
+            'drug_keywords': ['lisinopril', 'losartan', 'sacubitril', 'entresto',
+                              'carvedilol', 'metoprolol', 'bisoprolol',
+                              'spironolactone', 'eplerenone',
+                              'empagliflozin', 'dapagliflozin',
+                              'furosemide', 'bumetanide', 'torsemide'],
+        },
+        'atrial fibrillation': {
+            'icd_prefixes': ['I48'],
+            'expected_classes': ['anticoagulant', 'rate control'],
+            'drug_keywords': ['apixaban', 'rivaroxaban', 'warfarin', 'dabigatran', 'edoxaban',
+                              'eliquis', 'xarelto', 'coumadin',
+                              'metoprolol', 'diltiazem', 'digoxin', 'amiodarone'],
+        },
+        'hypothyroidism': {
+            'icd_prefixes': ['E03'],
+            'expected_classes': ['thyroid hormone'],
+            'drug_keywords': ['levothyroxine', 'synthroid', 'liothyronine', 'armour thyroid',
+                              'tirosint', 'cytomel', 'nature-throid'],
+        },
+        'GERD': {
+            'icd_prefixes': ['K21'],
+            'expected_classes': ['proton pump inhibitor', 'H2 blocker'],
+            'drug_keywords': ['omeprazole', 'pantoprazole', 'lansoprazole', 'esomeprazole',
+                              'rabeprazole', 'famotidine', 'ranitidine',
+                              'prilosec', 'protonix', 'nexium', 'prevacid', 'pepcid'],
+        },
+        'asthma': {
+            'icd_prefixes': ['J45'],
+            'expected_classes': ['inhaled corticosteroid', 'SABA', 'LABA'],
+            'drug_keywords': ['albuterol', 'fluticasone', 'budesonide', 'montelukast',
+                              'ventolin', 'proair', 'advair', 'symbicort', 'breo',
+                              'salmeterol', 'formoterol', 'mometasone', 'beclomethasone'],
+        },
+        'COPD': {
+            'icd_prefixes': ['J44'],
+            'expected_classes': ['LAMA', 'LABA', 'inhaled corticosteroid', 'SABA'],
+            'drug_keywords': ['tiotropium', 'umeclidinium', 'albuterol',
+                              'spiriva', 'incruse', 'trelegy', 'breo', 'anoro',
+                              'fluticasone', 'budesonide', 'symbicort'],
+        },
+        'depression': {
+            'icd_prefixes': ['F32', 'F33'],
+            'expected_classes': ['SSRI', 'SNRI', 'bupropion', 'TCA', 'atypical antidepressant'],
+            'drug_keywords': ['sertraline', 'fluoxetine', 'escitalopram', 'citalopram', 'paroxetine',
+                              'venlafaxine', 'duloxetine', 'desvenlafaxine', 'bupropion',
+                              'mirtazapine', 'trazodone', 'amitriptyline',
+                              'zoloft', 'prozac', 'lexapro', 'cymbalta', 'wellbutrin', 'effexor'],
+        },
+        'anxiety': {
+            'icd_prefixes': ['F41'],
+            'expected_classes': ['SSRI', 'SNRI', 'buspirone', 'hydroxyzine'],
+            'drug_keywords': ['sertraline', 'escitalopram', 'fluoxetine', 'paroxetine',
+                              'venlafaxine', 'duloxetine', 'buspirone', 'hydroxyzine',
+                              'zoloft', 'lexapro', 'prozac', 'cymbalta', 'effexor'],
+        },
+        'osteoporosis': {
+            'icd_prefixes': ['M80', 'M81'],
+            'expected_classes': ['bisphosphonate', 'denosumab', 'calcium/vitamin D'],
+            'drug_keywords': ['alendronate', 'risedronate', 'ibandronate', 'zoledronic',
+                              'denosumab', 'prolia', 'fosamax', 'boniva', 'reclast',
+                              'calcium', 'vitamin d', 'cholecalciferol'],
+        },
+    }
+
+    gaps = []
+    for diag in diagnoses:
+        icd = (diag.icd10_code or '').upper()
+        for condition, mapping in CONDITION_DRUG_MAP.items():
+            # Check if diagnosis matches condition ICD prefixes
+            if not any(icd.startswith(prefix) for prefix in mapping['icd_prefixes']):
+                continue
+            # Check if any expected medication keyword is in the patient's med list
+            has_treatment = any(
+                kw in name for kw in mapping['drug_keywords']
+                for name in med_names_lower
+            )
+            if not has_treatment:
+                gaps.append({
+                    'condition': condition.title(),
+                    'diagnosis': diag.diagnosis_name,
+                    'icd10': icd,
+                    'expected_classes': mapping['expected_classes'],
+                    'message': f"No {' / '.join(mapping['expected_classes'][:3])} found for {condition}",
+                })
+            break  # Only match first condition per diagnosis
+
+    return jsonify({'gaps': gaps})
+
+
+# ======================================================================
+# NEW-E: Patient Education Content
+# ======================================================================
+@intel_bp.route('/api/patient/<mrn>/education')
+@login_required
+def patient_education(mrn):
+    """
+    Return patient education content from MedlinePlus for the patient's
+    active diagnoses and medications.
+    """
+    diagnoses = PatientDiagnosis.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).limit(5).all()
+    medications = PatientMedication.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).limit(5).all()
+
+    education = []
+    try:
+        from app.services.api.medlineplus import MedlinePlusService
+        svc = MedlinePlusService(db)
+
+        # Education for top diagnoses
+        for diag in diagnoses[:3]:
+            icd = (diag.icd10_code or '').strip()
+            if not icd:
+                continue
+            content = svc.get_for_icd10(icd)
+            if content and content.get('title'):
+                education.append({
+                    'type': 'diagnosis',
+                    'source_name': diag.diagnosis_name,
+                    'title': content['title'],
+                    'summary': content.get('summary', '')[:500],
+                    'url': content.get('url', ''),
+                    'language': content.get('language', 'en'),
+                })
+
+        # Education for medications
+        for med in medications[:3]:
+            cui = getattr(med, 'rxnorm_cui', '') or ''
+            if not cui:
+                continue
+            content = svc.get_for_rxcui(cui)
+            if content and content.get('title'):
+                education.append({
+                    'type': 'medication',
+                    'source_name': med.drug_name,
+                    'title': content['title'],
+                    'summary': content.get('summary', '')[:500],
+                    'url': content.get('url', ''),
+                    'language': content.get('language', 'en'),
+                })
+    except Exception as e:
+        logger.debug('Patient education fetch failed: %s', e)
+
+    return jsonify({'education': education})
+
+
+# ======================================================================
+# F22: Morning Briefing
+# ======================================================================
+@intel_bp.route('/briefing')
+@login_required
+def morning_briefing():
+    """
+    Morning Briefing page — aggregates weather, schedule overview,
+    recall alerts, care gap summary, and guideline pre-loads.
+    """
+    today = date.today()
+
+    # Schedule overview
+    appointments = Schedule.query.filter_by(
+        user_id=current_user.id, appointment_date=today
+    ).order_by(Schedule.appointment_time).all()
+
+    # Weather
+    weather = {}
+    try:
+        from app.services.api.open_meteo import OpenMeteoService
+        weather_svc = OpenMeteoService(db)
+        weather = weather_svc.get_current_conditions() or {}
+    except Exception as e:
+        logger.debug('Weather fetch failed: %s', e)
+
+    # Recall alerts across all active medications for this provider's patients
+    recall_alerts = []
+    try:
+        from app.services.api.openfda_recalls import OpenFDARecallsService
+        recall_svc = OpenFDARecallsService(db)
+        # Get unique drug names across all claimed patients
+        med_names = [
+            row[0] for row in
+            db.session.query(PatientMedication.drug_name)
+            .filter(
+                PatientMedication.user_id == current_user.id,
+                PatientMedication.status == 'active',
+            )
+            .distinct().limit(50).all()
+            if row[0]
+        ]
+        if med_names:
+            drug_first_words = list(set(n.split()[0] for n in med_names if n))
+            results = recall_svc.check_drug_list_for_recalls(drug_first_words)
+            recall_alerts = [r for r in results if r.get('priority') in ('critical', 'high')]
+    except Exception as e:
+        logger.debug('Briefing recall check failed: %s', e)
+
+    # Care gap summary
+    from models.caregap import CareGap
+    open_gaps = CareGap.query.filter_by(
+        user_id=current_user.id, is_addressed=False
+    ).all()
+    gap_count = len(open_gaps)
+
+    # Claimed patient count
+    claimed_count = PatientRecord.query.filter_by(
+        claimed_by=current_user.id
+    ).count()
+
+    return render_template(
+        'morning_briefing.html',
+        today=today,
+        appointments=appointments,
+        weather=weather,
+        recall_alerts=recall_alerts,
+        gap_count=gap_count,
+        open_gaps=open_gaps[:10],
+        claimed_count=claimed_count,
+        appointment_count=len(appointments),
+    )
+
+
+# ======================================================================
+# Admin API Configuration
+# ======================================================================
+@intel_bp.route('/admin/api', methods=['GET', 'POST'])
+@login_required
+def admin_api_settings():
+    """Admin page for managing API keys and cache."""
+    if current_user.role != 'admin':
+        return jsonify({'error': 'Admin only'}), 403
+
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        if action == 'flush_cache':
+            api_name = request.form.get('api_name', '')
+            if api_name:
+                try:
+                    from app.services.api.cache_manager import CacheManager
+                    cache = CacheManager(db)
+                    cache.flush_api(api_name)
+                    from flask import flash
+                    flash(f'Cache flushed for {api_name}.', 'success')
+                except Exception as e:
+                    from flask import flash
+                    flash(f'Cache flush failed: {e}', 'danger')
+
+    # Get cache stats
+    cache_stats = {}
+    try:
+        from app.services.api.cache_manager import CacheManager
+        cache = CacheManager(db)
+        cache_stats = cache.get_all_api_stats()
+    except Exception:
+        pass
+
+    return render_template(
+        'admin_api.html',
+        cache_stats=cache_stats,
+    )

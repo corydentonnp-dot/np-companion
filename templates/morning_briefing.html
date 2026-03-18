@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Morning Briefing — NP Companion{% endblock %}
+{% block page_id %}morning-briefing{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">&#9728; Morning Briefing</h1>
+    <span style="font-size:14px;color:var(--text-secondary);">{{ today.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px;">
+
+    {# ---- Weather Card ---- #}
+    <div class="card">
+        <div class="card-header">&#127780; Weather</div>
+        <div class="card-body">
+            {% if weather and weather.temperature_f is not none %}
+            <div style="display:flex;align-items:center;gap:16px;">
+                <div style="font-size:32px;font-weight:700;color:var(--text-primary);">
+                    {{ weather.temperature_f }}°F
+                </div>
+                <div>
+                    <div style="font-weight:600;">{{ weather.description or 'Unknown' }}</div>
+                    <div style="font-size:13px;color:var(--text-secondary);">
+                        Wind: {{ weather.wind_speed_mph }} mph
+                    </div>
+                    {% if weather.rain_likely_commute %}
+                    <div style="font-size:13px;color:var(--color-warning,#f59e0b);font-weight:600;">
+                        &#9730; {{ weather.precipitation_probability_commute }}% chance of rain (7-9 AM)
+                    </div>
+                    {% endif %}
+                    {% if weather.is_extreme_heat %}
+                    <div style="font-size:13px;color:var(--color-red,#e74c3c);font-weight:600;">&#9888; Extreme heat alert (&gt;95°F)</div>
+                    {% elif weather.is_extreme_cold %}
+                    <div style="font-size:13px;color:var(--color-blue,#3498db);font-weight:600;">&#9888; Extreme cold alert (&lt;20°F)</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <p style="color:var(--text-secondary);font-style:italic;">Weather data unavailable</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- Schedule Overview Card ---- #}
+    <div class="card">
+        <div class="card-header">&#128197; Today's Schedule</div>
+        <div class="card-body">
+            <div style="display:flex;gap:24px;align-items:center;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:32px;font-weight:700;color:var(--color-teal,#0D7377);">{{ appointment_count }}</div>
+                    <div style="font-size:12px;color:var(--text-secondary);text-transform:uppercase;">Appointments</div>
+                </div>
+                <div>
+                    <div style="font-size:32px;font-weight:700;">{{ claimed_count }}</div>
+                    <div style="font-size:12px;color:var(--text-secondary);text-transform:uppercase;">Panel Patients</div>
+                </div>
+            </div>
+            {% if appointments %}
+            <div style="max-height:150px;overflow-y:auto;font-size:13px;">
+                {% for appt in appointments[:8] %}
+                <div style="padding:4px 0;border-bottom:1px solid var(--border,#f1f5f9);display:flex;justify-content:space-between;">
+                    <span style="font-weight:500;">{{ appt.patient_name or 'Unknown' }}</span>
+                    <span style="color:var(--text-secondary);">{{ appt.appointment_time or '' }}</span>
+                </div>
+                {% endfor %}
+                {% if appointments|length > 8 %}
+                <div style="padding:4px 0;color:var(--text-secondary);font-style:italic;">+{{ appointments|length - 8 }} more</div>
+                {% endif %}
+            </div>
+            {% else %}
+            <p style="color:var(--text-secondary);font-style:italic;">No appointments scheduled</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- Care Gaps Card ---- #}
+    <div class="card">
+        <div class="card-header">&#128203; Care Gap Summary</div>
+        <div class="card-body">
+            <div style="font-size:32px;font-weight:700;color:{{ 'var(--color-red,#e74c3c)' if gap_count > 0 else 'var(--color-green,#27ae60)' }};">
+                {{ gap_count }}
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:12px;">Open Care Gaps</div>
+            {% if open_gaps %}
+            <div style="max-height:120px;overflow-y:auto;font-size:13px;">
+                {% for g in open_gaps %}
+                <div style="padding:3px 0;display:flex;justify-content:space-between;">
+                    <span>{{ g.gap_name or g.gap_type }}</span>
+                    <span style="color:var(--text-secondary);font-size:11px;">{{ g.patient_name or '' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color:var(--color-green,#27ae60);font-weight:500;">All care gaps addressed &#10003;</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ---- Drug Recall Alerts ---- #}
+{% if recall_alerts %}
+<div class="card" style="border-left:4px solid var(--color-red,#e74c3c);margin-bottom:24px;">
+    <div class="card-header" style="color:var(--color-red,#e74c3c);">&#9888; FDA Drug Recall Alerts ({{ recall_alerts|length }})</div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">
+            Active FDA recalls affecting your patients' medications. Review and take action as needed.
+        </p>
+        {% for r in recall_alerts %}
+        <div style="padding:10px;margin-bottom:8px;background:var(--bg-muted,#f8fafc);border-radius:6px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <strong>{{ r.drug_name }}</strong>
+                <span class="badge badge--{{ 'danger' if r.priority == 'critical' else 'warning' }}">
+                    {{ r.classification or r.priority|title }}
+                </span>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary);">{{ r.reason[:200] }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="text-align:center;padding:20px;color:var(--color-green,#27ae60);">
+        &#10003; No active FDA drug recalls affecting your patients' medications.
+    </div>
+</div>
+{% endif %}
+
+<div style="text-align:center;margin-top:16px;">
+    <a href="/" class="btn btn-primary">Go to Today View</a>
+</div>
+{% endblock %}
