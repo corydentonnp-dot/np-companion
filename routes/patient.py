@@ -1,0 +1,1189 @@
+"""
+NP Companion — Patient Chart View (F10e) — Widget-Based Layout
+
+File location: np-companion/routes/patient.py
+
+Draggable/resizable widget-based patient chart with:
+  - XML upload (manual CDA import)
+  - Medications (active/inactive)
+  - Diagnoses (acute vs chronic)
+  - Labs (Epic-style spreadsheet with graphing)
+  - USPSTF recommendations
+  - Specialists
+  - Note Generator
+  - Vitals, Allergies, Immunizations, Care Gaps
+"""
+
+import json
+import os
+from collections import defaultdict
+from datetime import datetime, timezone
+
+from flask import Blueprint, render_template, request, jsonify
+from flask_login import login_required, current_user
+
+import config
+
+from models import db
+from models.patient import (
+    PatientRecord, PatientVitals, PatientMedication,
+    PatientDiagnosis, PatientAllergy, PatientImmunization,
+    PatientNoteDraft, PatientSpecialist, Icd10Cache, RxNormCache,
+)
+from models.labtrack import LabTrack
+from models.caregap import CareGap, CareGapRule
+
+patient_bp = Blueprint('patient', __name__)
+
+AC_NOTE_SECTIONS = [
+    "Chief Complaint",
+    "History of Present Illness",
+    "Review of Systems",
+    "Past Medical History",
+    "Social History",
+    "Family History",
+    "Allergies",
+    "Medications",
+    "Physical Exam",
+    "Functional Status/Mental Status",
+    "Confidential Information",
+    "Assessment",
+    "Plan",
+    "Instructions",
+    "Goals",
+    "Health Concerns",
+]
+
+# ICD-10 codes that are typically acute conditions
+ACUTE_ICD10_PREFIXES = (
+    'J00', 'J01', 'J02', 'J03', 'J04', 'J05', 'J06',  # Acute upper resp
+    'J09', 'J10', 'J11',  # Influenza
+    'J20', 'J21', 'J22',  # Acute lower resp
+    'A00', 'A01', 'A02', 'A03', 'A04', 'A05', 'A06', 'A07', 'A08', 'A09',  # GI infections
+    'B00', 'B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B09',  # Viral
+    'H10',  # Conjunctivitis
+    'H60', 'H65', 'H66',  # Otitis
+    'L00', 'L01', 'L02', 'L03', 'L04', 'L05',  # Skin infections
+    'M54',  # Back pain (often acute)
+    'M79',  # Soft tissue disorders
+    'N30',  # Cystitis
+    'N39',  # UTI
+    'R05', 'R06', 'R07', 'R10', 'R11', 'R50', 'R51',  # Symptoms
+    'S', 'T',  # Injuries, poisoning
+    'W', 'X', 'Y',  # External causes
+)
+
+ACUTE_KEYWORDS = (
+    'acute', 'sprain', 'strain', 'fracture', 'laceration', 'contusion',
+    'uti', 'urinary tract infection', 'bronchitis', 'sinusitis', 'pharyngitis',
+    'otitis', 'cellulitis', 'abscess', 'bite', 'burn', 'concussion',
+    'dislocation', 'foreign body', 'pain', 'injury', 'wound',
+)
+
+
+def _mrn_display(mrn):
+    """Return full MRN for display."""
+    return mrn or ''
+
+
+def _calc_age(dob_str):
+    """Calculate age string from DOB string (MM/DD/YYYY or YYYYMMDD)."""
+    if not dob_str:
+        return ''
+    try:
+        if '/' in dob_str:
+            dob = datetime.strptime(dob_str, '%m/%d/%Y')
+        elif len(dob_str) == 8:
+            dob = datetime.strptime(dob_str, '%Y%m%d')
+        else:
+            return ''
+        today = datetime.now()
+        age = today.year - dob.year - (
+            (today.month, today.day) < (dob.month, dob.day)
+        )
+        return f'{age}y'
+    except ValueError:
+        return ''
+
+
+def _calc_age_years(dob_str):
+    """Calculate numeric age from DOB string."""
+    if not dob_str:
+        return None
+    try:
+        if '/' in dob_str:
+            dob = datetime.strptime(dob_str, '%m/%d/%Y')
+        elif len(dob_str) == 8:
+            dob = datetime.strptime(dob_str, '%Y%m%d')
+        else:
+            return None
+        today = datetime.now()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    except ValueError:
+        return None
+
+
+def _classify_diagnosis(name, icd10):
+    """Classify diagnosis as acute or chronic based on ICD-10 and name."""
+    icd = (icd10 or '').upper().replace('.', '')
+    name_lower = (name or '').lower()
+
+    for prefix in ACUTE_ICD10_PREFIXES:
+        if icd.startswith(prefix):
+            return 'acute'
+
+    for kw in ACUTE_KEYWORDS:
+        if kw in name_lower:
+            return 'acute'
+
+    return 'chronic'
+
+
+def _backfill_icd10_codes(user_id, mrn):
+    """
+    Ensure every PatientDiagnosis for this patient has an NIH-verified
+    ICD-10 code.  Resolution order:
+      1. Check the local Icd10Cache table (fast, no network).
+      2. If not cached, query the NIH Clinical Tables API and store
+         the result in icd10_cache for future lookups.
+      3. NIH API codes always supersede codes that came from XML files.
+    """
+    import urllib.request
+    import urllib.parse
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    all_diags = PatientDiagnosis.query.filter(
+        PatientDiagnosis.user_id == user_id,
+        PatientDiagnosis.mrn == mrn,
+    ).all()
+
+    if not all_diags:
+        return
+
+    changed = False
+    for diag in all_diags:
+        name = (diag.diagnosis_name or '').strip()
+        if not name or len(name) < 3:
+            continue
+
+        name_lower = name.lower()
+
+        # 1. Check local cache
+        cached = Icd10Cache.query.filter_by(diagnosis_name_lower=name_lower).first()
+        if cached:
+            if diag.icd10_code != cached.icd10_code:
+                diag.icd10_code = cached.icd10_code
+                changed = True
+            continue
+
+        # 2. Query NIH API
+        try:
+            url = (
+                'https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search'
+                '?sf=code,name&maxList=1&terms='
+                + urllib.parse.quote(name)
+            )
+            req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode())
+                if len(data) >= 4 and data[3] and len(data[3]) > 0:
+                    best = data[3][0]
+                    if len(best) >= 2:
+                        code = best[0]
+                        desc = best[1] if len(best) >= 2 else ''
+                        # Store in global cache
+                        entry = Icd10Cache(
+                            diagnosis_name_lower=name_lower,
+                            icd10_code=code,
+                            icd10_description=desc,
+                            source='nih_api',
+                        )
+                        db.session.add(entry)
+                        # Always apply NIH code (supersedes XML)
+                        diag.icd10_code = code
+                        changed = True
+        except Exception as e:
+            logger.debug('NIH ICD-10 lookup failed for %s: %s', name, e)
+            continue
+
+    if changed:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+# ======================================================================
+# RxNorm API enrichment — cached drug info from NIH
+# ======================================================================
+def _fetch_rxnorm_api(path):
+    """Fetch a single RxNorm REST API endpoint, return parsed JSON or None."""
+    import urllib.request
+    url = 'https://rxnav.nlm.nih.gov/REST' + path
+    try:
+        req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return json.loads(resp.read().decode())
+    except Exception:
+        return None
+
+
+def _enrich_rxnorm_single(rxcui):
+    """
+    Look up one RXCUI via the NIH RxNorm API and return a dict with
+    brand_name, generic_name, dose_strength, dose_form, route, tty.
+    Returns None on failure.
+    """
+    import re as _re
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 1. Get concept properties
+    props_data = _fetch_rxnorm_api(f'/rxcui/{rxcui}/properties.json')
+    if not props_data:
+        return None
+    concept = (props_data.get('properties') or {})
+    name = concept.get('name', '')
+    tty = concept.get('tty', '')
+
+    # 2. Get related ingredient (generic name)
+    generic_name = ''
+    related_in = _fetch_rxnorm_api(f'/rxcui/{rxcui}/related.json?tty=IN')
+    if related_in:
+        groups = (related_in.get('relatedGroup') or {}).get('conceptGroup', [])
+        for group in groups:
+            props_list = group.get('conceptProperties', [])
+            if props_list:
+                generic_name = props_list[0].get('name', '')
+                break
+
+    # 3. Get related brand name
+    brand_name = ''
+    related_bn = _fetch_rxnorm_api(f'/rxcui/{rxcui}/related.json?tty=BN')
+    if related_bn:
+        groups = (related_bn.get('relatedGroup') or {}).get('conceptGroup', [])
+        for group in groups:
+            props_list = group.get('conceptProperties', [])
+            if props_list:
+                brand_name = props_list[0].get('name', '')
+                break
+
+    # 4. Parse dose strength and form from the concept name
+    #    Typical SCD name: "atorvastatin 20 MG Oral Tablet"
+    dose_strength = ''
+    dose_form = ''
+    route = ''
+    m = _re.search(r'(\d+(?:\.\d+)?\s*(?:MG|MCG|ML|UNITS?|%|MEQ)(?:/[\d.]+\s*(?:MG|MCG|ML|HR))?)', name, _re.IGNORECASE)
+    if m:
+        dose_strength = m.group(1).strip()
+    # Dose form comes after the dose strength
+    form_m = _re.search(
+        r'(?:MG|MCG|ML|UNITS?|%|MEQ|HR)\s+(Oral|Injectable|Topical|Inhalant|Nasal|Ophthalmic|Otic|Rectal|Vaginal|Transdermal)?\s*'
+        r'(Tablet|Capsule|Solution|Suspension|Injection|Cream|Ointment|Gel|Patch|Spray|Inhaler|Drops|Powder|Suppository|Film|Lozenge|Pack|Kit)?',
+        name, _re.IGNORECASE
+    )
+    if form_m:
+        route = (form_m.group(1) or '').strip()
+        dose_form = (form_m.group(2) or '').strip()
+
+    # If brand name IS the concept name for BN type, set accordingly
+    if tty == 'BN':
+        brand_name = brand_name or name
+    elif tty == 'IN':
+        generic_name = generic_name or name
+
+    return {
+        'brand_name': brand_name,
+        'generic_name': generic_name or name,
+        'dose_strength': dose_strength,
+        'dose_form': dose_form,
+        'route': route,
+        'tty': tty,
+    }
+
+
+def _enrich_rxnorm(rxcui, drug_name_fallback=''):
+    """
+    Return an RxNormCache row for the given RXCUI.
+    Checks local cache first; on miss, queries the NIH API.
+    If rxcui is empty, tries approximate match by drug name.
+    """
+    import urllib.parse
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Normalize
+    rxcui = (rxcui or '').strip()
+
+    # Fallback: look up by name if no CUI
+    if not rxcui and drug_name_fallback:
+        data = _fetch_rxnorm_api(
+            '/rxcui.json?name=' + urllib.parse.quote(drug_name_fallback) + '&search=2'
+        )
+        if data:
+            group = data.get('idGroup', {})
+            rxn_list = group.get('rxnormId', [])
+            if rxn_list:
+                rxcui = rxn_list[0]
+
+    if not rxcui:
+        return None
+
+    # 1. Check local cache
+    cached = RxNormCache.query.filter_by(rxcui=rxcui).first()
+    if cached:
+        return cached
+
+    # 2. Query API
+    info = _enrich_rxnorm_single(rxcui)
+    if not info:
+        return None
+
+    # 3. Cache the result
+    entry = RxNormCache(
+        rxcui=rxcui,
+        brand_name=info['brand_name'],
+        generic_name=info['generic_name'],
+        dose_strength=info['dose_strength'],
+        dose_form=info['dose_form'],
+        route=info['route'],
+        tty=info['tty'],
+    )
+    try:
+        db.session.add(entry)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        # May have been inserted concurrently
+        return RxNormCache.query.filter_by(rxcui=rxcui).first()
+
+    return entry
+
+
+def _enrich_medications(medications):
+    """
+    Annotate a list of PatientMedication objects with RxNorm data.
+    Adds .rx_info attribute to each medication (RxNormCache row or None).
+    """
+    for med in medications:
+        med.rx_info = _enrich_rxnorm(
+            getattr(med, 'rxnorm_cui', ''),
+            drug_name_fallback=med.drug_name,
+        )
+    return medications
+
+
+def _prepopulate_sections(mrn, user_id):
+    """Build dict mapping AC note section names to pre-populated text."""
+    prepop = {}
+    allergies = PatientAllergy.query.filter_by(user_id=user_id, mrn=mrn).all()
+    if allergies:
+        prepop['Allergies'] = '\n'.join(
+            f'{a.allergen} — {a.reaction}' if a.reaction else a.allergen
+            for a in allergies
+        )
+    meds = PatientMedication.query.filter_by(
+        user_id=user_id, mrn=mrn, status='active'
+    ).order_by(PatientMedication.drug_name).all()
+    if meds:
+        prepop['Medications'] = '\n'.join(
+            f'{m.drug_name} {m.dosage} {m.frequency}'.strip() for m in meds
+        )
+    diagnoses = PatientDiagnosis.query.filter_by(
+        user_id=user_id, mrn=mrn, status='active'
+    ).all()
+    if diagnoses:
+        lines = []
+        for d in diagnoses:
+            line = d.diagnosis_name
+            if d.icd10_code:
+                line += f' ({d.icd10_code})'
+            lines.append(line)
+        prepop['Past Medical History'] = '\n'.join(lines)
+    return prepop
+
+
+def _get_uspstf_recommendations(age, sex):
+    """Return applicable USPSTF screening recommendations."""
+    recs = []
+    rules = CareGapRule.query.all()
+    for rule in rules:
+        try:
+            criteria = json.loads(rule.criteria_json) if rule.criteria_json else {}
+        except (json.JSONDecodeError, TypeError):
+            criteria = {}
+        min_age = criteria.get('min_age', 0)
+        max_age = criteria.get('max_age', 999)
+        req_sex = criteria.get('sex', 'all')
+        if age is not None and min_age <= age <= max_age:
+            if req_sex == 'all' or req_sex == sex:
+                # Split billing_code_pair "G0105 / G0121" → commercial, medicare
+                pair = (rule.billing_code_pair or '').strip()
+                if ' / ' in pair:
+                    commercial, medicare = [p.strip() for p in pair.split(' / ', 1)]
+                elif pair:
+                    commercial = medicare = pair
+                else:
+                    commercial = medicare = ''
+                recs.append({
+                    'name': rule.gap_type,
+                    'description': getattr(rule, 'description', '') or rule.gap_type,
+                    'interval_days': rule.interval_days,
+                    'billing_code': commercial,
+                    'medicare_code': medicare,
+                    'explanation': getattr(rule, 'description', '') or '',
+                    'documentation_template': getattr(rule, 'documentation_template', '') or '',
+                })
+    return recs
+
+
+# ======================================================================
+# GET /patient/<mrn> — Patient Chart (widget layout)
+# ======================================================================
+@patient_bp.route('/patient/<mrn>')
+@login_required
+def chart(mrn):
+    """Patient chart view — widget-based drag/resize layout."""
+    record = PatientRecord.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+
+    medications = PatientMedication.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).order_by(PatientMedication.status, PatientMedication.drug_name).all()
+
+    # Enrich medications with RxNorm data (cached, minimal API calls)
+    _enrich_medications(medications)
+
+    # Backfill missing ICD-10 codes on chart load (cached, minimal API calls)
+    _backfill_icd10_codes(current_user.id, mrn)
+
+    diagnoses = PatientDiagnosis.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).order_by(PatientDiagnosis.status, PatientDiagnosis.diagnosis_name).all()
+
+    allergies = PatientAllergy.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).all()
+
+    immunizations = PatientImmunization.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).order_by(PatientImmunization.date_given.desc()).all()
+
+    vitals = PatientVitals.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).order_by(PatientVitals.measured_at.desc()).all()
+
+    lab_tracks = LabTrack.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).all()
+
+    care_gaps = CareGap.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).all()
+
+    specialists = PatientSpecialist.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).order_by(PatientSpecialist.specialty).all()
+
+    # Note draft
+    draft = PatientNoteDraft.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+    draft_data = json.loads(draft.section_data) if draft else {}
+
+    prepopulated = _prepopulate_sections(mrn, current_user.id)
+
+    # USPSTF recommendations
+    age = _calc_age_years(record.patient_dob if record else '')
+    sex = getattr(record, 'patient_sex', 'unknown') if record else 'unknown'
+    uspstf_recs = _get_uspstf_recommendations(age, sex)
+
+    # Build lab spreadsheet data: {lab_name: [{date, value}, ...]}
+    lab_spreadsheet = defaultdict(list)
+    all_lab_dates = set()
+    for lt in lab_tracks:
+        for r in lt.results:
+            if r.result_date:
+                date_str = r.result_date.strftime('%m/%d/%Y')
+                lab_spreadsheet[lt.lab_name].append({
+                    'date': date_str,
+                    'value': r.result_value,
+                    'is_critical': r.is_critical,
+                })
+                all_lab_dates.add(date_str)
+
+    # Sort dates chronologically
+    sorted_dates = sorted(all_lab_dates, key=lambda d: datetime.strptime(d, '%m/%d/%Y'))
+
+    # Overdue labs
+    overdue_labs = [lt for lt in lab_tracks if lt.status in ('overdue', 'due_soon', 'critical')]
+
+    # Widget layout preferences (default ordering)
+    widget_layout = current_user.get_pref('chart_widget_layout', None)
+
+    return render_template(
+        'patient_chart.html',
+        record=record,
+        mrn=mrn,
+        mrn_display=_mrn_display(mrn),
+        age_str=_calc_age(record.patient_dob if record else ''),
+        medications=medications,
+        diagnoses=diagnoses,
+        allergies=allergies,
+        immunizations=immunizations,
+        vitals=vitals,
+        lab_tracks=lab_tracks,
+        care_gaps=care_gaps,
+        specialists=specialists,
+        draft_data=draft_data,
+        prepopulated=prepopulated,
+        note_sections=AC_NOTE_SECTIONS,
+        uspstf_recs=uspstf_recs,
+        lab_spreadsheet=dict(lab_spreadsheet),
+        lab_dates=sorted_dates,
+        overdue_labs=overdue_labs,
+        widget_layout=json.dumps(widget_layout) if widget_layout else 'null',
+        has_data=record is not None and record.last_xml_parsed is not None,
+    )
+
+
+# ======================================================================
+# POST /patient/<mrn>/upload-xml — Manual XML upload
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/upload-xml', methods=['POST'])
+@login_required
+def upload_xml(mrn):
+    """Upload a CDA Clinical Summary XML file and parse it."""
+    if 'xml_file' not in request.files:
+        return jsonify({'success': False, 'message': 'No file uploaded'}), 400
+
+    f = request.files['xml_file']
+    if not f.filename:
+        return jsonify({'success': False, 'message': 'No file selected'}), 400
+
+    if not f.filename.lower().endswith('.xml'):
+        return jsonify({'success': False, 'message': 'File must be .xml'}), 400
+
+    # Save to temp file, parse, then delete
+    export_folder = getattr(config, 'CLINICAL_SUMMARY_EXPORT_FOLDER', 'data/clinical_summaries/')
+    if not os.path.isabs(export_folder):
+        export_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), export_folder)
+    os.makedirs(export_folder, exist_ok=True)
+
+    # Use secure filename
+    safe_name = f'upload_{current_user.id}_{mrn}_{int(datetime.now().timestamp())}.xml'
+    xml_path = os.path.join(export_folder, safe_name)
+
+    try:
+        f.save(xml_path)
+        from agent.clinical_summary_parser import parse_clinical_summary, store_parsed_summary
+
+        parsed = parse_clinical_summary(xml_path)
+
+        # Use the MRN from the URL (trusted) not from XML
+        if parsed.get('patient_mrn') and parsed['patient_mrn'] != mrn:
+            # Warn but still use the URL MRN
+            pass
+
+        # Clear existing data for this patient before re-import
+        PatientMedication.query.filter_by(user_id=current_user.id, mrn=mrn).delete()
+        PatientDiagnosis.query.filter_by(user_id=current_user.id, mrn=mrn).delete()
+        PatientAllergy.query.filter_by(user_id=current_user.id, mrn=mrn).delete()
+        PatientImmunization.query.filter_by(user_id=current_user.id, mrn=mrn).delete()
+        PatientVitals.query.filter_by(user_id=current_user.id, mrn=mrn).delete()
+        db.session.flush()
+
+        store_parsed_summary(current_user.id, mrn, parsed)
+
+        # Backfill missing ICD-10 codes via NIH API
+        _backfill_icd10_codes(current_user.id, mrn)
+
+        # Auto-classify diagnoses
+        for diag in PatientDiagnosis.query.filter_by(user_id=current_user.id, mrn=mrn).all():
+            diag.diagnosis_category = _classify_diagnosis(diag.diagnosis_name, diag.icd10_code)
+        db.session.commit()
+
+        sections = [k for k, v in parsed.items() if v and k not in ('patient_name', 'patient_mrn', 'patient_dob')]
+        return jsonify({
+            'success': True,
+            'message': f'Parsed {len(sections)} sections successfully.',
+            'sections': sections,
+            'patient_name': parsed.get('patient_name', ''),
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Parse error: {str(e)}'}), 500
+    finally:
+        # Clean up temp file
+        try:
+            if os.path.exists(xml_path):
+                os.remove(xml_path)
+        except OSError:
+            pass
+
+
+# ======================================================================
+# GET /api/patient/<mrn>/labs — Lab data for spreadsheet & graphing
+# ======================================================================
+@patient_bp.route('/api/patient/<mrn>/labs')
+@login_required
+def api_labs(mrn):
+    """Return lab data for the Epic-style spreadsheet and graphing."""
+    lab_tracks = LabTrack.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).all()
+
+    data = {}
+    all_dates = set()
+
+    for lt in lab_tracks:
+        results = []
+        for r in lt.results:
+            if r.result_date:
+                date_str = r.result_date.strftime('%Y-%m-%d')
+                results.append({
+                    'date': date_str,
+                    'display_date': r.result_date.strftime('%m/%d/%y'),
+                    'value': r.result_value,
+                    'is_critical': r.is_critical,
+                    'trend': r.trend_direction,
+                })
+                all_dates.add(date_str)
+        data[lt.lab_name] = {
+            'results': results,
+            'alert_low': lt.alert_low,
+            'alert_high': lt.alert_high,
+            'interval_days': lt.interval_days,
+            'status': lt.status,
+        }
+
+    sorted_dates = sorted(all_dates)
+    return jsonify({'labs': data, 'dates': sorted_dates})
+
+
+# ======================================================================
+# POST /patient/<mrn>/specialist — Add specialist
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/specialist', methods=['POST'])
+@login_required
+def add_specialist(mrn):
+    """Add a specialist record for a patient."""
+    data = request.get_json(silent=True) or {}
+    spec = PatientSpecialist(
+        user_id=current_user.id,
+        mrn=mrn,
+        specialty=data.get('specialty', ''),
+        provider_name=data.get('provider_name', ''),
+        phone=data.get('phone', ''),
+        fax=data.get('fax', ''),
+        notes=data.get('notes', ''),
+    )
+    db.session.add(spec)
+    db.session.commit()
+    return jsonify({'success': True, 'id': spec.id})
+
+
+# ======================================================================
+# DELETE /patient/<mrn>/specialist/<id> — Remove specialist
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/specialist/<int:spec_id>', methods=['DELETE'])
+@login_required
+def delete_specialist(mrn, spec_id):
+    """Remove a specialist record."""
+    spec = PatientSpecialist.query.filter_by(
+        id=spec_id, user_id=current_user.id, mrn=mrn
+    ).first()
+    if spec:
+        db.session.delete(spec)
+        db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# POST /patient/<mrn>/widget-layout — Save widget positions
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/widget-layout', methods=['POST'])
+@login_required
+def save_widget_layout(mrn):
+    """Save widget positions/sizes to user preferences."""
+    data = request.get_json(silent=True) or {}
+    layout = data.get('layout', {})
+    prefs = current_user.preferences_dict()
+    prefs['chart_widget_layout'] = layout
+    current_user.preferences = json.dumps(prefs)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# POST /patient/<mrn>/note/save — Save Prepped Note draft
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/note/save', methods=['POST'])
+@login_required
+def save_note(mrn):
+    """Save prepped note draft to database."""
+    data = request.get_json(silent=True) or {}
+    sections = data.get('sections', {})
+
+    draft = PatientNoteDraft.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+
+    if draft:
+        draft.section_data = json.dumps(sections)
+        draft.updated_at = datetime.now(timezone.utc)
+    else:
+        draft = PatientNoteDraft(
+            user_id=current_user.id,
+            mrn=mrn,
+            section_data=json.dumps(sections),
+        )
+        db.session.add(draft)
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# POST /patient/<mrn>/note/send-to-ac — PyAutoGUI paste to AC
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/note/send-to-ac', methods=['POST'])
+@login_required
+def send_to_ac(mrn):
+    """Trigger PyAutoGUI paste to Amazing Charts."""
+    from agent.ac_window import get_ac_state
+
+    if getattr(config, 'AC_MOCK_MODE', False):
+        ac_state = 'home_screen'
+    else:
+        ac_state = get_ac_state()
+
+    if ac_state == 'not_running':
+        return jsonify({
+            'success': False,
+            'message': 'Amazing Charts is not running. Start AC and try again.',
+        })
+
+    if ac_state == 'login_screen':
+        return jsonify({
+            'success': False,
+            'message': 'Amazing Charts is at the login screen. Log in first.',
+        })
+
+    return jsonify({
+        'success': False,
+        'message': (
+            'Automatic note injection is not yet implemented. '
+            'Use "Copy All" and paste into the Enlarge Textbox manually. '
+            'The 16 sections can be navigated with "Update & Go to Next Field".'
+        ),
+    })
+
+
+# ======================================================================
+# POST /patient/<mrn>/refresh — Re-export Clinical Summary
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/refresh', methods=['POST'])
+@login_required
+def refresh_patient(mrn):
+    """Trigger a clinical summary re-export for this patient."""
+    imported_items_path = getattr(config, 'AC_IMPORTED_ITEMS_PATH', '')
+    if imported_items_path:
+        patient_folder = os.path.join(imported_items_path, str(mrn))
+        if os.path.isdir(patient_folder):
+            files = os.listdir(patient_folder)
+            if files:
+                return jsonify({
+                    'success': True,
+                    'message': f'Found {len(files)} imported item(s). Processing will begin shortly.',
+                    'source': 'imported_items',
+                    'file_count': len(files),
+                })
+
+    return jsonify({
+        'success': True,
+        'message': (
+            'Refresh requested. Export a Clinical Summary XML from AC '
+            '(Alt+P > Export Clinical Summary), then upload it here.'
+        ),
+        'source': 'pending',
+    })
+
+
+# ======================================================================
+# POST /patient/<mrn>/claim — Claim patient for your panel
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/claim', methods=['POST'])
+@login_required
+def claim_patient(mrn):
+    """Claim a patient for the current provider's panel."""
+    from models.schedule import Schedule
+    data = request.get_json(silent=True) or {}
+
+    record = PatientRecord.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+
+    if not record:
+        record = PatientRecord(
+            user_id=current_user.id,
+            mrn=mrn,
+        )
+        db.session.add(record)
+
+    # Populate patient_name if missing
+    if not record.patient_name:
+        # 1) Accept from POST body (chart header knows the name)
+        name_from_body = (data.get('patient_name') or '').strip()
+        if name_from_body:
+            record.patient_name = name_from_body
+        else:
+            # 2) Look up from schedule data
+            sched = Schedule.query.filter_by(patient_mrn=mrn).order_by(
+                Schedule.appointment_date.desc()
+            ).first()
+            if sched and sched.patient_name:
+                record.patient_name = sched.patient_name
+
+    record.claimed_by = current_user.id
+    record.claimed_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+    return jsonify({'success': True, 'claimed_by': current_user.display_name})
+
+
+# ======================================================================
+# POST /patient/<mrn>/generate-note — AI-assisted note generation
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/generate-note', methods=['POST'])
+@login_required
+def generate_note(mrn):
+    """Generate note sections from patient data (rule-based, not LLM)."""
+    data = request.get_json(silent=True) or {}
+    selected_sections = data.get('sections', [])
+
+    record = PatientRecord.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+
+    generated = {}
+
+    for section in selected_sections:
+        if section == 'Allergies':
+            allergies = PatientAllergy.query.filter_by(
+                user_id=current_user.id, mrn=mrn
+            ).all()
+            if allergies:
+                lines = []
+                for a in allergies:
+                    line = a.allergen
+                    if a.reaction:
+                        line += f' → {a.reaction}'
+                    if a.severity:
+                        line += f' ({a.severity})'
+                    lines.append(line)
+                generated[section] = '\n'.join(lines)
+            else:
+                generated[section] = 'NKDA'
+
+        elif section == 'Medications':
+            meds = PatientMedication.query.filter_by(
+                user_id=current_user.id, mrn=mrn, status='active'
+            ).order_by(PatientMedication.drug_name).all()
+            if meds:
+                lines = []
+                for m in meds:
+                    line = m.drug_name
+                    if m.dosage:
+                        line += f' {m.dosage}'
+                    if m.frequency:
+                        line += f' {m.frequency}'
+                    lines.append(line)
+                generated[section] = '\n'.join(lines)
+            else:
+                generated[section] = 'No active medications'
+
+        elif section == 'Past Medical History':
+            diags = PatientDiagnosis.query.filter_by(
+                user_id=current_user.id, mrn=mrn, status='active'
+            ).all()
+            chronic = [d for d in diags if d.diagnosis_category == 'chronic']
+            acute = [d for d in diags if d.diagnosis_category == 'acute']
+            lines = []
+            if chronic:
+                lines.append('Chronic conditions:')
+                for d in chronic:
+                    line = f'  - {d.diagnosis_name}'
+                    if d.icd10_code:
+                        line += f' ({d.icd10_code})'
+                    lines.append(line)
+            if acute:
+                lines.append('Recent/Acute:')
+                for d in acute:
+                    line = f'  - {d.diagnosis_name}'
+                    if d.icd10_code:
+                        line += f' ({d.icd10_code})'
+                    lines.append(line)
+            generated[section] = '\n'.join(lines) if lines else 'No active diagnoses'
+
+        elif section == 'Social History':
+            # Pull from parsed XML social_history if available
+            generated[section] = ''
+
+        elif section == 'Assessment':
+            diags = PatientDiagnosis.query.filter_by(
+                user_id=current_user.id, mrn=mrn, status='active'
+            ).all()
+            if diags:
+                lines = []
+                for i, d in enumerate(diags, 1):
+                    line = f'{i}. {d.diagnosis_name}'
+                    if d.icd10_code:
+                        line += f' ({d.icd10_code})'
+                    lines.append(line)
+                generated[section] = '\n'.join(lines)
+            else:
+                generated[section] = ''
+
+        elif section == 'Plan':
+            # Generate basic plan from care gaps + overdue labs
+            lines = []
+            gaps = CareGap.query.filter_by(
+                user_id=current_user.id, mrn=mrn
+            ).filter(CareGap.status.in_(['open', 'in_progress'])).all()
+            if gaps:
+                lines.append('Preventive care:')
+                for g in gaps:
+                    lines.append(f'  - {g.gap_type}: {g.gap_name or "due"}')
+
+            overdue = LabTrack.query.filter_by(
+                user_id=current_user.id, mrn=mrn, is_overdue=True
+            ).all()
+            if overdue:
+                lines.append('Lab orders:')
+                for lt in overdue:
+                    lines.append(f'  - {lt.lab_name} (overdue)')
+
+            generated[section] = '\n'.join(lines) if lines else ''
+
+        elif section == 'Physical Exam':
+            vitals = PatientVitals.query.filter_by(
+                user_id=current_user.id, mrn=mrn
+            ).order_by(PatientVitals.measured_at.desc()).all()
+            seen = set()
+            lines = ['Vitals:']
+            for v in vitals:
+                if v.vital_name not in seen:
+                    seen.add(v.vital_name)
+                    lines.append(f'  {v.vital_name}: {v.vital_value} {v.vital_unit}')
+                if len(seen) >= 8:
+                    break
+            generated[section] = '\n'.join(lines) if len(lines) > 1 else ''
+
+        elif section == 'Health Concerns':
+            gaps = CareGap.query.filter_by(
+                user_id=current_user.id, mrn=mrn
+            ).filter(CareGap.status.in_(['open', 'in_progress'])).all()
+            if gaps:
+                generated[section] = '\n'.join(f'- {g.gap_type}' for g in gaps)
+            else:
+                generated[section] = ''
+        else:
+            generated[section] = ''
+
+    return jsonify({'success': True, 'sections': generated})
+
+
+# ======================================================================
+# POST /patient/upload-xml — Dashboard drag-and-drop XML upload (auto-detect MRN)
+# ======================================================================
+@patient_bp.route('/patient/upload-xml', methods=['POST'])
+@login_required
+def upload_xml_auto():
+    """Upload one or more CDA Clinical Summary XML files, auto-detecting MRN."""
+    files = request.files.getlist('xml_files')
+    if not files:
+        return jsonify({'success': False, 'message': 'No files uploaded'}), 400
+
+    results = []
+    for f in files:
+        if not f.filename or not f.filename.lower().endswith('.xml'):
+            results.append({'file': f.filename or '?', 'success': False, 'message': 'Not an XML file'})
+            continue
+
+        export_folder = getattr(config, 'CLINICAL_SUMMARY_EXPORT_FOLDER', 'data/clinical_summaries/')
+        if not os.path.isabs(export_folder):
+            export_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), export_folder)
+        os.makedirs(export_folder, exist_ok=True)
+
+        safe_name = f'upload_{current_user.id}_{int(datetime.now().timestamp())}_{f.filename}'
+        safe_name = ''.join(c for c in safe_name if c.isalnum() or c in '._-')
+        xml_path = os.path.join(export_folder, safe_name)
+
+        try:
+            f.save(xml_path)
+            from agent.clinical_summary_parser import parse_clinical_summary, store_parsed_summary
+
+            parsed = parse_clinical_summary(xml_path)
+            mrn = parsed.get('patient_mrn', '')
+            if not mrn:
+                results.append({'file': f.filename, 'success': False, 'message': 'No MRN found in XML'})
+                continue
+
+            store_parsed_summary(current_user.id, mrn, parsed)
+
+            # Backfill missing ICD-10 codes via NIH API
+            _backfill_icd10_codes(current_user.id, mrn)
+
+            # Auto-classify diagnoses
+            for diag in PatientDiagnosis.query.filter_by(user_id=current_user.id, mrn=mrn).all():
+                diag.diagnosis_category = _classify_diagnosis(diag.diagnosis_name, diag.icd10_code)
+            db.session.commit()
+
+            sections = [k for k, v in parsed.items() if v and k not in ('patient_name', 'patient_mrn', 'patient_dob')]
+            results.append({
+                'file': f.filename,
+                'success': True,
+                'mrn': mrn,
+                'patient_name': parsed.get('patient_name', ''),
+                'sections': sections,
+            })
+        except Exception as e:
+            db.session.rollback()
+            results.append({'file': f.filename, 'success': False, 'message': str(e)})
+        finally:
+            try:
+                if os.path.exists(xml_path):
+                    os.remove(xml_path)
+            except OSError:
+                pass
+
+    ok_count = sum(1 for r in results if r.get('success'))
+    return jsonify({
+        'success': ok_count > 0,
+        'message': f'Imported {ok_count} of {len(results)} file(s)',
+        'results': results,
+    })
+
+
+# ======================================================================
+# GET /patients — Patient Roster (My Patients panel)
+# ======================================================================
+@patient_bp.route('/patients')
+@login_required
+def roster():
+    """Show all patients claimed by the current provider."""
+    patients = (
+        PatientRecord.query
+        .filter_by(claimed_by=current_user.id)
+        .order_by(PatientRecord.patient_name)
+        .all()
+    )
+
+    return render_template(
+        'patient_roster.html',
+        patients=patients,
+    )
+
+
+# ======================================================================
+# POST /patient/<mrn>/diagnosis/<id>/toggle-category
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/diagnosis/<int:dx_id>/toggle-category', methods=['POST'])
+@login_required
+def toggle_dx_category(mrn, dx_id):
+    """Toggle a diagnosis between acute and chronic."""
+    dx = PatientDiagnosis.query.get(dx_id)
+    if not dx:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    new_cat = 'acute' if (dx.diagnosis_category or 'chronic') == 'chronic' else 'chronic'
+    dx.diagnosis_category = new_cat
+    db.session.commit()
+    return jsonify({'success': True, 'new_category': new_cat})
+
+
+# ======================================================================
+# POST /patient/<mrn>/<item_type>/<id>/toggle-status
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/<item_type>/<int:item_id>/toggle-status', methods=['POST'])
+@login_required
+def toggle_item_status(mrn, item_type, item_id):
+    """Toggle active/inactive status for a medication or diagnosis."""
+    if item_type == 'medication':
+        item = PatientMedication.query.get(item_id)
+    elif item_type == 'diagnosis':
+        item = PatientDiagnosis.query.get(item_id)
+    else:
+        return jsonify({'success': False, 'error': 'Invalid type'}), 400
+
+    if not item:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    new_status = 'inactive' if item.status == 'active' else 'active'
+    item.status = new_status
+    db.session.commit()
+    return jsonify({'success': True, 'new_status': new_status})
+
+
+# ======================================================================
+# POST /patient/<mrn>/update-demographics — Edit patient demographics
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/update-demographics', methods=['POST'])
+@login_required
+def update_demographics(mrn):
+    """Update patient demographics (name, DOB, sex)."""
+    data = request.get_json(silent=True) or {}
+    record = PatientRecord.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+    if not record:
+        record = PatientRecord(user_id=current_user.id, mrn=mrn)
+        db.session.add(record)
+
+    if 'patient_name' in data and data['patient_name'].strip():
+        record.patient_name = data['patient_name'].strip()
+    if 'patient_dob' in data:
+        record.patient_dob = data['patient_dob'].strip()
+    if 'patient_sex' in data:
+        record.patient_sex = data['patient_sex'].strip()
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# GET /api/icd10/search — Proxy to NIH ICD-10 API
+# ======================================================================
+@patient_bp.route('/api/icd10/search')
+@login_required
+def icd10_search():
+    """Search ICD-10-CM codes using the NIH Clinical Tables API."""
+    import urllib.request
+    import urllib.parse
+    import urllib.error
+
+    query = request.args.get('q', '').strip()
+    if not query or len(query) < 2:
+        return jsonify({'results': []})
+
+    url = (
+        'https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search'
+        '?sf=code,name&terms=' + urllib.parse.quote(query)
+    )
+
+    try:
+        req = urllib.request.Request(url, headers={'Accept': 'application/json'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            # API returns [total, codes, null, [code, name] pairs]
+            results = []
+            if len(data) >= 4 and data[3]:
+                for item in data[3]:
+                    if len(item) >= 2:
+                        results.append({'code': item[0], 'name': item[1]})
+            return jsonify({'results': results[:20]})
+    except Exception:
+        return jsonify({'results': []})

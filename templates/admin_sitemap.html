@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Site Map — NP Companion{% endblock %}
+{% block page_id %}admin-sitemap{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+    <a href="/admin" style="color:var(--text-secondary);font-size:13px;">← Admin</a>
+    <h1 style="margin:0;">Site Map</h1>
+</div>
+
+<p style="color:var(--text-secondary);font-size:14px;margin-bottom:24px;">
+    All registered routes in the application, grouped by module (blueprint).
+    <strong>GET</strong> routes are pages you can visit. <strong>POST</strong> routes are form actions or API endpoints.
+</p>
+
+{% for bp_name, routes in routes_by_blueprint.items() %}
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-header" style="display:flex;align-items:center;gap:8px;">
+        <span style="font-family:monospace;font-size:14px;color:var(--color-teal);">{{ bp_name }}</span>
+        <span class="badge badge--info">{{ routes|length }} route{{ 's' if routes|length != 1 }}</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="table" style="margin:0;">
+            <thead>
+                <tr>
+                    <th style="width:50%;">URL</th>
+                    <th style="width:25%;">Methods</th>
+                    <th style="width:25%;">Endpoint</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for route in routes %}
+                <tr>
+                    <td style="font-family:monospace;font-size:13px;">
+                        {% if 'GET' in route.methods %}
+                        <a href="{{ route.rule }}" style="color:var(--color-teal);">{{ route.rule }}</a>
+                        {% else %}
+                        {{ route.rule }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% for method in route.methods %}
+                        <span class="badge {% if method == 'GET' %}badge--success{% elif method == 'POST' %}badge--warning{% elif method == 'DELETE' %}badge--danger{% else %}badge--info{% endif %}" style="margin-right:4px;">{{ method }}</span>
+                        {% endfor %}
+                    </td>
+                    <td style="font-family:monospace;font-size:12px;color:var(--text-secondary);">{{ route.endpoint }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+<div style="margin-top:24px;padding:16px;background:var(--color-lt-gray);border-radius:var(--radius);font-size:13px;color:var(--text-secondary);">
+    Total: {{ routes_by_blueprint.values()|map('length')|sum }} routes across {{ routes_by_blueprint|length }} modules.
+</div>
+{% endblock %}

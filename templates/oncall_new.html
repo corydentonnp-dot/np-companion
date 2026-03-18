@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}New On-Call Note — NP Companion{% endblock %}
+{% block page_id %}oncall-new{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto;">
+    <h1 style="font-size:20px;margin-bottom:20px;">&#128222; New On-Call Note</h1>
+
+    <form method="POST" action="/oncall/new" id="oncall-form">
+        {# Chief Complaint #}
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Chief Complaint</label>
+            <div style="display:flex;gap:8px;">
+                <input type="text" name="chief_complaint" class="form-control" style="flex:1;min-height:44px;font-size:16px;" placeholder="Reason for call..." required>
+                <button type="button" class="btn btn-outline voice-btn" data-target="chief_complaint" style="min-width:44px;min-height:44px;font-size:20px;" title="Voice input">&#127908;</button>
+            </div>
+        </div>
+
+        {# Call Time #}
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Call Time</label>
+            <input type="datetime-local" name="call_time" class="form-control" style="min-height:44px;font-size:16px;width:100%;">
+        </div>
+
+        {# Patient Identifier (shorthand) #}
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Patient Identifier <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">(your shorthand — not MRN)</span></label>
+            <input type="text" name="patient_identifier" class="form-control" style="min-height:44px;font-size:16px;width:100%;" placeholder="e.g. Smith knee pain">
+        </div>
+
+        {# Recommendation #}
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Recommendation</label>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+                <textarea name="recommendation" class="form-control" style="flex:1;min-height:100px;font-size:16px;resize:vertical;" placeholder="What did you recommend?"></textarea>
+                <button type="button" class="btn btn-outline voice-btn" data-target="recommendation" style="min-width:44px;min-height:44px;font-size:20px;" title="Voice input">&#127908;</button>
+            </div>
+        </div>
+
+        {# Additional Notes #}
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Additional Notes</label>
+            <div style="display:flex;gap:8px;align-items:flex-start;">
+                <textarea name="note_content" class="form-control" style="flex:1;min-height:80px;font-size:16px;resize:vertical;" placeholder="Any other details..."></textarea>
+                <button type="button" class="btn btn-outline voice-btn" data-target="note_content" style="min-width:44px;min-height:44px;font-size:20px;" title="Voice input">&#127908;</button>
+            </div>
+        </div>
+
+        {# Callback Toggle #}
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:8px;">Callback Promised?</label>
+            <div style="display:flex;gap:12px;">
+                <label style="display:flex;align-items:center;gap:6px;min-height:44px;font-size:16px;cursor:pointer;">
+                    <input type="radio" name="callback_promised" value="no" checked onchange="toggleCallback(false)"> No
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;min-height:44px;font-size:16px;cursor:pointer;">
+                    <input type="radio" name="callback_promised" value="yes" onchange="toggleCallback(true)"> Yes
+                </label>
+            </div>
+        </div>
+
+        {# Callback By (hidden by default) #}
+        <div id="callback-by-section" style="display:none;margin-bottom:16px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Callback By</label>
+            <input type="datetime-local" name="callback_by" class="form-control" style="min-height:44px;font-size:16px;width:100%;">
+        </div>
+
+        {# Documentation Status #}
+        <div style="margin-bottom:20px;">
+            <label style="display:block;font-weight:600;font-size:14px;margin-bottom:8px;">Documentation Status</label>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:6px;min-height:44px;font-size:14px;cursor:pointer;">
+                    <input type="radio" name="documentation_status" value="pending" checked> Pending
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;min-height:44px;font-size:14px;cursor:pointer;">
+                    <input type="radio" name="documentation_status" value="entered"> Entered in Chart
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;min-height:44px;font-size:14px;cursor:pointer;">
+                    <input type="radio" name="documentation_status" value="not_needed"> No Doc Needed
+                </label>
+            </div>
+        </div>
+
+        {# Submit #}
+        <button type="submit" class="btn btn-primary" style="width:100%;min-height:50px;font-size:16px;font-weight:600;">Save Note</button>
+    </form>
+</div>
+
+<script>
+/* Set call_time default to now */
+(function() {
+    var now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    var input = document.querySelector('input[name="call_time"]');
+    if (input && !input.value) input.value = now.toISOString().slice(0,16);
+})();
+
+function toggleCallback(show) {
+    document.getElementById('callback-by-section').style.display = show ? 'block' : 'none';
+}
+
+/* ---- Web Speech API: Voice-to-Text (F7a) ---- */
+(function() {
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        /* Graceful degradation */
+        document.querySelectorAll('.voice-btn').forEach(function(btn) {
+            btn.title = 'Voice input not supported in this browser';
+            btn.style.opacity = '0.4';
+            btn.style.cursor = 'not-allowed';
+            btn.disabled = true;
+        });
+        return;
+    }
+
+    document.querySelectorAll('.voice-btn').forEach(function(btn) {
+        var recognition = null;
+        var isRecording = false;
+
+        btn.addEventListener('click', function() {
+            if (isRecording) {
+                recognition.stop();
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            var targetName = btn.getAttribute('data-target');
+            var target = document.querySelector('[name="' + targetName + '"]');
+            if (!target) return;
+
+            var startText = target.value;
+
+            /* Visual feedback: pulsing red dot */
+            btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#ef4444;animation:pulse-dot 1s infinite;"></span>';
+            btn.style.borderColor = '#ef4444';
+            isRecording = true;
+
+            recognition.onresult = function(event) {
+                var transcript = '';
+                for (var i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                /* Append to existing content */
+                target.value = startText + (startText ? ' ' : '') + transcript;
+            };
+
+            recognition.onerror = function() {
+                stopRecording();
+            };
+
+            recognition.onend = function() {
+                stopRecording();
+            };
+
+            function stopRecording() {
+                isRecording = false;
+                btn.innerHTML = '&#127908;';
+                btn.style.borderColor = '';
+            }
+
+            recognition.start();
+        });
+    });
+})();
+</script>
+<style>
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+</style>
+{% endblock %}

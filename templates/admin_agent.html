@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Agent Dashboard — Admin{% endblock %}
+{% block page_id %}admin-agent{% endblock %}
+{% block content %}
+
+<div class="d-flex items-center justify-between mb-2">
+    <h1>Background Agent</h1>
+    <form method="POST" action="/admin/agent/restart" id="restart-form" style="display:inline;">
+        <button type="submit" class="btn btn-warning btn-sm" id="restart-btn">
+            Restart Agent
+        </button>
+    </form>
+</div>
+
+{# ---- Status Cards ---- #}
+<div class="grid-2 mb-3">
+
+    {# Uptime card #}
+    <div class="card card--info">
+        <div class="card-header">Uptime</div>
+        <div class="card-body">
+            <p style="font-size:28px;font-weight:700;margin:0;">{{ uptime_str }}</p>
+            {% if last_startup %}
+            <p class="text-muted" style="margin:4px 0 0;">
+                Started {{ last_startup.timestamp.strftime('%Y-%m-%d %H:%M:%S') }} UTC
+                {% if last_startup.pid %}
+                &mdash; PID {{ last_startup.pid }}
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Last heartbeat card - color set by server-side data #}
+    <div class="card" id="heartbeat-card">
+        <div class="card-header">Last Heartbeat</div>
+        <div class="card-body">
+            {% if last_heartbeat %}
+            <p style="font-size:28px;font-weight:700;margin:0;" id="heartbeat-age"></p>
+            <p class="text-muted" style="margin:4px 0 0;">
+                {{ last_heartbeat.timestamp.strftime('%Y-%m-%d %H:%M:%S') }} UTC
+            </p>
+            {% else %}
+            <p style="font-size:28px;font-weight:700;margin:0;">No heartbeat</p>
+            <p class="text-muted" style="margin:4px 0 0;">Agent has never started</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Active user card #}
+    <div class="card">
+        <div class="card-header">Active User</div>
+        <div class="card-body">
+            {% if active_user and active_user.get('user_id') %}
+            <p style="font-size:20px;font-weight:600;margin:0;">
+                {{ active_user.get('username', 'Unknown') }}
+            </p>
+            <p class="text-muted" style="margin:4px 0 0;">
+                User ID {{ active_user.get('user_id') }}
+                — logged in {{ active_user.get('logged_in_at', '')[:19] }}
+            </p>
+            {% else %}
+            <p class="text-muted" style="margin:0;">No active user</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Error count card #}
+    <div class="card {% if recent_errors %}card--danger{% else %}card--success{% endif %}">
+        <div class="card-header">Recent Errors</div>
+        <div class="card-body">
+            <p style="font-size:28px;font-weight:700;margin:0;">
+                {{ recent_errors | length }}
+            </p>
+            <p class="text-muted" style="margin:4px 0 0;">in last 30 entries</p>
+        </div>
+    </div>
+</div>
+
+{# ---- Recent Events Table ---- #}
+<div class="card mb-3">
+    <div class="card-header">Recent Events</div>
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>Event</th>
+                        <th>PID</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for evt in recent_events %}
+                    <tr>
+                        <td>{{ evt.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td>
+                            {% if evt.event == 'startup' %}
+                                <span class="badge badge--success">startup</span>
+                            {% elif evt.event == 'shutdown' %}
+                                <span class="badge badge--info">shutdown</span>
+                            {% elif evt.event == 'heartbeat' %}
+                                <span class="badge badge--info">heartbeat</span>
+                            {% elif evt.event == 'crash_recovery' %}
+                                <span class="badge badge--warning">crash recovery</span>
+                            {% else %}
+                                <span class="badge">{{ evt.event }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ evt.pid or '' }}</td>
+                        <td>{{ evt.details[:120] if evt.details else '' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not recent_events %}
+                    <tr><td colspan="4" class="text-center text-muted">No events recorded yet</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{# ---- Recent Errors Table ---- #}
+<div class="card mb-3">
+    <div class="card-header">Recent Errors</div>
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>Job</th>
+                        <th>Error</th>
+                        <th>User</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for err in recent_errors %}
+                    <tr>
+                        <td>{{ err.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td><code>{{ err.job_name }}</code></td>
+                        <td title="{{ err.traceback[:500] if err.traceback else '' }}">
+                            {{ err.error_message[:100] }}{% if err.error_message|length > 100 %}&hellip;{% endif %}
+                        </td>
+                        <td>{{ err.user_id or '' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not recent_errors %}
+                    <tr><td colspan="4" class="text-center text-muted">No errors recorded</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Set heartbeat card colour and age text dynamically
+(function() {
+    var age = {{ heartbeat_age if heartbeat_age is not none else 'null' }};
+    var card = document.getElementById('heartbeat-card');
+    var ageEl = document.getElementById('heartbeat-age');
+    if (age !== null && card && ageEl) {
+        ageEl.textContent = age + 's ago';
+        if (age <= 60)       { card.classList.add('card--success'); }
+        else if (age <= 300) { card.classList.add('card--warning'); }
+        else                 { card.classList.add('card--danger'); }
+    } else if (card) {
+        card.classList.add('card--danger');
+    }
+})();
+
+// Restart button — confirm before sending
+document.getElementById('restart-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!confirm('Restart the background agent? This will interrupt any running jobs.')) return;
+
+    var btn = document.getElementById('restart-btn');
+    btn.disabled = true;
+    btn.textContent = 'Restarting...';
+
+    fetch('/admin/agent/restart', { method: 'POST' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                btn.textContent = 'Restarted!';
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-success');
+                setTimeout(function() { location.reload(); }, 3000);
+            } else {
+                btn.textContent = 'Failed';
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-danger');
+                alert('Restart failed: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(function() {
+            btn.textContent = 'Error';
+            btn.classList.add('btn-danger');
+        });
+});
+</script>
+
+{% endblock %}

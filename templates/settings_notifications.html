@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Notification Preferences — NP Companion{% endblock %}
+{% block page_id %}settings-notifications{% endblock %}
+
+{% block content %}
+<h1>Notification Preferences</h1>
+
+<div style="display:flex;gap:12px;margin-bottom:24px;">
+    <a href="{{ url_for('auth.settings_account') }}" class="btn btn-secondary btn-sm">Account</a>
+    <a href="{{ url_for('auth.settings_notifications') }}" class="btn btn-primary btn-sm">Notifications</a>
+</div>
+
+<form method="POST" action="{{ url_for('auth.settings_notifications') }}">
+
+    {# ---- General Settings ------------------------------------------ #}
+    <div class="card" style="margin-bottom:24px;max-width:600px;">
+        <div class="card-header">General</div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input
+                        type="checkbox"
+                        name="pushover_enabled"
+                        {{ 'checked' if current_user.get_pref('pushover_enabled') }}
+                    >
+                    <span>Enable Pushover notifications</span>
+                </label>
+                <p class="form-help">
+                    Pushover must be installed on your phone and your API key
+                    must be set in config.py on the work PC.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Quiet Hours ----------------------------------------------- #}
+    <div class="card" style="margin-bottom:24px;max-width:600px;">
+        <div class="card-header">Quiet Hours</div>
+        <div class="card-body">
+            <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+                Normal-priority notifications are silenced during quiet hours.
+                Critical alerts always come through.
+            </p>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="quiet_hours_start">Quiet starts (military time)</label>
+                    <input
+                        type="time"
+                        id="quiet_hours_start"
+                        name="quiet_hours_start"
+                        class="form-input"
+                        value="{{ '%02d:00' % current_user.get_pref('quiet_hours_start', 22) }}"
+                        placeholder="22:00"
+                    >
+                </div>
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="quiet_hours_end">Quiet ends (military time)</label>
+                    <input
+                        type="time"
+                        id="quiet_hours_end"
+                        name="quiet_hours_end"
+                        class="form-input"
+                        value="{{ '%02d:00' % current_user.get_pref('quiet_hours_end', 7) }}"
+                        placeholder="07:00"
+                    >
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="toggle-row">
+                    <input
+                        type="checkbox"
+                        name="weekend_alerts"
+                        {{ 'checked' if current_user.get_pref('weekend_alerts') }}
+                    >
+                    <span>Allow alerts on weekends</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Inbox Check Interval -------------------------------------- #}
+    <div class="card" style="margin-bottom:24px;max-width:600px;">
+        <div class="card-header">Inbox Monitor</div>
+        <div class="card-body">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="inbox_check_interval">
+                    Check interval (seconds)
+                </label>
+                <input
+                    type="number"
+                    id="inbox_check_interval"
+                    name="inbox_check_interval"
+                    class="form-input"
+                    min="30" max="600" step="10"
+                    value="{{ current_user.get_pref('inbox_check_interval', 120) }}"
+                    style="max-width:200px;"
+                >
+                <p class="form-help">
+                    How often the background agent checks for new inbox items.
+                    Default: 120 seconds (2 minutes).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Notification Types ---------------------------------------- #}
+    <div class="card" style="margin-bottom:24px;max-width:600px;">
+        <div class="card-header">Notification Types</div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_new_labs"
+                        {{ 'checked' if current_user.get_pref('notify_new_labs', true) }}>
+                    <span>New lab results</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_new_radiology"
+                        {{ 'checked' if current_user.get_pref('notify_new_radiology', true) }}>
+                    <span>New radiology results</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_new_messages"
+                        {{ 'checked' if current_user.get_pref('notify_new_messages', true) }}>
+                    <span>New patient messages</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_eod_reminder"
+                        {{ 'checked' if current_user.get_pref('notify_eod_reminder', true) }}>
+                    <span>End-of-day reminder</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_morning_briefing"
+                        {{ 'checked' if current_user.get_pref('notify_morning_briefing', true) }}>
+                    <span>Morning briefing</span>
+                </label>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="toggle-row" style="opacity:0.6;">
+                    <input type="checkbox" checked disabled>
+                    <span>Critical value alerts (always on)</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg">Save Preferences</button>
+</form>
+{% endblock %}

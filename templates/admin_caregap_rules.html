@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Care Gap Rules — Admin — NP Companion{% endblock %}
+{% block page_id %}admin{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <a href="/admin" style="color:var(--text-secondary);text-decoration:none;font-size:14px;">← Admin</a>
+    <h1 style="margin:0;">Care Gap Screening Rules</h1>
+    <span class="badge badge--info">{{ rules|length }} rules</span>
+    <form method="post" action="/admin/caregap-rules/reset" style="margin-left:auto;"
+          onsubmit="return confirm('Reset ALL rules to USPSTF defaults? This cannot be undone.');">
+        <button type="submit" class="btn btn-secondary btn-sm">Reset to Defaults</button>
+    </form>
+</div>
+
+<p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">
+    These rules control which preventive care gaps are evaluated for each patient.
+    Edit criteria, intervals, billing codes, and documentation templates.
+    Rules with source "api" override hardcoded defaults when both exist for the same gap type.
+</p>
+
+{% for rule in rules %}
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;"
+         onclick="toggleRule('rule-{{ rule.id }}')">
+        <div style="display:flex;align-items:center;gap:8px;">
+            {% if rule.is_active %}
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--success,#28a745);display:inline-block;"></span>
+            {% else %}
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--text-secondary,#999);display:inline-block;"></span>
+            {% endif %}
+            <strong>{{ rule.gap_name }}</strong>
+            <span class="badge" style="font-size:10px;padding:2px 6px;background:var(--bg-muted,#eee);color:var(--text-secondary);">{{ rule.gap_type }}</span>
+            <span class="badge" style="font-size:10px;padding:2px 6px;background:var(--bg-muted,#eee);color:var(--text-secondary);">{{ rule.source }}</span>
+        </div>
+        <span style="font-size:12px;color:var(--text-secondary);">
+            {{ rule.interval_days }}d interval · {{ rule.billing_code_pair or 'no code' }}
+        </span>
+    </div>
+    <div id="rule-{{ rule.id }}" style="display:none;">
+        <form method="post" action="/admin/caregap-rules/{{ rule.id }}/edit">
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Gap Name</label>
+                        <input type="text" name="gap_name" value="{{ rule.gap_name }}" class="form-control" style="width:100%;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Interval (days, 0=one-time)</label>
+                        <input type="number" name="interval_days" value="{{ rule.interval_days }}" class="form-control" style="width:100%;" min="0">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Billing Code Pair</label>
+                        <input type="text" name="billing_code_pair" value="{{ rule.billing_code_pair }}" class="form-control" style="width:100%;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Active</label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input type="checkbox" name="is_active" {% if rule.is_active %}checked{% endif %}>
+                            <span style="font-size:13px;">Enabled</span>
+                        </label>
+                    </div>
+                </div>
+                <div style="margin-top:12px;">
+                    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Description</label>
+                    <textarea name="description" rows="2" class="form-control" style="width:100%;font-size:13px;">{{ rule.description }}</textarea>
+                </div>
+                <div style="margin-top:12px;">
+                    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">
+                        Criteria JSON
+                        <span style="font-weight:normal;color:var(--text-secondary);">
+                            (keys: min_age, max_age, sex, risk_factors)
+                        </span>
+                    </label>
+                    <textarea name="criteria_json" rows="2" class="form-control" style="width:100%;font-family:monospace;font-size:12px;">{{ rule.criteria_json }}</textarea>
+                </div>
+                <div style="margin-top:12px;">
+                    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Documentation Template</label>
+                    <textarea name="documentation_template" rows="3" class="form-control" style="width:100%;font-size:13px;">{{ rule.documentation_template }}</textarea>
+                </div>
+                <div style="margin-top:12px;display:flex;gap:8px;">
+                    <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleRule('rule-{{ rule.id }}')">Cancel</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+{% if not rules %}
+<div class="card">
+    <div class="card-body">
+        <p class="empty-state">No rules found. Click "Reset to Defaults" to seed USPSTF rules.</p>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function toggleRule(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = (el.style.display === 'none') ? 'block' : 'none';
+}
+</script>
+{% endblock %}

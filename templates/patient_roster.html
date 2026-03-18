@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}My Patients — NP Companion{% endblock %}
+{% block page_id %}patient-roster{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:8px;">
+    <h1 style="margin:0;">My Patients</h1>
+    <span class="badge badge--info">{{ patients|length }} patient{{ 's' if patients|length != 1 }}</span>
+</div>
+
+{% if patients %}
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+        <table class="schedule-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>MRN</th>
+                    <th>DOB</th>
+                    <th>Last Data</th>
+                    <th>Claimed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in patients %}
+                <tr>
+                    <td>
+                        <a href="/patient/{{ p.mrn }}" style="color:inherit;font-weight:600;text-decoration:none;border-bottom:1px dotted var(--text-secondary);">
+                            {{ p.patient_name or 'Unknown' }}
+                        </a>
+                    </td>
+                    <td style="font-family:monospace;font-size:13px;">
+                        ••{{ p.mrn[-4:] if p.mrn and p.mrn|length >= 4 else p.mrn }}
+                    </td>
+                    <td>{{ p.patient_dob or '—' }}</td>
+                    <td>{{ p.last_xml_parsed.strftime('%m/%d/%Y') if p.last_xml_parsed else '—' }}</td>
+                    <td style="font-size:13px;color:var(--text-secondary);">
+                        {{ p.claimed_at.strftime('%m/%d/%Y') if p.claimed_at else '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
+        <p style="font-size:16px;margin-bottom:8px;">No patients claimed yet</p>
+        <p style="font-size:13px;">Open a patient chart and click "Claim Patient" to add them to your panel.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

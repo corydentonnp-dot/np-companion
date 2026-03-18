@@ -1,0 +1,38 @@
+# NP Companion ignore rules
+# File location in project: np-companion/.gitignore (project root, alongside app.py and config.py)
+# config.py is excluded because it contains sensitive machine-specific credentials and secrets
+
+# Sensitive config
+config.py
+
+# Runtime data (database, session files, backups)
+data/
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+
+# VS Code workspace settings
+.vscode/
+
+# Session cookies / serialized data
+*.pkl
+
+# Log files
+*.log
+
+# Build output
+dist/
+build/
+*.ico
+
+# Environment file
+.env
+
+# Workspace
+*.code-workspace

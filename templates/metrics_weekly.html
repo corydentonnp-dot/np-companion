@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Weekly Summary — NP Companion{% endblock %}
+{% block page_id %}metrics{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Weekly Summary{% if preview %} (Preview){% endif %}</h1>
+    <a href="/metrics" style="margin-left:auto;font-size:13px;color:var(--color-navy);">Back to Dashboard</a>
+</div>
+
+<div class="card" style="max-width:640px;margin-bottom:20px;">
+    <div class="card-header">Week of {{ summary.week_start }}</div>
+    <div class="card-body">
+        <div style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:20px;">
+            <div style="text-align:center;">
+                <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ summary.patients }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Patients Seen</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ summary.total_hours }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Total Chart Hours</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ summary.total_f2f }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">F2F Hours</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ summary.oncall_calls }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">On-Call Calls</div>
+            </div>
+        </div>
+
+        {% if summary.top_types %}
+        <h3 style="font-size:14px;font-weight:600;margin:0 0 8px;">Top Visit Types</h3>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:16px;">
+            {% for vt, cnt in summary.top_types %}
+            <tr style="border-bottom:1px solid var(--border,#f1f5f9);">
+                <td style="padding:6px 0;">{{ vt }}</td>
+                <td style="padding:6px 0;text-align:right;font-weight:600;">{{ cnt }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+
+        <div style="display:flex;gap:32px;flex-wrap:wrap;margin-bottom:16px;">
+            <div>
+                <div style="font-size:14px;font-weight:600;">Inbox Snapshot Items</div>
+                <div style="font-size:24px;font-weight:700;color:var(--color-navy);">{{ summary.inbox_items }}</div>
+            </div>
+        </div>
+
+        {% if summary.notable %}
+        <div style="padding:12px;background:#fefce8;border-radius:6px;border-left:4px solid #f59e0b;margin-top:12px;">
+            <p style="margin:0;font-size:14px;">{{ summary.notable }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if preview %}
+<div class="card" style="max-width:640px;">
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-secondary);">This is a preview of your weekly summary. The actual email will be sent Friday at 5 PM.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

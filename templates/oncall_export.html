@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Export Note — NP Companion{% endblock %}
+{% block page_id %}oncall-export{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h1 style="font-size:20px;margin:0;">Export for Amazing Charts</h1>
+        <a href="/oncall" class="btn btn-outline btn-sm">&larr; Back</a>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-body">
+            <pre id="export-text" style="white-space:pre-wrap;font-family:monospace;font-size:14px;line-height:1.6;margin:0;background:var(--bg-muted,#f8fafc);padding:16px;border-radius:6px;">{{ formatted_text }}</pre>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-primary" onclick="copyExport()" style="min-height:44px;flex:1;">&#128203; Copy to Clipboard</button>
+        {% if note.documentation_status == 'pending' %}
+        <form method="POST" action="/oncall/{{ note.id }}/status" style="flex:1;">
+            <input type="hidden" name="status" value="entered">
+            <button type="submit" class="btn btn-outline" style="min-height:44px;width:100%;">&#9989; Mark as Entered</button>
+        </form>
+        {% endif %}
+    </div>
+    <div id="copy-status" style="display:none;margin-top:8px;padding:8px;border-radius:6px;text-align:center;font-size:13px;background:var(--bg-success,#dcfce7);color:var(--text-success,#166534);"></div>
+</div>
+
+<script>
+function copyExport() {
+    var text = document.getElementById('export-text').textContent;
+    navigator.clipboard.writeText(text).then(function() {
+        var el = document.getElementById('copy-status');
+        el.textContent = 'Copied!';
+        el.style.display = 'block';
+        setTimeout(function() { el.style.display = 'none'; }, 3000);
+    });
+}
+</script>
+{% endblock %}

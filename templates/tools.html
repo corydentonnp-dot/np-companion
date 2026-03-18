@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Tools — NP Companion{% endblock %}
+{% block page_id %}tools{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+    <h1 style="margin:0;">Tools</h1>
+    <span class="badge badge--warning">Phase 7 — Coming Soon</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;max-width:900px;">
+
+    <div class="card">
+        <div class="card-header">Follow-Up Tickler</div>
+        <div class="card-body">
+            <p style="font-size:14px;">Three-column task board for patient follow-up reminders. Supports MA assignment, priority levels, and Pushover alerts for urgent items.</p>
+            <span class="badge badge--warning">Phase 7 · F24</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Controlled Substance Tracker</div>
+        <div class="card-body">
+            <p style="font-size:14px;">Track fill dates, PDMP check intervals, and UDS schedules for controlled substance patients.</p>
+            <span class="badge badge--warning">Phase 7 · F25</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Prior Authorization Generator</div>
+        <div class="card-body">
+            <p style="font-size:14px;">Narrative builder with payer history, shared winning-language library, and appeal tracker.</p>
+            <span class="badge badge--warning">Phase 7 · F26</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Referral Letter Generator</div>
+        <div class="card-body">
+            <p style="font-size:14px;">Specialty-specific letter templates, referral tracking log, and overdue-return report.</p>
+            <span class="badge badge--warning">Phase 7 · F27</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">AutoHotkey Macros</div>
+        <div class="card-body">
+            <p style="font-size:14px;">Manage and sync keyboard macros for Amazing Charts and NetPractice. Definitions stored in the database and pushed to the .ahk script.</p>
+            <span class="badge badge--warning">Phase 7 · F23</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">ICD-10 Coding Helper</div>
+        <div class="card-body">
+            <p style="font-size:14px;">Search ICD-10 codes, save favorites, detect unspecified codes, and suggest common pairings.</p>
+            <span class="badge badge--warning">Phase 5 · F17</span>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

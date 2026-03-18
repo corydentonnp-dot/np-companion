@@ -1,0 +1,351 @@
+/*
+ * NP Companion — Theme Definitions
+ * File: static/css/themes.css
+ *
+ * Each theme sets CSS custom properties on [data-theme="<name>"].
+ * The base light theme is defined in main.css :root block.
+ * Dark mode is also in main.css as [data-theme="dark"].
+ *
+ * NEW THEMES:
+ *   modern, fancy, retro, minimalist, nature, ocean, sunset, nord
+ *
+ * Font overrides: [data-font="<family>"]
+ * Color accent overrides: [data-accent="<color>"]
+ */
+
+
+/* ==========================================================
+   THEME: Modern (clean, bright, blue accents)
+   ========================================================== */
+[data-theme="modern"] {
+    --color-navy:       #2563EB;
+    --color-teal:       #0891B2;
+    --color-gold:       #F59E0B;
+    --color-red:        #EF4444;
+    --color-green:      #10B981;
+    --bg-primary:       #F8FAFC;
+    --bg-card:          #FFFFFF;
+    --bg-sidebar:       #1E293B;
+    --bg-header:        #FFFFFF;
+    --bg-surface:       #FFFFFF;
+    --bg-muted:         #F1F5F9;
+    --bg-input:         #FFFFFF;
+    --text-primary:     #0F172A;
+    --text-secondary:   #475569;
+    --text-muted:       #94A3B8;
+    --text-on-dark:     #F8FAFC;
+    --border-color:     #E2E8F0;
+    --border:           #E2E8F0;
+    --shadow-sm:        0 1px 2px rgba(0,0,0,.05);
+    --shadow-md:        0 4px 6px rgba(0,0,0,.07);
+    --shadow-lg:        0 10px 15px rgba(0,0,0,.10);
+    --radius:           8px;
+    --radius-lg:        12px;
+}
+
+/* ==========================================================
+   THEME: Fancy (purple/violet gradients, glass effects)
+   ========================================================== */
+[data-theme="fancy"] {
+    --color-navy:       #7C3AED;
+    --color-teal:       #A855F7;
+    --color-gold:       #FBBF24;
+    --color-red:        #F43F5E;
+    --color-green:      #34D399;
+    --bg-primary:       #FAF5FF;
+    --bg-card:          rgba(255,255,255,0.85);
+    --bg-sidebar:       #3B0764;
+    --bg-header:        rgba(255,255,255,0.9);
+    --bg-surface:       rgba(255,255,255,0.85);
+    --bg-muted:         #F3E8FF;
+    --bg-input:         #FFFFFF;
+    --text-primary:     #1E1033;
+    --text-secondary:   #6B21A8;
+    --text-muted:       #A78BFA;
+    --text-on-dark:     #F5F3FF;
+    --border-color:     #DDD6FE;
+    --border:           #DDD6FE;
+    --shadow-sm:        0 1px 3px rgba(124,58,237,.1);
+    --shadow-md:        0 4px 12px rgba(124,58,237,.12);
+    --shadow-lg:        0 8px 24px rgba(124,58,237,.15);
+    --radius:           10px;
+    --radius-lg:        16px;
+}
+[data-theme="fancy"] .sidebar {
+    background: linear-gradient(180deg, #3B0764 0%, #581C87 50%, #7C3AED 100%);
+}
+[data-theme="fancy"] .card,
+[data-theme="fancy"] .dash-widget {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(124,58,237,.15);
+}
+
+/* ==========================================================
+   THEME: Retro / Old School Windows (flat, chunky, 90s vibe)
+   ========================================================== */
+[data-theme="retro"] {
+    --color-navy:       #000080;
+    --color-teal:       #008080;
+    --color-gold:       #808000;
+    --color-red:        #C00000;
+    --color-green:      #008000;
+    --bg-primary:       #C0C0C0;
+    --bg-card:          #FFFFFF;
+    --bg-sidebar:       #000080;
+    --bg-header:        #C0C0C0;
+    --bg-surface:       #FFFFFF;
+    --bg-muted:         #D4D0C8;
+    --bg-input:         #FFFFFF;
+    --text-primary:     #000000;
+    --text-secondary:   #333333;
+    --text-muted:       #808080;
+    --text-on-dark:     #FFFFFF;
+    --border-color:     #808080;
+    --border:           #808080;
+    --shadow-sm:        inset -1px -1px 0 #808080, inset 1px 1px 0 #fff;
+    --shadow-md:        inset -2px -2px 0 #808080, inset 2px 2px 0 #fff;
+    --shadow-lg:        inset -2px -2px 0 #808080, inset 2px 2px 0 #fff;
+    --radius:           0px;
+    --radius-lg:        0px;
+}
+[data-theme="retro"] .btn {
+    border-radius: 0;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    text-transform: none;
+}
+[data-theme="retro"] .card {
+    border-radius: 0;
+    border: 2px solid;
+    border-color: #dfdfdf #808080 #808080 #dfdfdf;
+}
+[data-theme="retro"] .sidebar {
+    border-right: 2px solid;
+    border-color: #dfdfdf #808080 #808080 #dfdfdf;
+}
+
+/* ==========================================================
+   THEME: Minimalist (ultra clean, lots of whitespace)
+   ========================================================== */
+[data-theme="minimalist"] {
+    --color-navy:       #111111;
+    --color-teal:       #555555;
+    --color-gold:       #888888;
+    --color-red:        #D32F2F;
+    --color-green:      #388E3C;
+    --bg-primary:       #FAFAFA;
+    --bg-card:          #FFFFFF;
+    --bg-sidebar:       #111111;
+    --bg-header:        #FAFAFA;
+    --bg-surface:       #FFFFFF;
+    --bg-muted:         #F5F5F5;
+    --bg-input:         #FFFFFF;
+    --text-primary:     #212121;
+    --text-secondary:   #757575;
+    --text-muted:       #BDBDBD;
+    --text-on-dark:     #FAFAFA;
+    --border-color:     #EEEEEE;
+    --border:           #EEEEEE;
+    --shadow-sm:        none;
+    --shadow-md:        0 1px 3px rgba(0,0,0,.06);
+    --shadow-lg:        0 2px 8px rgba(0,0,0,.08);
+    --radius:           4px;
+    --radius-lg:        6px;
+}
+[data-theme="minimalist"] .card {
+    border: 1px solid #eee;
+    box-shadow: none;
+}
+
+/* ==========================================================
+   THEME: Nature (earthy greens, warm browns)
+   ========================================================== */
+[data-theme="nature"] {
+    --color-navy:       #2D5016;
+    --color-teal:       #558B2F;
+    --color-gold:       #F9A825;
+    --color-red:        #BF360C;
+    --color-green:      #33691E;
+    --bg-primary:       #F1F8E9;
+    --bg-card:          #FFFFFF;
+    --bg-sidebar:       #1B3A1A;
+    --bg-header:        #F1F8E9;
+    --bg-surface:       #FFFFFF;
+    --bg-muted:         #DCEDC8;
+    --bg-input:         #FFFFFF;
+    --text-primary:     #1B3A1A;
+    --text-secondary:   #33691E;
+    --text-muted:       #8BC34A;
+    --text-on-dark:     #F1F8E9;
+    --border-color:     #C5E1A5;
+    --border:           #C5E1A5;
+    --shadow-sm:        0 1px 3px rgba(45,80,22,.08);
+    --shadow-md:        0 3px 8px rgba(45,80,22,.10);
+    --shadow-lg:        0 6px 16px rgba(45,80,22,.12);
+    --radius:           8px;
+    --radius-lg:        12px;
+}
+[data-theme="nature"] .sidebar {
+    background: linear-gradient(180deg, #1B3A1A 0%, #2D5016 100%);
+}
+
+/* ==========================================================
+   THEME: Ocean (deep blues, aquamarine, wave gradients)
+   ========================================================== */
+[data-theme="ocean"] {
+    --color-navy:       #0277BD;
+    --color-teal:       #00838F;
+    --color-gold:       #FFB300;
+    --color-red:        #E64A19;
+    --color-green:      #00897B;
+    --bg-primary:       #E0F7FA;
+    --bg-card:          #FFFFFF;
+    --bg-sidebar:       #01579B;
+    --bg-header:        #E0F7FA;
+    --bg-surface:       #FFFFFF;
+    --bg-muted:         #B2EBF2;
+    --bg-input:         #FFFFFF;
+    --text-primary:     #004D5B;
+    --text-secondary:   #006064;
+    --text-muted:       #4DD0E1;
+    --text-on-dark:     #E0F7FA;
+    --border-color:     #80DEEA;
+    --border:           #80DEEA;
+    --shadow-sm:        0 1px 3px rgba(2,119,189,.08);
+    --shadow-md:        0 3px 8px rgba(2,119,189,.12);
+    --shadow-lg:        0 6px 20px rgba(2,119,189,.15);
+    --radius:           8px;
+    --radius-lg:        14px;
+}
+[data-theme="ocean"] .sidebar {
+    background: linear-gradient(180deg, #01579B 0%, #0277BD 50%, #0288D1 100%);
+}
+
+/* ==========================================================
+   THEME: Sunset (warm oranges, pinks, coral)
+   ========================================================== */
+[data-theme="sunset"] {
+    --color-navy:       #BF360C;
+    --color-teal:       #E65100;
+    --color-gold:       #FFB300;
+    --color-red:        #D32F2F;
+    --color-green:      #558B2F;
+    --bg-primary:       #FFF3E0;
+    --bg-card:          #FFFFFF;
+    --bg-sidebar:       #4E342E;
+    --bg-header:        #FFF3E0;
+    --bg-surface:       #FFFFFF;
+    --bg-muted:         #FFE0B2;
+    --bg-input:         #FFFFFF;
+    --text-primary:     #3E2723;
+    --text-secondary:   #5D4037;
+    --text-muted:       #BCAAA4;
+    --text-on-dark:     #FFF3E0;
+    --border-color:     #FFCCBC;
+    --border:           #FFCCBC;
+    --shadow-sm:        0 1px 3px rgba(191,54,12,.08);
+    --shadow-md:        0 3px 8px rgba(191,54,12,.12);
+    --shadow-lg:        0 6px 16px rgba(191,54,12,.15);
+    --radius:           8px;
+    --radius-lg:        12px;
+}
+[data-theme="sunset"] .sidebar {
+    background: linear-gradient(180deg, #4E342E 0%, #6D4C41 50%, #BF360C 100%);
+}
+
+/* ==========================================================
+   THEME: Nord (cool Nordic palette, muted blues/grays)
+   ========================================================== */
+[data-theme="nord"] {
+    --color-navy:       #5E81AC;
+    --color-teal:       #88C0D0;
+    --color-gold:       #EBCB8B;
+    --color-red:        #BF616A;
+    --color-green:      #A3BE8C;
+    --bg-primary:       #ECEFF4;
+    --bg-card:          #E5E9F0;
+    --bg-sidebar:       #2E3440;
+    --bg-header:        #ECEFF4;
+    --bg-surface:       #E5E9F0;
+    --bg-muted:         #D8DEE9;
+    --bg-input:         #ECEFF4;
+    --text-primary:     #2E3440;
+    --text-secondary:   #3B4252;
+    --text-muted:       #7B88A1;
+    --text-on-dark:     #ECEFF4;
+    --border-color:     #D8DEE9;
+    --border:           #D8DEE9;
+    --shadow-sm:        0 1px 2px rgba(46,52,64,.06);
+    --shadow-md:        0 2px 6px rgba(46,52,64,.08);
+    --shadow-lg:        0 4px 12px rgba(46,52,64,.10);
+    --radius:           6px;
+    --radius-lg:        10px;
+}
+[data-theme="nord"] .sidebar {
+    background: linear-gradient(180deg, #2E3440 0%, #3B4252 100%);
+}
+
+
+/* ==========================================================
+   FONT OVERRIDES — applied via [data-font] on <html>
+   ========================================================== */
+[data-font="system"] {
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+[data-font="inter"] {
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+[data-font="roboto"] {
+    --font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+[data-font="poppins"] {
+    --font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+[data-font="source-code"] {
+    --font-family: 'Source Code Pro', 'Consolas', 'Courier New', monospace;
+}
+[data-font="merriweather"] {
+    --font-family: 'Merriweather', Georgia, 'Times New Roman', serif;
+}
+[data-font="comic"] {
+    --font-family: 'Comic Sans MS', 'Comic Sans', cursive, sans-serif;
+}
+
+/* Apply the font variable */
+[data-font] body {
+    font-family: var(--font-family);
+}
+[data-font] input,
+[data-font] select,
+[data-font] textarea,
+[data-font] button {
+    font-family: var(--font-family);
+}
+
+
+/* ==========================================================
+   ACCENT COLOR OVERRIDES — [data-accent] on <html>
+   ========================================================== */
+[data-accent="blue"] {
+    --color-navy: #2563EB;
+    --color-teal: #0891B2;
+}
+[data-accent="teal"] {
+    --color-navy: #0D9488;
+    --color-teal: #0D7377;
+}
+[data-accent="purple"] {
+    --color-navy: #7C3AED;
+    --color-teal: #8B5CF6;
+}
+[data-accent="rose"] {
+    --color-navy: #E11D48;
+    --color-teal: #FB7185;
+}
+[data-accent="amber"] {
+    --color-navy: #D97706;
+    --color-teal: #F59E0B;
+}
+[data-accent="emerald"] {
+    --color-navy: #059669;
+    --color-teal: #10B981;
+}

@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Care Gaps — NP Companion{% endblock %}
+{% block page_id %}caregap{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Care Gaps</h1>
+    {% if total_gaps > 0 %}
+    <span class="badge badge--warning">{{ total_gaps }} open gap{{ 's' if total_gaps != 1 }}</span>
+    {% else %}
+    <span class="badge badge--success">No gaps for today</span>
+    {% endif %}
+    <a href="/caregap/panel" class="btn btn-secondary btn-sm" style="margin-left:auto;">Panel Report</a>
+</div>
+
+{# ---- DATE NAVIGATION ---- #}
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+    <a href="/caregap?date={{ yesterday.isoformat() }}" class="btn btn-secondary btn-sm">
+        ← {{ yesterday.strftime('%b %d').replace(' 0', ' ') }}
+    </a>
+    <a href="/caregap" class="btn {% if is_today %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Today
+    </a>
+    <a href="/caregap?date={{ tomorrow.isoformat() }}" class="btn btn-secondary btn-sm">
+        {{ tomorrow.strftime('%b %d').replace(' 0', ' ') }} →
+    </a>
+    <span style="font-size:14px;color:var(--text-secondary);margin-left:8px;">
+        {{ view_date.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}
+    </span>
+</div>
+
+{# ---- SCHEDULED PATIENTS WITH GAPS ---- #}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Scheduled Patients</span>
+        <span class="badge badge--info">{{ patients|length }} patient{{ 's' if patients|length != 1 }}</span>
+    </div>
+    {% if patients %}
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+        <table class="schedule-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Patient</th>
+                    <th>MRN</th>
+                    <th>Visit Type</th>
+                    <th>Care Gaps</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in patients %}
+                <tr>
+                    <td class="schedule-time">{{ p.time }}</td>
+                    <td>{{ p.name }}</td>
+                    <td style="font-family:monospace;font-size:13px;">{{ p.mrn_display }}</td>
+                    <td>{{ p.visit_type }}</td>
+                    <td>
+                        {% if p.gap_count > 0 %}
+                        <button class="badge badge--warning" style="cursor:pointer;border:none;background:var(--warning-bg,#fff3cd);color:var(--warning-text,#856404);padding:3px 10px;border-radius:12px;font-size:13px;"
+                                onclick="toggleGapRow('{{ p.mrn }}')">
+                            {{ p.gap_count }} gap{{ 's' if p.gap_count != 1 }}
+                        </button>
+                        {% else %}
+                        <span class="badge badge--success" style="font-size:12px;">✓ Up to date</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/caregap/{{ p.mrn }}" class="btn btn-primary btn-sm">View All</a>
+                    </td>
+                </tr>
+                {# Expandable gap detail row (F15a) #}
+                {% if p.gap_count > 0 %}
+                <tr id="gap-row-{{ p.mrn }}" style="display:none;">
+                    <td colspan="6" style="padding:12px 16px;background:var(--bg-muted,#f8f9fa);">
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                            {% for g in p.gaps %}
+                            <div style="background:var(--bg-surface,#fff);border:1px solid var(--border,#ddd);border-radius:8px;padding:10px 14px;min-width:220px;flex:1;max-width:350px;">
+                                <div style="font-weight:600;font-size:14px;margin-bottom:4px;">{{ g.gap_name or g.gap_type }}</div>
+                                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">{{ g.description|truncate(80) }}</div>
+                                {% if g.billing_code_suggested %}
+                                <div style="font-size:11px;color:var(--text-secondary);">Code: {{ g.billing_code_suggested }}</div>
+                                {% endif %}
+                                <div style="margin-top:8px;display:flex;gap:6px;">
+                                    <button class="btn btn-primary btn-sm" onclick="addressGap('{{ p.mrn }}', {{ g.id }})">
+                                        ✓ Address
+                                    </button>
+                                    <form method="post" action="/caregap/{{ p.mrn }}/status/{{ g.id }}" style="display:inline;">
+                                        <input type="hidden" name="status" value="declined">
+                                        <button type="submit" class="btn btn-secondary btn-sm" title="Patient declined">Decline</button>
+                                    </form>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="empty-state">No patients scheduled for {{ view_date.strftime('%A, %B %d').replace(' 0', ' ') }}.</p>
+    </div>
+    {% endif %}
+</div>
+
+{# ---- UNSCHEDULED PATIENTS WITH OPEN GAPS ---- #}
+{% if unscheduled_with_gaps %}
+<div class="card">
+    <div class="card-header">
+        Other Patients with Open Gaps
+        <span class="badge badge--info" style="margin-left:8px;">{{ unscheduled_with_gaps|length }}</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+        <table class="schedule-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Patient</th>
+                    <th>MRN</th>
+                    <th>Open Gaps</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in unscheduled_with_gaps %}
+                <tr>
+                    <td>{{ p.name or '—' }}</td>
+                    <td style="font-family:monospace;font-size:13px;">{{ p.mrn_display }}</td>
+                    <td><span class="badge badge--warning">{{ p.gap_count }}</span></td>
+                    <td><a href="/caregap/{{ p.mrn }}" class="btn btn-primary btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ---- DOCUMENTATION SNIPPET MODAL (F15b) ---- #}
+<div id="doc-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998;" onclick="closeDocModal()"></div>
+<div id="doc-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-surface,#fff);border-radius:12px;padding:24px;width:90%;max-width:520px;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;" id="doc-modal-title">Documentation Snippet</h3>
+        <button onclick="closeDocModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary);">&times;</button>
+    </div>
+    <textarea id="doc-modal-snippet" rows="5" class="form-control" style="width:100%;font-size:14px;margin-bottom:12px;" readonly></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="copySnippet()">📋 Copy to Clipboard</button>
+        <button class="btn btn-secondary" onclick="closeDocModal()">Close</button>
+    </div>
+    <div id="doc-copy-confirm" style="display:none;color:var(--success,green);font-size:13px;margin-top:8px;text-align:right;">
+        Copied to clipboard!
+    </div>
+</div>
+
+<script>
+function toggleGapRow(mrn) {
+    var row = document.getElementById('gap-row-' + mrn);
+    if (row) row.style.display = (row.style.display === 'none') ? '' : 'none';
+}
+
+function addressGap(mrn, gapId) {
+    fetch('/caregap/' + mrn + '/address/' + gapId, {
+        method: 'POST',
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            document.getElementById('doc-modal-title').textContent = data.gap_name + ' — Addressed';
+            document.getElementById('doc-modal-snippet').value = data.snippet;
+            document.getElementById('doc-modal').style.display = 'block';
+            document.getElementById('doc-modal-overlay').style.display = 'block';
+            /* Refresh after closing modal */
+            document.getElementById('doc-modal')._refresh = true;
+        }
+    });
+}
+
+function closeDocModal() {
+    document.getElementById('doc-modal').style.display = 'none';
+    document.getElementById('doc-modal-overlay').style.display = 'none';
+    document.getElementById('doc-copy-confirm').style.display = 'none';
+    if (document.getElementById('doc-modal')._refresh) {
+        location.reload();
+    }
+}
+
+function copySnippet() {
+    var ta = document.getElementById('doc-modal-snippet');
+    ta.select();
+    navigator.clipboard.writeText(ta.value).then(function() {
+        document.getElementById('doc-copy-confirm').style.display = 'block';
+        setTimeout(function() {
+            document.getElementById('doc-copy-confirm').style.display = 'none';
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

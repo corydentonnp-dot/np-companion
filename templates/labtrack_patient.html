@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}Lab Tracker — …{{ display_mrn }} — NP Companion{% endblock %}
+{% block page_id %}labtrack-patient{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+    <h1 style="margin:0;font-size:22px;">Labs for …{{ display_mrn }}</h1>
+    <a href="/labtrack" class="btn btn-outline btn-sm">&larr; All Patients</a>
+</div>
+
+{# ── Panel groups (F11d) ── #}
+{% for panel_name, panel_tracks in paneled.items() %}
+<div class="card" style="margin-bottom:16px;{% if panel_tracks|selectattr('status','equalto','critical')|list %}border-left:4px solid #ef4444;{% endif %}">
+    <div class="card-header" style="display:flex;align-items:center;gap:8px;">
+        <strong>{{ panel_name }} Panel</strong>
+        <span style="font-size:12px;color:var(--text-secondary);">({{ panel_tracks|length }} components)</span>
+        {% if panel_tracks|selectattr('status','equalto','critical')|list %}
+        <span class="badge badge--danger" style="background:#ef4444;">🔔 Critical</span>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{# ── All individual track cards ── #}
+{% for track in tracks %}
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <strong>{{ track.lab_name }}</strong>
+            {% if track.panel_name %}<span style="font-size:11px;color:var(--text-secondary);">({{ track.panel_name }})</span>{% endif %}
+            {% set st = track.status %}
+            {% if st == 'critical' %}
+                <span class="badge badge--danger" style="background:#ef4444;">🔔 Critical</span>
+            {% elif st == 'overdue' %}
+                <span class="badge badge--danger">Overdue</span>
+            {% elif st == 'due_soon' %}
+                <span class="badge badge--warning">Due Soon</span>
+            {% else %}
+                <span class="badge badge--success">On Track</span>
+            {% endif %}
+        </div>
+        <div style="display:flex;gap:6px;">
+            <button class="btn btn-sm btn-outline" onclick="toggleEdit({{ track.id }})">Edit</button>
+            <button class="btn btn-sm btn-outline" onclick="toggleAddResult({{ track.id }})">+ Result</button>
+        </div>
+    </div>
+    <div class="card-body">
+        {# ── Info row ── #}
+        <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px;margin-bottom:12px;">
+            <div>
+                <span style="color:var(--text-secondary);">Interval:</span>
+                {{ track.interval_days }} days
+            </div>
+            <div>
+                <span style="color:var(--text-secondary);">Last checked:</span>
+                {{ track.last_checked.strftime('%m/%d/%y') if track.last_checked else 'Never' }}
+            </div>
+            <div>
+                <span style="color:var(--text-secondary);">Next due:</span>
+                {% if track.next_due %}{{ track.next_due.strftime('%m/%d/%y') }}{% else %}—{% endif %}
+            </div>
+            <div>
+                <span style="color:var(--text-secondary);">Trend:</span>
+                {% if track.trend == 'up' %}<span style="color:#f97316;">Trending UP ↑</span>
+                {% elif track.trend == 'down' %}<span style="color:#3b82f6;">Trending DOWN ↓</span>
+                {% else %}<span>Stable →</span>{% endif %}
+            </div>
+        </div>
+
+        {# ── Threshold visual range bar (F11b) ── #}
+        {% if track.alert_low is not none or track.alert_high is not none or track.critical_low is not none or track.critical_high is not none %}
+        <div style="margin-bottom:12px;">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Threshold Range</div>
+            <div style="display:flex;height:20px;border-radius:4px;overflow:hidden;font-size:10px;line-height:20px;text-align:center;">
+                {% if track.critical_low is not none %}
+                <div style="flex:1;background:#fecaca;color:#991b1b;" title="Critical Low ≤{{ track.critical_low }}">≤{{ track.critical_low }}</div>
+                {% endif %}
+                {% if track.alert_low is not none %}
+                <div style="flex:1;background:#fed7aa;color:#9a3412;" title="Alert Low ≤{{ track.alert_low }}">≤{{ track.alert_low }}</div>
+                {% endif %}
+                <div style="flex:2;background:#bbf7d0;color:#166534;" title="Normal Range">Normal</div>
+                {% if track.alert_high is not none %}
+                <div style="flex:1;background:#fed7aa;color:#9a3412;" title="Alert High ≥{{ track.alert_high }}">≥{{ track.alert_high }}</div>
+                {% endif %}
+                {% if track.critical_high is not none %}
+                <div style="flex:1;background:#fecaca;color:#991b1b;" title="Critical High ≥{{ track.critical_high }}">≥{{ track.critical_high }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# ── Chart.js sparkline (F11a) ── #}
+        {% if track.results|length >= 2 %}
+        <div style="max-width:600px;height:200px;margin-bottom:12px;">
+            <canvas id="chart-{{ track.id }}"></canvas>
+        </div>
+        {% endif %}
+
+        {# ── Last 5 results table ── #}
+        {% if track.results %}
+        <table style="width:100%;max-width:500px;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="border-bottom:1px solid var(--border,#eee);text-align:left;">
+                    <th style="padding:4px 8px;">Date</th>
+                    <th style="padding:4px 8px;">Value</th>
+                    <th style="padding:4px 8px;">Trend</th>
+                    <th style="padding:4px 8px;">Flag</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in track.results[:5] %}
+                <tr style="border-bottom:1px solid var(--border,#f8fafc);">
+                    <td style="padding:4px 8px;color:var(--text-secondary);">{{ r.result_date.strftime('%m/%d/%y') if r.result_date else '—' }}</td>
+                    <td style="padding:4px 8px;{% if r.is_critical %}color:#ef4444;font-weight:700;{% endif %}">{{ r.result_value }}</td>
+                    <td style="padding:4px 8px;">
+                        {% if r.trend_direction == 'up' %}↑{% elif r.trend_direction == 'down' %}↓{% else %}→{% endif %}
+                    </td>
+                    <td style="padding:4px 8px;">{% if r.is_critical %}<span style="color:#ef4444;">⚠</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="font-size:13px;color:var(--text-secondary);">No results recorded yet.</p>
+        {% endif %}
+
+        {# ── Notes ── #}
+        {% if track.notes %}
+        <div style="margin-top:10px;font-size:12px;color:var(--text-secondary);padding:8px;background:var(--bg-hover,#f8fafc);border-radius:4px;">
+            <strong>Notes:</strong> {{ track.notes }}
+        </div>
+        {% endif %}
+
+        {# ── Hidden edit form ── #}
+        <div id="edit-{{ track.id }}" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border,#eee);border-radius:6px;">
+            <form method="POST" action="/labtrack/{{ track.id }}/edit">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;">
+                    <div>
+                        <label style="font-size:11px;">Interval (days)</label>
+                        <input type="number" name="interval_days" class="form-control" value="{{ track.interval_days }}" min="1">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;">Critical Low</label>
+                        <input type="number" step="any" name="critical_low" class="form-control" value="{{ track.critical_low if track.critical_low is not none else '' }}">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;">Alert Low</label>
+                        <input type="number" step="any" name="alert_low" class="form-control" value="{{ track.alert_low if track.alert_low is not none else '' }}">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;">Alert High</label>
+                        <input type="number" step="any" name="alert_high" class="form-control" value="{{ track.alert_high if track.alert_high is not none else '' }}">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;">Critical High</label>
+                        <input type="number" step="any" name="critical_high" class="form-control" value="{{ track.critical_high if track.critical_high is not none else '' }}">
+                    </div>
+                </div>
+                <div style="margin-top:8px;">
+                    <label style="font-size:11px;">Notes</label>
+                    <textarea name="notes" class="form-control" rows="2">{{ track.notes or '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:8px;">Save Changes</button>
+            </form>
+        </div>
+
+        {# ── Hidden add-result form ── #}
+        <div id="result-{{ track.id }}" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--border,#eee);border-radius:6px;">
+            <form method="POST" action="/labtrack/{{ track.id }}/result">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+                    <div>
+                        <label style="font-size:11px;">Value</label>
+                        <input type="text" name="result_value" class="form-control" placeholder="e.g., 6.8" required style="width:100px;">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;">Date</label>
+                        <input type="date" name="result_date" class="form-control" value="{{ today }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Add Result</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{# ── Chart.js CDN ── #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+function toggleEdit(id) {
+    const el = document.getElementById('edit-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function toggleAddResult(id) {
+    const el = document.getElementById('result-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+/* Render Chart.js trend graphs for each track with 2+ results */
+document.addEventListener('DOMContentLoaded', function() {
+    {% for track in tracks %}
+    {% if track.results|length >= 2 %}
+    (function() {
+        const canvas = document.getElementById('chart-{{ track.id }}');
+        if (!canvas) return;
+
+        fetch('/labtrack/{{ mrn }}/trend/{{ track.lab_name|urlencode }}')
+            .then(r => r.json())
+            .then(data => {
+                const ctx = canvas.getContext('2d');
+
+                /* Build annotation lines for thresholds */
+                const annotations = [];
+                if (data.alert_low !== null) {
+                    annotations.push({ type: 'line', yMin: data.alert_low, yMax: data.alert_low,
+                        borderColor: '#f97316', borderDash: [6,3], borderWidth: 1,
+                        label: { content: 'Alert Low', display: true, position: 'start', font: {size:10} }});
+                }
+                if (data.alert_high !== null) {
+                    annotations.push({ type: 'line', yMin: data.alert_high, yMax: data.alert_high,
+                        borderColor: '#f97316', borderDash: [6,3], borderWidth: 1,
+                        label: { content: 'Alert High', display: true, position: 'start', font: {size:10} }});
+                }
+                if (data.critical_low !== null) {
+                    annotations.push({ type: 'line', yMin: data.critical_low, yMax: data.critical_low,
+                        borderColor: '#ef4444', borderDash: [4,2], borderWidth: 1.5,
+                        label: { content: 'Crit Low', display: true, position: 'start', font: {size:10} }});
+                }
+                if (data.critical_high !== null) {
+                    annotations.push({ type: 'line', yMin: data.critical_high, yMax: data.critical_high,
+                        borderColor: '#ef4444', borderDash: [4,2], borderWidth: 1.5,
+                        label: { content: 'Crit High', display: true, position: 'start', font: {size:10} }});
+                }
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: data.lab_name,
+                            data: data.values,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59,130,246,0.1)',
+                            pointBackgroundColor: data.point_colors,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            tension: 0.2,
+                            fill: true,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: false },
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: { beginAtZero: false },
+                        },
+                    }
+                });
+
+                /* Add trend label below chart */
+                const trendDiv = document.createElement('div');
+                trendDiv.style.cssText = 'text-align:center;font-size:12px;font-weight:600;margin-top:4px;';
+                if (data.trend_label.includes('UP')) {
+                    trendDiv.style.color = '#f97316';
+                } else if (data.trend_label.includes('DOWN')) {
+                    trendDiv.style.color = '#3b82f6';
+                } else {
+                    trendDiv.style.color = 'var(--text-secondary)';
+                }
+                trendDiv.textContent = data.trend_label;
+                canvas.parentElement.appendChild(trendDiv);
+            })
+            .catch(err => console.warn('Chart load failed for track {{ track.id }}:', err));
+    })();
+    {% endif %}
+    {% endfor %}
+});
+</script>
+{% endblock %}

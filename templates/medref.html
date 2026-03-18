@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Med Reference — NP Companion{% endblock %}
+{% block page_id %}medref{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+    <h1 style="margin:0;">Medication Reference</h1>
+    <span class="badge badge--warning">Phase 3 — Coming Soon</span>
+</div>
+
+<div class="card" style="max-width:640px;">
+    <div class="card-header">Clinical Drug Reference</div>
+    <div class="card-body">
+        <p>The Med Reference module provides a searchable, locally-hosted drug reference:</p>
+        <ul style="margin:8px 0 0 20px;line-height:1.8;">
+            <li>Condition-based lookup — first-line and second-line options</li>
+            <li>Shared formulary notes with author and date</li>
+            <li>Pregnancy and renal filter context bar</li>
+            <li>Contraindication hiding when filters are active</li>
+            <li>Guideline update flag — yellow banner when review is needed</li>
+        </ul>
+        <p style="margin-top:16px;font-size:13px;color:var(--text-secondary);">
+            <strong>Phase 3</strong> — F10. No internet connection required.
+        </p>
+    </div>
+</div>
+{% endblock %}

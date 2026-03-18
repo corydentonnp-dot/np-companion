@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Patient {{ mrn_display }} — NP Companion{% endblock %}
+{% block page_id %}patient{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+    <h1 style="margin:0;">Patient {{ mrn_display }}</h1>
+</div>
+
+<div class="card" style="max-width:640px;margin-bottom:24px;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        Patient Information
+        <form method="POST" action="/api/patient/{{ mrn }}/refresh" style="display:inline;">
+            <button type="submit" class="btn btn-sm btn-outline" title="Refresh from Amazing Charts">&#128260; Refresh from AC</button>
+        </form>
+    </div>
+    <div class="card-body">
+        {% if record %}
+        <table style="width:100%;">
+            <tr>
+                <td style="font-weight:500;width:140px;">Name</td>
+                <td>{{ record.patient_name or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight:500;">DOB</td>
+                <td>{{ record.patient_dob or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight:500;">MRN</td>
+                <td>{{ mrn_display }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight:500;">Last XML Parsed</td>
+                <td>{{ record.last_xml_parsed.strftime('%m/%d/%Y %I:%M %p') if record.last_xml_parsed else 'Never' }}</td>
+            </tr>
+        </table>
+        {% else %}
+        <p style="color:var(--text-secondary);">No record found for this patient. Use "Refresh from AC" to import data.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;max-width:640px;">
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:28px;font-weight:600;">{{ vitals_count }}</div>
+            <div style="font-size:13px;color:var(--text-secondary);">Vitals</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:28px;font-weight:600;">{{ meds_count }}</div>
+            <div style="font-size:13px;color:var(--text-secondary);">Medications</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:28px;font-weight:600;">{{ labs_count }}</div>
+            <div style="font-size:13px;color:var(--text-secondary);">Lab Tracks</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

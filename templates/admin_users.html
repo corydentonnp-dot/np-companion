@@ -1,0 +1,404 @@
+﻿{% extends "base.html" %}
+{% block title %}User Management â€” NP Companion{% endblock %}
+{% block page_id %}admin-users{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+    <h1 style="margin:0;">User Management</h1>
+    <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="document.getElementById('send-notif-modal').style.display='flex'">&#128276; Send Notification</button>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-primary">+ New User</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>AI</th>
+                    <th>Created</th>
+                    <th>Last Login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.display_name }}</td>
+                    <td>{{ user.username }}</td>
+                    <td style="font-size:12px;color:var(--text-secondary);">{{ user.email or 'â€”' }}</td>
+                    <td>
+                        <form method="POST"
+                              action="{{ url_for('auth.admin_change_role', user_id=user.id) }}"
+                              style="display:inline-flex;align-items:center;gap:6px;">
+                            <select name="role" class="form-input" style="width:auto;padding:4px 8px;font-size:13px;">
+                                <option value="provider" {{ 'selected' if user.role == 'provider' }}>Provider</option>
+                                <option value="ma" {{ 'selected' if user.role == 'ma' }}>MA</option>
+                                <option value="admin" {{ 'selected' if user.role == 'admin' }}>Admin</option>
+                            </select>
+                            <button type="submit" class="btn btn-secondary btn-sm">Set</button>
+                        </form>
+                    </td>
+                    <td>
+                        {% if user.is_active_account %}
+                            <span class="badge badge--success">Active</span>
+                        {% elif not user.last_login %}
+                            <span class="badge badge--warning">Pending</span>
+                        {% else %}
+                            <span class="badge badge--danger">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:center;">
+                        <form method="POST"
+                              action="{{ url_for('auth.admin_toggle_ai', user_id=user.id) }}"
+                              style="display:inline;">
+                            {% if user.ai_enabled %}
+                                <button type="submit" class="badge badge--success" style="cursor:pointer;border:none;font:inherit;">
+                                    On{% if user.has_ai_api_key() %} âœ“{% endif %}
+                                </button>
+                            {% else %}
+                                <button type="submit" class="badge badge--danger" style="cursor:pointer;border:none;font:inherit;">Off</button>
+                            {% endif %}
+                        </form>
+                    </td>
+                    <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'â€”' }}</td>
+                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
+                    <td style="white-space:nowrap;">
+                        {# Toggle active/inactive #}
+                        {# Deactivate active accounts; Approve inactive/pending accounts #}
+                        {% if user.id != current_user.id and user.is_active_account %}
+                        <button type="button" class="btn btn-sm btn-danger"
+                                onclick="openDeactivateModal({{ user.id }}, '{{ user.display_name }}')">Deactivate</button>
+                        {% endif %}
+
+                        {# Approve pending / re-activate inactive #}
+                        {% if not user.is_active_account %}
+                        <form method="POST"
+                              action="{{ url_for('auth.admin_approve_user', user_id=user.id) }}"
+                              style="display:inline;">
+                            <button type="submit" class="btn btn-success btn-sm">Approve</button>
+                        </form>
+                        {% endif %}
+
+                        {# Reset password â€” opens a small inline form #}
+                        <button type="button"
+                                class="btn btn-secondary btn-sm"
+                                onclick="toggleRow('reset-row-{{ user.id }}')">
+                            Reset PW
+                        </button>
+
+                        {# Edit username #}
+                        <button type="button"
+                                class="btn btn-secondary btn-sm"
+                                onclick="toggleRow('username-row-{{ user.id }}')">
+                            Username
+                        </button>
+
+                        {# Set PIN #}
+                        <button type="button"
+                                class="btn btn-secondary btn-sm"
+                                onclick="toggleRow('pin-row-{{ user.id }}')">
+                            Set PIN
+                        </button>
+                    </td>
+                </tr>
+                {# Hidden row â€” reset password #}
+                <tr id="reset-row-{{ user.id }}" style="display:none;">
+                    <td colspan="9" style="background:var(--color-lt-yellow);padding:12px 16px;">
+                        <form method="POST"
+                              action="{{ url_for('auth.admin_reset_password', user_id=user.id) }}"
+                              style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:13px;font-weight:600;">
+                                Reset password for {{ user.display_name }}:
+                            </span>
+                            <input
+                                type="password"
+                                name="new_password"
+                                class="form-input"
+                                placeholder="New password (min 8 chars)"
+                                minlength="8"
+                                required
+                                style="width:auto;max-width:240px;"
+                                autocomplete="new-password"
+                            >
+                            <button type="submit" class="btn btn-primary btn-sm">Confirm</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="toggleRow('reset-row-{{ user.id }}')">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+
+                {# Hidden row â€” change username #}
+                <tr id="username-row-{{ user.id }}" style="display:none;">
+                    <td colspan="9" style="background:var(--color-lt-blue);padding:12px 16px;">
+                        <form method="POST"
+                              action="{{ url_for('auth.admin_change_username', user_id=user.id) }}"
+                              style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:13px;font-weight:600;">
+                                Change username for {{ user.display_name }} (current: {{ user.username }}):
+                            </span>
+                            <input
+                                type="text"
+                                name="new_username"
+                                class="form-input"
+                                placeholder="New username"
+                                required
+                                style="width:auto;max-width:200px;"
+                                autocomplete="off"
+                            >
+                            <button type="submit" class="btn btn-primary btn-sm">Confirm</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="toggleRow('username-row-{{ user.id }}')">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+
+                {# Hidden row â€” set PIN #}
+                <tr id="pin-row-{{ user.id }}" style="display:none;">
+                    <td colspan="9" style="background:var(--color-lt-green);padding:12px 16px;">
+                        <form method="POST"
+                              action="{{ url_for('auth.admin_set_pin', user_id=user.id) }}"
+                              style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:13px;font-weight:600;">
+                                Set auto-lock PIN for {{ user.display_name }}:
+                            </span>
+                            <input
+                                type="password"
+                                name="new_pin"
+                                class="form-input"
+                                placeholder="4 digits"
+                                maxlength="4"
+                                pattern="[0-9]{4}"
+                                inputmode="numeric"
+                                required
+                                style="width:auto;max-width:110px;"
+                                autocomplete="new-password"
+                            >
+                            <button type="submit" class="btn btn-primary btn-sm">Confirm</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="toggleRow('pin-row-{{ user.id }}')">Cancel</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+/* Toggle any hidden row by its element ID. */
+function toggleRow(rowId) {
+    var row = document.getElementById(rowId);
+    if (row) {
+        row.style.display = row.style.display === 'none' ? '' : 'none';
+    }
+}
+
+/* ---- Deactivation Modal ---- */
+var _deactivateUserId = null;
+function openDeactivateModal(userId, userName) {
+    _deactivateUserId = userId;
+    document.getElementById('deact-user-name').textContent = userName;
+    document.getElementById('deact-modal').style.display = 'flex';
+    document.getElementById('deact-mode-now').checked = true;
+    document.getElementById('deact-schedule-row').style.display = 'none';
+}
+
+function closeDeactivateModal() {
+    document.getElementById('deact-modal').style.display = 'none';
+}
+
+function toggleScheduleRow() {
+    var scheduled = document.getElementById('deact-mode-schedule').checked;
+    document.getElementById('deact-schedule-row').style.display = scheduled ? '' : 'none';
+}
+
+function submitDeactivation() {
+    var mode = document.getElementById('deact-mode-schedule').checked ? 'scheduled' : 'now';
+    var date = document.getElementById('deact-schedule-date').value;
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/users/' + _deactivateUserId + '/toggle-active';
+    var modeInput = document.createElement('input');
+    modeInput.name = 'deactivate_mode'; modeInput.value = mode; modeInput.type = 'hidden';
+    form.appendChild(modeInput);
+    if (mode === 'scheduled' && date) {
+        var dateInput = document.createElement('input');
+        dateInput.name = 'schedule_date'; dateInput.value = date; dateInput.type = 'hidden';
+        form.appendChild(dateInput);
+    }
+    document.body.appendChild(form);
+    form.submit();
+}
+
+/* ---- Send Notification ---- */
+function sendNotification() {
+    var sendToAll = document.getElementById('notif-send-all').checked;
+    var userId = document.getElementById('notif-user-select').value;
+    var message = document.getElementById('notif-message').value.trim();
+    var templateName = document.getElementById('notif-template').value;
+    var scheduledFor = document.getElementById('notif-schedule').value;
+
+    if (!sendToAll && !userId) { alert('Select a user or check Send to All.'); return; }
+    if (!message) { alert('Enter a message.'); return; }
+
+    fetch('/admin/send-notification', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            user_id: sendToAll ? null : parseInt(userId),
+            message: message,
+            send_to_all: sendToAll,
+            template_name: templateName,
+            scheduled_for: scheduledFor || null
+        })
+    }).then(function(r){return r.json();}).then(function(d){
+        if (d.success) {
+            document.getElementById('notif-message').value = '';
+            document.getElementById('send-notif-modal').style.display = 'none';
+            alert(d.message || 'Notification sent.');
+        } else {
+            alert(d.error || 'Failed to send.');
+        }
+    });
+}
+
+function applyTemplate() {
+    var sel = document.getElementById('notif-template');
+    var templates = {
+        'meeting': 'Reminder: Staff meeting today at [time].',
+        'maintenance': 'System maintenance scheduled for [date]. Please save your work.',
+        'policy_update': 'A new office policy has been posted. Please review at your earliest convenience.',
+        'schedule_change': 'Your schedule has been updated. Please check your appointments.',
+        'training': 'Mandatory training session: [topic]. Date: [date].',
+    };
+    var msg = templates[sel.value] || '';
+    if (msg) document.getElementById('notif-message').value = msg;
+}
+
+function toggleNotifUserSelect() {
+    var userSelect = document.getElementById('notif-user-select');
+    userSelect.disabled = document.getElementById('notif-send-all').checked;
+}
+
+function loadNotifHistory() {
+    var container = document.getElementById('notif-history-list');
+    container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">Loading...</p>';
+    document.getElementById('notif-history-panel').style.display = '';
+    fetch('/api/admin/notification-history')
+        .then(function(r){ return r.json(); })
+        .then(function(items) {
+            if (!items.length) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">No notifications sent yet.</p>';
+                return;
+            }
+            var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+                + '<thead><tr><th style="padding:6px;text-align:left;border-bottom:2px solid var(--border);">To</th>'
+                + '<th style="padding:6px;text-align:left;border-bottom:2px solid var(--border);">Message</th>'
+                + '<th style="padding:6px;text-align:left;border-bottom:2px solid var(--border);">Sent</th>'
+                + '<th style="padding:6px;text-align:center;border-bottom:2px solid var(--border);">Read</th></tr></thead><tbody>';
+            items.forEach(function(n) {
+                html += '<tr><td style="padding:4px 6px;border-bottom:1px solid var(--border,#f1f5f9);">' + n.to + '</td>'
+                    + '<td style="padding:4px 6px;border-bottom:1px solid var(--border,#f1f5f9);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + n.message + '</td>'
+                    + '<td style="padding:4px 6px;border-bottom:1px solid var(--border,#f1f5f9);">' + n.created_at + (n.scheduled_for ? '<br><span style="font-size:10px;color:var(--text-secondary);">Sched: ' + n.scheduled_for + '</span>' : '') + '</td>'
+                    + '<td style="padding:4px 6px;border-bottom:1px solid var(--border,#f1f5f9);text-align:center;">' + (n.is_read ? '&#10003;' : '') + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        });
+}
+</script>
+
+{# ---- Deactivation Modal ---- #}
+<div id="deact-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,#fff);border-radius:10px;padding:24px;width:380px;max-width:90vw;box-shadow:var(--shadow-lg);">
+        <h3 style="margin:0 0 16px;">Deactivate <span id="deact-user-name"></span></h3>
+        <div style="margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
+                <input type="radio" name="deact_mode" id="deact-mode-now" value="now" checked onchange="toggleScheduleRow()">
+                <span>Deactivate immediately</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="deact_mode" id="deact-mode-schedule" value="scheduled" onchange="toggleScheduleRow()">
+                <span>Schedule deactivation</span>
+            </label>
+        </div>
+        <div id="deact-schedule-row" style="display:none;margin-bottom:12px;">
+            <label class="form-label" style="font-size:13px;">Deactivation date:</label>
+            <input type="date" id="deact-schedule-date" class="form-input" style="max-width:200px;">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeDeactivateModal()">Cancel</button>
+            <button class="btn btn-danger" onclick="submitDeactivation()">Confirm</button>
+        </div>
+    </div>
+</div>
+
+{# ---- Send Notification Modal ---- #}
+<div id="send-notif-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,#fff);border-radius:10px;padding:24px;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-lg);">
+        <h3 style="margin:0 0 16px;">Send Notification</h3>
+
+        {# Recipient #}
+        <div class="form-group">
+            <label class="form-label">To:</label>
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <select id="notif-user-select" class="form-input" style="flex:1;">
+                    <option value="">— Select user —</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.display_name }} ({{ user.username }})</option>
+                    {% endfor %}
+                </select>
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap;">
+                    <input type="checkbox" id="notif-send-all" onchange="toggleNotifUserSelect()"> Send to All
+                </label>
+            </div>
+        </div>
+
+        {# Template #}
+        <div class="form-group">
+            <label class="form-label">Template:</label>
+            <select id="notif-template" class="form-input" onchange="applyTemplate()">
+                <option value="">— Custom message —</option>
+                <option value="meeting">Staff Meeting Reminder</option>
+                <option value="maintenance">System Maintenance</option>
+                <option value="policy_update">Policy Update</option>
+                <option value="schedule_change">Schedule Change</option>
+                <option value="training">Training Session</option>
+            </select>
+        </div>
+
+        {# Message #}
+        <div class="form-group">
+            <label class="form-label">Message:</label>
+            <textarea id="notif-message" class="form-input" rows="3" placeholder="Enter notification message..." style="resize:vertical;"></textarea>
+        </div>
+
+        {# Schedule #}
+        <div class="form-group">
+            <label class="form-label">Schedule for later (optional):</label>
+            <input type="datetime-local" id="notif-schedule" class="form-input" style="max-width:280px;">
+        </div>
+
+        {# History toggle #}
+        <div style="margin-bottom:12px;">
+            <button class="btn btn-secondary btn-sm" onclick="loadNotifHistory()">&#128337; View History</button>
+        </div>
+        <div id="notif-history-panel" style="display:none;margin-bottom:16px;max-height:200px;overflow-y:auto;border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:8px;">
+            <div id="notif-history-list"></div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="document.getElementById('send-notif-modal').style.display='none'">Cancel</button>
+            <button class="btn btn-primary" onclick="sendNotification()">Send</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

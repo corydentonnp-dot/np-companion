@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}NetPractice Settings — NP Companion{% endblock %}
+{% block page_id %}admin-netpractice{% endblock %}
+
+{% block content %}
+<h1>NetPractice Settings</h1>
+
+{# ---- Global Connection Settings --------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:640px;">
+    <div class="card-header">Connection Settings</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('np_admin.admin_save_np_settings') }}">
+            <div class="form-group">
+                <label class="form-label" for="netpractice_url">webPRACTICE URL</label>
+                <input
+                    type="text"
+                    id="netpractice_url"
+                    name="netpractice_url"
+                    class="form-input"
+                    value="{{ settings.netpractice_url }}"
+                    placeholder="https://wppm2.cgmus.com/scripts/npm7.mar?wlapp=npm7&MGWCHD=p"
+                >
+                <p class="form-help">
+                    The full URL of your CGM webPRACTICE login page.
+                </p>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="client_number">Client Number</label>
+                <input
+                    type="text"
+                    id="client_number"
+                    name="client_number"
+                    class="form-input"
+                    value="{{ settings.client_number }}"
+                    placeholder="e.g. 2034"
+                    style="max-width:200px;"
+                >
+                <p class="form-help">
+                    The practice's client number on the webPRACTICE login page.
+                </p>
+            </div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+                <div class="form-group" style="flex:1;min-width:140px;">
+                    <label class="form-label" for="scrape_time">Nightly Scrape Time</label>
+                    <input
+                        type="time"
+                        id="scrape_time"
+                        name="scrape_time"
+                        class="form-input"
+                        value="{{ settings.scrape_time or '18:00' }}"
+                    >
+                    <p class="form-help">When to scrape tomorrow's schedule each evening.</p>
+                </div>
+                <div class="form-group" style="flex:1;min-width:140px;">
+                    <label class="form-label" for="max_appointment_hour">Last Appointment Cutoff</label>
+                    <input
+                        type="time"
+                        id="max_appointment_hour"
+                        name="max_appointment_hour"
+                        class="form-input"
+                        value="{{ settings.max_appointment_hour or '19:00' }}"
+                    >
+                    <p class="form-help">Stop scraping appointments after this time.</p>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Per-User Setup Status ------------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:640px;">
+    <div class="card-header">Provider Setup Status</div>
+    <div class="card-body" style="padding:0;">
+        <table class="schedule-table">
+            <thead>
+                <tr>
+                    <th>Provider</th>
+                    <th>NP Credentials</th>
+                    <th>Nav Steps</th>
+                    <th>Provider Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>
+                        {{ user.display_name }}
+                        <span style="font-size:12px;color:var(--text-secondary);">({{ user.role }})</span>
+                    </td>
+                    <td>
+                        {% if user.has_np_credentials() %}
+                            <span class="badge badge--success">Saved</span>
+                        {% else %}
+                            <span class="badge badge--warning">Missing</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set steps = user.nav_steps %}
+                        {% if steps and steps|length > 0 %}
+                            <span class="badge badge--success">{{ steps|length }} steps</span>
+                        {% else %}
+                            <span class="badge badge--warning">Not recorded</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:13px;">{{ user.np_provider_name or '—' }}</td>
+                    <td>
+                        <a href="{{ url_for('np_admin.np_setup_wizard') }}?user_id={{ user.id }}"
+                           class="btn btn-secondary btn-sm"
+                           {% if user.id != current_user.id %}
+                           title="Can only run wizard for yourself"
+                           style="opacity:0.5;pointer-events:none;"
+                           {% endif %}>
+                            Setup Wizard
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ---- Quick Actions ---------------------------------------------- #}
+<div class="card" style="max-width:640px;">
+    <div class="card-header">Quick Actions</div>
+    <div class="card-body">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <a href="{{ url_for('np_admin.np_setup_wizard') }}" class="btn btn-primary">
+                Run Setup Wizard (My Account)
+            </a>
+            <button class="btn btn-secondary" onclick="testMyLogin()" id="test-login-btn">
+                Test My Login
+            </button>
+        </div>
+        <div id="test-result" style="margin-top:12px;display:none;" class="flash"></div>
+    </div>
+</div>
+
+<script>
+function testMyLogin() {
+    var btn = document.getElementById('test-login-btn');
+    var result = document.getElementById('test-result');
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    result.style.display = 'none';
+
+    fetch('/api/netpractice/test-login', { method: 'POST' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            result.style.display = 'block';
+            if (data.success) {
+                result.className = 'flash flash--success';
+                result.textContent = data.message;
+            } else {
+                result.className = 'flash flash--error';
+                result.textContent = data.error;
+            }
+            btn.disabled = false;
+            btn.textContent = 'Test My Login';
+        })
+        .catch(function() {
+            result.style.display = 'block';
+            result.className = 'flash flash--error';
+            result.textContent = 'Request failed — check that the server is running.';
+            btn.disabled = false;
+            btn.textContent = 'Test My Login';
+        });
+}
+</script>
+{% endblock %}

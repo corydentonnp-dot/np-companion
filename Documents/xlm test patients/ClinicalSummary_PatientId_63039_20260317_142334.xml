@@ -1,0 +1,1608 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603171423-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="6bf8dae0-61bf-4f75-8175-bb30079ca5a3" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="63039" />
+      <addr nullFlavor="NI" />
+      <telecom nullFlavor="NI" />
+      <patient>
+        <name use="L">
+          <given>CODING FAV</given>
+          <family>TEST</family>
+        </name>
+        <administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female" codeSystemName="AdministrativeGender" />
+        <birthTime value="19800101" />
+        <maritalStatusCode nullFlavor="UNK" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode nullFlavor="UNK" />
+        <ethnicGroupCode nullFlavor="UNK" />
+        <languageCommunication>
+          <languageCode nullFlavor="ASKU" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP">
+          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+          <city>Midlothian</city>
+          <state>VA</state>
+          <postalCode>23114</postalCode>
+          <country>US</country>
+        </addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time nullFlavor="NI" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP">
+        <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country>
+      </addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson>
+        <name>
+          <given>Cory</given>
+          <family>Denton</family>
+          <suffix>FNP</suffix>
+        </name>
+      </assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP">
+          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+          <city>Midlothian</city>
+          <state>VA</state>
+          <postalCode>23114</postalCode>
+          <country>US</country>
+        </addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP">
+          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+          <city>Midlothian</city>
+          <state>VA</state>
+          <postalCode>23114</postalCode>
+          <country>US</country>
+        </addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime>
+        <low value="19800101" />
+        <high value="20260317" />
+      </effectiveTime>
+      <performer typeCode="PRF">
+        <time>
+          <low nullFlavor="UNK" />
+        </time>
+        <assignedEntity>
+          <id extension="1417615303" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP">
+            <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+            <city>Midlothian</city>
+            <state>VA</state>
+            <postalCode>23114</postalCode>
+            <country>US</country>
+          </addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson>
+            <name>
+              <given>Autumn</given>
+              <given>S</given>
+              <family>Mejia</family>
+              <suffix>PA-C</suffix>
+            </name>
+          </assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP">
+              <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+              <city>Midlothian</city>
+              <state>VA</state>
+              <postalCode>23114</postalCode>
+              <country>US</country>
+            </addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+      <performer typeCode="PRF">
+        <time>
+          <low nullFlavor="UNK" />
+        </time>
+        <assignedEntity>
+          <id extension="1972594828" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP">
+            <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+            <city>Midlothian</city>
+            <state>VA</state>
+            <postalCode>23114</postalCode>
+            <country>US</country>
+          </addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson>
+            <name>
+              <given>Raymond</given>
+              <given>G</given>
+              <family>Decker</family>
+              <suffix>MD</suffix>
+            </name>
+          </assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP">
+              <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+              <city>Midlothian</city>
+              <state>VA</state>
+              <postalCode>23114</postalCode>
+              <country>US</country>
+            </addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter nullFlavor="NA">
+      <id root="6a294a3e-289b-915d-c8a7-e863d5385ed6" extension="1306884820" />
+      <effectiveTime nullFlavor="NA" />
+      <location>
+        <healthCareFacility>
+          <id nullFlavor="NA" />
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.22.1" extension="2015-08-01" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.22.1" />
+          <code code="46240-8" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Encounters" />
+          <title>ENCOUNTERS</title>
+          <text>No encounter problems information is available.</text>
+          <entry typeCode="DRIV">
+            <encounter classCode="ENC" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.49" />
+              <id root="95e48286-75c7-4315-ad59-a56c5b65920c" />
+              <code nullFlavor="UNK" />
+              <effectiveTime>
+                <low nullFlavor="NI" />
+              </effectiveTime>
+            </encounter>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.6.1" extension="2015-08-01" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.6.1" />
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>No adverse reactions, alerts, allergies information is available.</text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.30" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.30" />
+              <id root="6c445246-0846-76aa-6559-aca35a6fb97e" />
+              <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies, adverse reactions, alerts" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low nullFlavor="UNK" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time nullFlavor="NI" />
+                <assignedAuthor>
+                  <id root="d48f5511-ad44-41f9-8ae6-8571fa4e603e" nullFlavor="UNK" />
+                  <assignedPerson>
+                    <name nullFlavor="NI" />
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id root="2.16.840.1.113883.5.1008" nullFlavor="UNK" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN" negationInd="true">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.7" extension="2014-06-09" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.7" />
+                  <id root="c79bfc03-be6a-e202-9cd6-9feeee06e6b8" />
+                  <code code="ASSERTION" codeSystem="2.16.840.1.113883.5.4" />
+                  <statusCode code="completed" />
+                  <effectiveTime nullFlavor="NA" />
+                  <value xsi:type="CD" code="419199007" codeSystem="2.16.840.1.113883.6.96" displayName="Allergy to Substance" codeSystemName="SNOMED CT" />
+                  <participant typeCode="CSM">
+                    <participantRole classCode="MANU">
+                      <playingEntity classCode="MMAT">
+                        <code nullFlavor="NA" />
+                      </playingEntity>
+                    </participantRole>
+                  </participant>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.14" extension="2014-06-09" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.14" />
+          <code code="47420-5" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Functional Status" />
+          <title>FUNCTIONAL STATUS</title>
+          <text>There is no cognitive and functional status saved for this patient.</text>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.12" />
+          <code code="29299-5" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="REASON FOR VISIT" />
+          <title>REASON FOR VISIT</title>
+          <text>No reason for visit information is available.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.2" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.2.1" extension="2014-06-09" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.2.1" />
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>No known immunization history</text>
+          <entry>
+            <substanceAdministration classCode="SBADM" moodCode="EVN" negationInd="true">
+              <templateId root="2.16.840.1.113883.10.20.22.4.52" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.52" />
+              <id root="be22b6b6-26e3-87f0-342f-5e4654a3801c" />
+              <statusCode nullFlavor="NI" />
+              <effectiveTime nullFlavor="NI" />
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.54" extension="2014-06-09" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.54" />
+                  <manufacturedMaterial>
+                    <code nullFlavor="NI" />
+                  </manufacturedMaterial>
+                  <manufacturerOrganization nullFlavor="NA" />
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.45" />
+          <code code="69730-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="INSTRUCTIONS VISIT" />
+          <title>INSTRUCTIONS</title>
+          <text>No instructions information is available.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.23" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.23" extension="2014-06-09" />
+          <code code="46264-8" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="MEDICAL EQUIPMENT" />
+          <title>MEDICAL EQUIPMENT</title>
+          <text>Patient has no history of implanted devices.</text>
+          <entry>
+            <procedure classCode="PROC" moodCode="EVN" negationInd="true">
+              <templateId root="2.16.840.1.113883.10.20.22.4.14" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.14" extension="2014-06-09" />
+              <id root="0628016c-9da2-85af-28ba-c7e073f7185b" />
+              <code code="71388002" codeSystem="2.16.840.1.113883.6.96" displayName="Procedure" />
+              <statusCode code="completed" />
+              <effectiveTime nullFlavor="NA" />
+              <participant typeCode="DEV">
+                <participantRole classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.37" />
+                  <id root="2.16.840.1.113883.3.3719" nullFlavor="NA" />
+                  <playingDevice>
+                    <code code="40388003" codeSystem="2.16.840.1.113883.6.96" displayName="Implant" />
+                  </playingDevice>
+                  <scopingEntity>
+                    <id root="2.16.840.1.113883.3.3719" />
+                  </scopingEntity>
+                </participantRole>
+              </participant>
+            </procedure>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.1.1" extension="2014-06-09" />
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of Medication Use" />
+          <title>MEDICATIONS</title>
+          <text>No medications information is available.</text>
+          <entry typeCode="DRIV">
+            <substanceAdministration classCode="SBADM" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" extension="2014-06-09" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.16" />
+              <id root="01e8e36e-a948-1304-935d-134d119db123" />
+              <statusCode code="completed" />
+              <effectiveTime xsi:type="IVL_TS">
+                <low nullFlavor="UNK" />
+                <high nullFlavor="UNK" />
+              </effectiveTime>
+              <doseQuantity nullFlavor="UNK" />
+              <consumable>
+                <manufacturedProduct classCode="MANU">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" extension="2014-06-09" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.23" />
+                  <id root="2e8e2d30-5eb8-d001-9374-5cf56736ffef" />
+                  <manufacturedMaterial>
+                    <code nullFlavor="UNK" />
+                  </manufacturedMaterial>
+                </manufacturedProduct>
+              </consumable>
+            </substanceAdministration>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.18" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.18" extension="2015-08-01" />
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Payer" />
+          <title>INSURANCE PROVIDERS</title>
+          <text>Payer Unknown</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.10" />
+          <code code="18776-5" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Treatment Plan" />
+          <title>PLAN OF CARE</title>
+          <text>No plan of care information is available.</text>
+          <entry>
+            <act classCode="ACT" moodCode="RQO">
+              <templateId root="2.16.840.1.113883.10.20.22.4.39" />
+              <id root="230a88c3-2f9b-daea-5709-e69d9b6d35a1" />
+              <code nullFlavor="NI" />
+              <statusCode code="new" />
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.5.1" extension="2015-08-01" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.5.1" />
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="PROBLEM LIST" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead>
+                <tr>
+                  <th>Problem</th>
+                  <th>Problem Status</th>
+                  <th>Date Started</th>
+                  <th>Date Resolved</th>
+                  <th>Date Inactivated</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr ID="PROBSUMMARY_1">
+                  <td ID="PROBKIND_1">COVID-19 [ICD10: U07.1]</td>
+                  <td ID="PROBSTATUS_1">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_2">
+                  <td ID="PROBKIND_2">Contact with and (suspected) exposure to COVID-19 [ICD10: Z20.822]</td>
+                  <td ID="PROBSTATUS_2">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_3">
+                  <td ID="PROBKIND_3">Verbosity and circumstantial detail obscuring reason for contact [SNOMED-CT: 274654003]</td>
+                  <td ID="PROBSTATUS_3">Active</td>
+                  <td>11-01-2024</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_4">
+                  <td ID="PROBKIND_4">Problems related to health literacy [ICD10: Z55.6]</td>
+                  <td ID="PROBSTATUS_4">Active</td>
+                  <td>11-01-2024</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_5">
+                  <td ID="PROBKIND_5">Observation and evaluation for suspected exposure to other biological agent [ICD10: Z03.818]</td>
+                  <td ID="PROBSTATUS_5">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_6">
+                  <td ID="PROBKIND_6">Influenza A virus present [SNOMED-CT: 181000124108]</td>
+                  <td ID="PROBSTATUS_6">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_7">
+                  <td ID="PROBKIND_7">Acute cough [ICD10: R05.1]</td>
+                  <td ID="PROBSTATUS_7">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_8">
+                  <td ID="PROBKIND_8">Generalized body aches [SNOMED-CT: 82991003]</td>
+                  <td ID="PROBSTATUS_8">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_9">
+                  <td ID="PROBKIND_9">Influenza due to Influenza virus, type B [SNOMED-CT: 24662006]</td>
+                  <td ID="PROBSTATUS_9">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+                <tr ID="PROBSUMMARY_10">
+                  <td ID="PROBKIND_10">Weight gain [SNOMED-CT: 8943002]</td>
+                  <td ID="PROBSTATUS_10">Active</td>
+                  <td>02-02-2025</td>
+                  <td>NA</td>
+                  <td>NA</td>
+                </tr>
+              </tbody>
+            </table>
+          </text>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="58351b50-86fc-569f-7589-deb782434401" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="21c4ff4c-3133-bd3d-15a1-aa2cc58ddb0a" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" nullFlavor="OTH">
+                    <translation xmlns:xsd="http://www.w3.org/2001/XMLSchema" code="U07.1" displayName="COVID-19" codeSystem="2.16.840.1.113883.6.3" codeSystemName="ICD-10" />
+                  </value>
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="c532c5f7-b1f1-68f1-9c6a-5be0fdacf564" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="3055bfa8-adae-6362-2ebe-87f2ceab1a18" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" nullFlavor="OTH">
+                    <translation xmlns:xsd="http://www.w3.org/2001/XMLSchema" code="Z20.822" displayName="Contact with and (suspected) exposure to COVID-19" codeSystem="2.16.840.1.113883.6.3" codeSystemName="ICD-10" />
+                  </value>
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="17cc7198-b075-696b-44ad-7b14ce932792" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20241101" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202411010000-0400" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1417615303" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Autumn</given>
+                      <given>S</given>
+                      <family>Mejia</family>
+                      <suffix>PA-C</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="04a80288-507d-4ec0-278b-8f00d200b939" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20241101" />
+                  </effectiveTime>
+                  <value xsi:type="CD" code="274654003" codeSystem="2.16.840.1.113883.6.96" displayName="Verbosity and circumstantial detail obscuring reason for contact" codeSystemName="SNOMED CT" />
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202411011038-0400" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1417615303" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Autumn</given>
+                          <given>S</given>
+                          <family>Mejia</family>
+                          <suffix>PA-C</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="fb390005-7567-f7e5-cda8-20bb456b408e" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20241101" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202411010000-0400" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1417615303" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Autumn</given>
+                      <given>S</given>
+                      <family>Mejia</family>
+                      <suffix>PA-C</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="a96f6d6f-2916-056a-5f7b-d3df6e9576d2" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20241101" />
+                  </effectiveTime>
+                  <value xsi:type="CD" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" nullFlavor="OTH">
+                    <translation xmlns:xsd="http://www.w3.org/2001/XMLSchema" code="Z55.6" displayName="Problems related to health literacy" codeSystem="2.16.840.1.113883.6.3" codeSystemName="ICD-10" />
+                  </value>
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202411011038-0400" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1417615303" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Autumn</given>
+                          <given>S</given>
+                          <family>Mejia</family>
+                          <suffix>PA-C</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="636c238b-feb1-a4dc-4b6f-c3c0065f2572" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="9821c78f-6e5d-6307-3ce2-10970a76bcae" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" nullFlavor="OTH">
+                    <translation xmlns:xsd="http://www.w3.org/2001/XMLSchema" code="Z03.818" displayName="Observation and evaluation for suspected exposure to other biological agent" codeSystem="2.16.840.1.113883.6.3" codeSystemName="ICD-10" />
+                  </value>
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="413bc8d1-b7ea-32dd-5163-c53229fac54e" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="c98f0330-8cb2-bfad-4198-1e0c940e5fe4" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" code="181000124108" codeSystem="2.16.840.1.113883.6.96" displayName="Influenza A virus present" codeSystemName="SNOMED CT" />
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="fbae3c90-9218-776c-a86b-db0f597d57c8" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="81934698-8ad7-4b11-27e8-5b66fcc3a657" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" nullFlavor="OTH">
+                    <translation xmlns:xsd="http://www.w3.org/2001/XMLSchema" code="R05.1" displayName="Acute cough" codeSystem="2.16.840.1.113883.6.3" codeSystemName="ICD-10" />
+                  </value>
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="ff0ba6da-9750-f019-d839-63c21465e47e" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="b29bf684-a093-d09d-e69e-dcfc733f945b" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" code="82991003" codeSystem="2.16.840.1.113883.6.96" displayName="Generalized body aches" codeSystemName="SNOMED CT" />
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="09e7fb0a-b8ac-3381-dc12-3a773114d624" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="c0137e59-fba5-9c36-d91f-0d8de654e2e6" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" code="24662006" codeSystem="2.16.840.1.113883.6.96" displayName="Influenza due to Influenza virus, type B" codeSystemName="SNOMED CT" />
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+          <entry typeCode="DRIV">
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" extension="2015-08-01" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.3" />
+              <id root="32c82cbd-9f1c-35fb-36d2-9ca3780a827b" />
+              <code code="CONC" codeSystem="2.16.840.1.113883.5.6" displayName="Concern" />
+              <statusCode code="active" />
+              <effectiveTime>
+                <low value="20250202" />
+              </effectiveTime>
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time value="202502020000-0500" />
+                <assignedAuthor>
+                  <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                  <assignedPerson>
+                    <name>
+                      <given>Raymond</given>
+                      <given>G</given>
+                      <family>Decker</family>
+                      <suffix>MD</suffix>
+                    </name>
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+              <entryRelationship typeCode="SUBJ">
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" extension="2015-08-01" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.4" />
+                  <id root="9bba5783-89b5-7538-2fb6-7116ac774486" />
+                  <code code="282291009" codeSystem="2.16.840.1.113883.6.96" displayName="Diagnosis">
+                    <translation code="29308-4" displayName="Diagnosis" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+                  </code>
+                  <statusCode code="completed" />
+                  <effectiveTime>
+                    <low value="20250202" />
+                  </effectiveTime>
+                  <value xsi:type="CD" code="8943002" codeSystem="2.16.840.1.113883.6.96" displayName="Weight gain" codeSystemName="SNOMED CT" />
+                  <author>
+                    <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                    <time value="202502021851-0500" />
+                    <assignedAuthor>
+                      <id root="2.16.840.1.113883.4.6" extension="1972594828" assigningAuthorityName="National Provider Identifier" />
+                      <assignedPerson>
+                        <name>
+                          <given>Raymond</given>
+                          <given>G</given>
+                          <family>Decker</family>
+                          <suffix>MD</suffix>
+                        </name>
+                      </assignedPerson>
+                      <representedOrganization>
+                        <id extension="541111031" root="2.16.840.1.113883.4.2" assigningAuthorityName="National Provider Identifier" />
+                        <name>Family Practice Associates of Chesterfield</name>
+                        <telecom use="WP" value="tel:+1(804)-423-9913" />
+                        <addr use="">
+                          <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                          <city>Midlothian</city>
+                          <state>VA</state>
+                          <postalCode>23114</postalCode>
+                          <country>US</country>
+                        </addr>
+                      </representedOrganization>
+                    </assignedAuthor>
+                  </author>
+                  <entryRelationship typeCode="REFR">
+                    <observation classCode="OBS" moodCode="EVN">
+                      <templateId root="2.16.840.1.113883.10.20.22.4.6" />
+                      <code code="33999-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Status" />
+                      <statusCode code="completed" />
+                      <value xsi:type="CD" code="55561003" codeSystem="2.16.840.1.113883.6.96" displayName="Active" codeSystemName="SNOMED CT" />
+                    </observation>
+                  </entryRelationship>
+                </observation>
+              </entryRelationship>
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.7.1" extension="2014-06-09" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.7.1" />
+          <code code="47519-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="HISTORY OF PROCEDURES" />
+          <title>PROCEDURES</title>
+          <text>No procedures information is available.</text>
+          <entry>
+            <act classCode="ACT" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.12" extension="2014-06-09" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.12" />
+              <id root="ca07728d-d9ab-a2c6-3479-33d1ce017a62" />
+              <code nullFlavor="NI" />
+              <statusCode code="completed" />
+              <effectiveTime nullFlavor="NA" />
+            </act>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="1.3.6.1.4.1.19376.1.5.3.1.3.1" />
+          <templateId root="1.3.6.1.4.1.19376.1.5.3.1.3.1" extension="2014-06-09" />
+          <code code="42349-1" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="REASON FOR REFERRAL" />
+          <title>REASON FOR REFERRAL</title>
+          <text>No reason for referral information has been included.</text>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.3.1" extension="2015-08-01" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.3.1" />
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Results" />
+          <title>RESULTS</title>
+          <text>No Lab Test required. No Lab results.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.17" extension="2015-08-01" />
+          <templateId root="2.16.840.1.113883.10.20.22.2.17" />
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>No social history information is available.</text>
+          <entry typeCode="DRIV">
+            <observation classCode="OBS" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.85" extension="2014-06-09" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.85" />
+              <id root="daefc13c-9a1f-b601-c53f-2876a1a01605" />
+              <code code="11367-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="History of tobacco use" />
+              <statusCode code="completed" />
+              <effectiveTime>
+                <low nullFlavor="NI" />
+              </effectiveTime>
+              <value xsi:type="CD" codeSystem="2.16.840.1.113883.6.96" nullFlavor="NI" />
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time nullFlavor="NI" />
+                <assignedAuthor>
+                  <id root="72743550-f96d-23e9-b54c-dacc9481a909" nullFlavor="UNK" />
+                  <assignedPerson>
+                    <name nullFlavor="NI" />
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id root="2.16.840.1.113883.5.1008" nullFlavor="UNK" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+            </observation>
+          </entry>
+          <entry typeCode="DRIV">
+            <observation classCode="OBS" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.78" extension="2014-06-09" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.78" />
+              <id root="47be45d9-019a-cbaf-57f4-080d8bc3e3ea" extension="AmazingCharts" />
+              <code code="72166-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Tobacco smoking status NHIS" />
+              <statusCode code="completed" />
+              <effectiveTime />
+              <value xsi:type="CD" codeSystem="2.16.840.1.113883.6.96" nullFlavor="NI" />
+              <author>
+                <templateId root="2.16.840.1.113883.10.20.22.5.6" extension="2019-10-01" />
+                <time nullFlavor="NI" />
+                <assignedAuthor>
+                  <id root="04e86657-26f7-c31b-0427-d3b1fbcd8109" nullFlavor="UNK" />
+                  <assignedPerson>
+                    <name nullFlavor="NI" />
+                  </assignedPerson>
+                  <representedOrganization>
+                    <id root="2.16.840.1.113883.5.1008" nullFlavor="UNK" />
+                    <name>Family Practice Associates of Chesterfield</name>
+                    <telecom use="WP" value="tel:+1(804)-423-9913" />
+                    <addr use="">
+                      <streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+                      <city>Midlothian</city>
+                      <state>VA</state>
+                      <postalCode>23114</postalCode>
+                      <country>US</country>
+                    </addr>
+                  </representedOrganization>
+                </assignedAuthor>
+              </author>
+            </observation>
+          </entry>
+          <entry typeCode="DRIV">
+            <observation classCode="OBS" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.200" extension="2016-06-01" />
+              <code code="76689-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Sex Assigned At Birth" />
+              <text>
+                <reference value="#BSex_Narrative1" />
+              </text>
+              <statusCode code="completed" />
+              <value xsi:type="CD" code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female">
+                <originalText xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+                  <reference value="#BSex_value" />
+                </originalText>
+              </value>
+            </observation>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section>
+          <templateId root="2.16.840.1.113883.10.20.22.2.4.1" extension="2015-08-01" />
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="VITAL SIGNS" nullFlavor="NI" />
+          <title>VITAL SIGNS</title>
+          <text>No vital signs information is available.</text>
+          <entry typeCode="DRIV">
+            <organizer classCode="CLUSTER" moodCode="EVN">
+              <templateId root="2.16.840.1.113883.10.20.22.4.26" />
+              <templateId root="2.16.840.1.113883.10.20.22.4.26" extension="2015-08-01" />
+              <id root="e11aba07-9787-57c7-6129-18cd1b8ea57a" nullFlavor="NI" />
+              <code code="46680005" codeSystem="2.16.840.1.113883.6.96" codeSystemName="SNOMED CT" displayName="VITAL SIGNS" nullFlavor="NI">
+                <translation code="74728-7" displayName="VITAL SIGNS" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" />
+              </code>
+              <statusCode code="completed" />
+              <effectiveTime value="20260317" />
+              <component>
+                <observation classCode="OBS" moodCode="EVN">
+                  <templateId root="2.16.840.1.113883.10.20.22.4.27" extension="2014-06-09" />
+                  <templateId root="2.16.840.1.113883.10.20.22.4.27" />
+                  <id root="ef285d58-d23d-4819-9b73-12ffb1bcf91b" />
+                  <code nullFlavor="NI" />
+                  <statusCode nullFlavor="NI" />
+                  <effectiveTime value="20260317" />
+                  <value xsi:type="PQ" nullFlavor="NI" />
+                </observation>
+              </component>
+            </organizer>
+          </entry>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.60" />
+          <code code="61146-7" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Goals" />
+          <title>GOALS</title>
+          <text>No Goals Information.</text>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.58" extension="2015-08-01" />
+          <code code="75310-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Health Concerns Document" />
+          <title>HEALTH CONCERNS</title>
+          <text>No health concerns information is available.</text>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.56" extension="2015-08-01" />
+          <code code="10190-7" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="MENTAL STATUS" />
+          <title>MENTAL STATUS</title>
+          <text>No Mental Status information.</text>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.8" />
+          <code code="51848-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="ASSESSMENTS" />
+          <title>ASSESSMENTS</title>
+          <text>No assessment information is available.</text>
+        </section>
+      </component>
+      <component>
+        <section nullFlavor="NI">
+          <templateId root="2.16.840.1.113883.10.20.22.2.500" extension="2019-07-01" />
+          <code code="85847-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Patient Care Teams" />
+          <title>PATIENT CARE TEAMS</title>
+          <text>No care team information has been included.</text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

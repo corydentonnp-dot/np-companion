@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Audit Log — NP Companion{% endblock %}
+{% block page_id %}admin-audit-log{% endblock %}
+
+{% block content %}
+<h1>Audit Log</h1>
+
+{# ---- Filter bar ---------------------------------------------------- #}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('auth.admin_audit_log') }}"
+              style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+
+            {# User filter #}
+            <div class="form-group" style="margin-bottom:0;min-width:160px;">
+                <label class="form-label" for="user_id">User</label>
+                <select id="user_id" name="user_id" class="form-input" style="width:auto;">
+                    <option value="">All users</option>
+                    {% for u in users %}
+                    <option value="{{ u.id }}" {{ 'selected' if filter_user == u.id|string }}>
+                        {{ u.display_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Module filter #}
+            <div class="form-group" style="margin-bottom:0;min-width:140px;">
+                <label class="form-label" for="module">Module</label>
+                <select id="module" name="module" class="form-input" style="width:auto;">
+                    <option value="">All modules</option>
+                    {% for m in module_list %}
+                    <option value="{{ m }}" {{ 'selected' if filter_module == m }}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# Date range #}
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="date_from">From</label>
+                <input type="date" id="date_from" name="date_from"
+                       class="form-input" style="width:auto;"
+                       value="{{ date_from }}">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="date_to">To</label>
+                <input type="date" id="date_to" name="date_to"
+                       class="form-input" style="width:auto;"
+                       value="{{ date_to }}">
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+            <a href="{{ url_for('auth.admin_audit_log') }}" class="btn btn-secondary btn-sm">Clear</a>
+        </form>
+    </div>
+</div>
+
+{# ---- Results table ------------------------------------------------- #}
+<div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Showing {{ entries|length }} entries (max 500)</span>
+    </div>
+    <div class="table-wrap">
+        <table class="table table--striped" id="audit-table">
+            <thead>
+                <tr>
+                    <th style="cursor:pointer;" onclick="sortTable(0)">Timestamp</th>
+                    <th style="cursor:pointer;" onclick="sortTable(1)">User</th>
+                    <th style="cursor:pointer;" onclick="sortTable(2)">Action</th>
+                    <th style="cursor:pointer;" onclick="sortTable(3)">Module</th>
+                    <th style="cursor:pointer;" onclick="sortTable(4)">IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                <tr>
+                    <td style="white-space:nowrap;font-variant-numeric:tabular-nums;">
+                        {{ e.timestamp.strftime('%Y-%m-%d %H:%M:%S') if e.timestamp else '—' }}
+                    </td>
+                    <td>
+                        {# Look up display name from the users list #}
+                        {% set entry_user = users | selectattr('id', 'equalto', e.user_id) | first %}
+                        {{ entry_user.display_name if entry_user else 'User #' ~ e.user_id }}
+                    </td>
+                    <td>{{ e.action }}</td>
+                    <td>
+                        {% if e.module %}
+                        <span class="badge badge--info">{{ e.module }}</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td style="font-family:monospace;font-size:13px;">{{ e.ip_address }}</td>
+                </tr>
+                {% endfor %}
+                {% if not entries %}
+                <tr>
+                    <td colspan="5" style="text-align:center;color:var(--text-muted);padding:32px;">
+                        No audit log entries found.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+/**
+ * Simple client-side column sort for the audit table.
+ * Clicking a column header sorts ascending; clicking again sorts descending.
+ */
+var sortDir = {};
+function sortTable(colIndex) {
+    var table = document.getElementById('audit-table');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+
+    // Toggle sort direction
+    sortDir[colIndex] = !sortDir[colIndex];
+    var dir = sortDir[colIndex] ? 1 : -1;
+
+    rows.sort(function (a, b) {
+        var aText = (a.cells[colIndex] && a.cells[colIndex].textContent.trim()) || '';
+        var bText = (b.cells[colIndex] && b.cells[colIndex].textContent.trim()) || '';
+        return aText.localeCompare(bText) * dir;
+    });
+
+    rows.forEach(function (row) { tbody.appendChild(row); });
+}
+</script>
+{% endblock %}

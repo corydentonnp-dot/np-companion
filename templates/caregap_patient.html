@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Care Gaps — {{ patient_name or mrn_display }} — NP Companion{% endblock %}
+{% block page_id %}caregap{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <a href="/caregap" style="color:var(--text-secondary);text-decoration:none;font-size:14px;">← Back to Overview</a>
+    <h1 style="margin:0;">{{ patient_name or 'Patient' }} <span style="font-size:16px;color:var(--text-secondary);font-weight:normal;">({{ mrn_display }})</span></h1>
+</div>
+
+{# ---- OPEN GAPS ---- #}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="display:flex;align-items:center;gap:8px;">
+        Open Care Gaps
+        {% if open_gaps %}
+        <span class="badge badge--warning">{{ open_gaps|length }}</span>
+        {% else %}
+        <span class="badge badge--success">All addressed</span>
+        {% endif %}
+    </div>
+    {% if open_gaps %}
+    <div class="card-body" style="padding:0;">
+        {% for g in open_gaps %}
+        <div style="padding:16px;border-bottom:1px solid var(--border,#eee);{% if loop.last %}border-bottom:none;{% endif %}">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <div style="font-weight:600;font-size:15px;margin-bottom:4px;">{{ g.gap_name or g.gap_type }}</div>
+                    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">{{ g.description }}</div>
+                    {% if g.billing_code_suggested %}
+                    <div style="font-size:12px;color:var(--text-secondary);">
+                        <strong>Billing:</strong> {{ g.billing_code_suggested }}
+                    </div>
+                    {% endif %}
+                    {% if g.status == 'declined' %}
+                    <span class="badge" style="background:#fce4e4;color:#c44;font-size:11px;margin-top:4px;">Declined</span>
+                    {% endif %}
+                </div>
+                <div style="display:flex;gap:6px;align-items:flex-start;flex-shrink:0;">
+                    <button class="btn btn-primary btn-sm" onclick="showAddressForm('{{ g.id }}')">
+                        ✓ Address Now
+                    </button>
+                    <form method="post" action="/caregap/{{ mrn }}/status/{{ g.id }}" style="display:inline;">
+                        <input type="hidden" name="status" value="declined">
+                        <button type="submit" class="btn btn-secondary btn-sm" title="Patient declined">Decline</button>
+                    </form>
+                    <form method="post" action="/caregap/{{ mrn }}/status/{{ g.id }}" style="display:inline;">
+                        <input type="hidden" name="status" value="not_applicable">
+                        <button type="submit" class="btn btn-secondary btn-sm" title="Not applicable">N/A</button>
+                    </form>
+                </div>
+            </div>
+
+            {# Address form (hidden until clicked) #}
+            <div id="address-form-{{ g.id }}" style="display:none;margin-top:12px;padding:12px;background:var(--bg-muted,#f8f9fa);border-radius:8px;">
+                <form method="post" action="/caregap/{{ mrn }}/address/{{ g.id }}">
+                    <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Documentation Snippet</label>
+                    <textarea name="documentation_snippet" rows="4" class="form-control" style="width:100%;font-size:13px;margin-bottom:8px;"
+                              placeholder="Pre-filled template — edit as needed">{{ g.description }}</textarea>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button type="submit" class="btn btn-primary btn-sm">Mark Addressed & Copy</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="hideAddressForm('{{ g.id }}')">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="empty-state">All care gaps for this patient have been addressed. 🎉</p>
+    </div>
+    {% endif %}
+</div>
+
+{# ---- ADDRESSED GAPS ---- #}
+{% if addressed_gaps %}
+<div class="card">
+    <div class="card-header" style="display:flex;align-items:center;gap:8px;">
+        Addressed
+        <span class="badge badge--success">{{ addressed_gaps|length }}</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        {% for g in addressed_gaps %}
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border,#eee);{% if loop.last %}border-bottom:none;{% endif %}opacity:.7;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div>
+                    <span style="font-weight:600;font-size:14px;">✓ {{ g.gap_name or g.gap_type }}</span>
+                    {% if g.status == 'declined' %}
+                    <span class="badge" style="background:#fce4e4;color:#c44;font-size:11px;margin-left:6px;">Declined</span>
+                    {% elif g.status == 'not_applicable' %}
+                    <span class="badge" style="background:#e8e8e8;color:#666;font-size:11px;margin-left:6px;">N/A</span>
+                    {% endif %}
+                    {% if g.completed_date %}
+                    <span style="font-size:12px;color:var(--text-secondary);margin-left:8px;">
+                        {{ g.completed_date.strftime('%b %d, %Y') }}
+                    </span>
+                    {% endif %}
+                </div>
+                <div style="display:flex;gap:6px;">
+                    {% if g.documentation_snippet %}
+                    <button class="btn btn-secondary btn-sm" onclick="copyText(this, '{{ g.documentation_snippet|e }}')">
+                        📋 Copy Doc
+                    </button>
+                    {% endif %}
+                    <form method="post" action="/caregap/{{ mrn }}/status/{{ g.id }}" style="display:inline;">
+                        <input type="hidden" name="status" value="open">
+                        <button type="submit" class="btn btn-secondary btn-sm" title="Re-open this gap">Reopen</button>
+                    </form>
+                </div>
+            </div>
+            {% if g.documentation_snippet %}
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;font-style:italic;">
+                {{ g.documentation_snippet|truncate(120) }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+function showAddressForm(gapId) {
+    var el = document.getElementById('address-form-' + gapId);
+    if (el) el.style.display = 'block';
+}
+function hideAddressForm(gapId) {
+    var el = document.getElementById('address-form-' + gapId);
+    if (el) el.style.display = 'none';
+}
+function copyText(btn, text) {
+    navigator.clipboard.writeText(text).then(function() {
+        var orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(function() { btn.textContent = orig; }, 1500);
+    });
+}
+</script>
+{% endblock %}

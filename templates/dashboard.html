@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — NP Companion{% endblock %}
+{% block page_id %}dashboard{% endblock %}
+
+{% block content %}
+{# ---- DASHBOARD HEADER ---- #}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+    <h1 style="margin:0;">
+        {% if is_today %}Today View{% else %}Schedule{% endif %}
+    </h1>
+    <span style="font-size:14px;color:var(--text-secondary);">{{ view_date.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}</span>
+    <div style="margin-left:auto;">
+        {% include '_free_widgets.html' %}
+    </div>
+</div>
+
+{# ---- RE-AUTH BANNER ---- #}
+<div id="reauth-banner" class="card reauth-banner" style="display:none; margin-bottom:16px;">
+    <div class="card-body" style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:20px;">&#9888;&#65039;</span>
+        <div style="flex:1;">
+            <strong>NetPractice Session Expired</strong>
+            <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary);">
+                The schedule data may be outdated. Please re-authenticate to NetPractice.
+            </p>
+        </div>
+        {% if current_user.role == 'admin' %}
+        <button class="btn btn-warning btn-sm" onclick="clearNPSession()" id="reauth-btn">
+            Reauth Now
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{# ---- DASHBOARD WIDGET GRID ---- #}
+<div class="dash-widget-grid fw-container">
+
+    {# ---- STATS WIDGET ---- #}
+    <div class="dash-widget dash-widget-full fw-widget" data-widget-id="stats">
+        <div class="duration-bar">
+            <div class="duration-bar__item">
+                <span class="duration-bar__label">Appointments</span>
+                <span class="duration-bar__value">{{ appointments|length }}</span>
+            </div>
+            <div class="duration-bar__item">
+                <span class="duration-bar__label">New Patients</span>
+                <span class="duration-bar__value duration-bar__value--gold">{{ new_patient_count }}</span>
+            </div>
+            <div class="duration-bar__item">
+                <span class="duration-bar__label">Booked</span>
+                <span class="duration-bar__value">{{ booked_hours }} hrs</span>
+            </div>
+            <div class="duration-bar__item">
+                <span class="duration-bar__label">Your Typical Pace</span>
+                <span class="duration-bar__value
+                    {% if duration_info.pace_label == 'behind' %} duration-bar__value--red
+                    {% elif duration_info.pace_label == 'ahead' %} duration-bar__value--green
+                    {% endif %}">{{ estimated_hours }} hrs</span>
+            </div>
+            <div class="duration-bar__item">
+                <span class="duration-bar__label">Likely End</span>
+                <span class="duration-bar__value">{{ duration_info.likely_end_time }}</span>
+            </div>
+            <div class="duration-bar__item">
+                <span class="duration-bar__label">Pace</span>
+                <span class="duration-bar__badge
+                    {% if duration_info.pace_label == 'behind' %} badge--danger
+                    {% elif duration_info.pace_label == 'ahead' %} badge--success
+                    {% else %} badge--info
+                    {% endif %}">{{ duration_info.pace_label|title }}</span>
+            </div>
+        </div>
+    </div>
+
+    {# ---- ANOMALY WIDGET (if any) ---- #}
+    {% if anomalies %}
+    <div class="dash-widget dash-widget-full fw-widget" data-widget-id="anomalies">
+        <div class="dash-widget-header">
+            <span>&#9889; Schedule Alerts ({{ anomalies|length }})</span>
+        </div>
+        <div class="dash-widget-body" style="padding:0;">
+            <ul class="anomaly-list">
+                {% for anomaly in anomalies %}
+                <li class="anomaly-item anomaly-item--{{ anomaly.severity }}">
+                    <span class="anomaly-type">{{ anomaly.type|replace('_', ' ')|title }}</span>
+                    <span class="anomaly-message">{{ anomaly.message }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ---- APPOINTMENT SCHEDULE WIDGET ---- #}
+    <div class="dash-widget dash-widget-wide fw-widget" data-widget-id="schedule">
+        <div class="dash-widget-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span>&#128197; Patient Schedule</span>
+                <span class="badge badge--info">{{ appointments|length }} patient{{ 's' if appointments|length != 1 }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+                <a href="/dashboard?date={{ yesterday.isoformat() }}" class="btn btn-secondary btn-sm" title="Yesterday">
+                    &larr; {{ yesterday.strftime('%b %d').replace(' 0', ' ') }}
+                </a>
+                <a href="/dashboard" class="btn {% if is_today %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+                    Today
+                </a>
+                <a href="/dashboard?date={{ tomorrow.isoformat() }}" class="btn btn-secondary btn-sm" title="Tomorrow">
+                    {{ tomorrow.strftime('%b %d').replace(' 0', ' ') }} &rarr;
+                </a>
+            </div>
+        </div>
+        <div class="dash-widget-body" style="padding:0;">
+            {% if appointments %}
+            <div class="table-wrap">
+            <table class="schedule-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Patient</th>
+                        <th>MRN</th>
+                        <th>Visit Type</th>
+                        <th>Reason</th>
+                        <th>Duration</th>
+                        <th>Gaps</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for appt in appointments %}
+                    <tr class="{% if appt.is_new_patient %}schedule-row--new{% endif %}">
+                        <td class="schedule-time">{{ appt.appointment_time }}</td>
+                        <td>
+                            {% if appt.patient_mrn %}
+                            <a href="/patient/{{ appt.patient_mrn }}" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--text-secondary);" title="Open chart">{{ appt.patient_name }}</a>
+                            {% else %}
+                            {{ appt.patient_name }}
+                            {% endif %}
+                            {% if appt.is_new_patient %}
+                            <span class="badge badge--new-patient" title="New Patient">NEW</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-family:monospace;font-size:13px;">
+                            {% if appt.patient_mrn %}
+                            &#8226;&#8226;{{ appt.patient_mrn[-4:] }}
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                        <td>{{ appt.visit_type }}</td>
+                        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ appt.reason or '' }}">
+                            {{ appt.reason or '&mdash;' }}
+                        </td>
+                        <td>{{ appt.duration_minutes }} min</td>
+                        <td>
+                            {% set gap_count = care_gap_counts.get(appt.patient_mrn, 0) if appt.patient_mrn else 0 %}
+                            {% if gap_count > 0 %}
+                            <a href="/caregap/{{ appt.patient_mrn }}" class="badge badge--warning" style="text-decoration:none;cursor:pointer;" title="View care gaps">
+                                {{ gap_count }} gap{{ 's' if gap_count != 1 }}
+                            </a>
+                            {% else %}
+                            <span style="color:var(--text-secondary);font-size:12px;">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge badge--status-{{ (appt.status or 'scheduled')|lower|replace(' ', '-') }}">
+                                {{ (appt.status or 'Scheduled')|title }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p class="empty-state" style="padding:20px;">
+                No appointments loaded for {{ view_date.strftime('%A, %B %d').replace(' 0', ' ') }}.
+                <br><span style="font-size:13px;color:var(--text-secondary);">
+                    Configure NetPractice in Admin settings and run the scraper to populate the schedule.
+                </span>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- MY PATIENTS WIDGET ---- #}
+    <div class="dash-widget fw-widget" data-widget-id="patients">
+        <div class="dash-widget-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span>&#128100; My Patients</span>
+                {% if my_patients %}<span class="badge badge--info">{{ my_patients|length }}</span>{% endif %}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="patient-search" class="form-input" placeholder="Search..."
+                       style="width:160px;padding:4px 10px;font-size:13px;" oninput="filterPatientPanel()">
+                <select id="patient-sort" class="form-input" style="width:auto;padding:4px 8px;font-size:13px;" onchange="sortPatientPanel()">
+                    <option value="name">Name</option>
+                    <option value="mrn">MRN</option>
+                    <option value="recent" selected>Recent</option>
+                </select>
+            </div>
+        </div>
+        <div class="dash-widget-body" style="padding:0;max-height:400px;overflow-y:auto;">
+            {% if my_patients %}
+            <table class="schedule-table" id="patient-panel-table">
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>MRN</th>
+                        <th>DOB</th>
+                        <th>Last Import</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pt in my_patients %}
+                    <tr data-name="{{ pt.patient_name|lower }}" data-mrn="{{ pt.mrn }}"
+                        data-recent="{{ pt.last_xml_parsed.isoformat() if pt.last_xml_parsed else '' }}">
+                        <td>
+                            <a href="/patient/{{ pt.mrn }}" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--text-secondary);">
+                                {{ pt.patient_name or '(unknown)' }}
+                            </a>
+                        </td>
+                        <td style="font-family:monospace;font-size:13px;">{{ pt.mrn }}</td>
+                        <td style="font-size:13px;">
+                            {% if pt.patient_dob and pt.patient_dob|length >= 8 %}
+                                {{ pt.patient_dob[4:6] }}-{{ pt.patient_dob[6:8] }}-{{ pt.patient_dob[:4] }}
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                        <td style="font-size:13px;color:var(--text-secondary);">
+                            {% if pt.last_xml_parsed %}
+                                {{ pt.last_xml_parsed.strftime('%m-%d-%Y %I:%M %p') }}
+                            {% else %}&mdash;{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-state" style="padding:20px;">No patients imported yet. Upload an XML to get started.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- XML DROP ZONE (compact) ---- #}
+    <div class="dash-widget fw-widget" data-widget-id="xml-import" style="min-height:auto;">
+        <div class="dash-widget-header">
+            <span>&#128193; Import Clinical Summary</span>
+        </div>
+        <div class="dash-widget-body"
+             id="xml-dropzone"
+             style="text-align:center;cursor:pointer;padding:16px 12px;border:2px dashed var(--border-color,#ddd);border-radius:6px;margin:8px;transition:border-color .15s,background .15s;"
+             ondragover="event.preventDefault();this.style.borderColor='var(--color-teal)';this.style.background='rgba(13,115,119,.06)'"
+             ondragleave="this.style.borderColor='var(--border-color,#ddd)';this.style.background=''"
+             ondrop="handleXmlDrop(event)">
+            <p style="margin:0 0 4px;font-size:13px;color:var(--text-secondary);">&#128194; Drag &amp; drop XML files here</p>
+            <p style="margin:0;font-size:12px;color:var(--text-muted);">or <label for="xml-file-input" style="color:var(--color-teal);cursor:pointer;text-decoration:underline;">click to browse</label></p>
+            <input type="file" id="xml-file-input" accept=".xml" multiple style="display:none;" onchange="handleXmlFileInput(this)">
+            <div id="xml-upload-status" style="margin-top:8px;font-size:12px;"></div>
+        </div>
+    </div>
+</div>
+
+{# ---- DASHBOARD JAVASCRIPT ---- #}
+<script>
+/* Check auth status on page load and show/hide the reauth banner */
+(function checkAuthStatus() {
+    fetch('/api/auth-status')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            var banner = document.getElementById('reauth-banner');
+            if (!banner) return;
+            if (data.needs_reauth) {
+                banner.style.display = 'block';
+            }
+        })
+        .catch(function() {});
+})();
+
+/* Admin: clear NetPractice session and trigger re-auth */
+function clearNPSession() {
+    var btn = document.getElementById('reauth-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Clearing...'; }
+
+    fetch('/admin/auth/clear-session', { method: 'POST' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                if (btn) { btn.textContent = 'Session Cleared'; }
+                var banner = document.getElementById('reauth-banner');
+                if (banner) {
+                    var p = banner.querySelector('p');
+                    if (p) p.textContent = 'Session cleared. Re-authenticate in NetPractice, then the next scrape will save new cookies.';
+                }
+            } else {
+                if (btn) { btn.textContent = 'Error'; btn.disabled = false; }
+            }
+        })
+        .catch(function() {
+            if (btn) { btn.textContent = 'Error'; btn.disabled = false; }
+        });
+}
+
+/* ---- XML Drop Zone ---- */
+function handleXmlDrop(e) {
+    e.preventDefault();
+    var dz = document.getElementById('xml-dropzone');
+    dz.style.borderColor = 'var(--border-color,#ddd)';
+    dz.style.background = '';
+    var files = e.dataTransfer.files;
+    if (files.length) uploadXmlFiles(files);
+}
+
+function handleXmlFileInput(input) {
+    if (input.files.length) uploadXmlFiles(input.files);
+    input.value = '';
+}
+
+function uploadXmlFiles(files) {
+    var status = document.getElementById('xml-upload-status');
+    status.textContent = 'Uploading ' + files.length + ' file(s)…';
+    status.style.color = 'var(--text-secondary)';
+    var fd = new FormData();
+    for (var i = 0; i < files.length; i++) fd.append('xml_files', files[i]);
+    fetch('/patient/upload-xml', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                status.style.color = 'var(--color-green)';
+                status.textContent = d.message;
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                status.style.color = 'var(--color-red)';
+                status.textContent = d.message || 'Upload failed';
+            }
+        })
+        .catch(function() {
+            status.style.color = 'var(--color-red)';
+            status.textContent = 'Upload error — check console';
+        });
+}
+
+/* ---- Patient Panel Search / Sort ---- */
+function filterPatientPanel() {
+    var q = (document.getElementById('patient-search').value || '').toLowerCase();
+    var rows = document.querySelectorAll('#patient-panel-table tbody tr');
+    rows.forEach(function(tr) {
+        var name = tr.getAttribute('data-name') || '';
+        var mrn = tr.getAttribute('data-mrn') || '';
+        tr.style.display = (name.indexOf(q) !== -1 || mrn.indexOf(q) !== -1) ? '' : 'none';
+    });
+}
+
+function sortPatientPanel() {
+    var by = document.getElementById('patient-sort').value;
+    var tbody = document.querySelector('#patient-panel-table tbody');
+    if (!tbody) return;
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort(function(a, b) {
+        if (by === 'name') return (a.getAttribute('data-name') || '').localeCompare(b.getAttribute('data-name') || '');
+        if (by === 'mrn') return (a.getAttribute('data-mrn') || '').localeCompare(b.getAttribute('data-mrn') || '');
+        var da = a.getAttribute('data-recent') || '';
+        var db_ = b.getAttribute('data-recent') || '';
+        return db_.localeCompare(da);
+    });
+    rows.forEach(function(r) { tbody.appendChild(r); });
+}
+</script>
+{% endblock %}

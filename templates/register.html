@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Register — NP Companion{% endblock %}
+{% block page_id %}register{% endblock %}
+
+{% block content %}
+<div class="auth-card" style="max-width:480px;">
+    <div class="auth-card-header">
+        <h1 class="auth-title">
+            {% if first_user %}
+                Create Admin Account
+            {% elif admin_creating %}
+                Register New User
+            {% else %}
+                Request Access
+            {% endif %}
+        </h1>
+        <p class="auth-subtitle">
+            {% if first_user %}
+                This is the first account — it will have admin privileges.
+            {% elif admin_creating %}
+                Fill in the details below to create a new account.
+            {% else %}
+                Fill in the form below. Your account will be reviewed by an
+                admin before you can log in.
+            {% endif %}
+        </p>
+    </div>
+
+    {# Flash messages #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container" style="margin:0 0 16px;">
+        {% for category, message in messages %}
+        <div class="flash flash--{{ category }}">
+            <span>{{ message }}</span>
+            <button class="flash-close" aria-label="Dismiss">&times;</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('auth.register') }}" class="auth-form">
+        <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                class="form-input"
+                required
+                value="{{ form.get('username', '') }}"
+                autocomplete="username"
+            >
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="display_name">Display Name</label>
+            <input
+                type="text"
+                id="display_name"
+                name="display_name"
+                class="form-input"
+                value="{{ form.get('display_name', '') }}"
+                placeholder="How your name appears in the app"
+            >
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="email">Email <span style="font-weight:normal;color:var(--text-muted);">(optional)</span></label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                class="form-input"
+                value="{{ form.get('email', '') }}"
+                placeholder="your@email.com"
+            >
+        </div>
+
+        {# Role selector — only show when admin is creating a non-first user #}
+        {% if not first_user %}
+        <div class="form-group">
+            <label class="form-label" for="role">Role</label>
+            <select id="role" name="role" class="form-input">
+                <option value="provider" {{ 'selected' if form.get('role','provider') == 'provider' }}>Provider</option>
+                <option value="ma" {{ 'selected' if form.get('role') == 'ma' }}>Medical Assistant (MA)</option>
+                <option value="admin" {{ 'selected' if form.get('role') == 'admin' }}>Admin</option>
+            </select>
+            <p class="form-help">
+                MA sees: Dashboard, Orders, Care Gaps, Med Ref.
+                Provider sees all clinical modules. Admin sees everything.
+            </p>
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                class="form-input"
+                required
+                minlength="8"
+                autocomplete="new-password"
+            >
+            <p class="form-help">At least 8 characters.</p>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="confirm_password">Confirm Password</label>
+            <input
+                type="password"
+                id="confirm_password"
+                name="confirm_password"
+                class="form-input"
+                required
+                minlength="8"
+                autocomplete="new-password"
+            >
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="pin">
+                4-Digit PIN <span style="font-weight:normal;color:var(--text-muted);">(optional)</span>
+            </label>
+            <input
+                type="password"
+                id="pin"
+                name="pin"
+                class="form-input"
+                maxlength="4"
+                pattern="[0-9]{4}"
+                inputmode="numeric"
+                placeholder="Used to unlock the screen"
+                autocomplete="off"
+                style="max-width:200px;"
+            >
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg">
+            {% if first_user %}Create Admin Account{% else %}Create Account{% endif %}
+        </button>
+
+        {% if not first_user %}
+        <div style="text-align:center;margin-top:12px;">
+            <a href="{{ url_for('auth.admin_users') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}

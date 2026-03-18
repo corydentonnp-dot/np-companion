@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}On-Call Handoff — NP Companion{% endblock %}
+{% block page_id %}oncall-handoff{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h1 style="font-size:20px;margin:0;">Handoff Summary</h1>
+        <a href="/oncall" class="btn btn-outline btn-sm">&larr; Back</a>
+    </div>
+
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+        De-identified summary of {{ note_count }} call{{ 's' if note_count != 1 else '' }} from the last 72 hours.
+        <strong>No patient identifiers are included.</strong>
+    </p>
+
+    {% if summary_items %}
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-body" style="padding:0;">
+            {% for item in summary_items %}
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border,#f1f5f9);display:flex;align-items:center;gap:12px;">
+                <span style="font-size:12px;white-space:nowrap;color:var(--text-secondary);min-width:80px;">{{ item.call_time }}</span>
+                <span style="flex:1;">{{ item.chief_complaint }}</span>
+                <span style="padding:2px 8px;border-radius:12px;font-size:11px;white-space:nowrap;background:{{ 'var(--bg-danger,#fee2e2)' if item.status == 'pending' else 'var(--bg-success,#dcfce7)' }};">{{ item.status }}</span>
+                {% if item.callback_pending %}
+                <span style="font-size:11px;color:var(--color-warning,#f59e0b);">&#128222;</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="card-body" style="text-align:center;color:var(--text-secondary);padding:40px;">No calls in the last 72 hours.</div>
+    </div>
+    {% endif %}
+
+    <form id="share-form">
+        <button type="button" class="btn btn-primary" style="width:100%;min-height:44px;font-size:16px;" onclick="shareHandoff()">&#128279; Share Handoff (1-hour link)</button>
+    </form>
+    <div id="share-result" style="display:none;margin-top:12px;padding:12px;background:var(--bg-success,#dcfce7);border-radius:6px;font-size:13px;">
+        <p style="margin:0 0 6px;font-weight:600;">Handoff link created!</p>
+        <input type="text" id="share-url" class="form-control" readonly style="width:100%;font-size:13px;" onclick="this.select()">
+        <p style="margin:8px 0 0;font-size:12px;color:var(--text-secondary);">Expires in 1 hour. No login required.</p>
+    </div>
+</div>
+
+<script>
+function shareHandoff() {
+    fetch('/oncall/handoff/share', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                document.getElementById('share-url').value = data.url;
+                document.getElementById('share-result').style.display = 'block';
+            }
+        });
+}
+</script>
+{% endblock %}

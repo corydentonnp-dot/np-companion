@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Widget — NP Companion</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: #f8fafc;
+            color: #1e293b;
+        }
+        .provider {
+            font-size: 16px;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+        .provider strong { color: #1e293b; }
+        .big-btn {
+            width: 80vw;
+            max-width: 480px;
+            min-height: 200px;
+            border: none;
+            border-radius: 16px;
+            font-size: 28px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .big-btn:active { transform: scale(0.97); }
+        .btn-enter {
+            background: #22c55e;
+            color: #fff;
+        }
+        .btn-leave {
+            background: #ef4444;
+            color: #fff;
+        }
+        .status {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #64748b;
+            min-height: 20px;
+        }
+        .status.error { color: #ef4444; }
+        .qr-section {
+            margin-top: 32px;
+            text-align: center;
+        }
+        .qr-section p {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="provider">
+        Provider: <strong id="provider-name">{{ provider_name or 'Unknown' }}</strong>
+    </div>
+
+    <button class="big-btn {{ 'btn-leave' if f2f_active else 'btn-enter' }}" id="toggle-btn" onclick="toggleF2F()">
+        <span id="btn-icon" style="font-size:48px;">{{ '🖥' if f2f_active else '👋' }}</span>
+        <span id="btn-text">{{ 'Provider Left Room' if f2f_active else 'Provider Entered Room' }}</span>
+    </button>
+
+    <div class="status" id="status-msg"></div>
+
+    <div class="qr-section">
+        <p>Scan to open this widget on another device</p>
+        <canvas id="qr-canvas" width="120" height="120"></canvas>
+    </div>
+
+    <script>
+    var f2fActive = {{ 'true' if f2f_active else 'false' }};
+
+    function updateUI() {
+        var btn = document.getElementById('toggle-btn');
+        var icon = document.getElementById('btn-icon');
+        var text = document.getElementById('btn-text');
+        if (f2fActive) {
+            btn.className = 'big-btn btn-leave';
+            icon.textContent = '\uD83D\uDDA5';  // computer emoji
+            text.textContent = 'Provider Left Room';
+        } else {
+            btn.className = 'big-btn btn-enter';
+            icon.textContent = '\uD83D\uDC4B';  // wave emoji
+            text.textContent = 'Provider Entered Room';
+        }
+    }
+
+    function toggleF2F() {
+        var btn = document.getElementById('toggle-btn');
+        var msg = document.getElementById('status-msg');
+        btn.disabled = true;
+        msg.textContent = 'Updating...';
+        msg.className = 'status';
+
+        fetch('/timer/face/room-toggle', { method: 'POST' })
+            .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+            .then(function(res) {
+                btn.disabled = false;
+                if (res.ok) {
+                    f2fActive = res.data.f2f_active;
+                    updateUI();
+                    msg.textContent = res.data.action === 'started' ? 'Timer started' : 'Timer stopped';
+                } else {
+                    msg.textContent = res.data.error || 'Error';
+                    msg.className = 'status error';
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                msg.textContent = 'Connection error';
+                msg.className = 'status error';
+            });
+    }
+
+    // Auto-refresh state every 5 seconds
+    setInterval(function() {
+        fetch('/timer/face/room-toggle', { method: 'GET' }).catch(function(){});
+        // We just reload the page to pick up state changes
+        // (the button state is server-rendered on load)
+    }, 5000);
+
+    // Actually, let's do a smarter auto-refresh via page reload
+    setInterval(function() {
+        // Only reload if user isn't mid-action
+        if (!document.getElementById('toggle-btn').disabled) {
+            location.reload();
+        }
+    }, 10000);
+
+    // Basic QR code drawing (draws the current page URL as a simple placeholder)
+    (function drawQR() {
+        var canvas = document.getElementById('qr-canvas');
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        var url = location.href;
+        // Simple visual placeholder — real QR generation would use a library
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, 120, 120);
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('QR Code', 60, 55);
+        ctx.fillText('Placeholder', 60, 70);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.strokeRect(4, 4, 112, 112);
+    })();
+    </script>
+</body>
+</html>

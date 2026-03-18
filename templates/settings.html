@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+{% block title %}Settings — NP Companion{% endblock %}
+{% block page_id %}settings{% endblock %}
+
+{% block content %}
+<h1 style="margin-bottom:24px;">Settings</h1>
+
+{# ================================================================
+   SECTION 1: Profile & Security
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Profile &amp; Security</h2>
+
+{# ---- Display Name ----------------------------------------------- #}
+<div class="card" style="margin-bottom:16px;max-width:560px;">
+    <div class="card-header">Profile</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="update_profile">
+            <div class="form-group">
+                <label class="form-label" for="display_name">Display Name</label>
+                <input type="text" id="display_name" name="display_name" class="form-input"
+                       value="{{ current_user.display_name }}" required>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Username</label>
+                <p style="margin:0;color:var(--text-secondary);">{{ current_user.username }}</p>
+            </div>
+            <div class="form-group" style="margin-bottom:0;margin-top:8px;">
+                <label class="form-label">Role</label>
+                <p style="margin:0;color:var(--text-secondary);">{{ current_user.role | capitalize }}</p>
+            </div>
+            <div class="form-group" style="margin-top:8px;">
+                <label class="form-label" for="email">Email Address</label>
+                <input type="email" id="email" name="email" class="form-input"
+                       value="{{ current_user.email or '' }}" placeholder="your.email@example.com">
+                <p class="form-help">Used for password/PIN reset. Optional.</p>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top:16px;">Save</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Change Password -------------------------------------------- #}
+<div class="card" style="margin-bottom:16px;max-width:560px;">
+    <div class="card-header">Change Password</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="change_password">
+            <div class="form-group">
+                <label class="form-label" for="current_password">Current Password</label>
+                <input type="password" id="current_password" name="current_password" class="form-input"
+                       required autocomplete="current-password">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new_password">New Password</label>
+                <input type="password" id="new_password" name="new_password" class="form-input"
+                       required minlength="8" autocomplete="new-password">
+                <p class="form-help">At least 8 characters.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="confirm_password">Confirm New Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-input"
+                       required minlength="8" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-primary">Change Password</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Set / Change PIN ------------------------------------------ #}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">Screen Lock PIN</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Your 4-digit PIN is used to unlock the screen after inactivity.
+            {% if current_user.pin_hash %}
+                <span class="badge badge--success" style="margin-left:6px;">PIN set</span>
+            {% else %}
+                <span class="badge badge--warning" style="margin-left:6px;">No PIN set</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_pin">
+            <div class="form-group">
+                <label class="form-label" for="pin">New 4-Digit PIN</label>
+                <input type="password" id="pin" name="pin" class="form-input"
+                       maxlength="4" pattern="[0-9]{4}" inputmode="numeric"
+                       required autocomplete="off" style="max-width:200px;">
+            </div>
+            <button type="submit" class="btn btn-primary">Set PIN</button>
+        </form>
+    </div>
+</div>
+
+{# ================================================================
+   SECTION 2: Credentials
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Credentials</h2>
+
+{# ---- NetPractice Credentials ------------------------------------ #}
+<div class="card" style="margin-bottom:16px;max-width:560px;">
+    <div class="card-header">NetPractice Login</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Your CGM webPRACTICE credentials. Encrypted and stored locally.
+            {% if current_user.has_np_credentials() %}
+                <span class="badge badge--success" style="margin-left:6px;">Credentials saved</span>
+            {% else %}
+                <span class="badge badge--warning" style="margin-left:6px;">Not configured</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_np_credentials">
+            <div class="form-group">
+                <label class="form-label" for="np_username">NetPractice Username</label>
+                <input type="text" id="np_username" name="np_username" class="form-input"
+                       value="{{ current_user.get_np_username() }}" placeholder="Your webPRACTICE username" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="np_password">NetPractice Password</label>
+                <input type="password" id="np_password" name="np_password" class="form-input"
+                       placeholder="{% if current_user.has_np_credentials() %}••••••• (saved){% else %}Your webPRACTICE password{% endif %}" autocomplete="off">
+                <p class="form-help">Leave blank to keep the current saved password.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="np_provider_name">Provider Name in webPRACTICE</label>
+                <input type="text" id="np_provider_name" name="np_provider_name" class="form-input"
+                       value="{{ current_user.np_provider_name or '' }}" placeholder='FIRSTNAME LASTNAME (##)'>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Credentials</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Amazing Charts Credentials -------------------------------- #}
+<div class="card" style="margin-bottom:16px;max-width:560px;">
+    <div class="card-header">Amazing Charts Login</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Encrypted and stored locally for desktop automation features.
+            {% if current_user.has_ac_credentials() %}
+                <span class="badge badge--success" style="margin-left:6px;">Credentials saved</span>
+            {% else %}
+                <span class="badge badge--warning" style="margin-left:6px;">Not configured</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_ac_credentials">
+            <div class="form-group">
+                <label class="form-label" for="ac_username">Amazing Charts Username</label>
+                <input type="text" id="ac_username" name="ac_username" class="form-input"
+                       value="{{ current_user.get_ac_username() }}" placeholder="Your Amazing Charts username" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ac_password">Amazing Charts Password</label>
+                <input type="password" id="ac_password" name="ac_password" class="form-input"
+                       placeholder="{% if current_user.has_ac_credentials() %}••••••• (saved){% else %}Your Amazing Charts password{% endif %}" autocomplete="off">
+                <p class="form-help">Leave blank to keep the current saved password.</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Credentials</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Work PC Password ------------------------------------------ #}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">Work Computer Password <span class="badge badge--info" style="margin-left:8px;">Optional</span></div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Used for automated PC unlock features. Encrypted at rest.
+            {% if current_user.has_pc_password() %}
+                <span class="badge badge--success" style="margin-left:6px;">Password saved</span>
+            {% else %}
+                <span class="badge badge--info" style="margin-left:6px;">Not set</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_pc_password">
+            <div class="form-group">
+                <label class="form-label" for="pc_password">Work PC Password</label>
+                <input type="password" id="pc_password" name="pc_password" class="form-input"
+                       placeholder="{% if current_user.has_pc_password() %}••••••• (saved){% else %}Your Windows login password{% endif %}" autocomplete="off">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Password</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Browser Preference ---------------------------------------- #}
+<div class="card" style="margin-bottom:16px;max-width:560px;">
+    <div class="card-header">Preferred Browser</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Choose which browser opens when clicking external links (UpToDate, Google, etc.).
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_preferred_browser">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="preferred_browser">Browser</label>
+                <select id="preferred_browser" name="preferred_browser" class="form-input" style="max-width:240px;">
+                    <option value="chrome" {% if current_user.get_pref('preferred_browser', 'chrome') == 'chrome' %}selected{% endif %}>Google Chrome</option>
+                    <option value="edge" {% if current_user.get_pref('preferred_browser', 'chrome') == 'edge' %}selected{% endif %}>Microsoft Edge</option>
+                    <option value="firefox" {% if current_user.get_pref('preferred_browser', 'chrome') == 'firefox' %}selected{% endif %}>Mozilla Firefox</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top:12px;">Save Browser</button>
+        </form>
+    </div>
+</div>
+
+{# ---- AI Assistant Configuration -------------------------------- #}
+{% if current_user.ai_enabled %}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">AI Assistant
+        {% if current_user.has_ai_api_key() %}
+            <span class="badge badge--success" style="margin-left:8px;">Configured</span>
+        {% else %}
+            <span class="badge badge--warning" style="margin-left:8px;">Not configured</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Configure your AI assistant provider and API key. Your key is encrypted and stored locally.
+            The AI assistant is available via right-click on highlighted text.
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_ai_config">
+            <div class="form-group">
+                <label class="form-label" for="ai_provider">AI Provider</label>
+                <select id="ai_provider" name="ai_provider" class="form-input">
+                    <option value="" {% if not current_user.ai_provider %}selected{% endif %}>— Select provider —</option>
+                    <option value="openai" {% if current_user.ai_provider == 'openai' %}selected{% endif %}>OpenAI (ChatGPT)</option>
+                    <option value="anthropic" {% if current_user.ai_provider == 'anthropic' %}selected{% endif %}>Anthropic (Claude)</option>
+                    <option value="xai" {% if current_user.ai_provider == 'xai' %}selected{% endif %}>xAI (Grok)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ai_api_key">API Key</label>
+                <input type="password" id="ai_api_key" name="ai_api_key" class="form-input"
+                       placeholder="{% if current_user.has_ai_api_key() %}••••••••••••• (saved){% else %}Enter your API key{% endif %}" autocomplete="off">
+                <p class="form-help">Leave blank to keep the current saved key. Get your key from your provider's dashboard.</p>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary">Save AI Settings</button>
+                <button type="button" class="btn btn-secondary" onclick="testAIConnection()">Test Connection</button>
+            </div>
+            <p id="ai-test-result" style="margin-top:8px;font-size:13px;display:none;"></p>
+        </form>
+    </div>
+</div>
+<script>
+function testAIConnection() {
+    var r = document.getElementById('ai-test-result');
+    r.style.display = 'block'; r.style.color = 'var(--text-secondary)'; r.textContent = 'Testing connection…';
+    fetch('/api/ai/chat', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Say "Connection successful" in exactly two words.',context:'',history:[]})})
+    .then(function(res){return res.json();}).then(function(d){
+        if(d.error){r.style.color='var(--color-red,#e74c3c)';r.textContent='Error: '+d.error;}
+        else{r.style.color='var(--color-green,#27ae60)';r.textContent='✓ Connection successful!';}
+    }).catch(function(){r.style.color='var(--color-red,#e74c3c)';r.textContent='Failed to reach server.';});
+}
+</script>
+{% endif %}
+
+{# ================================================================
+   SECTION 3: Notifications
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Notifications</h2>
+
+<form method="POST" action="{{ url_for('auth.settings_notifications') }}">
+    {# ---- General Settings ------------------------------------------ #}
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">General</div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="pushover_enabled"
+                        {{ 'checked' if current_user.get_pref('pushover_enabled') }}>
+                    <span>Enable Pushover notifications</span>
+                </label>
+                <p class="form-help">Pushover must be installed on your phone and API keys set in config.py.</p>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Quiet Hours ----------------------------------------------- #}
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">Quiet Hours</div>
+        <div class="card-body">
+            <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+                Normal-priority notifications are silenced during quiet hours. Critical alerts always come through.
+            </p>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="quiet_hours_start">Quiet starts</label>
+                    <input type="time" id="quiet_hours_start" name="quiet_hours_start" class="form-input"
+                           value="{{ '%02d:00' % current_user.get_pref('quiet_hours_start', 22) }}">
+                </div>
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="quiet_hours_end">Quiet ends</label>
+                    <input type="time" id="quiet_hours_end" name="quiet_hours_end" class="form-input"
+                           value="{{ '%02d:00' % current_user.get_pref('quiet_hours_end', 7) }}">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="toggle-row">
+                    <input type="checkbox" name="weekend_alerts"
+                        {{ 'checked' if current_user.get_pref('weekend_alerts') }}>
+                    <span>Allow alerts on weekends</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Inbox Check Interval -------------------------------------- #}
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">Inbox Monitor</div>
+        <div class="card-body">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="inbox_check_interval">Check interval (seconds)</label>
+                <input type="number" id="inbox_check_interval" name="inbox_check_interval" class="form-input"
+                       min="30" max="600" step="10"
+                       value="{{ current_user.get_pref('inbox_check_interval', 120) }}" style="max-width:200px;">
+                <p class="form-help">How often the background agent checks for new inbox items. Default: 120 seconds.</p>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Notification Types ---------------------------------------- #}
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">Notification Types</div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_new_labs"
+                        {{ 'checked' if current_user.get_pref('notify_new_labs', true) }}>
+                    <span>New lab results</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_new_radiology"
+                        {{ 'checked' if current_user.get_pref('notify_new_radiology', true) }}>
+                    <span>New radiology results</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_new_messages"
+                        {{ 'checked' if current_user.get_pref('notify_new_messages', true) }}>
+                    <span>New patient messages</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_eod_reminder"
+                        {{ 'checked' if current_user.get_pref('notify_eod_reminder', true) }}>
+                    <span>End-of-day reminder</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="notify_morning_briefing"
+                        {{ 'checked' if current_user.get_pref('notify_morning_briefing', true) }}>
+                    <span>Morning briefing</span>
+                </label>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="toggle-row" style="opacity:0.6;">
+                    <input type="checkbox" checked disabled>
+                    <span>Critical value alerts (always on)</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg">Save Notification Preferences</button>
+</form>
+
+{# ================================================================
+   SECTION 4: Clinical Summary Import
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 12px;">Clinical Summary Import</h2>
+
+<form method="POST" action="{{ url_for('auth.settings_account') }}">
+    <input type="hidden" name="action" value="set_export_folder">
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">XML Export Folder</div>
+        <div class="card-body">
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" for="xml_export_folder">Folder path</label>
+                <input type="text" id="xml_export_folder" name="xml_export_folder" class="form-input"
+                       value="{{ current_user.get_pref('xml_export_folder', '') }}"
+                       placeholder="data/clinical_summaries/">
+                <p class="form-help">
+                    Full path to the folder where Amazing Charts exports Clinical Summary XML files.
+                    Leave blank to use the default (<code>data/clinical_summaries/</code>).
+                    NP Companion watches this folder for new files and auto-imports them.
+                </p>
+            </div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Save Export Folder</button>
+</form>
+
+{# ================================================================
+   SECTION 5: Theme & Appearance
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 12px;">Theme &amp; Appearance</h2>
+
+<div class="card" style="margin-bottom:16px;max-width:720px;">
+    <div class="card-header">Theme</div>
+    <div class="card-body">
+        <p style="margin-bottom:12px;color:var(--text-secondary);font-size:13px;">
+            Click a theme to preview it instantly. Your choice is saved automatically.
+        </p>
+        <div id="theme-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;">
+            {% set themes = [
+                ('light',      'Light',       '#f8fafc', '#1e293b', '#2563eb'),
+                ('dark',       'Dark',        '#0f172a', '#1e293b', '#38bdf8'),
+                ('modern',     'Modern',      '#f8fafc', '#1e293b', '#2563eb'),
+                ('fancy',      'Fancy',       '#faf5ff', '#3b0764', '#7c3aed'),
+                ('retro',      'Old School',  '#c0c0c0', '#000080', '#000080'),
+                ('minimalist', 'Minimalist',  '#fafafa', '#111111', '#111111'),
+                ('nature',     'Nature',      '#f1f8e9', '#1b3a1a', '#2d5016'),
+                ('ocean',      'Ocean',       '#e0f7fa', '#01579b', '#0277bd'),
+                ('sunset',     'Sunset',      '#fff3e0', '#4e342e', '#bf360c'),
+                ('nord',       'Nord',        '#eceff4', '#2e3440', '#5e81ac'),
+            ] %}
+            {% for tid, tname, bg, sidebar, accent in themes %}
+            <div class="theme-card{% if current_user.get_pref('theme','light') == tid %} theme-card--active{% endif %}"
+                 data-theme-id="{{ tid }}"
+                 style="cursor:pointer;border:2px solid var(--border-color);border-radius:var(--radius);
+                        padding:0;overflow:hidden;transition:border-color .2s,box-shadow .2s;"
+                 onclick="window._applyTheme('{{ tid }}')">
+                <div style="display:flex;height:48px;">
+                    <div style="width:28%;background:{{ sidebar }};"></div>
+                    <div style="flex:1;background:{{ bg }};display:flex;align-items:center;justify-content:center;">
+                        <span style="width:24px;height:6px;border-radius:3px;background:{{ accent }};display:block;"></span>
+                    </div>
+                </div>
+                <div style="text-align:center;padding:6px 4px;font-size:12px;font-weight:500;color:var(--text-primary);">
+                    {{ tname }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;max-width:720px;">
+    <div class="card-header">Font</div>
+    <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% set fonts = [
+                ('system',       'System Default'),
+                ('inter',        'Inter'),
+                ('roboto',       'Roboto'),
+                ('poppins',      'Poppins'),
+                ('source-code',  'Source Code Pro'),
+                ('merriweather', 'Merriweather'),
+                ('comic',        'Comic Sans'),
+            ] %}
+            {% for fid, fname in fonts %}
+            <button class="btn font-btn{% if current_user.get_pref('theme_font','system') == fid %} btn-primary{% endif %}"
+                    data-font-id="{{ fid }}"
+                    onclick="window._applyFont('{{ fid }}')"
+                    style="font-family:{% if fid == 'system' %}-apple-system,sans-serif{% elif fid == 'inter' %}'Inter',sans-serif{% elif fid == 'roboto' %}'Roboto',sans-serif{% elif fid == 'poppins' %}'Poppins',sans-serif{% elif fid == 'source-code' %}'Source Code Pro',monospace{% elif fid == 'merriweather' %}'Merriweather',serif{% elif fid == 'comic' %}'Comic Sans MS',cursive{% endif %};">
+                {{ fname }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;max-width:720px;">
+    <div class="card-header">Accent Colour</div>
+    <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+            {% set accents = [
+                ('',        'Theme Default', 'var(--color-navy)'),
+                ('blue',    'Blue',          '#2563EB'),
+                ('teal',    'Teal',          '#0D9488'),
+                ('purple',  'Purple',        '#7C3AED'),
+                ('rose',    'Rose',          '#E11D48'),
+                ('amber',   'Amber',         '#D97706'),
+                ('emerald', 'Emerald',       '#059669'),
+            ] %}
+            {% for aid, aname, acolor in accents %}
+            <div class="accent-btn{% if current_user.get_pref('theme_accent','') == aid %} accent-btn--active{% endif %}"
+                 data-accent-id="{{ aid }}"
+                 onclick="window._applyAccent('{{ aid }}')"
+                 title="{{ aname }}"
+                 style="cursor:pointer;width:32px;height:32px;border-radius:50%;
+                        background:{{ acolor }};border:3px solid var(--border-color);
+                        transition:border-color .2s,box-shadow .2s;">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+/* ---- Theme preview + persist ----------------------------------- */
+window._applyTheme = function(tid) {
+    document.documentElement.setAttribute('data-theme', tid);
+    localStorage.setItem('theme', tid);
+
+    document.querySelectorAll('.theme-card').forEach(function(el) {
+        el.classList.toggle('theme-card--active', el.dataset.themeId === tid);
+    });
+
+    fetch('/api/settings/theme', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({theme: tid})
+    });
+};
+
+window._applyFont = function(fid) {
+    document.documentElement.setAttribute('data-font', fid);
+    localStorage.setItem('theme_font', fid);
+
+    document.querySelectorAll('.font-btn').forEach(function(el) {
+        el.classList.toggle('btn-primary', el.dataset.fontId === fid);
+    });
+
+    fetch('/api/settings/theme', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({font: fid})
+    });
+};
+
+window._applyAccent = function(aid) {
+    document.documentElement.setAttribute('data-accent', aid);
+    localStorage.setItem('theme_accent', aid);
+
+    document.querySelectorAll('.accent-btn').forEach(function(el) {
+        el.classList.toggle('accent-btn--active', el.dataset.accentId === aid);
+    });
+
+    fetch('/api/settings/theme', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({accent: aid})
+    });
+};
+</script>
+
+<style>
+.theme-card:hover            { border-color: var(--color-navy) !important; }
+.theme-card--active          { border-color: var(--color-navy) !important;
+                               box-shadow: 0 0 0 2px var(--color-navy); }
+.accent-btn:hover            { border-color: var(--text-primary) !important; }
+.accent-btn--active          { border-color: var(--text-primary) !important;
+                               box-shadow: 0 0 0 2px var(--text-primary); }
+</style>
+{% endblock %}

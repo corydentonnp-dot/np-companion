@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block title %}Inbox — NP Companion{% endblock %}
+{% block page_id %}inbox{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+    <h1 style="margin:0;">
+        {% if view is defined and view == 'held' %}Held Items
+        {% elif view is defined and view == 'audit' %}Inbox Audit Log
+        {% else %}Inbox Monitor{% endif %}
+    </h1>
+</div>
+
+{# ---- Tab Navigation ---- #}
+<div style="display:flex;gap:8px;margin-bottom:16px;">
+    <a href="/inbox" class="btn {{ 'btn-primary' if view is not defined or view == 'inbox' else 'btn-outline' }}">Inbox</a>
+    <a href="/inbox/held" class="btn {{ 'btn-primary' if view is defined and view == 'held' else 'btn-outline' }}">Held Items</a>
+    <a href="/inbox/audit-log" class="btn {{ 'btn-primary' if view is defined and view == 'audit' else 'btn-outline' }}">Audit Log</a>
+    <a href="/inbox/digest" class="btn {{ 'btn-primary' if view is defined and view == 'digest' else 'btn-outline' }}">Digest</a>
+</div>
+
+{% if view is defined and view == 'digest' %}
+{# ---- Digest Report View (F5e) ---- #}
+<div class="card" style="max-width:900px;margin-bottom:24px;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        Inbox Digest — Past {{ digest_hours }}h
+        <a href="/inbox/digest?hours={{ digest_hours }}&format=csv" class="btn btn-sm btn-outline">Export CSV</a>
+    </div>
+    <div class="card-body">
+        {# ---- Period Selector ---- #}
+        <form style="margin-bottom:16px;display:flex;gap:8px;align-items:end;">
+            <div>
+                <label style="font-size:12px;">Lookback (hours)</label>
+                <select name="hours" class="form-control" style="width:120px;" onchange="this.form.submit()">
+                    {% for h in [8, 12, 24, 48, 72, 168] %}
+                    <option value="{{ h }}" {{ 'selected' if digest_hours == h }}>{{ h }}h{% if h == 24 %} (1d){% elif h == 48 %} (2d){% elif h == 72 %} (3d){% elif h == 168 %} (7d){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        {# ---- Summary Stats ---- #}
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:24px;">
+            <div style="text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:var(--color-green);">+{{ digest.period_new }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">New Items</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:var(--color-teal);">-{{ digest.period_resolved }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Resolved</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:28px;font-weight:700;">{{ digest.still_unresolved }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Unresolved</div>
+            </div>
+            {% if digest.critical_seen %}
+            <div style="text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:var(--color-red);">{{ digest.critical_seen }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Critical</div>
+            </div>
+            {% endif %}
+            <div style="text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:var(--color-gold);">{{ digest.held_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Held</div>
+            </div>
+            {% if digest.overdue_count %}
+            <div style="text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:var(--color-red);">{{ digest.overdue_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Overdue</div>
+            </div>
+            {% endif %}
+        </div>
+
+        {# ---- Trend Indicator ---- #}
+        <div style="padding:12px;border-radius:6px;margin-bottom:16px;
+            {% if digest.trend == 'improving' %}background:var(--color-lt-green);
+            {% elif digest.trend == 'growing' %}background:var(--color-lt-red);
+            {% else %}background:var(--color-lt-gray);{% endif %}">
+            <strong>Trend:</strong>
+            {% if digest.trend == 'improving' %}&#9650; Improving — inbox count decreasing
+            {% elif digest.trend == 'growing' %}&#9660; Growing — inbox count increasing
+            {% else %}&#9644; Stable — inbox count steady{% endif %}
+            <span style="float:right;font-size:12px;color:var(--text-secondary);">Based on {{ digest.snapshots_count }} snapshots</span>
+        </div>
+
+        {# ---- Category Breakdown ---- #}
+        {% if digest.category_breakdown %}
+        <h3 style="font-size:14px;margin:16px 0 8px;">New Items by Category</h3>
+        <table class="table" style="max-width:400px;">
+            <thead><tr><th>Category</th><th>Count</th></tr></thead>
+            <tbody>
+            {% for cat, count in digest.category_breakdown.items() %}
+                <tr><td>{{ cat }}</td><td>{{ count }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {# ---- Current Totals ---- #}
+        {% if digest.current_totals %}
+        <h3 style="font-size:14px;margin:16px 0 8px;">Current Inbox Totals (Latest Snapshot)</h3>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            {% for cat, count in digest.current_totals.items() %}
+            <div style="text-align:center;">
+                <div style="font-size:20px;font-weight:600;">{{ count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">{{ cat|capitalize }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% elif view is defined and view == 'audit' %}
+{# ---- Audit Log View ---- #}
+<div class="card" style="max-width:900px;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        Review Timestamp Log
+        <a href="/inbox/audit-log?format=csv{% if start %}&start={{ start }}{% endif %}{% if end %}&end={{ end }}{% endif %}" class="btn btn-sm btn-outline">Export CSV</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <form style="padding:12px;display:flex;gap:8px;align-items:end;">
+            <div>
+                <label style="font-size:12px;">Start</label>
+                <input type="date" name="start" class="form-control" value="{{ start }}" style="width:160px;">
+            </div>
+            <div>
+                <label style="font-size:12px;">End</label>
+                <input type="date" name="end" class="form-control" value="{{ end }}" style="width:160px;">
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        </form>
+        {% if snapshots %}
+        <table class="table" style="margin:0;">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Labs</th>
+                    <th>Radiology</th>
+                    <th>Messages</th>
+                    <th>Refills</th>
+                    <th>Other</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for s in snapshots %}
+                <tr>
+                    <td>{{ s.captured_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                    <td>{{ s.labs_count }}</td>
+                    <td>{{ s.radiology_count }}</td>
+                    <td>{{ s.messages_count }}</td>
+                    <td>{{ s.refills_count }}</td>
+                    <td>{{ s.other_count }}</td>
+                    <td>{{ s.labs_count + s.radiology_count + s.messages_count + s.refills_count + s.other_count }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="padding:16px;color:var(--text-secondary);margin:0;">No snapshots in this date range.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% elif view is defined and view == 'held' %}
+{# ---- Held Items View ---- #}
+<div class="card" style="max-width:900px;">
+    <div class="card-header">Items on Hold</div>
+    <div class="card-body" style="padding:0;">
+        {% if items %}
+        <table class="table" style="margin:0;">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Reason</th>
+                    <th>First Seen</th>
+                    <th>Age</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in items %}
+                <tr>
+                    <td><span class="badge badge--info">{{ item.item_type }}</span></td>
+                    <td>{{ item.held_reason or 'No reason given' }}</td>
+                    <td>{{ item.first_seen_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                    <td>{{ item._age_hours if item._age_hours is defined else '--' }}h</td>
+                    <td>
+                        <form method="POST" action="/inbox/{{ item.id }}/resolve" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">Resolve</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="padding:16px;color:var(--text-secondary);margin:0;">No held items.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% else %}
+{# ---- Main Inbox View ---- #}
+
+{# Snapshot Summary Card #}
+{% if snapshot %}
+<div class="card" style="max-width:640px;margin-bottom:24px;">
+    <div class="card-header">Latest Snapshot — {{ snapshot.captured_at.strftime('%m/%d/%Y %I:%M %p') if snapshot else 'N/A' }}</div>
+    <div class="card-body">
+        <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:600;">{{ snapshot.labs_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Labs</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:600;">{{ snapshot.radiology_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Radiology</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:600;">{{ snapshot.messages_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Messages</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:600;">{{ snapshot.refills_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Refills</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:600;">{{ snapshot.other_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Other</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Unresolved Items Table #}
+<div class="card" style="max-width:900px;">
+    <div class="card-header">Unresolved Items ({{ items|length }})</div>
+    <div class="card-body" style="padding:0;">
+        {% if items %}
+        <table class="table" style="margin:0;">
+            <thead>
+                <tr>
+                    <th>Age</th>
+                    <th>Type</th>
+                    <th>Priority</th>
+                    <th>First Seen</th>
+                    <th>Last Seen</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in items %}
+                <tr>
+                    <td>
+                        {% if item._age_class is defined and item._age_class == 'critical' %}
+                            <span style="color:#e74c3c;" title="{{ item._age_hours }}h old">&#128340;</span>
+                        {% elif item._age_class is defined and item._age_class == 'warning' %}
+                            <span style="color:#f39c12;" title="{{ item._age_hours }}h old">&#128340;</span>
+                        {% else %}
+                            <span style="color:var(--text-secondary);" title="{{ item._age_hours if item._age_hours is defined else '?' }}h">&#128340;</span>
+                        {% endif %}
+                        {{ item._age_hours if item._age_hours is defined else '--' }}h
+                    </td>
+                    <td><span class="badge badge--info">{{ item.item_type }}</span></td>
+                    <td>
+                        {% if item.priority == 'critical' %}
+                            <span class="badge badge--error">CRITICAL</span>
+                        {% else %}
+                            <span class="badge badge--default">normal</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.first_seen_at.strftime('%m/%d %I:%M %p') }}</td>
+                    <td>{{ item.last_seen_at.strftime('%m/%d %I:%M %p') }}</td>
+                    <td style="display:flex;gap:4px;">
+                        <form method="POST" action="/inbox/{{ item.id }}/hold" style="display:inline;">
+                            <select name="reason" style="font-size:11px;padding:2px;">
+                                <option value="">Hold reason...</option>
+                                <option value="Awaiting callback">Awaiting callback</option>
+                                <option value="No-show follow-up">No-show follow-up</option>
+                                <option value="Pending outside records">Pending outside records</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline">Hold</button>
+                        </form>
+                        <form method="POST" action="/inbox/{{ item.id }}/resolve" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">Resolve</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="padding:16px;color:var(--text-secondary);margin:0;">No unresolved items. Your inbox is clear!</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Poll inbox status for badge updates
+(function() {
+    function pollInbox() {
+        fetch('/api/inbox-status')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                // Could update a badge in the sidebar if needed
+            })
+            .catch(function(){});
+    }
+    setInterval(pollInbox, 60000);
+})();
+</script>
+{% endblock %}

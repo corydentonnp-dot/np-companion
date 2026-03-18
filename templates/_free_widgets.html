@@ -1,0 +1,11 @@
+{# ================================================================
+   FREE-FORM WIDGET LAYOUT TOGGLE
+   Include this partial wherever you want the Grid / Free / Reset
+   layout buttons.  Requires free_widgets.js to be loaded.
+   ================================================================ #}
+<div class="fw-toggle" style="display:inline-flex;gap:4px;align-items:center;">
+    <span style="font-size:12px;color:var(--text-secondary);">Layout:</span>
+    <button id="fw-grid-btn" class="btn btn-secondary btn-sm" onclick="FreeWidgets.setLayout('grid')" style="padding:2px 10px;font-size:12px;">Grid</button>
+    <button id="fw-free-btn" class="btn btn-primary btn-sm" onclick="FreeWidgets.setLayout('free')" style="padding:2px 10px;font-size:12px;">Free</button>
+    <button id="fw-reset-btn" class="btn btn-outline btn-sm" onclick="FreeWidgets.resetLayout()" style="padding:2px 10px;font-size:12px;display:none;">Reset</button>
+</div>

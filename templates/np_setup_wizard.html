@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}NetPractice Setup Wizard — NP Companion{% endblock %}
+{% block page_id %}np-setup-wizard{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+    <h1 style="margin:0;">NetPractice Setup Wizard</h1>
+    {% if current_user.role == 'admin' %}
+    <a href="{{ url_for('np_admin.admin_netpractice') }}" class="btn btn-secondary btn-sm">Back to Settings</a>
+    {% endif %}
+</div>
+
+<p style="margin-bottom:24px;color:var(--text-secondary);max-width:700px;">
+    This wizard helps NP Companion learn how to navigate to your daily schedule
+    in CGM webPRACTICE. You'll define each click step the scraper needs to take
+    after logging in. These steps are saved to your account so the
+    scraper can automatically replay them each night.
+</p>
+
+{# ---- Prerequisites Check ---------------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:700px;">
+    <div class="card-header">Prerequisites</div>
+    <div class="card-body">
+        <ul style="list-style:none;padding:0;margin:0;">
+            <li style="padding:6px 0;display:flex;align-items:center;gap:8px;">
+                {% if settings.netpractice_url %}
+                    <span class="badge badge--success">✓</span>
+                {% else %}
+                    <span class="badge badge--danger">✗</span>
+                {% endif %}
+                <span>webPRACTICE URL configured</span>
+                {% if not settings.netpractice_url %}
+                    <span style="font-size:12px;color:var(--text-secondary);">
+                        — <a href="{{ url_for('np_admin.admin_netpractice') }}">Set it here</a>
+                    </span>
+                {% endif %}
+            </li>
+            <li style="padding:6px 0;display:flex;align-items:center;gap:8px;">
+                {% if current_user.has_np_credentials() %}
+                    <span class="badge badge--success">✓</span>
+                {% else %}
+                    <span class="badge badge--danger">✗</span>
+                {% endif %}
+                <span>NetPractice credentials saved</span>
+                {% if not current_user.has_np_credentials() %}
+                    <span style="font-size:12px;color:var(--text-secondary);">
+                        — <a href="{{ url_for('auth.settings_account') }}">Set them in Account Settings</a>
+                    </span>
+                {% endif %}
+            </li>
+            <li style="padding:6px 0;display:flex;align-items:center;gap:8px;">
+                {% if current_user.np_provider_name %}
+                    <span class="badge badge--success">✓</span>
+                {% else %}
+                    <span class="badge badge--danger">✗</span>
+                {% endif %}
+                <span>Provider name set: <strong>{{ current_user.np_provider_name or 'Not set' }}</strong></span>
+            </li>
+        </ul>
+    </div>
+</div>
+
+{# ---- How It Works ----------------------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:700px;">
+    <div class="card-header">How the Scraper Navigation Works</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;">After logging in, the scraper follows these steps to reach your schedule:</p>
+        <ol style="margin:0 0 12px 20px;line-height:2;">
+            <li><strong>Login</strong> — Fills in Client Number, Username, Password and clicks Log In (automatic)</li>
+            <li><strong>Your steps below</strong> — Click "Schedule", then "Review Patient Appointments", etc.</li>
+            <li><strong>Verify schedule page</strong> — Confirms your provider name appears on the page</li>
+            <li><strong>Scrape patients</strong> — Clicks each patient name, reads details, presses Alt+Back (automatic)</li>
+        </ol>
+        <p style="margin:0;font-size:13px;color:var(--text-secondary);">
+            Steps 1, 3, and 4 are handled automatically. You only need to define step 2 — the
+            clicks to get from the post-login home page to your daily schedule.
+        </p>
+    </div>
+</div>
+
+{# ---- Default Steps (based on screenshots) ---------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:700px;">
+    <div class="card-header">Navigation Steps</div>
+    <div class="card-body">
+        <p style="margin:0 0 16px;font-size:14px;">
+            Define the clicks needed to get from the post-login page to your daily schedule.
+            The default steps below match the standard webPRACTICE layout. Modify them if
+            your setup is different.
+        </p>
+
+        <div id="steps-container">
+            {# Steps will be rendered by JavaScript #}
+        </div>
+
+        <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="addStep()">
+                + Add Step
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="loadDefaults()">
+                Load Default Steps
+            </button>
+        </div>
+    </div>
+</div>
+
+{# ---- Save / Test Buttons ---------------------------------------- #}
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
+    <button class="btn btn-primary btn-lg" onclick="saveSteps()" id="save-btn">
+        Save Navigation Steps
+    </button>
+    <button class="btn btn-secondary btn-lg" onclick="testSteps()" id="test-btn">
+        Test Steps (Dry Run)
+    </button>
+</div>
+
+<div id="wizard-result" style="display:none;max-width:700px;" class="flash"></div>
+
+{# ---- Step Template (hidden, cloned by JS) ---------------------- #}
+<template id="step-template">
+    <div class="wizard-step card" style="margin-bottom:12px;" data-step-index="">
+        <div class="card-body" style="padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                <span class="wizard-step__number badge badge--info" style="min-width:28px;text-align:center;"></span>
+                <select class="form-input wizard-step__action" style="max-width:140px;">
+                    <option value="click">Click</option>
+                    <option value="click_text">Click Text</option>
+                    <option value="wait">Wait</option>
+                    <option value="navigate">Navigate URL</option>
+                </select>
+                <button class="btn btn-sm" style="margin-left:auto;color:var(--color-red);background:none;border:none;cursor:pointer;font-size:18px;" onclick="removeStep(this)" title="Remove step">&times;</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" style="font-size:11px;">Target / Text</label>
+                    <input type="text" class="form-input wizard-step__target" placeholder='e.g. "Schedule" or CSS selector'>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label class="form-label" style="font-size:11px;">Wait For (after action)</label>
+                    <input type="text" class="form-input wizard-step__wait" placeholder='e.g. "text=Schedule Menu"'>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;margin-top:8px;">
+                <label class="form-label" style="font-size:11px;">Description (for your reference)</label>
+                <input type="text" class="form-input wizard-step__desc" placeholder="What does this step do?">
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+/* ============================================================
+   Setup Wizard JavaScript
+   ============================================================ */
+
+// Default steps based on the standard CGM webPRACTICE layout
+var DEFAULT_STEPS = [
+    {
+        order: 1,
+        action: 'click_text',
+        target: 'Schedule',
+        selector: '',
+        description: 'Click "Schedule" in the left navigation menu',
+        wait_for: 'text=Schedule Menu'
+    },
+    {
+        order: 2,
+        action: 'click_text',
+        target: 'Review Patient Appointments',
+        selector: '',
+        description: 'Click "Review Patient Appointments" on the Schedule Menu',
+        wait_for: 'text=Review Patient Appointments'
+    },
+    {
+        order: 3,
+        action: 'click_text',
+        target: 'Doctors',
+        selector: '',
+        description: 'Click the Doctors button/list toggle',
+        wait_for: 'text={{NP_PROVIDER_NAME}}'
+    },
+    {
+        order: 4,
+        action: 'click_text',
+        target: '{{NP_PROVIDER_NAME}}',
+        selector: '',
+        description: 'Click your configured provider name from Settings > Account',
+        wait_for: ''
+    }
+];
+
+// Load existing steps or defaults on page load
+var currentSteps = {{ existing_steps | tojson }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (currentSteps && currentSteps.length > 0) {
+        renderSteps(currentSteps);
+    } else {
+        renderSteps(DEFAULT_STEPS);
+    }
+});
+
+
+function renderSteps(steps) {
+    var container = document.getElementById('steps-container');
+    container.innerHTML = '';
+    steps.forEach(function(step, i) {
+        addStepToDOM(step, i);
+    });
+}
+
+
+function addStepToDOM(step, index) {
+    var template = document.getElementById('step-template');
+    var clone = template.content.cloneNode(true);
+    var card = clone.querySelector('.wizard-step');
+
+    card.setAttribute('data-step-index', index);
+    card.querySelector('.wizard-step__number').textContent = (index + 1);
+    card.querySelector('.wizard-step__action').value = step.action || 'click';
+    card.querySelector('.wizard-step__target').value = step.target || '';
+    card.querySelector('.wizard-step__wait').value = step.wait_for || '';
+    card.querySelector('.wizard-step__desc').value = step.description || '';
+
+    document.getElementById('steps-container').appendChild(clone);
+}
+
+
+function addStep() {
+    var container = document.getElementById('steps-container');
+    var count = container.querySelectorAll('.wizard-step').length;
+    addStepToDOM({
+        order: count + 1,
+        action: 'click_text',
+        target: '',
+        description: '',
+        wait_for: ''
+    }, count);
+}
+
+
+function removeStep(btn) {
+    var card = btn.closest('.wizard-step');
+    if (card) card.remove();
+    // Renumber remaining steps
+    var steps = document.querySelectorAll('#steps-container .wizard-step');
+    steps.forEach(function(s, i) {
+        s.querySelector('.wizard-step__number').textContent = (i + 1);
+        s.setAttribute('data-step-index', i);
+    });
+}
+
+
+function loadDefaults() {
+    if (confirm('Replace current steps with the default webPRACTICE navigation?')) {
+        renderSteps(DEFAULT_STEPS);
+    }
+}
+
+
+function collectSteps() {
+    var stepCards = document.querySelectorAll('#steps-container .wizard-step');
+    var steps = [];
+    stepCards.forEach(function(card, i) {
+        steps.push({
+            order: i + 1,
+            action: card.querySelector('.wizard-step__action').value,
+            target: card.querySelector('.wizard-step__target').value.trim(),
+            selector: '',
+            description: card.querySelector('.wizard-step__desc').value.trim(),
+            wait_for: card.querySelector('.wizard-step__wait').value.trim()
+        });
+    });
+    return steps;
+}
+
+
+function saveSteps() {
+    var btn = document.getElementById('save-btn');
+    var result = document.getElementById('wizard-result');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    var steps = collectSteps();
+
+    fetch('/api/netpractice/save-steps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steps: steps })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        result.style.display = 'block';
+        if (data.success) {
+            result.className = 'flash flash--success';
+            result.textContent = data.message;
+        } else {
+            result.className = 'flash flash--error';
+            result.textContent = data.error || 'Save failed.';
+        }
+        btn.disabled = false;
+        btn.textContent = 'Save Navigation Steps';
+    })
+    .catch(function() {
+        result.style.display = 'block';
+        result.className = 'flash flash--error';
+        result.textContent = 'Request failed.';
+        btn.disabled = false;
+        btn.textContent = 'Save Navigation Steps';
+    });
+}
+
+
+function testSteps() {
+    var btn = document.getElementById('test-btn');
+    var result = document.getElementById('wizard-result');
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    result.style.display = 'block';
+    result.className = 'flash flash--info';
+    result.textContent = 'Launching browser and testing navigation steps. This may take 30+ seconds...';
+
+    // First save steps, then test
+    var steps = collectSteps();
+
+    fetch('/api/netpractice/save-steps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steps: steps })
+    })
+    .then(function() {
+        return fetch('/api/netpractice/test-login', { method: 'POST' });
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            result.className = 'flash flash--success';
+            result.textContent = 'Test passed! ' + data.message;
+        } else {
+            result.className = 'flash flash--error';
+            result.textContent = 'Test failed: ' + (data.error || 'Unknown error');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Test Steps (Dry Run)';
+    })
+    .catch(function() {
+        result.className = 'flash flash--error';
+        result.textContent = 'Request failed — server may have timed out.';
+        btn.disabled = false;
+        btn.textContent = 'Test Steps (Dry Run)';
+    });
+}
+</script>
+{% endblock %}

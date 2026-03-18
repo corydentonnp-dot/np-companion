@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Page Not Found — NP Companion{% endblock %}
+{% block page_id %}error{% endblock %}
+{% block content %}
+<div class="card card--warning" style="max-width:900px;margin:60px auto;">
+    <div class="card-body text-center">
+        <h1 style="font-size:48px;margin-bottom:8px;color:var(--color-gold);">404</h1>
+        <h2>Page Not Found</h2>
+        <p class="text-muted">The page you requested does not exist.</p>
+        <a href="{{ url_for('auth.login') if not current_user.is_authenticated else '/dashboard' }}" class="btn btn-primary mt-2">{{ 'Back to Login' if not current_user.is_authenticated else 'Back to Dashboard' }}</a>
+    </div>
+    {% if config.DEBUG %}
+    <div style="margin-top:24px;padding:16px;background:#1a1a2e;color:#e0e0e0;border-radius:8px;text-align:left;">
+        <h3 style="color:#e8a020;margin-bottom:8px;">🔧 Debug Info (hidden when DEBUG=False)</h3>
+        <p style="margin:4px 0;font-size:13px;"><strong>Requested URL:</strong> {{ request.url }}</p>
+        <p style="margin:4px 0;font-size:13px;"><strong>Method:</strong> {{ request.method }}</p>
+        <p style="margin:4px 0;font-size:13px;"><strong>Referrer:</strong> {{ request.referrer or 'none' }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

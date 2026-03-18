@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Lab Tracker — NP Companion{% endblock %}
+{% block page_id %}labtrack{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+    <h1 style="margin:0;font-size:22px;">Lab Tracker</h1>
+    {% if overdue_count > 0 %}
+    <span class="badge badge--danger">{{ overdue_count }} Overdue</span>
+    {% endif %}
+    {% if critical_count > 0 %}
+    <span class="badge badge--danger" style="background:#ef4444;">{{ critical_count }} Critical</span>
+    {% endif %}
+    {% if due_soon_count > 0 %}
+    <span class="badge badge--warning">{{ due_soon_count }} Due Soon</span>
+    {% endif %}
+</div>
+
+{# ── Stats cards ── #}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+    <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:700;">{{ all_tracks|length }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Total Tracked</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:700;">{{ patients|length }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Patients</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:700;color:{% if overdue_count %}#ef4444{% else %}var(--text-primary){% endif %};">{{ overdue_count }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Overdue</div>
+    </div>
+    <div class="card" style="text-align:center;padding:16px;">
+        <div style="font-size:28px;font-weight:700;color:{% if critical_count %}#ef4444{% else %}var(--text-primary){% endif %};">{{ critical_count }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Critical</div>
+    </div>
+</div>
+
+{# ── Add Tracking / Add Panel forms ── #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+    <div class="card">
+        <div class="card-header">Add Lab Tracking</div>
+        <div class="card-body">
+            <form method="POST" action="/labtrack/add">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div>
+                        <label style="font-size:12px;font-weight:600;">Patient MRN</label>
+                        <input type="text" name="mrn" class="form-control" placeholder="Full MRN" required>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:600;">Lab Name</label>
+                        <input type="text" name="lab_name" class="form-control" placeholder="e.g., HbA1c" required>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:600;">Check Every (days)</label>
+                        <input type="number" name="interval_days" class="form-control" value="90" min="1">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:600;">Panel (optional)</label>
+                        <input type="text" name="panel_name" class="form-control" placeholder="e.g., BMP">
+                    </div>
+                </div>
+                <details style="margin-top:8px;">
+                    <summary style="font-size:12px;cursor:pointer;color:var(--text-secondary);">Alert Thresholds</summary>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:8px;">
+                        <div>
+                            <label style="font-size:11px;">Critical Low</label>
+                            <input type="number" step="any" name="critical_low" class="form-control" placeholder="—">
+                        </div>
+                        <div>
+                            <label style="font-size:11px;">Alert Low</label>
+                            <input type="number" step="any" name="alert_low" class="form-control" placeholder="—">
+                        </div>
+                        <div>
+                            <label style="font-size:11px;">Alert High</label>
+                            <input type="number" step="any" name="alert_high" class="form-control" placeholder="—">
+                        </div>
+                        <div>
+                            <label style="font-size:11px;">Critical High</label>
+                            <input type="number" step="any" name="critical_high" class="form-control" placeholder="—">
+                        </div>
+                    </div>
+                </details>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:10px;">+ Add Tracking</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Add Lab Panel</div>
+        <div class="card-body">
+            <form method="POST" action="/labtrack/add-panel">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div>
+                        <label style="font-size:12px;font-weight:600;">Patient MRN</label>
+                        <input type="text" name="mrn" class="form-control" placeholder="Full MRN" required>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:600;">Panel</label>
+                        <select name="panel_name" class="form-control" required>
+                            <option value="">Select panel…</option>
+                            {% for name in STANDARD_PANELS %}
+                            <option value="{{ name }}">{{ name }} ({{ STANDARD_PANELS[name]|length }} labs)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;font-weight:600;">Check Every (days)</label>
+                        <input type="number" name="interval_days" class="form-control" value="90" min="1">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm" style="margin-top:10px;">+ Add Panel</button>
+            </form>
+            {% if not panels %}
+            <form method="POST" action="/labtrack/seed-panels" style="margin-top:8px;">
+                <button type="submit" class="btn btn-outline btn-sm">Seed Standard Panels (BMP, CMP, CBC, …)</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ── Patient Lab Table ── #}
+{% if patients %}
+<div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border,#eee);text-align:left;">
+                    <th style="padding:10px 12px;">Patient</th>
+                    <th style="padding:10px 12px;">Lab</th>
+                    <th style="padding:10px 12px;">Last Value</th>
+                    <th style="padding:10px 12px;">Last Date</th>
+                    <th style="padding:10px 12px;">Next Due</th>
+                    <th style="padding:10px 12px;">Trend</th>
+                    <th style="padding:10px 12px;">Status</th>
+                    <th style="padding:10px 12px;width:80px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mrn, pdata in patients.items() %}
+                {% for track in pdata.tracks %}
+                <tr style="border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;" onclick="window.location='/labtrack/{{ mrn }}'">
+                    {% if loop.first %}
+                    <td style="padding:8px 12px;font-weight:600;" rowspan="{{ pdata.tracks|length }}">
+                        …{{ pdata.display_mrn }}
+                    </td>
+                    {% endif %}
+                    <td style="padding:8px 12px;">
+                        {{ track.lab_name }}
+                        {% if track.panel_name %}<span style="font-size:11px;color:var(--text-secondary);">({{ track.panel_name }})</span>{% endif %}
+                    </td>
+                    <td style="padding:8px 12px;">
+                        {% if track.results %}
+                            {% set latest = track.results[0] %}
+                            <span style="{% if latest.is_critical %}color:#ef4444;font-weight:700;{% endif %}">{{ latest.result_value }}</span>
+                        {% else %}
+                            <span style="color:var(--text-secondary);">—</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:8px 12px;color:var(--text-secondary);">
+                        {% if track.results %}
+                            {{ track.results[0].result_date.strftime('%m/%d/%y') if track.results[0].result_date else '—' }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td style="padding:8px 12px;color:var(--text-secondary);">
+                        {% if track.next_due %}
+                            {{ track.next_due.strftime('%m/%d/%y') }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td style="padding:8px 12px;font-size:16px;">
+                        {% if track.trend == 'up' %}
+                            <span style="color:#f97316;" title="Trending Up">↑</span>
+                        {% elif track.trend == 'down' %}
+                            <span style="color:#3b82f6;" title="Trending Down">↓</span>
+                        {% else %}
+                            <span style="color:var(--text-secondary);" title="Stable">→</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:8px 12px;">
+                        {% set st = track.status %}
+                        {% if st == 'critical' %}
+                            <span class="badge badge--danger" style="background:#ef4444;">🔔 Critical</span>
+                        {% elif st == 'overdue' %}
+                            <span class="badge badge--danger">Overdue</span>
+                        {% elif st == 'due_soon' %}
+                            <span class="badge badge--warning">Due Soon</span>
+                        {% else %}
+                            <span class="badge badge--success">On Track</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:8px 12px;" onclick="event.stopPropagation();">
+                        <form method="POST" action="/labtrack/{{ track.id }}/delete" style="display:inline;" onsubmit="return confirm('Remove this tracking?');">
+                            <button type="submit" class="btn btn-sm" style="color:var(--color-red,#ef4444);font-size:12px;padding:2px 6px;">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card" style="max-width:640px;">
+    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
+        No labs being tracked yet. Use the forms above to add tracking criteria for a patient.
+    </div>
+</div>
+{% endif %}
+
+<style>
+@media (max-width: 768px) {
+    div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+}
+</style>
+{% endblock %}

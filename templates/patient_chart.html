@@ -1,0 +1,1353 @@
+{% extends "base.html" %}
+{% block title %}Patient {{ mrn_display }} — NP Companion{% endblock %}
+{% block page_id %}patient-chart{% endblock %}
+
+{% block content %}
+{# ---- PATIENT HEADER BAR ---- #}
+<div class="pt-header">
+    <div class="pt-header-left">
+        <h1 class="pt-name">{{ record.patient_name if record else 'Unknown Patient' }}</h1>
+        <button class="btn-icon" id="edit-demo-btn" onclick="toggleDemoEdit()" title="Edit demographics" style="margin-left:8px;font-size:14px;background:none;border:none;cursor:pointer;opacity:0.6;">&#9998;</button>
+        <div class="pt-meta" id="pt-meta-display">
+            {% if record and record.patient_dob and record.patient_dob|length >= 8 %}
+            <span title="Date of birth">DOB: {{ record.patient_dob[4:6] }}/{{ record.patient_dob[6:8] }}/{{ record.patient_dob[:4] }}</span>
+            {% elif record and record.patient_dob %}
+            <span title="Date of birth">DOB: {{ record.patient_dob }}</span>
+            {% endif %}
+            {% if age_str %}<span>{{ age_str }}</span>{% endif %}
+            {% if record and record.patient_sex %}<span title="Sex">{{ record.patient_sex }}</span>{% endif %}
+            <span title="Medical Record Number">MRN: {{ mrn_display }}</span>
+        </div>
+        {# ---- Inline demographics edit form (hidden by default) ---- #}
+        <div id="pt-meta-edit" style="display:none;" class="pt-meta">
+            <label style="font-size:12px;">Name:
+                <input type="text" id="demo-name" class="form-input form-input-sm" value="{{ record.patient_name if record else '' }}" style="width:160px;">
+            </label>
+            <label style="font-size:12px;">DOB:
+                <input type="date" id="demo-dob" class="form-input form-input-sm" value="{% if record and record.patient_dob and record.patient_dob|length >= 8 %}{{ record.patient_dob[:4] }}-{{ record.patient_dob[4:6] }}-{{ record.patient_dob[6:8] }}{% endif %}" style="width:140px;">
+            </label>
+            <label style="font-size:12px;">Sex:
+                <select id="demo-sex" class="form-input form-input-sm" style="width:80px;">
+                    <option value="">—</option>
+                    <option value="M" {% if record and record.patient_sex == 'M' %}selected{% endif %}>M</option>
+                    <option value="F" {% if record and record.patient_sex == 'F' %}selected{% endif %}>F</option>
+                </select>
+            </label>
+            <button class="btn btn-sm btn-primary" onclick="saveDemographics()">Save</button>
+            <button class="btn btn-sm btn-outline" onclick="toggleDemoEdit()">Cancel</button>
+        </div>
+    </div>
+    <div class="pt-header-right">
+        {# Claim button #}
+        <button class="btn btn-sm {% if record and record.claimed_by == current_user.id %}btn-outline{% else %}btn-primary{% endif %}" id="claim-btn" onclick="claimPatient('{{ mrn_display }}')">
+            {% if record and record.claimed_by == current_user.id %}
+                &#10003; Claimed
+            {% else %}
+                &#128100; Claim
+            {% endif %}
+        </button>
+        <span class="pt-sync-label">
+            Last synced:
+            {% if record and record.last_xml_parsed %}
+                {{ record.last_xml_parsed.strftime('%m/%d/%Y %I:%M %p') }}
+            {% else %}
+                Never
+            {% endif %}
+        </span>
+        <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0;">
+            &#128194; Upload XML
+            <input type="file" id="xml-upload" accept=".xml" style="display:none;">
+        </label>
+        <button class="btn btn-sm btn-outline" onclick="toggleEditMode()">&#9881; Edit Layout</button>
+        {% include '_free_widgets.html' %}
+    </div>
+</div>
+
+{% if not has_data %}
+<div class="pt-no-data-banner">
+    <span style="font-size:20px;">&#9888;&#65039;</span>
+    <div>
+        <strong>No clinical summary loaded</strong>
+        <p style="margin:4px 0 0;font-size:13px;opacity:0.7;">Export a Clinical Summary XML from Amazing Charts (Alt+P &rarr; Export Clinical Summary) and upload it above.</p>
+    </div>
+</div>
+{% endif %}
+
+<div id="upload-status" style="display:none;" class="pt-status-bar"></div>
+
+{# ---- WIDGET GRID (Drag + Resize) ---- #}
+<div id="widget-grid" class="widget-grid fw-container">
+
+    {# ---- MEDICATIONS WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="medications" data-widget-id="medications" data-col="0" data-row="0" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128138; Medications</span>
+            <div class="widget-controls">
+                <select class="widget-filter" id="med-filter" onchange="filterMeds(this.value)">
+                    <option value="all">All</option>
+                    <option value="active" selected>Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            {% if medications %}
+            <table class="widget-table" id="med-table">
+                <thead>
+                    <tr><th>Drug Name</th><th>Generic</th><th>Dose / Form</th><th>Frequency</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for m in medications %}
+                    {% set rx = m.rx_info %}
+                    <tr data-status="{{ m.status }}" class="{% if m.status != 'active' %}row-inactive{% endif %}">
+                        <td class="fw-500 cell-clip" title="{{ m.drug_name }}"><a href="https://www.uptodate.com/contents/{{ (rx.generic_name if rx and rx.generic_name else m.drug_name.split()[0])|lower }}-drug-information" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">{{ rx.brand_name if rx and rx.brand_name else m.drug_name.split()[0] }}</a></td>
+                        <td class="cell-clip">{{ rx.generic_name if rx and rx.generic_name else '' }}</td>
+                        <td>{{ (rx.dose_strength ~ ' ' ~ rx.dose_form) | trim if rx and rx.dose_strength else m.dosage }}</td>
+                        <td>{{ m.frequency }}</td>
+                        <td><span class="badge badge-{{ 'success' if m.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'medication', {{ m.id }})" style="cursor:pointer;" title="Click to toggle">{{ m.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="widget-empty">No medications loaded</p>
+            {% endif %}
+            <div class="widget-footer-count">{{ medications|selectattr('status','equalto','active')|list|length }} active / {{ medications|length }} total</div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- DIAGNOSES WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="diagnoses" data-widget-id="diagnoses" data-col="1" data-row="0" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#129658; Diagnoses</span>
+            <div class="widget-controls">
+                <button class="btn btn-sm btn-outline" onclick="copyDiagnoses()" title="Copy all diagnoses">&#128203; Copy</button>
+                <button class="btn btn-sm btn-outline" onclick="document.getElementById('dx-col-picker').style.display=document.getElementById('dx-col-picker').style.display==='block'?'none':'block'" title="Choose columns to copy">&#9881;</button>
+                <button class="btn btn-sm btn-outline" onclick="document.getElementById('icd10-lookup-modal').style.display='flex'" title="ICD-10 Lookup">&#128270; ICD-10</button>
+                <select class="widget-filter" id="diag-filter" onchange="filterDiagnoses(this.value)">
+                    <option value="all" selected>All</option>
+                    <option value="chronic">Chronic</option>
+                    <option value="acute">Acute</option>
+                </select>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" style="position:relative;">
+            {# Column picker dropdown for Copy #}
+            <div id="dx-col-picker" style="display:none;position:absolute;top:0;right:0;z-index:50;background:var(--card-bg,#fff);border:1px solid var(--border,#ddd);border-radius:6px;padding:10px 14px;box-shadow:0 4px 12px rgba(0,0,0,.15);font-size:13px;">
+                <div style="font-weight:600;margin-bottom:6px;">Copy Columns</div>
+                <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="checkbox" id="dx-col-diag" checked> Diagnosis</label>
+                <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="checkbox" id="dx-col-icd" checked> ICD-10</label>
+                <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="checkbox" id="dx-col-type"> Type</label>
+                <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="checkbox" id="dx-col-status"> Status</label>
+                <button class="btn btn-sm btn-primary" style="margin-top:6px;width:100%;" onclick="copyDiagnoses();document.getElementById('dx-col-picker').style.display='none';">Copy</button>
+            </div>
+            {% if diagnoses %}
+            <table class="widget-table" id="diag-table">
+                <thead>
+                    <tr><th>Diagnosis</th><th>ICD-10</th><th>Type</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for d in diagnoses %}
+                    <tr data-category="{{ d.diagnosis_category or 'chronic' }}" data-status="{{ d.status }}" class="{% if d.status != 'active' %}row-inactive{% endif %}">
+                        <td class="fw-500 cell-clip" title="{{ d.diagnosis_name }}">{{ d.diagnosis_name }}</td>
+                        <td class="mono">{{ d.icd10_code }}</td>
+                        <td><span class="badge badge-{{ 'warning' if d.diagnosis_category == 'acute' else 'info' }} badge-toggle" onclick="toggleDxCategory(this, '{{ mrn_display }}', {{ d.id }})" style="cursor:pointer;" title="Click to toggle">{{ d.diagnosis_category or 'chronic' }}</span></td>
+                        <td><span class="badge badge-{{ 'success' if d.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'diagnosis', {{ d.id }})" style="cursor:pointer;" title="Click to toggle">{{ d.status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="widget-empty">No diagnoses loaded</p>
+            {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- LABS SIMPLE VIEW WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="labs-simple" data-widget-id="labs-simple" data-col="2" data-row="0" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128300; Labs</span>
+            <div class="widget-controls">
+                <button class="btn btn-sm btn-outline" onclick="openLabDetail()">Detailed View &#8594;</button>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            {% if lab_tracks %}
+            <div class="lab-simple-list">
+                {% for lt in lab_tracks %}
+                <div class="lab-simple-row">
+                    <span class="lab-name">{{ lt.lab_name }}</span>
+                    <span class="lab-status-badge lab-status-{{ lt.status }}">{{ lt.status }}</span>
+                    {% if lt.results %}
+                    <span class="lab-value {% if lt.results[0].is_critical %}lab-critical{% endif %}">
+                        {{ lt.results[0].result_value }}
+                    </span>
+                    <span class="lab-date">{{ lt.results[0].result_date.strftime('%m/%d') if lt.results[0].result_date else '' }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% if overdue_labs %}
+            <div class="lab-overdue-alert">
+                <strong>&#9888; Overdue:</strong>
+                {% for lt in overdue_labs %}
+                <span class="badge badge-danger">{{ lt.lab_name }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% else %}
+            <p class="widget-empty">No labs tracked</p>
+            {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- VITALS WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="vitals" data-widget-id="vitals" data-col="0" data-row="1" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128200; Vitals</span>
+            <div class="widget-controls">
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            {% if vitals %}
+            <table class="widget-table">
+                <thead><tr><th>Vital</th><th>Value</th><th>Unit</th><th>Date</th></tr></thead>
+                <tbody>
+                    {% set seen_vitals = [] %}
+                    {% for v in vitals %}
+                        {% if v.vital_name not in seen_vitals %}
+                            {% if seen_vitals.append(v.vital_name) %}{% endif %}
+                            <tr>
+                                <td>{{ v.vital_name }}</td>
+                                <td class="fw-500">{{ v.vital_value }}</td>
+                                <td class="text-muted">{{ v.vital_unit }}</td>
+                                <td class="text-sm">{{ v.measured_at.strftime('%m/%d/%Y') if v.measured_at else '' }}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="widget-empty">No vitals loaded</p>
+            {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- ALLERGIES WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="allergies" data-widget-id="allergies" data-col="1" data-row="1" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#9888;&#65039; Allergies</span>
+            <div class="widget-controls">
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            {% if allergies %}
+            <table class="widget-table">
+                <thead><tr><th>Allergen</th><th>Reaction</th><th>Severity</th></tr></thead>
+                <tbody>
+                    {% for a in allergies %}
+                    <tr>
+                        <td class="fw-500">{{ a.allergen }}</td>
+                        <td>{{ a.reaction }}</td>
+                        <td>{% if a.severity %}<span class="badge badge-{{ 'danger' if a.severity == 'severe' else 'warning' }}">{{ a.severity }}</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="widget-empty">NKDA (No Known Drug Allergies)</p>
+            {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- IMMUNIZATIONS WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="immunizations" data-widget-id="immunizations" data-col="2" data-row="1" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128137; Immunizations</span>
+            <div class="widget-controls">
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            {% if immunizations %}
+            <table class="widget-table">
+                <thead><tr><th>Vaccine</th><th>Date</th></tr></thead>
+                <tbody>
+                    {% for imm in immunizations %}
+                    <tr>
+                        <td>{{ imm.vaccine_name }}</td>
+                        <td>{{ imm.date_given.strftime('%m/%d/%Y') if imm.date_given else 'Unknown' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="widget-empty">No immunizations loaded</p>
+            {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- USPSTF RECOMMENDATIONS WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="uspstf" data-widget-id="uspstf" data-col="0" data-row="2" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128203; USPSTF Recommendations</span>
+            <div class="widget-controls">
+                <button class="btn btn-sm btn-outline" onclick="printUSPSTF()" title="Print recommendations">&#128424; Print</button>
+                <select class="widget-filter" id="uspstf-filter" onchange="filterUSPSTF(this.value)">
+                    <option value="all" selected>All</option>
+                    <option value="due">Due / Overdue Only</option>
+                </select>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            {% if uspstf_recs %}
+            <table class="widget-table" id="uspstf-table">
+                <thead>
+                    <tr>
+                        <th>Screening</th>
+                        <th>Interval</th>
+                        <th>Commercial Code</th>
+                        <th>Medicare Code</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set open_gap_types = care_gaps|rejectattr('is_addressed')|map(attribute='gap_type')|list if care_gaps else [] %}
+                    {% for rec in uspstf_recs %}
+                    <tr data-has-gap="{{ 'yes' if rec.name in open_gap_types else 'no' }}">
+                        <td class="fw-500">{{ rec.name }}</td>
+                        <td>{% if rec.interval_days %}Every {{ (rec.interval_days / 365)|round|int }} yr{% endif %}</td>
+                        <td class="mono">{{ rec.billing_code or '—' }}</td>
+                        <td class="mono">{{ rec.medicare_code or rec.billing_code or '—' }}</td>
+                        <td>
+                            <button class="widget-btn" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" title="Show explanation">&#9432;</button>
+                            <div style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">{{ rec.explanation or 'No additional details.' }}</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="widget-empty">No recommendations available (demographics needed)</p>
+            {% endif %}
+            {% if care_gaps %}
+            <div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--border,#e2e8f0);">
+                <strong style="font-size:12px;">Open Care Gaps:</strong>
+                {% for g in care_gaps if not g.is_addressed %}
+                <div class="care-gap-row">
+                    <span>{{ g.gap_type }}</span>
+                    {% if g.due_date %}<span class="text-muted text-sm">Due: {{ g.due_date.strftime('%m/%d/%Y') }}</span>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- SPECIALISTS WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="specialists" data-widget-id="specialists" data-col="1" data-row="2" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#129464; Specialists</span>
+            <div class="widget-controls">
+                <button class="btn btn-sm btn-outline" onclick="showAddSpecialist()">+ Add</button>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            <div id="specialist-list">
+                {% if specialists %}
+                {% for s in specialists %}
+                <div class="specialist-card" data-id="{{ s.id }}">
+                    <div class="spec-row"><strong>{{ s.specialty }}</strong>
+                        <button class="widget-btn-sm" onclick="deleteSpecialist({{ s.id }})" title="Remove">&#10005;</button>
+                    </div>
+                    {% if s.provider_name %}<div class="spec-detail">{{ s.provider_name }}</div>{% endif %}
+                    {% if s.phone %}<div class="spec-detail">&#128222; {{ s.phone }}</div>{% endif %}
+                    {% if s.fax %}<div class="spec-detail">&#128224; {{ s.fax }}</div>{% endif %}
+                    {% if s.notes %}<div class="spec-detail text-muted">{{ s.notes }}</div>{% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="widget-empty">No specialists added</p>
+                {% endif %}
+            </div>
+            <div id="add-specialist-form" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+                <input type="text" id="spec-specialty" placeholder="Specialty (e.g. Cardiology)" class="widget-input">
+                <input type="text" id="spec-name" placeholder="Provider name" class="widget-input">
+                <input type="text" id="spec-phone" placeholder="Phone" class="widget-input">
+                <input type="text" id="spec-fax" placeholder="Fax" class="widget-input">
+                <input type="text" id="spec-notes" placeholder="Notes" class="widget-input">
+                <div style="display:flex;gap:6px;margin-top:4px;">
+                    <button class="btn btn-sm btn-primary" onclick="saveSpecialist()">Save</button>
+                    <button class="btn btn-sm btn-outline" onclick="hideAddSpecialist()">Cancel</button>
+                </div>
+            </div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- NOTE GENERATOR WIDGET ---- #}
+    <div class="widget widget-wide" data-widget="note-gen" data-col="2" data-row="2" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128221; Note Generator</span>
+            <div class="widget-controls">
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body">
+            <div class="note-gen-sections">
+                <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px;">Select sections to auto-generate from patient data:</p>
+                <div class="note-gen-checkboxes" id="note-gen-checks">
+                    {% for section in note_sections %}
+                    <label class="note-gen-check">
+                        <input type="checkbox" value="{{ section }}"
+                            {% if section in ['Allergies','Medications','Past Medical History','Assessment','Plan','Physical Exam','Health Concerns'] %}checked{% endif %}>
+                        {{ section }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <button class="btn btn-primary btn-sm" onclick="generateNote()">&#9881; Generate Selected</button>
+                    <button class="btn btn-outline btn-sm" onclick="copyAllSections()">&#128203; Copy All</button>
+                    <button class="btn btn-outline btn-sm" onclick="saveDraft()">&#128190; Save Draft</button>
+                </div>
+            </div>
+            <div id="note-gen-status" style="display:none;padding:6px 10px;border-radius:4px;margin-top:8px;font-size:12px;"></div>
+            <div id="note-sections" style="margin-top:12px;">
+                {% for section in note_sections %}
+                <div class="note-section" style="margin-bottom:10px;">
+                    <label class="note-label">{{ section }}</label>
+                    <textarea data-section="{{ section }}" class="note-textarea"
+                        placeholder="Enter {{ section|lower }}...">{{ draft_data.get(section, prepopulated.get(section, '')) }}</textarea>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+</div>
+
+{# ---- ICD-10 LOOKUP MODAL ---- #}
+<div id="icd10-lookup-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:600px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-lg);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);background:var(--bg-muted,#f8fafc);">
+            <h3 style="margin:0;font-size:16px;">&#128270; ICD-10 Code Lookup (NIH)</h3>
+            <button class="btn btn-sm btn-outline" onclick="document.getElementById('icd10-lookup-modal').style.display='none'">&#10005;</button>
+        </div>
+        <div style="padding:14px 20px;">
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="icd10-search-input" class="form-input" placeholder="Search diagnoses or codes..." style="flex:1;" onkeydown="if(event.key==='Enter')searchICD10()">
+                <button class="btn btn-primary btn-sm" onclick="searchICD10()">Search</button>
+            </div>
+        </div>
+        <div id="icd10-results" style="flex:1;overflow-y:auto;padding:0 20px 14px;font-size:13px;">
+            <p style="text-align:center;color:var(--text-secondary);">Enter a term to search the NIH ICD-10 database.</p>
+        </div>
+    </div>
+</div>
+
+{# ---- EPIC-STYLE LAB DETAIL MODAL ---- #}
+<div id="lab-detail-modal" class="lab-modal" style="display:none;">
+    <div class="lab-modal-content">
+        <div class="lab-modal-header">
+            <h2>&#128300; Lab Results — Detailed View</h2>
+            <button class="btn btn-sm btn-outline" onclick="closeLabDetail()">&#10005; Close</button>
+        </div>
+        <div class="lab-modal-toolbar">
+            <div class="lab-filter-group">
+                <label>Filter labs:</label>
+                <input type="text" id="lab-search" placeholder="Search lab names..." oninput="filterLabSpreadsheet()" class="widget-input" style="width:200px;">
+            </div>
+            <div class="lab-filter-group">
+                <label>View:</label>
+                <button class="btn btn-sm btn-outline lab-view-btn active" onclick="setLabView('spreadsheet',this)">Spreadsheet</button>
+                <button class="btn btn-sm btn-outline lab-view-btn" onclick="setLabView('graph',this)">Graph</button>
+            </div>
+            <div class="lab-filter-group" id="lab-select-group">
+                <label>Select labs to display:</label>
+                <div id="lab-checkboxes" class="lab-checkbox-list"></div>
+            </div>
+        </div>
+        <div id="lab-spreadsheet-container" class="lab-spreadsheet-wrap">
+            <div class="lab-spreadsheet" id="lab-spreadsheet">
+                <p class="widget-empty">Loading labs...</p>
+            </div>
+        </div>
+        <div id="lab-graph-container" class="lab-graph-wrap" style="display:none;">
+            <canvas id="lab-graph-canvas" width="900" height="400"></canvas>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ============= PATIENT CHART STYLES ============= */
+.pt-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border,#e2e8f0);margin:-20px -20px 16px;flex-wrap:wrap;gap:8px;}
+.pt-header-left{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.pt-name{margin:0;font-size:20px;}
+.pt-meta{display:flex;gap:12px;font-size:13px;color:var(--text-secondary,#64748b);}
+.pt-header-right{display:flex;align-items:center;gap:10px;font-size:12px;}
+.pt-sync-label{color:var(--text-secondary,#64748b);}
+.pt-no-data-banner{margin:0 0 16px;padding:14px 20px;background:var(--bg-warning,#fef3c7);border:1px solid var(--border-warning,#fbbf24);border-radius:8px;display:flex;align-items:center;gap:12px;}
+.pt-status-bar{padding:8px 16px;border-radius:6px;font-size:13px;margin-bottom:12px;}
+
+/* ============= WIDGET GRID ============= */
+.widget-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:0 0 40px;}
+.widget{background:var(--bg-surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:10px;display:flex;flex-direction:column;min-height:180px;overflow:hidden;transition:box-shadow 0.15s;position:relative;}
+.widget:hover{box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+.widget.widget-dragging{opacity:0.85;box-shadow:0 8px 30px rgba(0,0,0,0.15);z-index:1000;}
+.widget.widget-wide{grid-column:span 2;}
+.widget.widget-full{grid-column:span 3;}
+
+/* Edit mode */
+.widget-grid.edit-mode .widget{cursor:grab;border:2px dashed var(--color-teal,#0D7377);}
+.widget-grid.edit-mode .widget-resize-handle{display:block;}
+.widget-grid.edit-mode .widget-header{cursor:grab;}
+
+.widget-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border,#f1f5f9);background:var(--bg-muted,#f8fafc);flex-shrink:0;user-select:none;}
+.widget-title{font-weight:600;font-size:14px;}
+.widget-controls{display:flex;align-items:center;gap:6px;}
+.widget-body{flex:1;overflow-y:auto;padding:10px 14px;font-size:13px;user-select:text;}
+.widget-footer-count{margin-top:8px;font-size:11px;color:var(--text-secondary);text-align:right;}
+.widget-empty{color:var(--text-secondary,#64748b);margin:12px 0;text-align:center;font-style:italic;}
+.widget-filter{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#fff);color:var(--text-primary);}
+.widget-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:2px 4px;color:var(--text-secondary);border-radius:3px;}
+.widget-btn:hover{background:var(--bg-muted);}
+.widget-btn-sm{background:none;border:none;cursor:pointer;font-size:10px;padding:1px 3px;color:var(--text-secondary);opacity:0.5;}
+.widget-btn-sm:hover{opacity:1;color:var(--color-red);}
+.widget-input{width:100%;padding:4px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;margin-bottom:4px;background:var(--bg-input,#fff);color:var(--text-primary);}
+.widget-resize-handle{display:none;position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:se-resize;background:linear-gradient(135deg,transparent 50%,var(--color-teal) 50%);border-radius:0 0 10px 0;opacity:0.5;}
+
+/* Widget tables */
+.widget-table{width:100%;border-collapse:collapse;font-size:12px;}
+.widget-table th{padding:5px 8px;text-align:left;border-bottom:2px solid var(--border,#e2e8f0);font-weight:600;font-size:11px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.3px;}
+.widget-table td{padding:5px 8px;border-bottom:1px solid var(--border,#f1f5f9);}
+.widget-table td.cell-clip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+.fw-500{font-weight:500;}
+.mono{font-family:monospace;font-size:11px;}
+.text-muted{color:var(--text-secondary,#64748b)!important;}
+.text-sm{font-size:11px;}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;}
+.badge-success{background:var(--bg-success,#dcfce7);color:var(--text-success,#166534);}
+.badge-muted{background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);}
+.badge-warning{background:var(--bg-warning,#fef3c7);color:#92400e;}
+.badge-danger{background:var(--bg-danger,#fee2e2);color:var(--color-red,#dc2626);}
+.badge-info{background:#dbeafe;color:#1e40af;}
+
+/* Labs simple */
+.lab-simple-list{display:flex;flex-direction:column;gap:4px;}
+.lab-simple-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;}
+.lab-name{flex:1;font-weight:500;}
+.lab-value{font-weight:600;min-width:50px;text-align:right;}
+.lab-critical{color:var(--color-red,#dc2626)!important;font-weight:700;}
+.lab-date{color:var(--text-secondary);font-size:11px;min-width:40px;}
+.lab-status-badge{font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;text-transform:uppercase;}
+.lab-status-on_track{background:#dcfce7;color:#166534;}
+.lab-status-overdue{background:#fee2e2;color:#dc2626;}
+.lab-status-due_soon{background:#fef3c7;color:#92400e;}
+.lab-status-critical{background:#dc2626;color:#fff;}
+.lab-overdue-alert{margin-top:8px;padding:6px 8px;background:var(--bg-danger,#fee2e2);border-radius:6px;font-size:12px;}
+
+/* USPSTF */
+.uspstf-list{display:flex;flex-direction:column;gap:6px;}
+.uspstf-item{padding:6px 0;border-bottom:1px solid var(--border,#f1f5f9);}
+.uspstf-name{font-weight:500;font-size:13px;}
+.uspstf-interval{font-size:11px;color:var(--text-secondary);}
+.uspstf-code{font-size:10px;font-family:monospace;color:var(--color-teal);}
+.care-gap-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px;}
+
+/* Specialists */
+.specialist-card{padding:6px 0;border-bottom:1px solid var(--border,#f1f5f9);}
+.spec-row{display:flex;justify-content:space-between;align-items:center;}
+.spec-detail{font-size:11px;color:var(--text-secondary);margin-top:2px;}
+
+/* Note Generator */
+.note-gen-checkboxes{display:grid;grid-template-columns:repeat(3,1fr);gap:2px 12px;}
+.note-gen-check{font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;}
+.note-gen-check input{margin:0;width:14px;height:14px;}
+.note-label{display:block;font-weight:600;font-size:12px;margin-bottom:3px;color:var(--text-primary);}
+.note-textarea{width:100%;min-height:50px;resize:vertical;font-family:monospace;font-size:12px;padding:6px 8px;border:1px solid var(--border,#e2e8f0);border-radius:4px;background:var(--bg-input,#fff);color:var(--text-primary);}
+
+/* ============= LAB DETAIL MODAL ============= */
+.lab-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px;}
+.lab-modal-content{background:var(--bg-surface,#fff);border-radius:12px;width:95vw;max-width:1400px;height:85vh;display:flex;flex-direction:column;overflow:hidden;}
+.lab-modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--bg-muted,#f8fafc);}
+.lab-modal-header h2{margin:0;font-size:18px;}
+.lab-modal-toolbar{display:flex;align-items:center;gap:16px;padding:10px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.lab-filter-group{display:flex;align-items:center;gap:6px;font-size:12px;}
+.lab-filter-group label{font-weight:600;white-space:nowrap;}
+.lab-checkbox-list{display:flex;flex-wrap:wrap;gap:4px 10px;max-height:60px;overflow-y:auto;}
+.lab-checkbox-list label{font-size:11px;display:flex;align-items:center;gap:3px;cursor:pointer;}
+.lab-view-btn.active{background:var(--color-teal,#0D7377)!important;color:#fff!important;}
+
+/* Epic-style spreadsheet */
+.lab-spreadsheet-wrap{flex:1;overflow:auto;padding:0;}
+.lab-spreadsheet{display:grid;font-size:12px;min-width:fit-content;}
+.lab-cell{padding:6px 10px;border-bottom:1px solid var(--border,#f1f5f9);border-right:1px solid var(--border,#f1f5f9);white-space:nowrap;min-width:80px;}
+.lab-cell-name{position:sticky;left:0;background:var(--bg-muted,#f8fafc);font-weight:600;z-index:10;min-width:140px;border-right:2px solid var(--border);}
+.lab-cell-header{position:sticky;top:0;background:var(--bg-muted,#f8fafc);font-weight:600;text-align:center;z-index:5;font-size:11px;border-bottom:2px solid var(--border);}
+.lab-cell-corner{position:sticky;top:0;left:0;z-index:15;background:var(--bg-muted,#f8fafc);border-right:2px solid var(--border);border-bottom:2px solid var(--border);}
+.lab-cell-value{text-align:center;}
+.lab-cell-critical{background:rgba(220,38,38,0.1);color:#dc2626;font-weight:700;}
+
+/* Lab graph */
+.lab-graph-wrap{flex:1;padding:20px;overflow:hidden;}
+
+/* ============= RESPONSIVE ============= */
+@media(max-width:1024px){
+    .widget-grid{grid-template-columns:repeat(2,1fr);}
+    .widget.widget-wide{grid-column:span 2;}
+    .widget.widget-full{grid-column:span 2;}
+    .note-gen-checkboxes{grid-template-columns:repeat(2,1fr);}
+}
+@media(max-width:768px){
+    .widget-grid{grid-template-columns:1fr;}
+    .widget.widget-wide,.widget.widget-full{grid-column:span 1;}
+    .pt-header{flex-direction:column;align-items:flex-start;}
+    .note-gen-checkboxes{grid-template-columns:1fr;}
+    .lab-modal-content{width:100vw;height:95vh;border-radius:0;}
+}
+</style>
+
+<script>
+/* ============================================================
+   NP Companion — Patient Chart Widget System
+   ============================================================ */
+var MRN = {{ mrn|tojson }};
+var labData = null;
+var selectedLabs = new Set();
+var labColors = ['#0D7377','#E8A020','#C0392B','#1B3A6B','#8B5CF6','#059669','#DB2777','#D97706','#2563EB','#6366F1'];
+
+/* ---- XML Upload ---- */
+document.getElementById('xml-upload').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var fd = new FormData();
+    fd.append('xml_file', file);
+    var status = document.getElementById('upload-status');
+    status.style.display = 'block';
+    status.style.background = 'var(--bg-warning,#fef3c7)';
+    status.textContent = 'Uploading and parsing XML...';
+    fetch('/patient/' + MRN + '/upload-xml', {method:'POST', body:fd})
+    .then(function(r){return r.json();})
+    .then(function(data){
+        status.style.background = data.success ? 'var(--bg-success,#dcfce7)' : 'var(--bg-danger,#fee2e2)';
+        status.textContent = data.message;
+        if (data.success) {
+            setTimeout(function(){ location.reload(); }, 1500);
+        }
+    })
+    .catch(function(){
+        status.style.background = 'var(--bg-danger,#fee2e2)';
+        status.textContent = 'Upload failed — check your connection.';
+    });
+    e.target.value = '';
+});
+
+/* ---- Widget Collapse ---- */
+function toggleWidgetCollapse(btn) {
+    var widget = btn.closest('.widget');
+    var body = widget.querySelector('.widget-body');
+    if (body.style.display === 'none') {
+        body.style.display = '';
+        btn.innerHTML = '&#9660;';
+    } else {
+        body.style.display = 'none';
+        btn.innerHTML = '&#9654;';
+    }
+}
+
+/* ---- Toggle Diagnosis Category (acute ↔ chronic) ---- */
+function toggleDxCategory(badge, mrn, dxId) {
+    fetch('/patient/' + mrn + '/diagnosis/' + dxId + '/toggle-category', {method:'POST'})
+    .then(function(r){return r.json();})
+    .then(function(data) {
+        if (data.success) {
+            badge.textContent = data.new_category;
+            var tr = badge.closest('tr');
+            tr.setAttribute('data-category', data.new_category);
+            badge.className = 'badge badge-' + (data.new_category === 'acute' ? 'warning' : 'info') + ' badge-toggle';
+        }
+    });
+}
+
+/* ---- Toggle Status (active ↔ inactive, for meds or diagnoses) ---- */
+function toggleItemStatus(badge, mrn, itemType, itemId) {
+    fetch('/patient/' + mrn + '/' + itemType + '/' + itemId + '/toggle-status', {method:'POST'})
+    .then(function(r){return r.json();})
+    .then(function(data) {
+        if (data.success) {
+            badge.textContent = data.new_status;
+            var tr = badge.closest('tr');
+            tr.setAttribute('data-status', data.new_status);
+            badge.className = 'badge badge-' + (data.new_status === 'active' ? 'success' : 'muted') + ' badge-toggle';
+            if (data.new_status === 'active') {
+                tr.classList.remove('row-inactive');
+            } else {
+                tr.classList.add('row-inactive');
+            }
+        }
+    });
+}
+
+/* ---- Claim Patient ---- */
+function claimPatient(mrn) {
+    var patientName = document.querySelector('.pt-name') ? document.querySelector('.pt-name').textContent.trim() : '';
+    fetch('/patient/' + mrn + '/claim', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({patient_name: patientName})
+    })
+    .then(function(r){return r.json();})
+    .then(function(data) {
+        if (data.success) {
+            var btn = document.getElementById('claim-btn');
+            btn.innerHTML = '&#10003; Claimed';
+            btn.className = 'btn btn-sm btn-outline';
+        }
+    });
+}
+
+/* ---- Demographics Edit ---- */
+function toggleDemoEdit() {
+    var display = document.getElementById('pt-meta-display');
+    var edit = document.getElementById('pt-meta-edit');
+    var showing = edit.style.display !== 'none';
+    display.style.display = showing ? '' : 'none';
+    edit.style.display = showing ? 'none' : 'flex';
+}
+
+function saveDemographics() {
+    var name = document.getElementById('demo-name').value.trim();
+    var dobVal = document.getElementById('demo-dob').value; // YYYY-MM-DD from <input type=date>
+    var sex = document.getElementById('demo-sex').value;
+    // Convert YYYY-MM-DD to YYYYMMDD for storage
+    var dob = dobVal ? dobVal.replace(/-/g, '') : '';
+    fetch('/patient/' + MRN + '/update-demographics', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({patient_name: name, patient_dob: dob, patient_sex: sex})
+    })
+    .then(function(r){return r.json();})
+    .then(function(data) {
+        if (data.success) { location.reload(); }
+        else { alert('Failed to update demographics.'); }
+    });
+}
+
+/* ---- Edit Mode (drag/resize) ---- */
+var editMode = false;
+function toggleEditMode() {
+    editMode = !editMode;
+    var grid = document.getElementById('widget-grid');
+    grid.classList.toggle('edit-mode', editMode);
+    if (!editMode) saveWidgetLayout();
+}
+
+/* ---- Drag & Drop ---- */
+(function() {
+    var grid = document.getElementById('widget-grid');
+    var dragging = null;
+    var placeholder = null;
+
+    grid.addEventListener('mousedown', function(e) {
+        if (!editMode) return;
+        var handle = e.target.closest('[data-drag-handle]');
+        if (!handle) return;
+        dragging = handle.closest('.widget');
+        if (!dragging) return;
+        e.preventDefault();
+
+        dragging.classList.add('widget-dragging');
+        placeholder = document.createElement('div');
+        placeholder.className = 'widget widget-placeholder';
+        placeholder.style.minHeight = dragging.offsetHeight + 'px';
+        placeholder.style.border = '2px dashed var(--color-gold)';
+        placeholder.style.background = 'var(--bg-muted)';
+        placeholder.style.opacity = '0.5';
+        dragging.parentNode.insertBefore(placeholder, dragging);
+
+        var origW = dragging.offsetWidth;
+        dragging.style.position = 'fixed';
+        dragging.style.width = origW + 'px';
+        dragging.style.zIndex = '9999';
+        dragging.style.left = e.clientX - origW / 2 + 'px';
+        dragging.style.top = e.clientY - 20 + 'px';
+
+        function onMove(ev) {
+            dragging.style.left = ev.clientX - origW / 2 + 'px';
+            dragging.style.top = ev.clientY - 20 + 'px';
+
+            // Find drop target
+            var widgets = Array.from(grid.querySelectorAll('.widget:not(.widget-dragging):not(.widget-placeholder)'));
+            var closest = null, closestDist = Infinity;
+            widgets.forEach(function(w) {
+                var r = w.getBoundingClientRect();
+                var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+                var d = Math.hypot(ev.clientX - cx, ev.clientY - cy);
+                if (d < closestDist) { closestDist = d; closest = w; }
+            });
+            if (closest && closestDist < 200) {
+                var r = closest.getBoundingClientRect();
+                if (ev.clientY < r.top + r.height / 2) {
+                    grid.insertBefore(placeholder, closest);
+                } else {
+                    grid.insertBefore(placeholder, closest.nextSibling);
+                }
+            }
+        }
+
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            dragging.classList.remove('widget-dragging');
+            dragging.style.position = '';
+            dragging.style.width = '';
+            dragging.style.zIndex = '';
+            dragging.style.left = '';
+            dragging.style.top = '';
+            grid.insertBefore(dragging, placeholder);
+            placeholder.remove();
+            dragging = null;
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+})();
+
+/* ---- Resize handles ---- */
+(function() {
+    document.addEventListener('mousedown', function(e) {
+        if (!editMode) return;
+        if (!e.target.classList.contains('widget-resize-handle')) return;
+        e.preventDefault();
+        var widget = e.target.closest('.widget');
+        var startW = widget.offsetWidth, startH = widget.offsetHeight;
+        var startX = e.clientX, startY = e.clientY;
+
+        function onMove(ev) {
+            var newH = startH + (ev.clientY - startY);
+            var newW = startW + (ev.clientX - startX);
+            widget.style.minHeight = Math.max(120, newH) + 'px';
+
+            // Determine column span
+            var gridW = document.getElementById('widget-grid').offsetWidth;
+            var colW = gridW / 3;
+            var span = Math.max(1, Math.min(3, Math.round(newW / colW)));
+            widget.classList.remove('widget-wide', 'widget-full');
+            if (span === 2) widget.classList.add('widget-wide');
+            else if (span === 3) widget.classList.add('widget-full');
+        }
+
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+})();
+
+/* ---- Save Widget Layout ---- */
+function saveWidgetLayout() {
+    var widgets = document.querySelectorAll('#widget-grid .widget:not(.widget-placeholder)');
+    var layout = [];
+    widgets.forEach(function(w, i) {
+        layout.push({
+            id: w.getAttribute('data-widget'),
+            order: i,
+            wide: w.classList.contains('widget-wide'),
+            full: w.classList.contains('widget-full'),
+            collapsed: w.querySelector('.widget-body').style.display === 'none',
+            minHeight: w.style.minHeight || ''
+        });
+    });
+    fetch('/patient/' + MRN + '/widget-layout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({layout: layout})
+    });
+}
+
+/* ---- Restore Widget Layout ---- */
+(function() {
+    var saved = {{ widget_layout|safe }};
+    if (saved && Array.isArray(saved)) {
+        var grid = document.getElementById('widget-grid');
+        var map = {};
+        grid.querySelectorAll('.widget').forEach(function(w) {
+            map[w.getAttribute('data-widget')] = w;
+        });
+        saved.forEach(function(item) {
+            var w = map[item.id];
+            if (!w) return;
+            grid.appendChild(w);
+            w.classList.remove('widget-wide', 'widget-full');
+            if (item.wide) w.classList.add('widget-wide');
+            if (item.full) w.classList.add('widget-full');
+            if (item.collapsed) {
+                w.querySelector('.widget-body').style.display = 'none';
+                var btn = w.querySelector('.widget-controls .widget-btn');
+                if (btn) btn.innerHTML = '&#9654;';
+            }
+            if (item.minHeight) w.style.minHeight = item.minHeight;
+        });
+    }
+})();
+
+/* ---- Medication Filter ---- */
+function filterMeds(val) {
+    var rows = document.querySelectorAll('#med-table tbody tr');
+    rows.forEach(function(r) {
+        if (val === 'all') r.style.display = '';
+        else r.style.display = r.getAttribute('data-status') === val ? '' : 'none';
+    });
+}
+/* Auto-filter to active on load */
+filterMeds('active');
+
+/* ---- Diagnosis Filter ---- */
+function filterDiagnoses(val) {
+    var rows = document.querySelectorAll('#diag-table tbody tr');
+    rows.forEach(function(r) {
+        if (val === 'all') r.style.display = '';
+        else r.style.display = r.getAttribute('data-category') === val ? '' : 'none';
+    });
+}
+
+/* ---- Copy All Diagnoses ---- */
+function copyDiagnoses() {
+    var inclDiag   = document.getElementById('dx-col-diag').checked;
+    var inclIcd    = document.getElementById('dx-col-icd').checked;
+    var inclType   = document.getElementById('dx-col-type').checked;
+    var inclStatus = document.getElementById('dx-col-status').checked;
+    if (!inclDiag && !inclIcd && !inclType && !inclStatus) { inclDiag = true; inclIcd = true; }
+    var rows = document.querySelectorAll('#diag-table tbody tr');
+    var lines = [];
+    rows.forEach(function(r) {
+        if (r.style.display === 'none') return;
+        var cells = r.querySelectorAll('td');
+        if (cells.length < 4) return;
+        var parts = [];
+        if (inclDiag)   parts.push(cells[0].textContent.trim());
+        if (inclIcd)    parts.push(cells[1].textContent.trim());
+        if (inclType)   parts.push(cells[2].textContent.trim());
+        if (inclStatus) parts.push(cells[3].textContent.trim());
+        lines.push(parts.join('\t'));
+    });
+    if (lines.length) {
+        navigator.clipboard.writeText(lines.join('\n')).catch(function(){});
+    }
+}
+
+/* ---- ICD-10 Lookup (NIH) ---- */
+function searchICD10() {
+    var q = document.getElementById('icd10-search-input').value.trim();
+    if (!q) return;
+    var container = document.getElementById('icd10-results');
+    container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">Searching…</p>';
+    fetch('/api/icd10/search?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var results = data.results || [];
+            if (results.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">No results found.</p>';
+                return;
+            }
+            var html = '<table class="widget-table"><thead><tr><th>Code</th><th>Description</th><th></th></tr></thead><tbody>';
+            results.forEach(function(r) {
+                html += '<tr><td class="mono fw-500">' + escHtml(r.code) + '</td><td>' + escHtml(r.name) + '</td>' +
+                    '<td><button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(\'' + escHtml(r.code) + ' - ' + escHtml(r.name).replace(/'/g, "\\'") + '\')">Copy</button></td></tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        })
+        .catch(function() {
+            container.innerHTML = '<p style="text-align:center;color:var(--color-red);">Search failed. Check connection.</p>';
+        });
+}
+
+/* ---- Print USPSTF Recommendations ---- */
+function filterUSPSTF(val) {
+    var rows = document.querySelectorAll('#uspstf-table tbody tr');
+    rows.forEach(function(r) {
+        if (val === 'all') r.style.display = '';
+        else r.style.display = r.getAttribute('data-has-gap') === 'yes' ? '' : 'none';
+    });
+}
+
+function printUSPSTF() {
+    var table = document.getElementById('uspstf-table');
+    if (!table) return;
+    var name = document.querySelector('.pt-name');
+    var win = window.open('', '_blank', 'width=800,height=600');
+    win.document.write('<html><head><title>USPSTF Recommendations</title>' +
+        '<style>body{font-family:Arial,sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;margin-top:12px;}' +
+        'th,td{padding:6px 10px;border:1px solid #ccc;text-align:left;font-size:12px;}th{background:#f5f5f5;font-weight:600;}</style></head><body>' +
+        '<h2>USPSTF Recommendations' + (name ? ' — ' + name.textContent : '') + '</h2>' +
+        '<p style="font-size:12px;color:#666;">Printed: ' + new Date().toLocaleDateString() + '</p>' +
+        table.outerHTML + '</body></html>');
+    win.document.close();
+    win.print();
+}
+
+/* ---- Specialist CRUD ---- */
+function showAddSpecialist() { document.getElementById('add-specialist-form').style.display = ''; }
+function hideAddSpecialist() { document.getElementById('add-specialist-form').style.display = 'none'; }
+function saveSpecialist() {
+    var data = {
+        specialty: document.getElementById('spec-specialty').value,
+        provider_name: document.getElementById('spec-name').value,
+        phone: document.getElementById('spec-phone').value,
+        fax: document.getElementById('spec-fax').value,
+        notes: document.getElementById('spec-notes').value
+    };
+    if (!data.specialty) return alert('Specialty is required');
+    fetch('/patient/' + MRN + '/specialist', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) location.reload();
+    });
+}
+function deleteSpecialist(id) {
+    if (!confirm('Remove this specialist?')) return;
+    fetch('/patient/' + MRN + '/specialist/' + id, {method: 'DELETE'})
+    .then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) {
+            var card = document.querySelector('.specialist-card[data-id="' + id + '"]');
+            if (card) card.remove();
+        }
+    });
+}
+
+/* ---- Note Generator ---- */
+function generateNote() {
+    var checks = document.querySelectorAll('#note-gen-checks input:checked');
+    var sections = [];
+    checks.forEach(function(c) { sections.push(c.value); });
+    if (sections.length === 0) return alert('Select at least one section');
+
+    var status = document.getElementById('note-gen-status');
+    status.style.display = 'block';
+    status.style.background = 'var(--bg-warning,#fef3c7)';
+    status.textContent = 'Generating...';
+
+    fetch('/patient/' + MRN + '/generate-note', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sections: sections})
+    }).then(function(r){ return r.json(); }).then(function(data){
+        if (data.success) {
+            var filled = 0;
+            for (var key in data.sections) {
+                var ta = document.querySelector('textarea[data-section="' + key + '"]');
+                if (ta && data.sections[key]) {
+                    ta.value = data.sections[key];
+                    filled++;
+                }
+            }
+            status.style.background = 'var(--bg-success,#dcfce7)';
+            status.textContent = 'Generated ' + filled + ' section(s)';
+        } else {
+            status.style.background = 'var(--bg-danger,#fee2e2)';
+            status.textContent = 'Generation failed';
+        }
+        setTimeout(function(){ status.style.display = 'none'; }, 3000);
+    });
+}
+
+function copyAllSections() {
+    var text = '';
+    document.querySelectorAll('#note-sections .note-section').forEach(function(s) {
+        var label = s.querySelector('label').textContent;
+        var value = s.querySelector('textarea').value;
+        if (value.trim()) text += label + ':\n' + value.trim() + '\n\n';
+    });
+    navigator.clipboard.writeText(text).then(function() {
+        showNoteStatus('Copied to clipboard!', 'success');
+    }).catch(function() { showNoteStatus('Copy failed', 'error'); });
+}
+
+function saveDraft() {
+    var sections = {};
+    document.querySelectorAll('#note-sections textarea').forEach(function(ta) {
+        sections[ta.getAttribute('data-section')] = ta.value;
+    });
+    fetch('/patient/' + MRN + '/note/save', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sections: sections})
+    }).then(function(r){ return r.json(); }).then(function(d){
+        showNoteStatus(d.success ? 'Draft saved!' : 'Save failed.', d.success ? 'success' : 'error');
+    });
+}
+
+function showNoteStatus(msg, type) {
+    var el = document.getElementById('note-gen-status');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = type === 'success' ? 'var(--bg-success,#dcfce7)' : 'var(--bg-danger,#fee2e2)';
+    setTimeout(function(){ el.style.display = 'none'; }, 3000);
+}
+
+/* ---- Auto-save note draft to localStorage every 30s ---- */
+setInterval(function() {
+    var sections = {};
+    document.querySelectorAll('#note-sections textarea').forEach(function(ta) {
+        sections[ta.getAttribute('data-section')] = ta.value;
+    });
+    try { localStorage.setItem('np_note_draft_' + MRN, JSON.stringify(sections)); } catch(e) {}
+}, 30000);
+
+/* ============================================================
+   EPIC-STYLE LAB DETAIL MODAL
+   ============================================================ */
+function openLabDetail() {
+    document.getElementById('lab-detail-modal').style.display = 'flex';
+    if (!labData) {
+        loadLabData();
+    } else {
+        renderLabSpreadsheet();
+    }
+}
+
+function closeLabDetail() {
+    document.getElementById('lab-detail-modal').style.display = 'none';
+}
+
+function loadLabData() {
+    fetch('/api/patient/' + MRN + '/labs')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+        labData = data;
+        // Build lab checkboxes
+        var container = document.getElementById('lab-checkboxes');
+        container.innerHTML = '';
+        var names = Object.keys(data.labs || {}).sort();
+        names.forEach(function(name) {
+            selectedLabs.add(name);
+            var lbl = document.createElement('label');
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = true;
+            cb.value = name;
+            cb.addEventListener('change', function() {
+                if (this.checked) selectedLabs.add(name);
+                else selectedLabs.delete(name);
+                renderLabSpreadsheet();
+                if (document.getElementById('lab-graph-container').style.display !== 'none') renderLabGraph();
+            });
+            lbl.appendChild(cb);
+            lbl.appendChild(document.createTextNode(' ' + name));
+            container.appendChild(lbl);
+        });
+        renderLabSpreadsheet();
+    });
+}
+
+function filterLabSpreadsheet() {
+    var term = document.getElementById('lab-search').value.toLowerCase();
+    var cbs = document.querySelectorAll('#lab-checkboxes input[type=checkbox]');
+    cbs.forEach(function(cb) {
+        var match = cb.value.toLowerCase().indexOf(term) >= 0;
+        cb.parentElement.style.display = match ? '' : 'none';
+    });
+}
+
+function renderLabSpreadsheet() {
+    if (!labData) return;
+    var container = document.getElementById('lab-spreadsheet');
+    var dates = labData.dates || [];
+    var labs = labData.labs || {};
+    var names = Object.keys(labs).filter(function(n){ return selectedLabs.has(n); }).sort();
+
+    if (names.length === 0 || dates.length === 0) {
+        container.innerHTML = '<p class="widget-empty" style="padding:20px;">No lab data to display. Upload a clinical summary XML with lab results.</p>';
+        return;
+    }
+
+    // Build grid: lab names as rows, dates as columns
+    container.style.gridTemplateColumns = '160px repeat(' + dates.length + ', minmax(80px, 1fr))';
+
+    var html = '';
+    // Corner cell
+    html += '<div class="lab-cell lab-cell-corner">Lab Name</div>';
+    // Date headers
+    dates.forEach(function(d) {
+        var parts = d.split('-');
+        var display = parts.length === 3 ? parts[1] + '/' + parts[2] + '/' + parts[0].slice(2) : d;
+        html += '<div class="lab-cell lab-cell-header">' + display + '</div>';
+    });
+
+    // Data rows
+    names.forEach(function(name) {
+        html += '<div class="lab-cell lab-cell-name">' + escHtml(name) + '</div>';
+        var resultMap = {};
+        (labs[name].results || []).forEach(function(r) {
+            resultMap[r.date] = r;
+        });
+        dates.forEach(function(d) {
+            var r = resultMap[d];
+            if (r) {
+                var cls = 'lab-cell lab-cell-value';
+                if (r.is_critical) cls += ' lab-cell-critical';
+                html += '<div class="' + cls + '" title="' + escHtml(name) + ' on ' + d + '">' + escHtml(String(r.value)) + '</div>';
+            } else {
+                html += '<div class="lab-cell lab-cell-value" style="color:var(--text-secondary,#ccc);">&mdash;</div>';
+            }
+        });
+    });
+
+    container.innerHTML = html;
+}
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function setLabView(view, btn) {
+    document.querySelectorAll('.lab-view-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    if (view === 'spreadsheet') {
+        document.getElementById('lab-spreadsheet-container').style.display = '';
+        document.getElementById('lab-graph-container').style.display = 'none';
+    } else {
+        document.getElementById('lab-spreadsheet-container').style.display = 'none';
+        document.getElementById('lab-graph-container').style.display = '';
+        renderLabGraph();
+    }
+}
+
+/* ---- Lab Graphing (Canvas) ---- */
+function renderLabGraph() {
+    if (!labData) return;
+    var canvas = document.getElementById('lab-graph-canvas');
+    var ctx = canvas.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = (rect.height - 40) * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = (rect.height - 40) + 'px';
+    ctx.scale(dpr, dpr);
+
+    var W = rect.width, H = rect.height - 40;
+    var padL = 60, padR = 30, padT = 40, padB = 60;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Gather selected labs with numeric data
+    var series = [];
+    var allDates = [], allVals = [];
+    var names = Object.keys(labData.labs || {}).filter(function(n){ return selectedLabs.has(n); }).sort();
+
+    names.forEach(function(name, idx) {
+        var pts = [];
+        (labData.labs[name].results || []).forEach(function(r) {
+            var v = parseFloat(r.value);
+            if (!isNaN(v)) {
+                var t = new Date(r.date).getTime();
+                pts.push({t: t, v: v, date: r.date});
+                allDates.push(t);
+                allVals.push(v);
+            }
+        });
+        if (pts.length > 0) {
+            pts.sort(function(a, b){ return a.t - b.t; });
+            series.push({name: name, pts: pts, color: labColors[idx % labColors.length]});
+        }
+    });
+
+    if (series.length === 0) {
+        ctx.fillStyle = '#999';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No numeric lab data to graph', W / 2, H / 2);
+        return;
+    }
+
+    var minT = Math.min.apply(null, allDates), maxT = Math.max.apply(null, allDates);
+    var minV = Math.min.apply(null, allVals), maxV = Math.max.apply(null, allVals);
+    var rangeT = maxT - minT || 1, rangeV = maxV - minV || 1;
+    minV -= rangeV * 0.1; maxV += rangeV * 0.1; rangeV = maxV - minV;
+
+    function xOf(t) { return padL + ((t - minT) / rangeT) * plotW; }
+    function yOf(v) { return padT + plotH - ((v - minV) / rangeV) * plotH; }
+
+    // Grid lines
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+    for (var i = 0; i <= 5; i++) {
+        var y = padT + (plotH / 5) * i;
+        ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+        var val = maxV - (rangeV / 5) * i;
+        ctx.fillStyle = '#64748b'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(val.toFixed(1), padL - 6, y + 4);
+    }
+
+    // Date labels
+    var uniqueDates = Array.from(new Set(allDates)).sort(function(a,b){return a-b;});
+    var dateSteps = Math.max(1, Math.floor(uniqueDates.length / 8));
+    ctx.fillStyle = '#64748b'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    for (var i = 0; i < uniqueDates.length; i += dateSteps) {
+        var x = xOf(uniqueDates[i]);
+        var d = new Date(uniqueDates[i]);
+        ctx.fillText((d.getMonth() + 1) + '/' + d.getDate() + '/' + (d.getFullYear() % 100), x, H - padB + 20);
+    }
+
+    // Draw series lines + points
+    series.forEach(function(s) {
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        s.pts.forEach(function(p, idx) {
+            var x = xOf(p.t), y = yOf(p.v);
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Points
+        s.pts.forEach(function(p) {
+            var x = xOf(p.t), y = yOf(p.v);
+            ctx.fillStyle = s.color;
+            ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+        });
+    });
+
+    // Legend
+    var lx = padL + 10, ly = padT + 10;
+    series.forEach(function(s, i) {
+        ctx.fillStyle = s.color;
+        ctx.fillRect(lx, ly + i * 18, 12, 12);
+        ctx.fillStyle = '#333';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(s.name, lx + 16, ly + i * 18 + 10);
+    });
+}
+
+/* ---- Keyboard shortcuts ---- */
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeLabDetail();
+});
+</script>
+{% endblock %}

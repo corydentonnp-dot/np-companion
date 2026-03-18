@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Outreach List — {{ gap_name }} — NP Companion{% endblock %}
+{% block page_id %}caregap{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <a href="/caregap/panel" style="color:var(--text-secondary);text-decoration:none;font-size:14px;">← Panel Report</a>
+    <h1 style="margin:0;">Outreach List</h1>
+    <span class="badge badge--warning">{{ gap_name }}</span>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>{{ gaps|length }} patient{{ 's' if gaps|length != 1 }} due for {{ gap_name }}</span>
+        <a href="/caregap/panel/outreach?gap_type={{ gap_type }}&export=csv" class="btn btn-primary btn-sm">
+            📥 Export CSV (Full Names)
+        </a>
+    </div>
+    {% if gaps %}
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+        <table class="schedule-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>MRN (Last 4)</th>
+                    <th>Status</th>
+                    <th>Gap Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for g in gaps %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td style="font-family:monospace;font-size:13px;">
+                        ••{{ g.mrn[-4:] if g.mrn|length >= 4 else g.mrn }}
+                    </td>
+                    <td>
+                        <span class="badge badge--warning">{{ g.status|replace('_', ' ')|title }}</span>
+                    </td>
+                    <td style="font-size:13px;">
+                        {{ g.created_at.strftime('%b %d, %Y') if g.created_at else '—' }}
+                    </td>
+                    <td>
+                        <a href="/caregap/{{ g.mrn }}" class="btn btn-secondary btn-sm">View Gaps</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="empty-state">No patients currently due for this screening.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-body" style="font-size:13px;color:var(--text-secondary);">
+        <strong>Note:</strong> The table above shows MRN last 4 digits only for HIPAA compliance.
+        Use the CSV export button to generate a full-name list for your MA to use for outreach calls.
+    </div>
+</div>
+{% endblock %}

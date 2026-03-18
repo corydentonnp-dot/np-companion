@@ -1,0 +1,615 @@
+{% extends "base.html" %}
+{% block title %}Order Sets — NP Companion{% endblock %}
+{% block page_id %}orders{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Order Sets</h1>
+    <div style="display:flex;gap:8px;">
+        <a href="/orders/master-list" class="btn btn-outline btn-sm">Master List</a>
+        <button class="btn btn-primary btn-sm" onclick="openBuilder(null)">+ New Order Set</button>
+    </div>
+</div>
+
+{# F8e: Interrupted execution banner #}
+{% if interrupted %}
+<div class="card" style="border:2px solid var(--color-warning,#f59e0b);margin-bottom:16px;">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+            <strong style="color:var(--color-warning,#f59e0b);">&#9888; Previous execution was interrupted.</strong>
+            <span style="font-size:13px;color:var(--text-secondary);">
+                {{ interrupted.completed_items }} of {{ interrupted.total_items }} orders completed.
+            </span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <form method="POST" action="/orders/resume/{{ interrupted.id }}" style="display:inline;">
+                <button type="submit" class="btn btn-primary btn-sm" style="min-height:36px;">Resume</button>
+            </form>
+            <form method="POST" action="/orders/dismiss-interrupted/{{ interrupted.id }}" style="display:inline;">
+                <button type="submit" class="btn btn-outline btn-sm" style="min-height:36px;">Dismiss</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Tab bar: Mine / Community ---- #}
+<div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border,#e2e8f0);">
+    <a href="/orders?tab=mine" style="padding:10px 20px;font-size:14px;font-weight:{{ 600 if tab == 'mine' else 400 }};text-decoration:none;color:{{ 'var(--color-navy)' if tab == 'mine' else 'var(--text-secondary)' }};border-bottom:{{ '3px solid var(--color-navy)' if tab == 'mine' else 'none' }};margin-bottom:-2px;">My Sets</a>
+    <a href="/orders?tab=community" style="padding:10px 20px;font-size:14px;font-weight:{{ 600 if tab == 'community' else 400 }};text-decoration:none;color:{{ 'var(--color-navy)' if tab == 'community' else 'var(--text-secondary)' }};border-bottom:{{ '3px solid var(--color-navy)' if tab == 'community' else 'none' }};margin-bottom:-2px;">Community</a>
+</div>
+
+{% if tab == 'mine' %}
+{# ======== MY ORDER SETS GRID ======== #}
+{% if my_sets %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+    {% for s in my_sets %}
+    <div class="card" style="cursor:pointer;transition:box-shadow 0.15s;" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'" onmouseleave="this.style.boxShadow=''">
+        <div class="card-body" style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+                <div>
+                    <div style="font-size:16px;font-weight:600;">{{ s.name }}</div>
+                    {% if s.visit_type %}
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">{{ s.visit_type }}</div>
+                    {% endif %}
+                </div>
+                <div style="display:flex;gap:4px;align-items:center;">
+                    {% if s.is_shared %}
+                    <span style="font-size:10px;padding:2px 6px;border-radius:8px;background:var(--color-lt-green);color:var(--color-green);">shared</span>
+                    {% endif %}
+                    {% if s.forked_from_id %}
+                    <span style="font-size:10px;padding:2px 6px;border-radius:8px;background:var(--color-lt-yellow);color:#8a6d3b;">forked</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+                {{ s.items|length }} items · v{{ s.version }}
+                {% if s.updated_at %} · {{ s.updated_at.strftime('%m/%d/%Y') }}{% endif %}
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openBuilder({{ s.id }})" style="flex:1;">&#9998; Edit</button>
+                <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openExecutePanel({{ s.id }})" style="flex:1;">&#9654; Execute</button>
+                <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();showHistory({{ s.id }})" title="History">&#128337;</button>
+                {% if s.is_shared and not s.is_retracted %}
+                <form method="POST" action="/orders/unshare/{{ s.id }}" style="display:inline;" onclick="event.stopPropagation();">
+                    <button type="submit" class="btn btn-outline btn-sm" title="Retract">Unshare</button>
+                </form>
+                {% elif not s.is_shared %}
+                <form method="POST" action="/orders/share/{{ s.id }}" style="display:inline;" onclick="event.stopPropagation();">
+                    <button type="submit" class="btn btn-outline btn-sm" title="Share">Share</button>
+                </form>
+                {% endif %}
+                <form method="POST" action="/orders/{{ s.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete &quot;{{ s.name }}&quot;?');" onclick="event.stopPropagation();">
+                    <button type="submit" class="btn btn-outline btn-sm" style="color:var(--color-red);" title="Delete">&#128465;</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:60px 20px;color:var(--text-secondary);">
+        <p style="font-size:16px;margin-bottom:8px;">No order sets yet</p>
+        <p style="font-size:13px;">Click <strong>+ New Order Set</strong> to create one.</p>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+{# ======== COMMUNITY SETS ======== #}
+{% if community_sets %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+    {% for s in community_sets %}
+    <div class="card">
+        <div class="card-body" style="padding:16px;">
+            <div style="font-size:16px;font-weight:600;">{{ s.name }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin:4px 0 12px;">
+                by {{ s.shared_by_user.display_name if s.shared_by_user else s.user.display_name }} · {{ s.items|length }} items
+            </div>
+            <form method="POST" action="/orders/import/{{ s.id }}">
+                <button type="submit" class="btn btn-outline btn-sm">Import to My Sets</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px 20px;color:var(--text-secondary);">
+        No shared sets available yet.
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+{# ======== ORDER SET BUILDER POPUP ======== #}
+<div id="order-builder" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:5000;">
+    <div style="position:absolute;inset:20px;background:var(--bg-surface,#fff);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        {# Builder header #}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);background:var(--bg-muted,#f8fafc);">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <h2 style="margin:0;font-size:18px;" id="builder-title">New Order Set</h2>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" onclick="saveOrderSet()">&#128190; Save</button>
+                <button class="btn btn-outline btn-sm" onclick="closeBuilder()">&#10005; Close</button>
+            </div>
+        </div>
+
+        {# Builder: name/visit type bar #}
+        <div style="display:flex;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border,#e2e8f0);align-items:center;flex-wrap:wrap;">
+            <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:200px;">
+                <label style="font-size:13px;font-weight:600;white-space:nowrap;">Name:</label>
+                <input type="text" id="builder-name" class="form-control" style="flex:1;font-size:14px;" placeholder="Order set name..." required>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:200px;">
+                <label style="font-size:13px;font-weight:600;white-space:nowrap;">Visit Type:</label>
+                <input type="text" id="builder-visit-type" class="form-control" style="flex:1;font-size:13px;" placeholder="e.g. Annual Physical">
+            </div>
+        </div>
+
+        {# Builder body: 2-panel #}
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;">
+            {# LEFT: Master order browser #}
+            <div style="border-right:1px solid var(--border,#e2e8f0);display:flex;flex-direction:column;overflow:hidden;">
+                <div style="padding:10px 16px;border-bottom:1px solid var(--border,#f1f5f9);display:flex;flex-direction:column;gap:8px;">
+                    <div style="font-weight:600;font-size:14px;">&#128218; Order Browser</div>
+                    <input type="text" id="browser-search" class="form-control" placeholder="Search orders..." style="font-size:13px;" oninput="filterBrowser()">
+                    <div id="browser-tabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+                </div>
+                <div id="browser-list" style="flex:1;overflow-y:auto;padding:0;"></div>
+            </div>
+
+            {# RIGHT: Selected orders #}
+            <div style="display:flex;flex-direction:column;overflow:hidden;">
+                <div style="padding:10px 16px;border-bottom:1px solid var(--border,#f1f5f9);">
+                    <div style="font-weight:600;font-size:14px;">&#9989; Selected Orders (<span id="selected-count">0</span>)</div>
+                </div>
+                <div id="selected-list" style="flex:1;overflow-y:auto;padding:0;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ======== EXECUTE PANEL POPUP ======== #}
+<div id="execute-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:5000;">
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-surface,#fff);border-radius:12px;width:560px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);background:var(--bg-muted,#f8fafc);">
+            <h2 style="margin:0;font-size:18px;" id="exec-title">Execute Order Set</h2>
+            <button class="btn btn-outline btn-sm" onclick="closeExecutePanel()">&#10005;</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:0;" id="exec-items-list"></div>
+        <div style="padding:16px 20px;border-top:1px solid var(--border,#e2e8f0);">
+            <div style="background:var(--bg-muted,#f8fafc);border-radius:6px;padding:10px;font-size:13px;margin-bottom:12px;">
+                &#9888; <strong>Confirm Amazing Charts is open on the Orders tab for the correct patient.</strong>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;margin-bottom:12px;cursor:pointer;font-size:14px;">
+                <input type="checkbox" id="exec-confirm-check" style="width:18px;height:18px;" onchange="updateExecBtn()">
+                I confirm AC is on the correct patient's Orders tab
+            </label>
+            <button id="exec-go-btn" class="btn" disabled
+                style="width:100%;min-height:48px;font-size:16px;font-weight:700;background:#9ca3af;color:#fff;cursor:not-allowed;border:none;border-radius:8px;"
+                onclick="beginExecution()">
+                &#9654; EXECUTE
+            </button>
+            <div id="exec-progress" style="display:none;margin-top:12px;font-family:monospace;font-size:12px;max-height:200px;overflow:auto;"></div>
+        </div>
+    </div>
+</div>
+
+{# ======== Version History Modal ======== #}
+<div id="history-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:5000;align-items:center;justify-content:center;">
+    <div style="background:var(--card-bg,#fff);border-radius:12px;padding:24px;max-width:560px;width:90%;max-height:80vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="font-size:18px;margin:0;">Version History</h2>
+            <button type="button" class="btn btn-outline btn-sm" onclick="hideHistory()">Close</button>
+        </div>
+        <div id="history-content"></div>
+    </div>
+</div>
+
+{# ======== 3-second execute confirmation modal ======== #}
+<div id="execute-countdown-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:6000;align-items:center;justify-content:center;">
+    <div style="background:var(--card-bg,#fff);border-radius:12px;padding:24px;max-width:480px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+        <h2 style="font-size:18px;margin:0 0 16px;">Confirm Execution</h2>
+        <p style="font-size:14px;margin-bottom:12px;" id="countdown-text">Executing...</p>
+        <div style="margin-bottom:16px;">
+            <label style="font-size:13px;font-weight:600;margin-bottom:4px;display:block;">Type anything to confirm:</label>
+            <input type="text" id="countdown-confirm" class="form-control" placeholder="Type to confirm..." style="width:100%;font-size:14px;">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="cancelCountdown()">Cancel</button>
+            <button id="countdown-go" class="btn" disabled style="min-width:120px;background:#9ca3af;color:#fff;border:none;cursor:not-allowed;" onclick="fireExecution()">Wait (3s)...</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ==============================================================
+   Order Set Manager — Redesigned
+   ============================================================== */
+
+var _builderSetId = null;      // null = new, int = editing
+var _selectedItems = [];       // [{order_name, order_tab, order_label, id?}]
+var _masterOrders = [];        // full browse cache
+var _masterTabs = [];          // tab names
+var _activeTab = '';            // '' = All
+var _execSetId = null;         // set ID being executed
+var _countdownTimer2 = null;
+var _countdownVal = 3;
+
+/* ---- Builder ---- */
+function openBuilder(setId) {
+    _builderSetId = setId;
+    _selectedItems = [];
+    document.getElementById('builder-name').value = '';
+    document.getElementById('builder-visit-type').value = '';
+    document.getElementById('builder-title').textContent = setId ? 'Edit Order Set' : 'New Order Set';
+    document.getElementById('order-builder').style.display = 'block';
+
+    /* Load master orders first */
+    fetch('/api/orders/master-browse')
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            _masterOrders = data.orders || [];
+            _masterTabs = data.tabs || [];
+            renderBrowserTabs();
+            renderBrowserList();
+
+            /* If editing, load set details */
+            if (setId) {
+                fetch('/orders/' + setId + '/edit')
+                    .then(function(r){ return r.json(); })
+                    .then(function(s) {
+                        document.getElementById('builder-name').value = s.name || '';
+                        document.getElementById('builder-visit-type').value = s.visit_type || '';
+                        _selectedItems = (s.items || []).map(function(i) {
+                            return {
+                                id: i.id,
+                                order_name: i.order_name,
+                                order_tab: i.order_tab,
+                                order_label: i.order_label,
+                            };
+                        });
+                        renderSelectedList();
+                        renderBrowserList(); /* update checkboxes */
+                    });
+            }
+        });
+}
+
+function closeBuilder() {
+    document.getElementById('order-builder').style.display = 'none';
+}
+
+function renderBrowserTabs() {
+    var html = '<button class="btn btn-sm ' + (!_activeTab ? 'btn-primary' : 'btn-outline') + '" onclick="setActiveTab(\'\')">All</button>';
+    _masterTabs.forEach(function(t) {
+        html += '<button class="btn btn-sm ' + (_activeTab === t ? 'btn-primary' : 'btn-outline') + '" onclick="setActiveTab(\'' + t + '\')">' + t + '</button>';
+    });
+    document.getElementById('browser-tabs').innerHTML = html;
+}
+
+function setActiveTab(tab) {
+    _activeTab = tab;
+    renderBrowserTabs();
+    renderBrowserList();
+}
+
+function filterBrowser() {
+    renderBrowserList();
+}
+
+function renderBrowserList() {
+    var q = (document.getElementById('browser-search').value || '').toLowerCase();
+    var list = _masterOrders.filter(function(o) {
+        if (_activeTab && o.order_tab !== _activeTab) return false;
+        if (q && o.order_name.toLowerCase().indexOf(q) === -1) return false;
+        return true;
+    });
+
+    /* Sort: common first, then alphabetically */
+    list.sort(function(a, b) {
+        if (a.is_common && !b.is_common) return -1;
+        if (!a.is_common && b.is_common) return 1;
+        return a.order_name.localeCompare(b.order_name);
+    });
+
+    var selectedNames = {};
+    _selectedItems.forEach(function(i) { selectedNames[i.order_name] = true; });
+
+    var html = '';
+    if (!list.length) {
+        html = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--text-secondary);">No orders found</div>';
+    }
+    list.forEach(function(o) {
+        var checked = selectedNames[o.order_name] ? ' checked' : '';
+        var star = o.is_common ? '&#11088; ' : '';
+        html += '<label style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;font-size:13px;" onmouseenter="this.style.background=\'var(--bg-muted)\'" onmouseleave="this.style.background=\'\'">'
+            + '<input type="checkbox"' + checked + ' style="width:16px;height:16px;flex-shrink:0;" onchange="toggleOrderInSet(this, ' + JSON.stringify(o).replace(/"/g, '&quot;') + ')">'
+            + '<div style="flex:1;min-width:0;">'
+            + '<div style="font-weight:500;">' + star + escHtml(o.order_name) + '</div>'
+            + '<div style="font-size:11px;color:var(--text-secondary);">' + escHtml(o.order_tab || '') + (o.cpt_code ? ' · ' + escHtml(o.cpt_code) : '') + '</div>'
+            + '</div>'
+            + '<button class="widget-btn" onclick="event.preventDefault();event.stopPropagation();toggleStar(' + o.id + ',this)" title="Toggle common" style="font-size:16px;">' + (o.is_common ? '&#11088;' : '&#9734;') + '</button>'
+            + '</label>';
+    });
+    document.getElementById('browser-list').innerHTML = html;
+}
+
+function toggleOrderInSet(cb, order) {
+    if (cb.checked) {
+        _selectedItems.push({
+            order_name: order.order_name,
+            order_tab: order.order_tab,
+            order_label: order.order_label || order.order_name,
+        });
+    } else {
+        _selectedItems = _selectedItems.filter(function(i) { return i.order_name !== order.order_name; });
+    }
+    renderSelectedList();
+}
+
+function toggleStar(orderId, btn) {
+    fetch('/api/orders/master/' + orderId + '/toggle-common', {method:'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                /* Update cached data */
+                _masterOrders.forEach(function(o) {
+                    if (o.id === orderId) o.is_common = d.is_common;
+                });
+                renderBrowserList();
+            }
+        });
+}
+
+function renderSelectedList() {
+    document.getElementById('selected-count').textContent = _selectedItems.length;
+    var html = '';
+    if (!_selectedItems.length) {
+        html = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--text-secondary);">No orders selected. Check items from the browser on the left.</div>';
+    }
+    _selectedItems.forEach(function(item, idx) {
+        html += '<div draggable="true" data-idx="' + idx + '" style="display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border,#f1f5f9);cursor:grab;" '
+            + 'ondragstart="dragStart(event,' + idx + ')" ondragover="dragOver(event)" ondrop="dropItem(event,' + idx + ')">'
+            + '<span style="color:var(--text-secondary);font-size:14px;cursor:grab;">&#9776;</span>'
+            + '<div style="flex:1;min-width:0;">'
+            + '<div style="font-size:13px;font-weight:500;">' + escHtml(item.order_name) + '</div>'
+            + '<div style="font-size:11px;color:var(--text-secondary);">' + escHtml(item.order_tab || '') + '</div>'
+            + '</div>'
+            + '<button class="widget-btn" onclick="removeSelectedItem(' + idx + ')" title="Remove" style="font-size:14px;color:var(--color-red);">&#10005;</button>'
+            + '</div>';
+    });
+    document.getElementById('selected-list').innerHTML = html;
+}
+
+function removeSelectedItem(idx) {
+    _selectedItems.splice(idx, 1);
+    renderSelectedList();
+    renderBrowserList();
+}
+
+/* Drag-to-reorder */
+var _dragIdx = null;
+function dragStart(e, idx) { _dragIdx = idx; e.dataTransfer.effectAllowed = 'move'; }
+function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function dropItem(e, targetIdx) {
+    e.preventDefault();
+    if (_dragIdx === null || _dragIdx === targetIdx) return;
+    var item = _selectedItems.splice(_dragIdx, 1)[0];
+    _selectedItems.splice(targetIdx, 0, item);
+    _dragIdx = null;
+    renderSelectedList();
+}
+
+function saveOrderSet() {
+    var name = document.getElementById('builder-name').value.trim();
+    if (!name) { alert('Name is required.'); return; }
+    var visitType = document.getElementById('builder-visit-type').value.trim();
+    var itemsJson = JSON.stringify(_selectedItems.map(function(i, idx) {
+        return { order_name: i.order_name, order_tab: i.order_tab, order_label: i.order_label || i.order_name, sort_order: idx };
+    }));
+
+    if (_builderSetId) {
+        /* Update existing */
+        var form = new FormData();
+        form.append('name', name);
+        form.append('visit_type', visitType);
+        form.append('items', itemsJson);
+        fetch('/orders/' + _builderSetId + '/update', { method: 'POST', body: form })
+            .then(function() { location.reload(); });
+    } else {
+        /* Create new, then update items */
+        var form = new FormData();
+        form.append('name', name);
+        form.append('visit_type', visitType);
+        fetch('/orders/create', { method: 'POST', body: form, redirect: 'follow' })
+            .then(function(r) {
+                /* The server redirects; extract the new set ID from URL params */
+                var url = new URL(r.url);
+                var newId = url.searchParams.get('set');
+                if (newId && _selectedItems.length) {
+                    var form2 = new FormData();
+                    form2.append('name', name);
+                    form2.append('visit_type', visitType);
+                    form2.append('items', itemsJson);
+                    return fetch('/orders/' + newId + '/update', { method: 'POST', body: form2 });
+                }
+            })
+            .then(function() { location.reload(); });
+    }
+}
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+/* ---- Execute Panel ---- */
+function openExecutePanel(setId) {
+    _execSetId = setId;
+    document.getElementById('exec-confirm-check').checked = false;
+    updateExecBtn();
+    document.getElementById('exec-progress').style.display = 'none';
+    document.getElementById('exec-progress').innerHTML = '';
+    document.getElementById('execute-panel').style.display = 'block';
+
+    fetch('/orders/' + setId + '/edit')
+        .then(function(r){ return r.json(); })
+        .then(function(s) {
+            document.getElementById('exec-title').textContent = 'Execute: ' + s.name;
+            var html = '';
+            (s.items || []).forEach(function(i) {
+                html += '<label style="display:flex;align-items:center;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;font-size:13px;">'
+                    + '<input type="checkbox" name="exec_item" value="' + i.id + '" checked style="width:18px;height:18px;">'
+                    + '<div style="flex:1;">'
+                    + '<div style="font-size:14px;">' + escHtml(i.order_name) + '</div>'
+                    + (i.order_tab ? '<div style="font-size:11px;color:var(--text-secondary);">Tab: ' + escHtml(i.order_tab) + '</div>' : '')
+                    + '</div></label>';
+            });
+            if (!s.items || !s.items.length) {
+                html = '<div style="padding:20px;text-align:center;color:var(--text-secondary);">No items in this set.</div>';
+            }
+            document.getElementById('exec-items-list').innerHTML = html;
+        });
+}
+
+function closeExecutePanel() {
+    document.getElementById('execute-panel').style.display = 'none';
+}
+
+function updateExecBtn() {
+    var btn = document.getElementById('exec-go-btn');
+    var checked = document.getElementById('exec-confirm-check').checked;
+    btn.disabled = !checked;
+    btn.style.background = checked ? '#16a34a' : '#9ca3af';
+    btn.style.cursor = checked ? 'pointer' : 'not-allowed';
+}
+
+function beginExecution() {
+    /* Show 3-second countdown modal */
+    document.getElementById('countdown-confirm').value = '';
+    document.getElementById('countdown-go').disabled = true;
+    document.getElementById('countdown-go').style.background = '#9ca3af';
+    document.getElementById('countdown-go').style.cursor = 'not-allowed';
+    document.getElementById('execute-countdown-modal').style.display = 'flex';
+    _countdownVal = 3;
+    document.getElementById('countdown-go').textContent = 'Wait (' + _countdownVal + 's)...';
+
+    _countdownTimer2 = setInterval(function() {
+        _countdownVal--;
+        if (_countdownVal <= 0) {
+            clearInterval(_countdownTimer2);
+            checkCountdownReady();
+        } else {
+            document.getElementById('countdown-go').textContent = 'Wait (' + _countdownVal + 's)...';
+        }
+    }, 1000);
+
+    document.getElementById('countdown-confirm').addEventListener('input', checkCountdownReady);
+}
+
+function checkCountdownReady() {
+    var btn = document.getElementById('countdown-go');
+    if (_countdownVal <= 0 && document.getElementById('countdown-confirm').value.trim().length > 0) {
+        btn.disabled = false;
+        btn.style.background = '#16a34a';
+        btn.style.cursor = 'pointer';
+        btn.textContent = '\u25B6 Execute Now';
+    }
+}
+
+function cancelCountdown() {
+    clearInterval(_countdownTimer2);
+    document.getElementById('execute-countdown-modal').style.display = 'none';
+}
+
+function fireExecution() {
+    cancelCountdown();
+
+    var checkedBoxes = document.querySelectorAll('#exec-items-list input[name="exec_item"]:checked');
+    var form = new FormData();
+    checkedBoxes.forEach(function(cb) { form.append('checked_items', cb.value); });
+
+    var progress = document.getElementById('exec-progress');
+    progress.style.display = 'block';
+    progress.innerHTML = '<p style="color:var(--text-secondary);">Starting execution...</p>';
+
+    fetch('/orders/' + _execSetId + '/execute', { method: 'POST', body: form })
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                progress.innerHTML = '<p style="color:var(--color-green);">\u2705 ' + data.message + '</p>';
+            } else {
+                var html = '<p style="color:var(--color-red);">\u274C ' + (data.error || 'Execution failed') + '</p>';
+                if (data.completed !== undefined) html += '<p>' + data.completed + ' completed, ' + data.failed + ' failed</p>';
+                if (data.interrupted) html += '<p style="font-size:12px;color:var(--text-secondary);">Refresh to see the resume option.</p>';
+                progress.innerHTML = html;
+            }
+            if (data.execution_id) {
+                fetch('/api/orders/execution/' + data.execution_id)
+                    .then(function(r){ return r.json(); })
+                    .then(function(exec) {
+                        var itemsHtml = '';
+                        exec.items.forEach(function(item) {
+                            var icon = item.status === 'completed' ? '\u2705' : item.status === 'failed' ? '\u274C' : item.status === 'skipped' ? '\u23ED' : '\u23F3';
+                            itemsHtml += '<div style="padding:4px 0;font-size:12px;">' + icon + ' ' + escHtml(item.order_name);
+                            if (item.error_message) itemsHtml += ' <span style="color:var(--color-red);">(' + escHtml(item.error_message) + ')</span>';
+                            itemsHtml += '</div>';
+                        });
+                        progress.innerHTML += itemsHtml;
+                    });
+            }
+        })
+        .catch(function(e) {
+            progress.innerHTML = '<p style="color:var(--color-red);">Network error: ' + e.message + '</p>';
+        });
+}
+
+/* ---- Version History (reused from original) ---- */
+function showHistory(setId) {
+    var modal = document.getElementById('history-modal');
+    var content = document.getElementById('history-content');
+    content.innerHTML = '<p style="color:var(--text-secondary);">Loading...</p>';
+    modal.style.display = 'flex';
+
+    fetch('/orders/' + setId + '/history')
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            if (!data.versions || data.versions.length === 0) {
+                content.innerHTML = '<p style="color:var(--text-secondary);">No version history yet.</p>';
+                return;
+            }
+            var html = '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Current: v' + data.current_version + '</p>';
+            data.versions.forEach(function(v) {
+                html += '<div style="border:1px solid var(--border,#eee);border-radius:6px;padding:12px;margin-bottom:8px;">'
+                    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+                    + '<span style="font-weight:600;">Version ' + v.version_number + '</span>'
+                    + '<span style="font-size:11px;color:var(--text-secondary);">' + v.saved_at + ' by ' + v.saved_by + '</span>'
+                    + '</div><div style="font-size:12px;margin-bottom:8px;">';
+                v.items.forEach(function(item) {
+                    html += '<div style="padding:2px 0;">\u2022 ' + escHtml(item.order_name) + (item.order_tab ? ' (' + escHtml(item.order_tab) + ')' : '') + '</div>';
+                });
+                html += '</div>'
+                    + '<form method="POST" action="/orders/' + setId + '/restore/' + v.id + '">'
+                    + '<button type="submit" class="btn btn-outline btn-sm" style="font-size:12px;">Restore this version</button>'
+                    + '</form></div>';
+            });
+            content.innerHTML = html;
+        });
+}
+
+function hideHistory() {
+    document.getElementById('history-modal').style.display = 'none';
+}
+</script>
+
+<style>
+@media (max-width: 768px) {
+    #order-builder > div > div:last-child { grid-template-columns: 1fr !important; }
+}
+</style>
+{% endblock %}

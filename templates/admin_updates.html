@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Updates — NP Companion{% endblock %}
+{% block page_id %}admin-updates{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Software Updates</h1>
+    <p class="page-subtitle">Current version: <strong>v{{ current_version }}</strong></p>
+</div>
+
+<div class="card" style="max-width:700px;">
+    <div class="card-header">
+        <h2 class="card-title">Check for Updates</h2>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom:12px;color:var(--text-secondary);">
+            Enter the path to the folder containing the update zip
+            (your Downloads folder, a USB drive, Google Drive sync folder, etc.).
+        </p>
+
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+            <input type="text" id="update-folder"
+                   class="form-control" style="flex:1;"
+                   placeholder="C:\Users\coryd\Downloads"
+                   value="{{ update_folder }}">
+            <button class="btn btn-primary" id="scan-btn" onclick="scanForUpdate()">
+                Scan Folder
+            </button>
+        </div>
+
+        <div id="scan-result" style="display:none;">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+</div>
+
+<div class="card" style="max-width:700px;margin-top:24px;">
+    <div class="card-header">
+        <h2 class="card-title">Update Instructions</h2>
+    </div>
+    <div class="card-body" style="color:var(--text-secondary);font-size:14px;">
+        <ol style="padding-left:20px;line-height:1.8;">
+            <li>On your personal PC, run <code>python build.py</code> to create a new build zip.</li>
+            <li>Transfer the zip to this PC:
+                <ul style="margin:4px 0 4px 16px;">
+                    <li><strong>Google Drive:</strong> Upload zip → download on this PC</li>
+                    <li><strong>USB drive:</strong> Copy zip to USB → plug in here</li>
+                    <li><strong>Email:</strong> Attach and download (small updates only)</li>
+                </ul>
+            </li>
+            <li>Enter the folder path above (e.g. <code>C:\Users\coryd\Downloads</code> or <code>E:\</code>).</li>
+            <li>Click <strong>Scan Folder</strong> — the newest version will appear.</li>
+            <li>Click <strong>Apply Update</strong> → the app extracts and replaces code files.</li>
+            <li>Click <strong>Restart</strong> → the app relaunches with the new version.</li>
+        </ol>
+        <p style="margin-top:12px;">
+            <strong>Your data is safe.</strong> Updates never touch: database, config.py, browsers, or tesseract.
+        </p>
+    </div>
+</div>
+
+<script>
+function scanForUpdate() {
+    const folder = document.getElementById('update-folder').value.trim();
+    if (!folder) { alert('Enter a folder path first.'); return; }
+    const btn = document.getElementById('scan-btn');
+    const result = document.getElementById('scan-result');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    result.style.display = 'none';
+
+    const form = new FormData();
+    form.append('folder', folder);
+
+    fetch('/admin/updates/scan', { method: 'POST', body: form })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.textContent = 'Scan Folder';
+            result.style.display = 'block';
+
+            if (data.found) {
+                let notes = data.release_notes
+                    ? '<div style="margin-top:12px;padding:12px;background:var(--bg-surface-alt,#f5f5f5);border-radius:6px;white-space:pre-wrap;font-size:13px;max-height:200px;overflow-y:auto;">' + escapeHtml(data.release_notes) + '</div>'
+                    : '';
+                result.innerHTML =
+                    '<div class="alert alert-success">' +
+                    '<strong>Update available:</strong> v' + escapeHtml(data.version) +
+                    ' (' + escapeHtml(data.zip_name) + ')' +
+                    notes +
+                    '<div style="margin-top:12px;">' +
+                    '<button class="btn btn-primary" onclick="applyUpdate(\'' + escapeHtml(data.zip_path.replace(/\\/g, '\\\\').replace(/'/g, "\\'")) + '\')">Apply Update</button>' +
+                    '</div></div>';
+            } else {
+                result.innerHTML =
+                    '<div class="alert alert-info">' +
+                    (data.error || data.message || 'No newer version found in this folder.') +
+                    '</div>';
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.textContent = 'Scan Folder';
+            result.style.display = 'block';
+            result.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(err.message) + '</div>';
+        });
+}
+
+function applyUpdate(zipPath) {
+    if (!confirm('Apply this update? The app will replace code files and then restart.\nYour data and settings will NOT be affected.')) return;
+    const result = document.getElementById('scan-result');
+    result.innerHTML = '<div class="alert alert-info">Applying update... please wait.</div>';
+
+    const form = new FormData();
+    form.append('zip_path', zipPath);
+
+    fetch('/admin/updates/apply', { method: 'POST', body: form })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                result.innerHTML =
+                    '<div class="alert alert-success">' +
+                    escapeHtml(data.message) +
+                    '<div style="margin-top:12px;">' +
+                    '<button class="btn btn-primary" onclick="restartApp()">Restart Now</button>' +
+                    '</div></div>';
+            } else {
+                result.innerHTML =
+                    '<div class="alert alert-danger">Update failed: ' + escapeHtml(data.message) + '</div>';
+            }
+        })
+        .catch(err => {
+            result.innerHTML = '<div class="alert alert-danger">Error: ' + escapeHtml(err.message) + '</div>';
+        });
+}
+
+function restartApp() {
+    document.getElementById('scan-result').innerHTML =
+        '<div class="alert alert-info">Restarting NP Companion...</div>';
+    fetch('/admin/updates/restart', { method: 'POST' }).catch(function(){});
+    setTimeout(function() {
+        window.location.href = '/dashboard';
+    }, 5000);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(text || ''));
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

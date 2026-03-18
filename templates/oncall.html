@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}On-Call Notes — NP Companion{% endblock %}
+{% block page_id %}oncall{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px;">
+    <h1 style="margin:0;font-size:22px;">On-Call Notes</h1>
+    <div style="display:flex;gap:8px;">
+        <a href="/oncall/new" class="btn btn-primary" style="min-height:44px;display:flex;align-items:center;gap:6px;">&#128222; New Call</a>
+        <a href="/oncall/handoff" class="btn btn-outline" style="min-height:44px;display:flex;align-items:center;">Handoff</a>
+    </div>
+</div>
+
+{# ---- Filters ---- #}
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+    <a href="/oncall" class="btn btn-sm {{ 'btn-primary' if not status_filter else 'btn-outline' }}">All</a>
+    <a href="/oncall?status=pending" class="btn btn-sm {{ 'btn-primary' if status_filter == 'pending' else 'btn-outline' }}">Pending ({{ pending_count }})</a>
+    <a href="/oncall?status=entered" class="btn btn-sm {{ 'btn-primary' if status_filter == 'entered' else 'btn-outline' }}">Entered</a>
+    <a href="/oncall?status=not_needed" class="btn btn-sm {{ 'btn-primary' if status_filter == 'not_needed' else 'btn-outline' }}">No Doc Needed</a>
+    {% if is_monday %}
+    <a href="/oncall?monday=1" class="btn btn-sm btn-outline" style="border-color:var(--color-warning,#f59e0b);color:var(--color-warning,#f59e0b);">&#128197; Weekend Pending</a>
+    {% endif %}
+</div>
+
+{# ---- Callbacks Due Section (F7b) ---- #}
+{% if callbacks_due %}
+<div class="card" style="margin-bottom:20px;border-left:4px solid var(--color-danger,#ef4444);">
+    <div class="card-header" style="color:var(--color-danger,#ef4444);font-weight:600;">
+        &#128276; Callbacks Due ({{ callbacks_due|length }})
+    </div>
+    <div class="card-body" style="padding:0;">
+        {% for note in callbacks_due %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border,#f1f5f9);flex-wrap:wrap;gap:8px;">
+            <div>
+                <strong>{{ note.patient_identifier or 'Unknown' }}</strong>
+                <span style="font-size:12px;color:var(--text-secondary);">
+                    — {{ note.chief_complaint }}
+                </span>
+                <div style="font-size:12px;color:var(--color-danger,#ef4444);">
+                    Due: {{ note.callback_by.strftime('%m/%d %I:%M %p') if note.callback_by else 'Not set' }}
+                </div>
+            </div>
+            <form method="POST" action="/oncall/{{ note.id }}/complete-callback" style="display:inline;">
+                <button type="submit" class="btn btn-sm btn-outline" style="min-height:44px;">&#9989; Done</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{# ---- Notes grouped by date ---- #}
+{% if grouped_notes %}
+    {% for date_label, notes in grouped_notes.items() %}
+    <h3 style="font-size:14px;color:var(--text-secondary);margin:20px 0 8px;font-weight:500;">{{ date_label }}</h3>
+        {% for note in notes %}
+        <div class="card" style="margin-bottom:8px;border-left:4px solid {{ 'var(--color-danger,#ef4444)' if note.documentation_status == 'pending' else ('var(--color-warning,#f59e0b)' if note.callback_promised and not note.callback_completed else 'var(--color-success,#22c55e)') }};">
+            <div class="card-body" style="padding:12px 16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                    <div style="flex:1;min-width:200px;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <strong style="font-size:15px;">{{ note.chief_complaint or 'No complaint' }}</strong>
+                            {# Status badge #}
+                            {% if note.documentation_status == 'pending' %}
+                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-danger,#fee2e2);color:var(--text-danger,#dc2626);">Pending</span>
+                            {% elif note.documentation_status == 'entered' %}
+                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-success,#dcfce7);color:var(--text-success,#166534);">Entered</span>
+                            {% else %}
+                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);">No Doc Needed</span>
+                            {% endif %}
+                            {# Callback badge #}
+                            {% if note.callback_promised and not note.callback_completed %}
+                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-warning,#fef3c7);color:#92400e;">&#128222; Callback</span>
+                            {% endif %}
+                            {% if note.forwarded_to %}
+                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:#e0e7ff;color:#3730a3;">&#10132; {{ note.forwarded_user.display_name if note.forwarded_user else 'Provider' }}</span>
+                            {% endif %}
+                        </div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+                            {{ note.call_time.strftime('%I:%M %p') if note.call_time else '' }}
+                            {% if note.patient_identifier %} — {{ note.patient_identifier }}{% endif %}
+                        </div>
+                        {% if note.recommendation %}
+                        <div style="font-size:13px;margin-top:6px;color:var(--text-secondary);">{{ note.recommendation[:120] }}{{ '...' if note.recommendation|length > 120 else '' }}</div>
+                        {% endif %}
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <a href="/oncall/{{ note.id }}" class="btn btn-sm btn-outline" style="min-height:44px;display:flex;align-items:center;">View</a>
+                        <a href="/oncall/export/{{ note.id }}" class="btn btn-sm btn-outline" style="min-height:44px;display:flex;align-items:center;">Export</a>
+                        {# Forward dropdown #}
+                        {% if active_users %}
+                        <form method="POST" action="/oncall/{{ note.id }}/forward" style="display:inline-flex;align-items:center;gap:4px;">
+                            <select name="provider_id" class="input" style="font-size:12px;padding:4px 6px;min-height:44px;max-width:140px;">
+                                <option value="">Forward to...</option>
+                                {% for u in active_users %}
+                                <option value="{{ u.id }}">{{ u.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline" style="min-height:44px;">&#10132;</button>
+                        </form>
+                        {% endif %}
+                        {# Kanban status buttons (F7e) #}
+                        {% if note.documentation_status == 'pending' %}
+                        <form method="POST" action="/oncall/{{ note.id }}/status" style="display:inline;">
+                            <input type="hidden" name="status" value="entered">
+                            <button type="submit" class="btn btn-sm btn-outline" style="min-height:44px;" title="Mark as Entered in Chart">&#9989; Entered</button>
+                        </form>
+                        <form method="POST" action="/oncall/{{ note.id }}/status" style="display:inline;">
+                            <input type="hidden" name="status" value="not_needed">
+                            <button type="submit" class="btn btn-sm btn-outline" style="min-height:44px;" title="No documentation needed">&#10060; No Doc</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endfor %}
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
+        <p style="font-size:16px;margin-bottom:12px;">No on-call notes found</p>
+        <a href="/oncall/new" class="btn btn-primary">Create First Note</a>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

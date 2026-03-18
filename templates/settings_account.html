@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Account Settings — NP Companion{% endblock %}
+{% block page_id %}settings-account{% endblock %}
+
+{% block content %}
+<h1>Account Settings</h1>
+
+<div style="display:flex;gap:12px;margin-bottom:24px;">
+    <a href="{{ url_for('auth.settings_account') }}" class="btn btn-primary btn-sm">Account</a>
+    <a href="{{ url_for('auth.settings_notifications') }}" class="btn btn-secondary btn-sm">Notifications</a>
+    <a href="{{ url_for('auth.setup_page') }}" class="btn btn-secondary btn-sm">Setup Wizard</a>
+</div>
+
+{# ---- Display Name ----------------------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">Profile</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="update_profile">
+            <div class="form-group">
+                <label class="form-label" for="display_name">Display Name</label>
+                <input
+                    type="text"
+                    id="display_name"
+                    name="display_name"
+                    class="form-input"
+                    value="{{ current_user.display_name }}"
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="email">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    class="form-input"
+                    value="{{ current_user.email or '' }}"
+                    placeholder="your@email.com"
+                >
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label">Username</label>
+                <p style="margin:0;color:var(--text-secondary);">{{ current_user.username }}</p>
+            </div>
+            <div class="form-group" style="margin-bottom:0;margin-top:8px;">
+                <label class="form-label">Role</label>
+                <p style="margin:0;color:var(--text-secondary);">{{ current_user.role | capitalize }}</p>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top:16px;">Save</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Change Password -------------------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">Change Password</div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="change_password">
+            <div class="form-group">
+                <label class="form-label" for="current_password">Current Password</label>
+                <input
+                    type="password"
+                    id="current_password"
+                    name="current_password"
+                    class="form-input"
+                    required
+                    autocomplete="current-password"
+                >
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="new_password">New Password</label>
+                <input
+                    type="password"
+                    id="new_password"
+                    name="new_password"
+                    class="form-input"
+                    required
+                    minlength="8"
+                    autocomplete="new-password"
+                >
+                <p class="form-help">At least 8 characters.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="confirm_password">Confirm New Password</label>
+                <input
+                    type="password"
+                    id="confirm_password"
+                    name="confirm_password"
+                    class="form-input"
+                    required
+                    minlength="8"
+                    autocomplete="new-password"
+                >
+            </div>
+            <button type="submit" class="btn btn-primary">Change Password</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Set / Change PIN ------------------------------------------ #}
+<div class="card" style="max-width:560px;">
+    <div class="card-header">Screen Lock PIN</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Your 4-digit PIN is used to unlock the screen after inactivity.
+            {% if current_user.pin_hash %}
+                <span class="badge badge--success" style="margin-left:6px;">PIN set</span>
+            {% else %}
+                <span class="badge badge--warning" style="margin-left:6px;">No PIN set</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_pin">
+            <div class="form-group">
+                <label class="form-label" for="pin">New 4-Digit PIN</label>
+                <input
+                    type="password"
+                    id="pin"
+                    name="pin"
+                    class="form-input"
+                    maxlength="4"
+                    pattern="[0-9]{4}"
+                    inputmode="numeric"
+                    required
+                    autocomplete="off"
+                    style="max-width:200px;"
+                >
+            </div>
+            <button type="submit" class="btn btn-primary">Set PIN</button>
+        </form>
+    </div>
+</div>
+
+{# ---- NetPractice Credentials ------------------------------------ #}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">NetPractice Login</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Your CGM webPRACTICE credentials. These are encrypted and stored locally
+            so the scraper can log in to pull your schedule.
+            {% if current_user.has_np_credentials() %}
+                <span class="badge badge--success" style="margin-left:6px;">Credentials saved</span>
+            {% else %}
+                <span class="badge badge--warning" style="margin-left:6px;">Not configured</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_np_credentials">
+            <div class="form-group">
+                <label class="form-label" for="np_username">NetPractice Username</label>
+                <input
+                    type="text"
+                    id="np_username"
+                    name="np_username"
+                    class="form-input"
+                    value="{{ current_user.get_np_username() }}"
+                    placeholder="Your webPRACTICE username"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="np_password">NetPractice Password</label>
+                <input
+                    type="password"
+                    id="np_password"
+                    name="np_password"
+                    class="form-input"
+                    placeholder="{% if current_user.has_np_credentials() %}••••••• (saved){% else %}Your webPRACTICE password{% endif %}"
+                    autocomplete="off"
+                >
+                <p class="form-help">Leave blank to keep the current saved password.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="np_provider_name">Provider Name in webPRACTICE</label>
+                <input
+                    type="text"
+                    id="np_provider_name"
+                    name="np_provider_name"
+                    class="form-input"
+                    value="{{ current_user.np_provider_name or '' }}"
+                    placeholder='e.g. "ASHLEY MORSBERGER FNP (45)"'
+                >
+                <p class="form-help">
+                    Exactly as it appears on the schedule page header.
+                    Used to verify we're on the right provider's schedule.
+                </p>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Credentials</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Amazing Charts Credentials -------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">Amazing Charts Login</div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Your Amazing Charts credentials. Encrypted and stored locally
+            for desktop automation features.
+            {% if current_user.has_ac_credentials() %}
+                <span class="badge badge--success" style="margin-left:6px;">Credentials saved</span>
+            {% else %}
+                <span class="badge badge--warning" style="margin-left:6px;">Not configured</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_ac_credentials">
+            <div class="form-group">
+                <label class="form-label" for="ac_username">Amazing Charts Username</label>
+                <input type="text" id="ac_username" name="ac_username" class="form-input"
+                       value="{{ current_user.get_ac_username() }}"
+                       placeholder="Your Amazing Charts username" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ac_password">Amazing Charts Password</label>
+                <input type="password" id="ac_password" name="ac_password" class="form-input"
+                       placeholder="{% if current_user.has_ac_credentials() %}••••••• (saved){% else %}Your Amazing Charts password{% endif %}" autocomplete="off">
+                <p class="form-help">Leave blank to keep the current saved password.</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Credentials</button>
+        </form>
+    </div>
+</div>
+
+{# ---- Work PC Password (optional) ------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">Work Computer Password <span class="badge badge--info" style="margin-left:8px;">Optional</span></div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Optional. Used for automated PC unlock features. Encrypted at rest.
+            {% if current_user.has_pc_password() %}
+                <span class="badge badge--success" style="margin-left:6px;">Password saved</span>
+            {% else %}
+                <span class="badge badge--info" style="margin-left:6px;">Not set</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_pc_password">
+            <div class="form-group">
+                <label class="form-label" for="pc_password">Work PC Password</label>
+                <input type="password" id="pc_password" name="pc_password" class="form-input"
+                       placeholder="{% if current_user.has_pc_password() %}••••••• (saved){% else %}Your Windows login password{% endif %}" autocomplete="off">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Password</button>
+        </form>
+    </div>
+</div>
+
+{# ---- AI Assistant Configuration -------------------------------- #}
+{% if current_user.ai_enabled %}
+<div class="card" style="margin-bottom:24px;max-width:560px;">
+    <div class="card-header">AI Assistant
+        {% if current_user.has_ai_api_key() %}
+            <span class="badge badge--success" style="margin-left:8px;">Configured</span>
+        {% else %}
+            <span class="badge badge--warning" style="margin-left:8px;">Not configured</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Configure your AI assistant provider and API key. Your key is encrypted and stored locally.
+            The AI assistant is available via right-click on highlighted text.
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_ai_config">
+            <div class="form-group">
+                <label class="form-label" for="ai_provider">AI Provider</label>
+                <select id="ai_provider" name="ai_provider" class="form-input">
+                    <option value="" {% if not current_user.ai_provider %}selected{% endif %}>— Select provider —</option>
+                    <option value="openai" {% if current_user.ai_provider == 'openai' %}selected{% endif %}>OpenAI (ChatGPT)</option>
+                    <option value="anthropic" {% if current_user.ai_provider == 'anthropic' %}selected{% endif %}>Anthropic (Claude)</option>
+                    <option value="xai" {% if current_user.ai_provider == 'xai' %}selected{% endif %}>xAI (Grok)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="ai_api_key">API Key</label>
+                <input type="password" id="ai_api_key" name="ai_api_key" class="form-input"
+                       placeholder="{% if current_user.has_ai_api_key() %}••••••••••••• (saved){% else %}Enter your API key{% endif %}" autocomplete="off">
+                <p class="form-help">Leave blank to keep the current saved key. Get your key from your provider's dashboard.</p>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary">Save AI Settings</button>
+                <button type="button" class="btn btn-secondary" id="ai-test-btn" onclick="testAIConnection()">Test Connection</button>
+            </div>
+            <p id="ai-test-result" style="margin-top:8px;font-size:13px;display:none;"></p>
+        </form>
+    </div>
+</div>
+<script>
+function testAIConnection() {
+    var result = document.getElementById('ai-test-result');
+    result.style.display = 'block';
+    result.style.color = 'var(--text-secondary)';
+    result.textContent = 'Testing connection…';
+    fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message: 'Say "Connection successful" in exactly two words.', context: '', history: []})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            result.style.color = 'var(--color-red, #e74c3c)';
+            result.textContent = 'Error: ' + data.error;
+        } else {
+            result.style.color = 'var(--color-green, #27ae60)';
+            result.textContent = '✓ Connection successful!';
+        }
+    })
+    .catch(function() {
+        result.style.color = 'var(--color-red, #e74c3c)';
+        result.textContent = 'Failed to reach server.';
+    });
+}
+</script>
+{% endif %}
+{% endblock %}

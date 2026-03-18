@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Panel Gap Report — NP Companion{% endblock %}
+{% block page_id %}caregap{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <a href="/caregap" style="color:var(--text-secondary);text-decoration:none;font-size:14px;">← Care Gaps</a>
+    <h1 style="margin:0;">Panel Gap Report</h1>
+</div>
+
+{# ---- SUMMARY CARDS ---- #}
+<div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+    <div class="card" style="flex:1;min-width:160px;">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:28px;font-weight:700;">{{ total_open_gaps }}</div>
+            <div style="font-size:13px;color:var(--text-secondary);">Open Gaps</div>
+        </div>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:28px;font-weight:700;">{{ unique_patients }}</div>
+            <div style="font-size:13px;color:var(--text-secondary);">Patients with Gaps</div>
+        </div>
+    </div>
+    <div class="card" style="flex:1;min-width:160px;">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:28px;font-weight:700;">{{ summary|length }}</div>
+            <div style="font-size:13px;color:var(--text-secondary);">Gap Types</div>
+        </div>
+    </div>
+</div>
+
+{# ---- FILTERS ---- #}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-body">
+        <form method="get" action="/caregap/panel" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+            <div>
+                <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Min Age</label>
+                <input type="number" name="min_age" value="{{ min_age or '' }}" class="form-control" style="width:80px;" placeholder="0" min="0" max="120">
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Max Age</label>
+                <input type="number" name="max_age" value="{{ max_age or '' }}" class="form-control" style="width:80px;" placeholder="120" min="0" max="120">
+            </div>
+            <div>
+                <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Sex</label>
+                <select name="sex" class="form-control" style="width:100px;">
+                    <option value="">All</option>
+                    <option value="male" {% if sex_filter == 'male' %}selected{% endif %}>Male</option>
+                    <option value="female" {% if sex_filter == 'female' %}selected{% endif %}>Female</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+            <a href="/caregap/panel" class="btn btn-secondary btn-sm">Clear</a>
+        </form>
+    </div>
+</div>
+
+{# ---- TAB BAR ---- #}
+<div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border,#e2e8f0);align-items:center;">
+    <button class="panel-tab active" id="tab-summary" onclick="showView('summary')" style="padding:10px 20px;font-size:14px;font-weight:600;text-decoration:none;color:var(--color-navy);border:none;background:none;border-bottom:3px solid var(--color-navy);margin-bottom:-2px;cursor:pointer;">Summary</button>
+    <button class="panel-tab" id="tab-spreadsheet" onclick="showView('spreadsheet')" style="padding:10px 20px;font-size:14px;font-weight:400;text-decoration:none;color:var(--text-secondary);border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;">Spreadsheet</button>
+    <button class="panel-tab" id="tab-claimed" onclick="showView('claimed')" style="padding:10px 20px;font-size:14px;font-weight:400;text-decoration:none;color:var(--text-secondary);border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;">&#128100; Claimed Patients</button>
+    <span style="flex:1;"></span>
+    <a href="/caregap/panel/csv{% if claimed_only %}?claimed=1{% endif %}" class="btn btn-secondary btn-sm" style="margin-bottom:4px;" title="Export spreadsheet as CSV">&#128190; CSV Export</a>
+    <a href="/caregap/panel/csv?claimed=1" class="btn btn-secondary btn-sm" style="margin-bottom:4px;margin-left:6px;" title="Export claimed patients CSV">&#128190; Claimed CSV</a>
+</div>
+
+{# ---- GAP SUMMARY TABLE (default view) ---- #}
+<div id="view-summary">
+<div class="card">
+    <div class="card-header">
+        Gap Coverage — Sorted by Worst Coverage First
+    </div>
+    {% if summary %}
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+        <table class="schedule-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Gap</th>
+                    <th style="text-align:center;">Patients Due</th>
+                    <th style="text-align:center;">Covered</th>
+                    <th style="text-align:center;">Total</th>
+                    <th style="width:180px;">Coverage</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in summary %}
+                <tr>
+                    <td style="font-weight:600;">{{ s.gap_name }}</td>
+                    <td style="text-align:center;">
+                        <span class="badge badge--warning">{{ s.due_count }}</span>
+                    </td>
+                    <td style="text-align:center;">{{ s.covered_count }}</td>
+                    <td style="text-align:center;">{{ s.total_in_panel }}</td>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <div style="flex:1;height:16px;background:var(--border,#e0e0e0);border-radius:8px;overflow:hidden;">
+                                <div style="height:100%;width:{{ s.coverage_pct }}%;background:{% if s.coverage_pct >= 80 %}var(--success,#28a745){% elif s.coverage_pct >= 50 %}var(--warning,#ffc107){% else %}var(--danger,#dc3545){% endif %};border-radius:8px;transition:width .3s;"></div>
+                            </div>
+                            <span style="font-size:13px;font-weight:600;min-width:36px;text-align:right;">{{ s.coverage_pct }}%</span>
+                        </div>
+                    </td>
+                    <td>
+                        <a href="/caregap/panel/outreach?gap_type={{ s.gap_type }}" class="btn btn-secondary btn-sm" title="Generate outreach list">
+                            📋 Outreach
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="empty-state">No open care gaps found for your panel. 🎉</p>
+    </div>
+    {% endif %}
+</div>
+</div>
+
+{# ---- SPREADSHEET VIEW ---- #}
+<div id="view-spreadsheet" style="display:none;">
+<div class="card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Patient × Gap Spreadsheet</span>
+        <div style="display:flex;gap:12px;align-items:center;font-size:12px;">
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#22c55e;"></span> Addressed</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#f59e0b;"></span> Declined</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#ef4444;"></span> Open / Due</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#111;color:#fff;text-align:center;font-weight:700;font-size:10px;line-height:14px;">✕</span> N/A</span>
+        </div>
+    </div>
+    {% if spreadsheet_rows and gap_types %}
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:{{ 200 + gap_types|length * 90 }}px;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border,#ddd);">
+                    <th style="padding:10px 12px;text-align:left;position:sticky;left:0;background:var(--card-bg,#fff);z-index:1;min-width:180px;">Patient</th>
+                    {% for gt in gap_types %}
+                    <th style="padding:10px 8px;text-align:center;font-size:11px;max-width:100px;white-space:normal;line-height:1.3;">{{ gap_names_map[gt] }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in spreadsheet_rows %}
+                <tr style="border-bottom:1px solid var(--border,#f1f5f9);">
+                    <td style="padding:8px 12px;position:sticky;left:0;background:var(--card-bg,#fff);z-index:1;">
+                        <a href="/caregap/{{ row.mrn }}" style="text-decoration:none;color:inherit;">
+                            <div style="font-weight:600;">{{ row.name or row.mrn_display }}</div>
+                            <div style="font-size:11px;color:var(--text-secondary);">{{ row.mrn_display }}</div>
+                        </a>
+                    </td>
+                    {% for gt in gap_types %}
+                    {% set cell = row.cells.get(gt) %}
+                    <td style="padding:8px;text-align:center;">
+                        {% if cell == 'addressed' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#22c55e;color:#fff;line-height:28px;font-size:14px;font-weight:700;" title="Addressed">✓</span>
+                        {% elif cell == 'declined' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#f59e0b;color:#fff;line-height:28px;font-size:13px;" title="Declined">—</span>
+                        {% elif cell == 'not_applicable' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#111;color:#fff;line-height:28px;font-size:14px;font-weight:700;" title="N/A">✕</span>
+                        {% elif cell == 'open' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#ef4444;color:#fff;line-height:28px;font-size:14px;font-weight:700;" title="Open – Due">!</span>
+                        {% else %}
+                        <span style="color:var(--text-secondary);font-size:11px;">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="empty-state">No gap data to display. 🎉</p>
+    </div>
+    {% endif %}
+</div>
+</div>
+
+{# ---- CLAIMED PATIENTS VIEW ---- #}
+<div id="view-claimed" style="display:none;">
+<div class="card">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>&#128100; Claimed Patients — Gap Spreadsheet</span>
+        <div style="display:flex;gap:12px;align-items:center;font-size:12px;">
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#22c55e;"></span> Addressed</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#f59e0b;"></span> Declined</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#ef4444;"></span> Open / Due</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:#111;color:#fff;text-align:center;font-weight:700;font-size:10px;line-height:14px;">✕</span> N/A</span>
+        </div>
+    </div>
+    {% if claimed_spreadsheet_rows and gap_types %}
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:{{ 200 + gap_types|length * 90 }}px;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border,#ddd);">
+                    <th style="padding:10px 12px;text-align:left;position:sticky;left:0;background:var(--card-bg,#fff);z-index:1;min-width:180px;">Patient</th>
+                    {% for gt in gap_types %}
+                    <th style="padding:10px 8px;text-align:center;font-size:11px;max-width:100px;white-space:normal;line-height:1.3;">{{ gap_names_map[gt] }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in claimed_spreadsheet_rows %}
+                <tr style="border-bottom:1px solid var(--border,#f1f5f9);">
+                    <td style="padding:8px 12px;position:sticky;left:0;background:var(--card-bg,#fff);z-index:1;">
+                        <a href="/caregap/{{ row.mrn }}" style="text-decoration:none;color:inherit;">
+                            <div style="font-weight:600;">{{ row.name or row.mrn_display }}</div>
+                            <div style="font-size:11px;color:var(--text-secondary);">{{ row.mrn_display }}</div>
+                        </a>
+                    </td>
+                    {% for gt in gap_types %}
+                    {% set cell = row.cells.get(gt) %}
+                    <td style="padding:8px;text-align:center;">
+                        {% if cell == 'addressed' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#22c55e;color:#fff;line-height:28px;font-size:14px;font-weight:700;" title="Addressed">✓</span>
+                        {% elif cell == 'declined' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#f59e0b;color:#fff;line-height:28px;font-size:13px;" title="Declined">—</span>
+                        {% elif cell == 'not_applicable' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#111;color:#fff;line-height:28px;font-size:14px;font-weight:700;" title="N/A">✕</span>
+                        {% elif cell == 'open' %}
+                        <span style="display:inline-block;width:28px;height:28px;border-radius:6px;background:#ef4444;color:#fff;line-height:28px;font-size:14px;font-weight:700;" title="Open – Due">!</span>
+                        {% else %}
+                        <span style="color:var(--text-secondary);font-size:11px;">—</span>
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-body" style="padding:8px 16px;border-top:1px solid var(--border,#e2e8f0);font-size:12px;color:var(--text-secondary);">
+        {{ claimed_spreadsheet_rows|length }} claimed patient{{ 's' if claimed_spreadsheet_rows|length != 1 else '' }}
+    </div>
+    {% else %}
+    <div class="card-body">
+        <p class="empty-state">No claimed patients with gap data. Claim patients from the patient chart to track them here.</p>
+    </div>
+    {% endif %}
+</div>
+</div>
+
+<script>
+function showView(view) {
+    document.getElementById('view-summary').style.display = (view === 'summary') ? '' : 'none';
+    document.getElementById('view-spreadsheet').style.display = (view === 'spreadsheet') ? '' : 'none';
+    document.getElementById('view-claimed').style.display = (view === 'claimed') ? '' : 'none';
+    var tabs = document.querySelectorAll('.panel-tab');
+    tabs.forEach(function(t) {
+        t.style.fontWeight = '400';
+        t.style.color = 'var(--text-secondary)';
+        t.style.borderBottom = '3px solid transparent';
+        t.classList.remove('active');
+    });
+    var active = document.getElementById('tab-' + view);
+    if (active) {
+        active.style.fontWeight = '600';
+        active.style.color = 'var(--color-navy)';
+        active.style.borderBottom = '3px solid var(--color-navy)';
+        active.classList.add('active');
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Timer — NP Companion{% endblock %}
+{% block page_id %}timer{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+    <h1 style="margin:0;">Visit Timer</h1>
+    <a href="/timer/export" class="btn btn-sm btn-outline" title="Export CSV">&#128190; Export CSV</a>
+</div>
+
+{# ---- Active Session Card ---- #}
+<div class="card" style="max-width:720px;margin-bottom:24px;">
+    <div class="card-header">Active Session</div>
+    <div class="card-body" id="active-session">
+        {% if active_session %}
+        <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+            <div>
+                <div style="font-size:13px;color:var(--text-secondary);">Patient</div>
+                <div style="font-size:20px;font-weight:600;">****{{ active_session.mrn[-4:] if active_session.mrn and active_session.mrn|length >= 4 else active_session.mrn }}</div>
+            </div>
+            <div>
+                <div style="font-size:13px;color:var(--text-secondary);">Duration</div>
+                <div style="font-size:20px;font-weight:600;" id="active-duration">--:--</div>
+            </div>
+            <div>
+                <div style="font-size:13px;color:var(--text-secondary);">F2F Time</div>
+                <div style="font-size:20px;font-weight:600;" id="f2f-duration">--:--</div>
+            </div>
+            <div>
+                <div style="font-size:13px;color:var(--text-secondary);">Status</div>
+                <div id="active-status" style="font-size:14px;">
+                    <span class="badge badge--success">Recording</span>
+                </div>
+            </div>
+            <div>
+                {% if active_session.face_to_face_start and not active_session.face_to_face_end %}
+                <form method="POST" action="/timer/face/stop" style="display:inline;">
+                    <button type="submit" class="btn btn-primary" style="min-height:44px;font-size:15px;">&#128421; Back at Desk</button>
+                </form>
+                {% else %}
+                <form method="POST" action="/timer/face/start" style="display:inline;">
+                    <button type="submit" class="btn btn-outline" style="min-height:44px;font-size:15px;">&#128075; Leaving Desk</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% if active_session.visit_type %}
+        <div style="margin-top:8px;font-size:13px;color:var(--text-secondary);">
+            Visit Type: <strong>{{ active_session.visit_type }}</strong>
+            {% if active_session.visit_type_source == 'auto' %}
+            <span class="badge badge--info" style="font-size:11px;">Auto</span>
+            {% elif active_session.visit_type_source == 'manual' %}
+            <span class="badge" style="font-size:11px;background:var(--bg-secondary);">Manual</span>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% else %}
+        <p style="color:var(--text-secondary);margin:0;">No active session. Open a patient chart in Amazing Charts to start tracking.</p>
+        {% endif %}
+    </div>
+</div>
+
+{# ---- Daily Summary ---- #}
+<div class="card" style="max-width:720px;margin-bottom:24px;">
+    <div class="card-header">Daily Summary</div>
+    <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;margin-bottom:16px;">
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;">{{ session_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Sessions</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;">{{ '%d:%02d' % (total_duration // 3600, (total_duration % 3600) // 60) }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Total Time</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;">{{ '%d:%02d' % (avg_duration // 60, avg_duration % 60) }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Avg Duration</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;">{{ '%d:%02d' % (total_f2f // 3600, (total_f2f % 3600) // 60) }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Total F2F</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;">{{ complex_count }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Complex</div>
+            </div>
+        </div>
+        {# E&M Distribution bar chart #}
+        {% if em_dist %}
+        <div style="margin-top:8px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px;">E&M Distribution</div>
+            <div style="display:flex;gap:4px;height:28px;border-radius:6px;overflow:hidden;">
+                {% set colors = {'99211':'#94a3b8','99212':'#60a5fa','99213':'#34d399','99214':'#fbbf24','99215':'#f87171','99201':'#c4b5fd','99202':'#67e8f9','99203':'#86efac','99204':'#fcd34d','99205':'#fca5a5','AWV':'#a78bfa','Unbilled':'#e2e8f0'} %}
+                {% for lvl, cnt in em_dist.items() %}
+                <div style="flex:{{ cnt }};background:{{ colors.get(lvl, '#cbd5e1') }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#1e293b;min-width:30px;" title="{{ lvl }}: {{ cnt }}">
+                    {{ lvl }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# ---- E&M Calculator Widget (F14a — Inline) ---- #}
+<div class="card" style="max-width:720px;margin-bottom:24px;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        E&M Level Calculator
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('em-widget').style.display = document.getElementById('em-widget').style.display === 'none' ? 'block' : 'none'">
+            &#128170; Quick Calc
+        </button>
+    </div>
+    <div class="card-body" id="em-widget" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+                <label style="font-size:13px;font-weight:500;">MDM Complexity</label>
+                <select id="em-mdm" class="form-control" style="font-size:13px;">
+                    <option value="straightforward">Straightforward</option>
+                    <option value="low" selected>Low</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:13px;font-weight:500;">Total Time (min)</label>
+                <input type="number" id="em-time" class="form-control" min="0" max="300" value="0" style="font-size:13px;">
+            </div>
+        </div>
+        <button onclick="calcEM()" class="btn btn-primary" style="min-height:44px;font-size:14px;">Calculate</button>
+        <a href="/billing/em-calculator" style="margin-left:12px;font-size:12px;color:var(--color-navy);">Full Calculator &rarr;</a>
+
+        <div id="em-result" style="display:none;margin-top:12px;padding:12px;background:var(--bg-secondary,#f8fafc);border-radius:6px;">
+            <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;">
+                <div>
+                    <div style="font-size:28px;font-weight:700;color:var(--color-navy);" id="em-result-code">—</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Recommended</div>
+                </div>
+                <div>
+                    <div style="font-size:20px;font-weight:700;" id="em-result-rvu">—</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">wRVU</div>
+                </div>
+                <div style="font-size:12px;color:var(--text-secondary);" id="em-result-detail"></div>
+                {% if active_session %}
+                <button onclick="useThisLevel()" class="btn btn-outline" style="margin-left:auto;font-size:13px;min-height:44px;" id="em-use-btn" title="Apply this level to the active session">Use This Level</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Manual Entry Card ---- #}
+<div class="card" style="max-width:720px;margin-bottom:24px;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        Manual Entry
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('manual-form').style.display = document.getElementById('manual-form').style.display === 'none' ? 'block' : 'none'">
+            &#9998; New Entry
+        </button>
+    </div>
+    <div class="card-body">
+        <form id="manual-form" method="POST" action="/timer/manual" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                    <label style="font-size:13px;font-weight:500;">MRN</label>
+                    <input type="text" name="mrn" class="form-control" required placeholder="Patient MRN">
+                </div>
+                <div>
+                    <label style="font-size:13px;font-weight:500;">Visit Type</label>
+                    <select name="visit_type" class="form-control">
+                        <option value="">Select...</option>
+                        {% for val, label in visit_types %}
+                        <option value="{{ val }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:13px;font-weight:500;">Session Start</label>
+                    <input type="datetime-local" name="session_start" class="form-control" required>
+                </div>
+                <div>
+                    <label style="font-size:13px;font-weight:500;">Session End</label>
+                    <input type="datetime-local" name="session_end" class="form-control" required>
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label style="font-size:13px;font-weight:500;">Notes</label>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Billing notes (optional)"></textarea>
+                </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;">
+                <button type="submit" class="btn btn-primary">Save Entry</button>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('manual-form').style.display='none'">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ---- Today's Sessions ---- #}
+<div class="card" style="max-width:1100px;">
+    <div class="card-header">Today's Sessions</div>
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+        {% if sessions %}
+        <table class="table" style="margin:0;font-size:13px;">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Patient</th>
+                    <th>Time</th>
+                    <th>Duration</th>
+                    <th>Visit Type</th>
+                    <th>F2F</th>
+                    <th>Billing Level</th>
+                    <th>Complex</th>
+                    <th>Notes</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for s in sessions %}
+                <tr>
+                    <td>{% if s.manual_entry %}&#9998;{% endif %}</td>
+                    <td>****{{ s.mrn[-4:] if s.mrn and s.mrn|length >= 4 else s.mrn }}</td>
+                    <td style="white-space:nowrap;">
+                        {{ s.session_start.strftime('%I:%M %p') if s.session_start else '--' }}
+                        –
+                        {% if s.session_end %}
+                            {{ s.session_end.strftime('%I:%M %p') }}
+                        {% else %}
+                            <span class="badge badge--success">Active</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ '%d:%02d' % (s.duration_seconds // 60, s.duration_seconds % 60) if s.duration_seconds else '--' }}</td>
+                    <td>
+                        {{ s.visit_type or '--' }}
+                        {% if s.visit_type_source == 'auto' %}
+                        <span class="badge badge--info" style="font-size:10px;">Auto</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ '%d:%02d' % (s.face_to_face_seconds // 60, s.face_to_face_seconds % 60) if s.face_to_face_seconds else '--' }}</td>
+                    <td>
+                        <form method="POST" action="/timer/{{ s.id }}/annotate" style="display:inline;">
+                            <select name="billed_level" class="form-control" style="width:90px;font-size:12px;padding:2px 4px;" onchange="this.form.submit()">
+                                <option value="">--</option>
+                                {% for lvl in billing_levels %}
+                                <option value="{{ lvl }}" {{ 'selected' if s.billed_level == lvl else '' }}>{{ lvl }}</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
+                    <td style="text-align:center;">
+                        <form method="POST" action="/timer/{{ s.id }}/flag-complex" style="display:inline;" id="complex-form-{{ s.id }}">
+                            <button type="{% if s.is_complex %}submit{% else %}button{% endif %}" class="btn btn-sm {{ 'btn-primary' if s.is_complex else 'btn-outline' }}" style="min-width:32px;font-size:13px;" {% if not s.is_complex %}onclick="promptComplex({{ s.id }})"{% endif %} title="{{ s.complexity_notes if s.is_complex else 'Flag as complex' }}">
+                                {% if s.is_complex %}&#9733;{% else %}&#9734;{% endif %}
+                            </button>
+                            <input type="hidden" name="complexity_notes" id="complex-notes-{{ s.id }}" value="">
+                        </form>
+                    </td>
+                    <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ s.billing_notes or '' }}">{{ s.billing_notes or '--' }}</td>
+                    <td style="white-space:nowrap;">
+                        {% if s.manual_entry %}
+                        <form method="POST" action="/timer/{{ s.id }}/delete" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-outline" title="Delete" onclick="return confirm('Delete this session?')">&#128465;</button>
+                        </form>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline" title="Add Note" onclick="promptNote({{ s.id }})">&#128221;</button>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="padding:16px;color:var(--text-secondary);margin:0;">No sessions recorded today.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Poll timer status every 3 seconds
+(function() {
+    function fmt(secs) {
+        var m = Math.floor(secs / 60);
+        var s = secs % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+    function poll() {
+        fetch('/api/timer-status')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var el = document.getElementById('active-duration');
+                var st = document.getElementById('active-status');
+                var f2f = document.getElementById('f2f-duration');
+                if (el && d.active_mrn) {
+                    el.textContent = fmt(d.duration_seconds);
+                    if (f2f) f2f.textContent = fmt(d.f2f_seconds || 0);
+                    if (st) {
+                        if (d.f2f_active) {
+                            st.innerHTML = '<span class="badge badge--info">Face-to-Face</span>';
+                        } else if (d.is_idle) {
+                            st.innerHTML = '<span class="badge badge--warning">Idle</span>';
+                        } else {
+                            st.innerHTML = '<span class="badge badge--success">Recording</span>';
+                        }
+                    }
+                }
+            })
+            .catch(function(){});
+    }
+    setInterval(poll, 3000);
+    poll();
+})();
+
+function promptNote(id) {
+    var note = prompt('Enter billing note:');
+    if (note === null) return;
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/timer/' + id + '/note';
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'notes';
+    input.value = note;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function promptComplex(id) {
+    var note = prompt('Complexity notes (optional):');
+    if (note === null) return;
+    document.getElementById('complex-notes-' + id).value = note;
+    document.getElementById('complex-form-' + id).submit();
+}
+
+// F14a — Inline E&M calculator
+var _emSuggestedCode = '';
+function calcEM() {
+    var mdm = document.getElementById('em-mdm').value;
+    var mins = parseInt(document.getElementById('em-time').value) || 0;
+    fetch('/billing/em-calculate-json', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mdm_level: mdm, total_minutes: mins})
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        _emSuggestedCode = d.suggested_code;
+        document.getElementById('em-result-code').textContent = d.suggested_code;
+        document.getElementById('em-result-rvu').textContent = d.rvu;
+        document.getElementById('em-result-detail').textContent = 'Winner: ' + d.method + ' | MDM: ' + d.mdm_code + ' (' + d.mdm_rvu + ') | Time: ' + d.time_code + ' (' + d.time_rvu + ')';
+        document.getElementById('em-result').style.display = 'block';
+    })
+    .catch(function(){});
+}
+
+function useThisLevel() {
+    if (!_emSuggestedCode) return;
+    // Find the active session's billing level selector and set it
+    var selects = document.querySelectorAll('select[name="billed_level"]');
+    if (selects.length > 0) {
+        var sel = selects[0]; // First row = most recent / active
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === _emSuggestedCode) {
+                sel.selectedIndex = i;
+                sel.form.submit();
+                return;
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

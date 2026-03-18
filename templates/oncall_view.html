@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}On-Call Note — NP Companion{% endblock %}
+{% block page_id %}oncall-view{% endblock %}
+
+{% block content %}
+<div style="max-width:640px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <h1 style="font-size:20px;margin:0;">On-Call Note</h1>
+        <a href="/oncall" class="btn btn-outline btn-sm">&larr; Back</a>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>{{ note.call_time.strftime('%m/%d/%Y %I:%M %p') if note.call_time else 'Unknown' }}</span>
+            {% if note.documentation_status == 'pending' %}
+            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-danger,#fee2e2);color:var(--text-danger,#dc2626);">Pending</span>
+            {% elif note.documentation_status == 'entered' %}
+            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-success,#dcfce7);color:var(--text-success,#166534);">Entered</span>
+            {% else %}
+            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);">No Doc Needed</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <table style="width:100%;font-size:14px;">
+                <tr>
+                    <td style="font-weight:500;width:140px;padding:6px 0;">Patient</td>
+                    <td>{{ note.patient_identifier or '—' }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:500;padding:6px 0;">Chief Complaint</td>
+                    <td>{{ note.chief_complaint or '—' }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:500;padding:6px 0;">Recommendation</td>
+                    <td>{{ note.recommendation or '—' }}</td>
+                </tr>
+                {% if note.callback_promised %}
+                <tr>
+                    <td style="font-weight:500;padding:6px 0;">Callback</td>
+                    <td>
+                        By {{ note.callback_by.strftime('%m/%d %I:%M %p') if note.callback_by else 'TBD' }}
+                        {% if note.callback_completed %}
+                        <span style="color:var(--text-success,#166534);">&#9989; Completed</span>
+                        {% else %}
+                        <span style="color:var(--color-warning,#f59e0b);">Pending</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endif %}
+                {% if note.note_content %}
+                <tr>
+                    <td style="font-weight:500;padding:6px 0;vertical-align:top;">Notes</td>
+                    <td style="white-space:pre-wrap;">{{ note.note_content }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+    {# Edit form #}
+    <details style="margin-bottom:16px;">
+        <summary class="btn btn-outline btn-sm" style="cursor:pointer;min-height:44px;display:inline-flex;align-items:center;">Edit Note</summary>
+        <form method="POST" action="/oncall/{{ note.id }}/edit" style="margin-top:12px;">
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Chief Complaint</label>
+                <input type="text" name="chief_complaint" class="form-control" value="{{ note.chief_complaint }}" style="min-height:44px;font-size:16px;width:100%;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Patient Identifier</label>
+                <input type="text" name="patient_identifier" class="form-control" value="{{ note.patient_identifier }}" style="min-height:44px;font-size:16px;width:100%;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Recommendation</label>
+                <textarea name="recommendation" class="form-control" style="min-height:80px;font-size:16px;resize:vertical;width:100%;">{{ note.recommendation }}</textarea>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Additional Notes</label>
+                <textarea name="note_content" class="form-control" style="min-height:80px;font-size:16px;resize:vertical;width:100%;">{{ note.note_content }}</textarea>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:13px;margin-bottom:8px;">Callback Promised?</label>
+                <label style="margin-right:12px;font-size:16px;cursor:pointer;"><input type="radio" name="callback_promised" value="no" {{ '' if note.callback_promised else 'checked' }}> No</label>
+                <label style="font-size:16px;cursor:pointer;"><input type="radio" name="callback_promised" value="yes" {{ 'checked' if note.callback_promised else '' }}> Yes</label>
+            </div>
+            {% if note.callback_promised %}
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-weight:600;font-size:13px;margin-bottom:4px;">Callback By</label>
+                <input type="datetime-local" name="callback_by" class="form-control" style="min-height:44px;font-size:16px;width:100%;" value="{{ note.callback_by.strftime('%Y-%m-%dT%H:%M') if note.callback_by else '' }}">
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary" style="width:100%;min-height:44px;font-size:16px;">Save Changes</button>
+        </form>
+    </details>
+
+    <div style="display:flex;gap:8px;">
+        <a href="/oncall/export/{{ note.id }}" class="btn btn-outline" style="min-height:44px;flex:1;display:flex;align-items:center;justify-content:center;">Export for AC</a>
+        {% if note.documentation_status == 'pending' %}
+        <form method="POST" action="/oncall/{{ note.id }}/status" style="flex:1;">
+            <input type="hidden" name="status" value="entered">
+            <button type="submit" class="btn btn-outline" style="min-height:44px;width:100%;">&#9989; Mark Entered</button>
+        </form>
+        {% endif %}
+        {% if note.callback_promised and not note.callback_completed %}
+        <form method="POST" action="/oncall/{{ note.id }}/complete-callback" style="flex:1;">
+            <button type="submit" class="btn btn-outline" style="min-height:44px;width:100%;">&#128222; Callback Done</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
