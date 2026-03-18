@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Controlled Substance Tracker — NP Companion{% endblock %}
+{% block page_id %}cs-tracker{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Controlled Substance Tracker</h1>
+    <span class="badge badge--success">F25</span>
+    <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-modal').style.display='flex'">+ Add Entry</button>
+    <a href="/cs-tracker/calculator" class="btn btn-outline btn-sm">Refill Calculator</a>
+</div>
+
+{% if entries %}
+<div class="card">
+    <div class="card-body" style="padding:0;overflow-x:auto;">
+        <table class="schedule-table" style="font-size:13px;">
+            <thead>
+                <tr>
+                    <th>Patient</th>
+                    <th>Drug</th>
+                    <th>Schedule</th>
+                    <th>Dose</th>
+                    <th>Days Supply</th>
+                    <th>Last Fill</th>
+                    <th>Next Fill</th>
+                    <th>Refill Status</th>
+                    <th>PDMP</th>
+                    <th>UDS</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                <tr>
+                    <td style="font-weight:500;">{{ e.patient_name or e.mrn }}</td>
+                    <td style="font-weight:600;">{{ e.drug_name }}</td>
+                    <td>{% if e.dea_schedule %}<span class="badge badge--danger">C-{{ e.dea_schedule }}</span>{% else %}—{% endif %}</td>
+                    <td>{{ e.dose or '—' }}</td>
+                    <td>{{ e.days_supply }}d</td>
+                    <td>{{ e.last_fill_date.strftime('%m/%d/%Y') if e.last_fill_date else '—' }}</td>
+                    <td>{{ e.next_fill_date.strftime('%m/%d/%Y') if e.next_fill_date else '—' }}</td>
+                    <td>
+                        {% set status = e.refill_status %}
+                        {% if status == 'available' %}
+                        <span class="badge badge--success">Available</span>
+                        {% elif status == 'too_early' %}
+                        <span class="badge badge--danger">{{ e.days_until_refill }}d early</span>
+                        {% else %}
+                        <span class="badge badge--muted">Unknown</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if e.pdmp_due %}
+                        <span class="badge badge--warning" title="PDMP check due">DUE</span>
+                        {% else %}
+                        <span class="badge badge--success" title="Last: {{ e.last_pdmp_check }}">OK</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if e.uds_due %}
+                        <span class="badge badge--warning" title="UDS due">DUE</span>
+                        {% else %}
+                        <span class="badge badge--success" title="Last: {{ e.last_uds_date }}">OK</span>
+                        {% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn btn-sm btn-primary" onclick="recordFill({{ e.id }})" style="font-size:11px;">Fill</button>
+                        <button class="btn btn-sm btn-outline" onclick="recordPDMP({{ e.id }})" style="font-size:11px;" title="Record PDMP check">PDMP</button>
+                        <button class="btn btn-sm btn-outline" onclick="recordUDS({{ e.id }})" style="font-size:11px;" title="Record UDS">UDS</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
+        <p style="font-size:16px;margin-bottom:8px;">No controlled substances tracked</p>
+        <p style="font-size:13px;">Click "+ Add Entry" to start tracking a patient's controlled substance prescription.</p>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Add Entry Modal ---- #}
+<div id="add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:500px;max-width:90vw;max-height:85vh;overflow:auto;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin:0;font-size:18px;">Add Controlled Substance</h2>
+            <button class="btn btn-sm btn-outline" onclick="document.getElementById('add-modal').style.display='none'">&#10005;</button>
+        </div>
+        <form id="add-form">
+            <div class="form-group"><label class="form-label">Patient Name</label><input type="text" name="patient_name" class="form-input" placeholder="Last, First"></div>
+            <div class="form-group"><label class="form-label">MRN</label><input type="text" name="mrn" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Drug Name</label><input type="text" name="drug_name" class="form-input" required placeholder="e.g., Oxycodone 5mg"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label class="form-label">DEA Schedule</label>
+                    <select name="dea_schedule" class="form-input">
+                        <option value="">Auto-detect</option>
+                        <option value="II">Schedule II</option>
+                        <option value="III">Schedule III</option>
+                        <option value="IV">Schedule IV</option>
+                        <option value="V">Schedule V</option>
+                    </select>
+                </div>
+                <div class="form-group"><label class="form-label">Dose</label><input type="text" name="dose" class="form-input" placeholder="e.g., 5mg TID"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label class="form-label">Quantity</label><input type="number" name="quantity" class="form-input" value="90"></div>
+                <div class="form-group"><label class="form-label">Days Supply</label><input type="number" name="days_supply" class="form-input" value="30"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Last Fill Date</label><input type="date" name="last_fill_date" class="form-input"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label class="form-label">PDMP Check Interval (days)</label><input type="number" name="pdmp_interval" class="form-input" value="90"></div>
+                <div class="form-group"><label class="form-label">UDS Interval (days)</label><input type="number" name="uds_interval" class="form-input" value="180"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Notes</label><textarea name="notes" class="form-input" rows="2"></textarea></div>
+            <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Add to Tracker</button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('add-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var fd = new FormData(this);
+    var data = {};
+    fd.forEach(function(v, k) { data[k] = v; });
+    fetch('/cs-tracker/add', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if (d.success) location.reload();
+            else alert(d.error || 'Failed to add');
+        });
+});
+function recordFill(id) {
+    var dt = prompt('Fill date (YYYY-MM-DD, blank=today):');
+    if (dt === null) return;
+    fetch('/cs-tracker/' + id + '/fill', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fill_date:dt})})
+        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+}
+function recordPDMP(id) {
+    if (!confirm('Record PDMP check as of today?')) return;
+    fetch('/cs-tracker/' + id + '/pdmp', {method:'POST'}).then(function(){location.reload();});
+}
+function recordUDS(id) {
+    if (!confirm('Record UDS as of today?')) return;
+    fetch('/cs-tracker/' + id + '/uds', {method:'POST'}).then(function(){location.reload();});
+}
+</script>
+{% endblock %}

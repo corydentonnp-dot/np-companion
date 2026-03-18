@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Prior Authorization — NP Companion{% endblock %}
+{% block page_id %}pa{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Prior Authorization Generator</h1>
+    <span class="badge badge--success">F26</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    {# ---- LEFT: PA Form ---- #}
+    <div>
+        <div class="card">
+            <div class="card-header">New Prior Authorization</div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Drug Name</label>
+                    <input type="text" id="pa-drug" class="form-input" placeholder="e.g., Ozempic, Eliquis..." autocomplete="off">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label class="form-label">Diagnosis</label>
+                        <input type="text" id="pa-diagnosis" class="form-input" placeholder="e.g., Type 2 diabetes">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ICD-10 Code</label>
+                        <input type="text" id="pa-icd10" class="form-input" placeholder="e.g., E11.9">
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label class="form-label">Insurance Payer</label>
+                        <input type="text" id="pa-payer" class="form-input" placeholder="e.g., Anthem BCBS">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Patient Name (optional)</label>
+                        <input type="text" id="pa-patient" class="form-input" placeholder="Last, First">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Failed First-Line Alternatives</label>
+                    <div id="alt-list"></div>
+                    <div style="display:flex;gap:8px;margin-top:4px;">
+                        <input type="text" id="alt-drug-input" class="form-input" placeholder="Drug name" style="flex:1;">
+                        <input type="text" id="alt-reason-input" class="form-input" placeholder="Reason stopped (optional)" style="flex:1;">
+                        <button class="btn btn-outline btn-sm" onclick="addAlt()">+ Add</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Clinical Justification</label>
+                    <textarea id="pa-justification" class="form-input" rows="3" placeholder="Why is this medication medically necessary for this patient?"></textarea>
+                </div>
+
+                <button class="btn btn-primary" onclick="generatePA()" id="pa-gen-btn" style="width:100%;">Generate PA Narrative</button>
+            </div>
+        </div>
+    </div>
+
+    {# ---- RIGHT: Generated Narrative ---- #}
+    <div>
+        <div class="card" id="narrative-card" style="display:none;">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>Generated Narrative</span>
+                <div style="display:flex;gap:6px;">
+                    <button class="btn btn-sm btn-outline" onclick="copyNarrative()">Copy</button>
+                    <button class="btn btn-sm btn-primary" onclick="submitPA()">Mark Submitted</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <textarea id="pa-narrative" class="form-input" rows="12" style="font-size:13px;line-height:1.6;"></textarea>
+                <div id="pa-metadata" style="margin-top:12px;font-size:12px;color:var(--text-secondary);"></div>
+            </div>
+        </div>
+
+        {# ---- PA History ---- #}
+        <div class="card" style="margin-top:16px;">
+            <div class="card-header">PA History ({{ history|length }})</div>
+            <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
+                {% if history %}
+                <table class="schedule-table" style="font-size:12px;">
+                    <thead>
+                        <tr><th>Drug</th><th>Payer</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for pa in history %}
+                        <tr>
+                            <td style="font-weight:500;">{{ pa.drug_name }}</td>
+                            <td>{{ pa.payer_name or '—' }}</td>
+                            <td>{{ pa.created_at.strftime('%m/%d/%Y') if pa.created_at else '—' }}</td>
+                            <td>
+                                {% if pa.status == 'approved' %}
+                                <span class="badge badge--success">Approved</span>
+                                {% elif pa.status == 'denied' %}
+                                <span class="badge badge--danger">Denied</span>
+                                {% elif pa.status == 'submitted' %}
+                                <span class="badge badge--info">Submitted</span>
+                                {% elif pa.status == 'appealed' %}
+                                <span class="badge badge--warning">Appealed</span>
+                                {% else %}
+                                <span class="badge badge--muted">Draft</span>
+                                {% endif %}
+                            </td>
+                            <td style="white-space:nowrap;">
+                                {% if pa.status == 'submitted' %}
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="updatePAStatus({{ pa.id }},'approved')">Approve</button>
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="denyPA({{ pa.id }})">Deny</button>
+                                {% elif pa.status == 'denied' %}
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--color-warning);" onclick="appealPA({{ pa.id }})">Appeal</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">No PA history yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var _alternatives = [];
+var _currentPAId = null;
+
+function addAlt() {
+    var name = document.getElementById('alt-drug-input').value.trim();
+    var reason = document.getElementById('alt-reason-input').value.trim();
+    if (!name) return;
+    _alternatives.push({name: name, reason: reason});
+    document.getElementById('alt-drug-input').value = '';
+    document.getElementById('alt-reason-input').value = '';
+    renderAlts();
+}
+
+function removeAlt(idx) {
+    _alternatives.splice(idx, 1);
+    renderAlts();
+}
+
+function renderAlts() {
+    var el = document.getElementById('alt-list');
+    if (_alternatives.length === 0) { el.innerHTML = ''; return; }
+    var html = '';
+    _alternatives.forEach(function(a, i) {
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;">';
+        html += '<span style="font-weight:500;">' + escHtml(a.name) + '</span>';
+        if (a.reason) html += '<span style="color:var(--text-secondary);">— ' + escHtml(a.reason) + '</span>';
+        html += '<button onclick="removeAlt(' + i + ')" style="background:none;border:none;color:var(--color-red);cursor:pointer;font-size:14px;" title="Remove">&#10005;</button>';
+        html += '</div>';
+    });
+    el.innerHTML = html;
+}
+
+function generatePA() {
+    var btn = document.getElementById('pa-gen-btn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+
+    var data = {
+        drug_name: document.getElementById('pa-drug').value.trim(),
+        diagnosis: document.getElementById('pa-diagnosis').value.trim(),
+        icd10_code: document.getElementById('pa-icd10').value.trim(),
+        payer_name: document.getElementById('pa-payer').value.trim(),
+        patient_name: document.getElementById('pa-patient').value.trim(),
+        failed_alternatives: _alternatives,
+        justification: document.getElementById('pa-justification').value.trim(),
+    };
+
+    fetch('/pa/generate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            btn.disabled = false; btn.textContent = 'Generate PA Narrative';
+            if (d.error) { alert(d.error); return; }
+            _currentPAId = d.id;
+            document.getElementById('pa-narrative').value = d.narrative;
+            var meta = '';
+            if (d.ndc) meta += 'NDC: ' + d.ndc + ' | ';
+            if (d.drug_class) meta += 'Class: ' + d.drug_class + ' | ';
+            if (d.generic_available) meta += 'Generic available | ';
+            document.getElementById('pa-metadata').innerHTML = meta || '';
+            document.getElementById('narrative-card').style.display = '';
+        })
+        .catch(function(){
+            btn.disabled = false; btn.textContent = 'Generate PA Narrative';
+            alert('Generation failed');
+        });
+}
+
+function copyNarrative() {
+    var text = document.getElementById('pa-narrative').value;
+    navigator.clipboard.writeText(text).then(function(){
+        alert('Narrative copied to clipboard');
+    });
+}
+
+function submitPA() {
+    if (!_currentPAId) return;
+    updatePAStatus(_currentPAId, 'submitted');
+}
+
+function updatePAStatus(id, status) {
+    fetch('/pa/' + id + '/status', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status})})
+        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+}
+
+function denyPA(id) {
+    var reason = prompt('Denial reason:');
+    if (reason === null) return;
+    fetch('/pa/' + id + '/status', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'denied',reason:reason})})
+        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+}
+
+function appealPA(id) {
+    fetch('/pa/' + id + '/appeal', {method:'POST'})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if (d.success) {
+                document.getElementById('pa-narrative').value = d.appeal;
+                document.getElementById('narrative-card').style.display = '';
+                _currentPAId = id;
+            }
+        });
+}
+
+function escHtml(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+</script>
+{% endblock %}

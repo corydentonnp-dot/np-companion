@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}ICD-10 Coding Helper — NP Companion{% endblock %}
+{% block page_id %}coding{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">ICD-10 Coding Helper</h1>
+    <span class="badge badge--success">F17</span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 280px;gap:20px;">
+    {# ---- LEFT: Search + Results ---- #}
+    <div>
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-body" style="padding:12px 16px;">
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="code-search" class="form-input" placeholder="Search diagnoses or ICD-10 codes..." style="flex:1;" autocomplete="off">
+                    <button class="btn btn-primary btn-sm" onclick="doSearch()" id="code-search-btn">Search</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="search-results"></div>
+
+        {# Pairing suggestions #}
+        <div id="pairing-section" style="display:none;margin-top:16px;">
+            <div class="card">
+                <div class="card-header">Commonly Paired Codes</div>
+                <div class="card-body" id="pairing-list" style="font-size:13px;"></div>
+            </div>
+        </div>
+
+        {# Specificity reminder #}
+        <div id="specificity-section" style="display:none;margin-top:16px;">
+            <div class="card" style="border-left:3px solid var(--color-warning,#f59e0b);">
+                <div class="card-header" style="color:var(--color-warning);">More Specific Codes Available</div>
+                <div class="card-body" id="specificity-list" style="font-size:13px;"></div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- RIGHT: Favorites ---- #}
+    <div>
+        <div class="card" style="position:sticky;top:16px;">
+            <div class="card-header">Favorites ({{ favorites|length }})</div>
+            <div class="card-body" style="padding:0;max-height:500px;overflow-y:auto;">
+                {% if favorites %}
+                {% for f in favorites %}
+                <div style="padding:8px 14px;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="document.getElementById('code-search').value='{{ f.icd10_code }}';doSearch();">
+                    <div>
+                        <span class="mono" style="font-weight:600;color:var(--color-teal);">{{ f.icd10_code }}</span>
+                        <div style="color:var(--text-secondary);font-size:11px;">{{ f.description[:60] }}</div>
+                    </div>
+                    <span style="font-size:10px;color:var(--text-muted);">{{ f.use_count }}x</span>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div style="padding:16px;text-align:center;color:var(--text-secondary);font-size:13px;">
+                    No favorites yet. Star codes from search results.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var _searchInput = document.getElementById('code-search');
+_searchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
+
+var _debounceTimer = null;
+_searchInput.addEventListener('input', function() {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(doSearch, 300);
+});
+
+function doSearch() {
+    var q = _searchInput.value.trim();
+    if (!q || q.length < 2) return;
+
+    fetch('/coding/search?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            renderResults(data.results || []);
+            renderPairings(data.pairings || []);
+        });
+}
+
+function renderResults(results) {
+    var el = document.getElementById('search-results');
+    if (results.length === 0) {
+        el.innerHTML = '<div class="card"><div class="card-body" style="text-align:center;color:var(--text-secondary);padding:24px;">No results found</div></div>';
+        return;
+    }
+    var html = '<div class="card"><div class="card-body" style="padding:0;">';
+    results.forEach(function(r) {
+        var specBadge = r.needs_specificity ? '<span class="badge badge--warning" style="font-size:10px;margin-left:6px;" title="More specific code may be available">Unspecified</span>' : '';
+        var billBadge = r.is_billable ? '' : '<span class="badge badge--danger" style="font-size:10px;margin-left:6px;">Not billable</span>';
+        var favIcon = r.is_favorite ? '&#9733;' : '&#9734;';
+        var favColor = r.is_favorite ? 'color:var(--color-gold,#f59e0b);' : 'color:var(--text-muted);';
+
+        html += '<div style="padding:10px 14px;border-bottom:1px solid var(--border,#f1f5f9);display:flex;align-items:center;gap:10px;">';
+        html += '<button onclick="toggleFav(\'' + r.code + '\',\'' + escHtml(r.description).replace(/'/g, "\\'") + '\')" style="background:none;border:none;cursor:pointer;font-size:18px;' + favColor + '" title="Toggle favorite">' + favIcon + '</button>';
+        html += '<div style="flex:1;">';
+        html += '<div><span class="mono" style="font-weight:700;color:var(--color-teal);font-size:14px;">' + escHtml(r.code) + '</span>' + specBadge + billBadge + '</div>';
+        html += '<div style="font-size:13px;">' + escHtml(r.description) + '</div>';
+        html += '</div>';
+        html += '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="copyCode(\'' + r.code + '\',\'' + escHtml(r.description).replace(/'/g, "\\'") + '\')" title="Copy to clipboard">Copy</button>';
+        if (r.needs_specificity) {
+            html += '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--color-warning);" onclick="showSpecificity(\'' + r.code + '\')" title="Show more specific codes">Specify</button>';
+        }
+        html += '</div>';
+    });
+    html += '</div></div>';
+    el.innerHTML = html;
+}
+
+function renderPairings(pairings) {
+    var section = document.getElementById('pairing-section');
+    var list = document.getElementById('pairing-list');
+    if (!pairings || pairings.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    var html = '';
+    pairings.forEach(function(p) {
+        var src = p.source === 'history' ? '<span class="badge badge--info" style="font-size:9px;">Your history (' + p.count + 'x)</span>' : '<span class="badge badge--muted" style="font-size:9px;">Clinical</span>';
+        html += '<div style="padding:6px 0;border-bottom:1px solid var(--border,#f1f5f9);display:flex;align-items:center;justify-content:space-between;">';
+        html += '<span class="mono" style="font-weight:600;color:var(--color-teal);">' + escHtml(p.code) + '</span> ' + src;
+        html += '<button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="document.getElementById(\'code-search\').value=\'' + p.code + '\';doSearch();">Look up</button>';
+        html += '</div>';
+    });
+    list.innerHTML = html;
+}
+
+function showSpecificity(code) {
+    fetch('/coding/specificity?code=' + encodeURIComponent(code))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var section = document.getElementById('specificity-section');
+            var list = document.getElementById('specificity-list');
+            var children = data.children || [];
+            if (children.length === 0) { section.style.display = 'none'; return; }
+            section.style.display = 'block';
+            var html = '<p style="margin:0 0 8px;color:var(--text-secondary);">Consider using a more specific code instead of <strong>' + escHtml(code) + '</strong>:</p>';
+            children.forEach(function(c) {
+                html += '<div style="padding:4px 0;display:flex;align-items:center;gap:8px;">';
+                html += '<span class="mono" style="font-weight:600;color:var(--color-teal);">' + escHtml(c.code || c) + '</span>';
+                if (c.description) html += '<span style="font-size:12px;">' + escHtml(c.description) + '</span>';
+                html += '</div>';
+            });
+            list.innerHTML = html;
+        });
+}
+
+function toggleFav(code, desc) {
+    fetch('/coding/favorite', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,description:desc})})
+        .then(function(r){return r.json();}).then(function(d){ doSearch(); });
+}
+
+function copyCode(code, desc) {
+    navigator.clipboard.writeText(code + ' ' + desc).catch(function(){});
+}
+
+function escHtml(s) { if(!s)return''; var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+</script>
+{% endblock %}
