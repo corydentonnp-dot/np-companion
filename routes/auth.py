@@ -368,6 +368,21 @@ def settings_account():
                     db.session.commit()
                     flash('AI assistant settings saved.', 'success')
 
+        # ---- Set clinical intelligence preferences ----------------------
+        elif action == 'set_intelligence_prefs':
+            current_user.set_pref('intel_drug_safety', 'intel_drug_safety' in request.form)
+            current_user.set_pref('intel_guidelines', 'intel_guidelines' in request.form)
+            current_user.set_pref('intel_formulary_gaps', 'intel_formulary_gaps' in request.form)
+            current_user.set_pref('intel_education', 'intel_education' in request.form)
+            try:
+                current_user.set_pref('guideline_publication_years', int(request.form.get('guideline_years', 3)))
+            except (ValueError, TypeError):
+                pass
+            current_user.set_pref('medlineplus_language', request.form.get('medlineplus_language', 'en'))
+            current_user.set_pref('care_gap_grade_threshold', request.form.get('care_gap_grade', 'A+B'))
+            db.session.commit()
+            flash('Intelligence preferences saved.', 'success')
+
         # ---- Set preferred browser --------------------------------------
         elif action == 'set_preferred_browser':
             browser = request.form.get('preferred_browser', 'chrome').strip()

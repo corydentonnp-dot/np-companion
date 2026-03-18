@@ -107,6 +107,24 @@ HTTP_RETRY_BACKOFF_SECONDS = 1.0    # Initial backoff; doubles each retry
 HTTP_USER_AGENT = "NPCompanion/1.1.2 (clinical-workflow; non-commercial)"
 
 # ===========================================================================
+# API KEYS — loaded from config.py (not hardcoded here)
+# ===========================================================================
+# These are read at runtime. If config.py doesn't have them, empty defaults.
+try:
+    import config as _cfg
+    OPENFDA_API_KEY = getattr(_cfg, 'OPENFDA_API_KEY', '')
+    PUBMED_API_KEY = getattr(_cfg, 'PUBMED_API_KEY', '')
+    LOINC_USERNAME = getattr(_cfg, 'LOINC_USERNAME', '')
+    LOINC_PASSWORD = getattr(_cfg, 'LOINC_PASSWORD', '')
+    UMLS_API_KEY = getattr(_cfg, 'UMLS_API_KEY', '')
+except ImportError:
+    OPENFDA_API_KEY = ''
+    PUBMED_API_KEY = ''
+    LOINC_USERNAME = ''
+    LOINC_PASSWORD = ''
+    UMLS_API_KEY = ''
+
+# ===========================================================================
 # CMS BILLING CONSTANTS — Virginia MAC Jurisdiction M
 # ===========================================================================
 # These values are confirmed for CY 2025-2026. Update annually each November

@@ -36,6 +36,16 @@ intel_bp = Blueprint('intelligence', __name__)
 
 
 # ======================================================================
+# API Setup Guide (accessible to all authenticated users)
+# ======================================================================
+@intel_bp.route('/api-setup-guide')
+@login_required
+def api_setup_guide():
+    """Display the provider-facing API setup instructions."""
+    return render_template('api_setup_guide.html')
+
+
+# ======================================================================
 # NEW-A + NEW-F: Drug Safety Panel  (recalls + interactions + monitoring)
 # ======================================================================
 @intel_bp.route('/api/patient/<mrn>/drug-safety')

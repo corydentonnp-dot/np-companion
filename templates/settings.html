@@ -548,6 +548,104 @@ window._applyAccent = function(aid) {
 };
 </script>
 
+{# ================================================================
+   SECTION 5: Clinical Intelligence Preferences
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Clinical Intelligence</h2>
+
+<form method="POST" action="{{ url_for('auth.settings_account') }}">
+    <input type="hidden" name="action" value="set_intelligence_prefs">
+
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">Patient Chart Intelligence Widgets</div>
+        <div class="card-body">
+            <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+                These widgets load automatically on each patient chart using free government APIs.
+                No patient data is sent to external services — only drug names, ICD-10 codes, and lab codes.
+            </p>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="intel_drug_safety" {{ 'checked' if current_user.get_pref('intel_drug_safety', True) }}>
+                    <span>Drug Safety Panel (FDA recalls, interactions, monitoring)</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="intel_guidelines" {{ 'checked' if current_user.get_pref('intel_guidelines', True) }}>
+                    <span>PubMed Clinical Guidelines (recent guidelines for patient's diagnoses)</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="intel_formulary_gaps" {{ 'checked' if current_user.get_pref('intel_formulary_gaps', True) }}>
+                    <span>Formulary Gap Detection (flags missing expected medication classes)</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="intel_education" {{ 'checked' if current_user.get_pref('intel_education', True) }}>
+                    <span>Patient Education (MedlinePlus content for diagnoses &amp; medications)</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">Guideline Preferences</div>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label">Guideline lookback period</label>
+                <select name="guideline_years" class="form-input" style="max-width:200px;">
+                    {% for y in [2, 3, 5, 10] %}
+                    <option value="{{ y }}" {{ 'selected' if current_user.get_pref('guideline_publication_years', 3) == y }}>{{ y }} years</option>
+                    {% endfor %}
+                </select>
+                <p class="form-help">How far back to search PubMed for clinical guidelines.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Patient education language</label>
+                <select name="medlineplus_language" class="form-input" style="max-width:200px;">
+                    <option value="en" {{ 'selected' if current_user.get_pref('medlineplus_language', 'en') == 'en' }}>English</option>
+                    <option value="es" {{ 'selected' if current_user.get_pref('medlineplus_language', 'en') == 'es' }}>Spanish</option>
+                </select>
+                <p class="form-help">Language for MedlinePlus patient education materials.</p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Care gap USPSTF grade threshold</label>
+                <select name="care_gap_grade" class="form-input" style="max-width:200px;">
+                    <option value="A" {{ 'selected' if current_user.get_pref('care_gap_grade_threshold', 'A+B') == 'A' }}>Grade A only</option>
+                    <option value="A+B" {{ 'selected' if current_user.get_pref('care_gap_grade_threshold', 'A+B') == 'A+B' }}>Grade A + B (recommended)</option>
+                    <option value="A+B+C" {{ 'selected' if current_user.get_pref('care_gap_grade_threshold', 'A+B') == 'A+B+C' }}>Grade A + B + C</option>
+                </select>
+                <p class="form-help">Which USPSTF recommendation grades to surface as care gaps.</p>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="margin-bottom:24px;">Save Intelligence Preferences</button>
+</form>
+
+<div class="card" style="margin-bottom:24px;max-width:600px;border-left:3px solid var(--color-teal,#0D7377);">
+    <div class="card-header">About Clinical Intelligence APIs</div>
+    <div class="card-body" style="font-size:13px;">
+        <p style="margin:0 0 8px;">NP Companion uses free, publicly available government APIs to enrich your patient data:</p>
+        <ul style="margin:0;padding-left:20px;line-height:1.8;">
+            <li><strong>RxNorm</strong> (NIH/NLM) — drug name standardization and properties</li>
+            <li><strong>OpenFDA</strong> (FDA) — drug labels, recalls, adverse events</li>
+            <li><strong>ICD-10</strong> (NLM) — diagnosis code lookup and validation</li>
+            <li><strong>PubMed</strong> (NIH) — clinical guideline literature search</li>
+            <li><strong>MedlinePlus</strong> (NLM) — patient education content</li>
+            <li><strong>HealthFinder</strong> (AHRQ) — USPSTF screening recommendations</li>
+            <li><strong>Open-Meteo</strong> — weather for morning briefing</li>
+            <li><strong>CMS PFS</strong> — Medicare billing code rates</li>
+        </ul>
+        <p style="margin:8px 0 0;color:var(--text-secondary);">
+            No patient identifiers (names, MRNs, DOBs) are ever sent to any external API.
+            Only clinical vocabulary (drug names, ICD-10 codes) is transmitted.
+        </p>
+    </div>
+</div>
+
 <style>
 .theme-card:hover            { border-color: var(--color-navy) !important; }
 .theme-card--active          { border-color: var(--color-navy) !important;

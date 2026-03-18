@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}API Setup Guide — NP Companion{% endblock %}
+{% block page_id %}api-setup-guide{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+        <h1 style="margin:0;">API Setup Guide</h1>
+        <span class="badge badge--info">For Providers &amp; IT Staff</span>
+    </div>
+
+    <p style="margin-bottom:24px;color:var(--text-secondary);line-height:1.6;">
+        NP Companion uses free, publicly available government APIs to power its clinical
+        intelligence features. Most APIs require no setup at all. A few optional registrations
+        unlock higher rate limits or additional features. This guide walks through each.
+    </p>
+
+    {# ---- No Setup Required ---- #}
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header" style="background:var(--color-lt-green,#dcfce7);">
+            &#10003; No Setup Required — Works Out of the Box
+        </div>
+        <div class="card-body">
+            <table class="schedule-table" style="font-size:13px;">
+                <thead>
+                    <tr><th>API</th><th>Provider</th><th>What It Does</th><th>Rate Limit</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="font-weight:600;">RxNorm</td>
+                        <td>NIH / NLM</td>
+                        <td>Drug name standardization, generic/brand name lookup, drug properties</td>
+                        <td>20 req/sec</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">RxClass</td>
+                        <td>NIH / NLM</td>
+                        <td>Drug-to-therapeutic class mapping (e.g., which drug class for hypertension)</td>
+                        <td>20 req/sec (shared with RxNorm)</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">ICD-10</td>
+                        <td>NLM Clinical Tables</td>
+                        <td>Diagnosis code lookup, autocomplete, validation</td>
+                        <td>Generous (no published limit)</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">MedlinePlus</td>
+                        <td>NIH / NLM</td>
+                        <td>Patient education content in English and Spanish</td>
+                        <td>No published limit</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">HealthFinder</td>
+                        <td>AHRQ / HHS</td>
+                        <td>USPSTF preventive screening recommendations</td>
+                        <td>No published limit</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">Open-Meteo</td>
+                        <td>Open-Meteo (open source)</td>
+                        <td>Weather for morning briefing</td>
+                        <td>10,000/day</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:600;">CMS PFS</td>
+                        <td>Centers for Medicare &amp; Medicaid</td>
+                        <td>Physician Fee Schedule billing code rates</td>
+                        <td>No published limit</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ---- Optional: OpenFDA ---- #}
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header" style="background:var(--color-lt-yellow,#fef3c7);">
+            &#128273; Optional: OpenFDA API Key (Recommended)
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom:12px;">
+                <strong>What it unlocks:</strong> Higher rate limits for drug label lookups, recall checks, and adverse event queries.
+            </div>
+            <div style="margin-bottom:12px;">
+                <strong>Without key:</strong> 40 requests/minute &nbsp;|&nbsp; <strong>With key:</strong> 240 requests/minute
+            </div>
+            <div style="margin-bottom:12px;">
+                <strong>Features affected:</strong> Drug Safety Panel, Drug Recall Alerts, Morning Briefing recall check
+            </div>
+            <h3 style="font-size:14px;margin:16px 0 8px;">Setup Instructions:</h3>
+            <ol style="line-height:2;font-size:14px;">
+                <li>Go to <a href="https://open.fda.gov/apis/authentication/" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">https://open.fda.gov/apis/authentication/</a></li>
+                <li>Enter your email address in the "Your Email" field</li>
+                <li>Click "Get API Key"</li>
+                <li>Check your email — the API key will arrive within minutes</li>
+                <li>Give the key to your system administrator to add to NP Companion's configuration</li>
+            </ol>
+            <div style="background:var(--bg-muted,#f8fafc);border-radius:6px;padding:10px;font-size:12px;margin-top:8px;">
+                <strong>Cost:</strong> Free &nbsp;|&nbsp; <strong>Time:</strong> ~2 minutes &nbsp;|&nbsp; <strong>Requires:</strong> Email address only
+            </div>
+        </div>
+    </div>
+
+    {# ---- Optional: NCBI / PubMed ---- #}
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header" style="background:var(--color-lt-yellow,#fef3c7);">
+            &#128273; Optional: NCBI / PubMed API Key
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom:12px;">
+                <strong>What it unlocks:</strong> Higher rate limits for PubMed clinical guideline searches.
+            </div>
+            <div style="margin-bottom:12px;">
+                <strong>Without key:</strong> 3 requests/second &nbsp;|&nbsp; <strong>With key:</strong> 10 requests/second
+            </div>
+            <div style="margin-bottom:12px;">
+                <strong>Features affected:</strong> Clinical Guidelines widget, Morning Briefing guideline pre-load
+            </div>
+            <h3 style="font-size:14px;margin:16px 0 8px;">Setup Instructions:</h3>
+            <ol style="line-height:2;font-size:14px;">
+                <li>Go to <a href="https://www.ncbi.nlm.nih.gov/account/" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">https://www.ncbi.nlm.nih.gov/account/</a></li>
+                <li>Create a free NCBI account or sign in</li>
+                <li>After logging in, go to <strong>Settings</strong> (top right menu)</li>
+                <li>Scroll down to <strong>"API Key Management"</strong></li>
+                <li>Click <strong>"Create an API Key"</strong></li>
+                <li>Copy the generated key</li>
+                <li>Give the key to your system administrator</li>
+            </ol>
+            <div style="background:var(--bg-muted,#f8fafc);border-radius:6px;padding:10px;font-size:12px;margin-top:8px;">
+                <strong>Cost:</strong> Free &nbsp;|&nbsp; <strong>Time:</strong> ~5 minutes &nbsp;|&nbsp; <strong>Requires:</strong> NCBI account (email + password)
+            </div>
+        </div>
+    </div>
+
+    {# ---- Optional: LOINC ---- #}
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header" style="background:var(--color-lt-yellow,#fef3c7);">
+            &#128273; Optional: LOINC Account (For Lab Reference Ranges)
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom:12px;">
+                <strong>What it unlocks:</strong> Lab test identification, reference ranges, panel grouping via the LOINC FHIR API.
+            </div>
+            <div style="margin-bottom:12px;">
+                <strong>Features affected:</strong> Lab Tracker reference ranges, Abnormal Lab Interpretation Assistant (future)
+            </div>
+            <h3 style="font-size:14px;margin:16px 0 8px;">Setup Instructions:</h3>
+            <ol style="line-height:2;font-size:14px;">
+                <li>Go to <a href="https://loinc.org/get-started/" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">https://loinc.org/get-started/</a></li>
+                <li>Click "Create a free account"</li>
+                <li>Fill in the registration form (name, email, organization, intended use)</li>
+                <li>For "intended use" select "Clinical/Healthcare"</li>
+                <li>Confirm your email and set a password</li>
+                <li>Your LOINC username and password are used for API access</li>
+            </ol>
+            <div style="background:var(--bg-muted,#f8fafc);border-radius:6px;padding:10px;font-size:12px;margin-top:8px;">
+                <strong>Cost:</strong> Free &nbsp;|&nbsp; <strong>Time:</strong> ~5 minutes &nbsp;|&nbsp; <strong>Requires:</strong> Email, name, organization
+            </div>
+        </div>
+    </div>
+
+    {# ---- Optional: UMLS ---- #}
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-header" style="background:var(--color-lt-yellow,#fef3c7);">
+            &#128273; Optional: UMLS License (For Advanced Terminology)
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom:12px;">
+                <strong>What it unlocks:</strong> Cross-terminology mapping (SNOMED ↔ ICD-10 ↔ RxNorm ↔ LOINC), differential diagnosis support.
+            </div>
+            <div style="margin-bottom:12px;">
+                <strong>Features affected:</strong> Coding Suggester code pairing, Differential Diagnosis Widget (future)
+            </div>
+            <h3 style="font-size:14px;margin:16px 0 8px;">Setup Instructions:</h3>
+            <ol style="line-height:2;font-size:14px;">
+                <li>Go to <a href="https://uts.nlm.nih.gov/uts/" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">https://uts.nlm.nih.gov/uts/</a></li>
+                <li>Click "Sign In" — you can use login.gov, Google, or Microsoft</li>
+                <li>After authentication, NLM will show a license request form</li>
+                <li>Complete the form — indicate clinical use</li>
+                <li>Wait for NLM review (up to 3 business days)</li>
+                <li>Once approved, go to "My Profile" → "UMLS Licensee Profile" to find your API key</li>
+            </ol>
+            <div style="background:var(--bg-muted,#f8fafc);border-radius:6px;padding:10px;font-size:12px;margin-top:8px;">
+                <strong>Cost:</strong> Free &nbsp;|&nbsp; <strong>Time:</strong> 5 min registration + up to 3 business days review &nbsp;|&nbsp; <strong>Requires:</strong> login.gov / Google / Microsoft account
+            </div>
+        </div>
+    </div>
+
+    {# ---- HIPAA Note ---- #}
+    <div style="font-size:12px;color:var(--text-secondary);padding:16px;background:var(--bg-muted,#f8fafc);border-radius:6px;margin-bottom:24px;">
+        <strong>HIPAA Compliance:</strong> NP Companion NEVER sends patient-identifiable information
+        to any external API. All API requests contain only clinical vocabulary terms (drug names,
+        ICD-10 codes, LOINC codes). No patient names, MRNs, dates of birth, or other identifiers
+        leave the local system. All data enrichment happens locally after API responses are cached.
+    </div>
+
+    <a href="/settings/account" class="btn btn-outline">Back to Settings</a>
+</div>
+{% endblock %}
