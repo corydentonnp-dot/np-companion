@@ -9,10 +9,13 @@
         <h1 class="pt-name">{{ record.patient_name if record else 'Unknown Patient' }}</h1>
         <button class="btn-icon" id="edit-demo-btn" onclick="toggleDemoEdit()" title="Edit demographics" style="margin-left:8px;font-size:14px;background:none;border:none;cursor:pointer;opacity:0.6;">&#9998;</button>
         <div class="pt-meta" id="pt-meta-display">
-            {% if record and record.patient_dob and record.patient_dob|length >= 8 %}
-            <span title="Date of birth">DOB: {{ record.patient_dob[4:6] }}/{{ record.patient_dob[6:8] }}/{{ record.patient_dob[:4] }}</span>
-            {% elif record and record.patient_dob %}
+            {% if record and record.patient_dob %}
+                {% set dob = record.patient_dob|replace('-','')|replace('/','')|trim %}
+                {% if dob|length >= 8 %}
+            <span title="Date of birth">DOB: {{ dob[4:6] }}-{{ dob[6:8] }}-{{ dob[:4] }}</span>
+                {% else %}
             <span title="Date of birth">DOB: {{ record.patient_dob }}</span>
+                {% endif %}
             {% endif %}
             {% if age_str %}<span>{{ age_str }}</span>{% endif %}
             {% if record and record.patient_sex %}<span title="Sex">{{ record.patient_sex }}</span>{% endif %}
@@ -101,7 +104,7 @@
                     {% for m in medications %}
                     {% set rx = m.rx_info %}
                     <tr data-status="{{ m.status }}" class="{% if m.status != 'active' %}row-inactive{% endif %}">
-                        <td class="fw-500 cell-clip" title="{{ m.drug_name }}"><a href="https://www.uptodate.com/contents/{{ (rx.generic_name if rx and rx.generic_name else m.drug_name.split()[0])|lower }}-drug-information" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">{{ rx.brand_name if rx and rx.brand_name else m.drug_name.split()[0] }}</a></td>
+                        <td class="fw-500 cell-clip" title="{{ m.drug_name }}"><a href="https://www.uptodate.com/contents/search?search={{ (rx.generic_name if rx and rx.generic_name else m.drug_name.split()[0])|urlencode }}+drug+information" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">{{ rx.brand_name if rx and rx.brand_name else m.drug_name.split()[0] }}</a></td>
                         <td class="cell-clip">{{ rx.generic_name if rx and rx.generic_name else '' }}</td>
                         <td>{{ (rx.dose_strength ~ ' ' ~ rx.dose_form) | trim if rx and rx.dose_strength else m.dosage }}</td>
                         <td>{{ m.frequency }}</td>
@@ -325,9 +328,19 @@
                 </thead>
                 <tbody>
                     {% set open_gap_types = care_gaps|rejectattr('is_addressed')|map(attribute='gap_type')|list if care_gaps else [] %}
+                    {% set addressed_gap_types = care_gaps|selectattr('is_addressed')|map(attribute='gap_type')|list if care_gaps else [] %}
                     {% for rec in uspstf_recs %}
                     <tr data-has-gap="{{ 'yes' if rec.name in open_gap_types else 'no' }}">
-                        <td class="fw-500">{{ rec.name }}</td>
+                        <td class="fw-500">
+                            {% if rec.name in open_gap_types %}
+                                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e67e22;margin-right:4px;" title="Care gap — overdue"></span>
+                            {% elif rec.name in addressed_gap_types %}
+                                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#27ae60;margin-right:4px;" title="Addressed"></span>
+                            {% else %}
+                                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--text-muted,#999);margin-right:4px;" title="Not evaluated"></span>
+                            {% endif %}
+                            {{ rec.name }}
+                        </td>
                         <td>{% if rec.interval_days %}Every {{ (rec.interval_days / 365)|round|int }} yr{% endif %}</td>
                         <td class="mono">{{ rec.billing_code or '—' }}</td>
                         <td class="mono">{{ rec.medicare_code or rec.billing_code or '—' }}</td>
@@ -506,7 +519,7 @@
 
 /* ============= WIDGET GRID ============= */
 .widget-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:0 0 40px;}
-.widget{background:var(--bg-surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:10px;display:flex;flex-direction:column;min-height:180px;overflow:hidden;transition:box-shadow 0.15s;position:relative;}
+.widget{background:var(--bg-surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:10px;display:flex;flex-direction:column;min-height:120px;overflow:hidden;transition:box-shadow 0.15s;position:relative;}
 .widget:hover{box-shadow:0 2px 12px rgba(0,0,0,0.06);}
 .widget.widget-dragging{opacity:0.85;box-shadow:0 8px 30px rgba(0,0,0,0.15);z-index:1000;}
 .widget.widget-wide{grid-column:span 2;}
@@ -520,7 +533,7 @@
 .widget-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border,#f1f5f9);background:var(--bg-muted,#f8fafc);flex-shrink:0;user-select:none;}
 .widget-title{font-weight:600;font-size:14px;}
 .widget-controls{display:flex;align-items:center;gap:6px;}
-.widget-body{flex:1;overflow-y:auto;padding:10px 14px;font-size:13px;user-select:text;}
+.widget-body{flex:1;overflow:auto;padding:10px 14px;font-size:13px;user-select:text;min-height:0;}
 .widget-footer-count{margin-top:8px;font-size:11px;color:var(--text-secondary);text-align:right;}
 .widget-empty{color:var(--text-secondary,#64748b);margin:12px 0;text-align:center;font-style:italic;}
 .widget-filter{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#fff);color:var(--text-primary);}
@@ -707,7 +720,9 @@ function toggleItemStatus(badge, mrn, itemType, itemId) {
 
 /* ---- Claim Patient ---- */
 function claimPatient(mrn) {
-    var patientName = document.querySelector('.pt-name') ? document.querySelector('.pt-name').textContent.trim() : '';
+    var rawName = document.querySelector('.pt-name') ? document.querySelector('.pt-name').textContent.trim() : '';
+    // Never send placeholder text as the patient name
+    var patientName = (rawName && rawName.toLowerCase() !== 'unknown patient' && rawName.toLowerCase() !== 'unknown') ? rawName : '';
     fetch('/patient/' + mrn + '/claim', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},

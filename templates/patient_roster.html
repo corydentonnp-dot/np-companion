@@ -11,8 +11,12 @@
 {% if patients %}
 <div class="card">
     <div class="card-body" style="padding:0;">
+        {# Live search input #}
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);">
+            <input type="text" id="roster-search" class="form-input" placeholder="Search patients…" autocomplete="off" style="width:100%;max-width:320px;">
+        </div>
         <div class="table-wrap">
-        <table class="schedule-table">
+        <table class="schedule-table" id="roster-table">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -31,9 +35,18 @@
                         </a>
                     </td>
                     <td style="font-family:monospace;font-size:13px;">
-                        ••{{ p.mrn[-4:] if p.mrn and p.mrn|length >= 4 else p.mrn }}
+                        {{ p.mrn }}
                     </td>
-                    <td>{{ p.patient_dob or '—' }}</td>
+                    <td>
+                        {%- set dob = (p.patient_dob or '')|replace('-','')|replace('/','')|trim -%}
+                        {%- if dob|length >= 8 -%}
+                            {{ dob[4:6] }}-{{ dob[6:8] }}-{{ dob[:4] }}
+                        {%- elif p.patient_dob -%}
+                            {{ p.patient_dob }}
+                        {%- else -%}
+                            —
+                        {%- endif -%}
+                    </td>
                     <td>{{ p.last_xml_parsed.strftime('%m/%d/%Y') if p.last_xml_parsed else '—' }}</td>
                     <td style="font-size:13px;color:var(--text-secondary);">
                         {{ p.claimed_at.strftime('%m/%d/%Y') if p.claimed_at else '—' }}
@@ -45,6 +58,20 @@
         </div>
     </div>
 </div>
+<script>
+(function(){
+    var input = document.getElementById('roster-search');
+    if (!input) return;
+    input.addEventListener('input', function(){
+        var q = this.value.toLowerCase();
+        var rows = document.querySelectorAll('#roster-table tbody tr');
+        for (var i = 0; i < rows.length; i++) {
+            var text = rows[i].textContent.toLowerCase();
+            rows[i].style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
+        }
+    });
+})();
+</script>
 {% else %}
 <div class="card">
     <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">

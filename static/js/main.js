@@ -566,6 +566,29 @@ function initUserPopover() {
    13.  CUSTOM RIGHT-CLICK CONTEXT MENU
    ========================================================== */
 
+/**
+ * Sanitize text before writing to clipboard.
+ * Blocks known API key patterns from being copied to prevent secret leakage.
+ */
+function _safeClipboardWrite(text) {
+    if (!text) return Promise.resolve();
+    // Detect common API key patterns (Anthropic, OpenAI, xAI, generic)
+    var keyPatterns = [
+        /sk-ant-api\S+/i,        // Anthropic
+        /sk-[a-zA-Z0-9]{20,}/,   // OpenAI
+        /xai-[a-zA-Z0-9]{20,}/,  // xAI
+        /pk-[a-zA-Z0-9]{20,}/,   // Generic provider key
+        /key-[a-zA-Z0-9]{20,}/,  // Generic
+    ];
+    for (var i = 0; i < keyPatterns.length; i++) {
+        if (keyPatterns[i].test(text)) {
+            console.warn('[NP Companion] Blocked clipboard write — text matched API key pattern');
+            return Promise.resolve();
+        }
+    }
+    return navigator.clipboard.writeText(text).catch(function(){});
+}
+
 function initContextMenu() {
     var menu = document.getElementById('ctx-menu');
     if (!menu) return;
@@ -660,7 +683,7 @@ function initContextMenu() {
                 document.execCommand('cut');
                 break;
             case 'copy':
-                if (sel) navigator.clipboard.writeText(sel).catch(function(){});
+                if (sel) _safeClipboardWrite(sel);
                 else document.execCommand('copy');
                 break;
             case 'paste':
@@ -678,9 +701,7 @@ function initContextMenu() {
                 break;
             case 'uptodate':
                 if (sel) {
-                    // Extract first word for drug lookup
-                    var drugWord = sel.split(/[\s,]+/)[0].toLowerCase();
-                    openInPreferredBrowser('https://www.uptodate.com/contents/' + encodeURIComponent(drugWord) + '-drug-information');
+                    openInPreferredBrowser('https://www.uptodate.com/contents/search?search=' + encodeURIComponent(sel));
                 }
                 break;
             case 'ai-assist':
@@ -695,10 +716,10 @@ function initContextMenu() {
                 break;
             // Link-specific actions
             case 'copy-link-text':
-                if (_ctxLinkEl) navigator.clipboard.writeText(_ctxLinkEl.textContent.trim()).catch(function(){});
+                if (_ctxLinkEl) _safeClipboardWrite(_ctxLinkEl.textContent.trim());
                 break;
             case 'copy-link-url':
-                if (_ctxLinkEl) navigator.clipboard.writeText(_ctxLinkEl.href).catch(function(){});
+                if (_ctxLinkEl) _safeClipboardWrite(_ctxLinkEl.href);
                 break;
             case 'goto-link':
                 if (_ctxLinkEl) openInPreferredBrowser(_ctxLinkEl.href);
@@ -711,8 +732,8 @@ function initContextMenu() {
                 break;
             case 'uptodate-link':
                 if (_ctxLinkEl) {
-                    var ltWord = _ctxLinkEl.textContent.trim().split(/[\s,]+/)[0].toLowerCase();
-                    if (ltWord) openInPreferredBrowser('https://www.uptodate.com/contents/' + encodeURIComponent(ltWord) + '-drug-information');
+                    var ltText = _ctxLinkEl.textContent.trim();
+                    if (ltText) openInPreferredBrowser('https://www.uptodate.com/contents/search?search=' + encodeURIComponent(ltText));
                 }
                 break;
             case 'ai-link':

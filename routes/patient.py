@@ -362,16 +362,69 @@ def _enrich_rxnorm(rxcui, drug_name_fallback=''):
     return entry
 
 
+def _parse_dose_fallback(drug_name, frequency):
+    """
+    Last-resort dose extraction when RxNorm lookup fails.
+    Parses dose from the drug name string or the Instructions/frequency field.
+    Examples:
+      "Lisinopril 10 MG Tablet" → "10 MG"
+      "take 0.25 mg SQ once a week" → "0.25 mg"
+    Returns (dose_str, form_str) or ('', '').
+    """
+    import re as _re
+    # Try drug_name first (e.g. "Lisinopril 10 MG Oral Tablet")
+    for text in [drug_name, frequency]:
+        if not text:
+            continue
+        m = _re.search(
+            r'(\d+(?:\.\d+)?\s*(?:mg|mcg|ml|units?|%|meq|g|iu)(?:/[\d.]+\s*(?:mg|mcg|ml|hr))?)',
+            text, _re.IGNORECASE
+        )
+        if m:
+            dose = m.group(1).strip()
+            # Try to find form after the dose
+            fm = _re.search(
+                r'(?:mg|mcg|ml|units?|%|meq|g|iu|hr)\s+'
+                r'(oral|injectable|topical|inhalant|nasal|ophthalmic)?\s*'
+                r'(tablet|capsule|solution|suspension|injection|cream|ointment|gel|patch|spray|inhaler|drops|powder|suppository)?',
+                text, _re.IGNORECASE
+            )
+            form = ''
+            if fm:
+                parts = [x for x in [fm.group(1), fm.group(2)] if x]
+                form = ' '.join(parts).strip()
+            return dose, form
+    return '', ''
+
+
 def _enrich_medications(medications):
     """
     Annotate a list of PatientMedication objects with RxNorm data.
     Adds .rx_info attribute to each medication (RxNormCache row or None).
+    When RxNorm lookup fails, falls back to regex-based dose parsing
+    from drug_name or frequency (Instructions) to avoid showing
+    raw quantity in the dose column.
     """
     for med in medications:
         med.rx_info = _enrich_rxnorm(
             getattr(med, 'rxnorm_cui', ''),
             drug_name_fallback=med.drug_name,
         )
+        # Fallback: if no RxNorm dose_strength, try parsing from drug name / frequency
+        if not med.rx_info or not getattr(med.rx_info, 'dose_strength', ''):
+            dose, form = _parse_dose_fallback(med.drug_name, med.frequency)
+            if dose:
+                if not med.rx_info:
+                    # Create a lightweight stand-in object
+                    class _FallbackRx:
+                        pass
+                    med.rx_info = _FallbackRx()
+                    med.rx_info.brand_name = ''
+                    med.rx_info.generic_name = ''
+                    med.rx_info.route = ''
+                    med.rx_info.tty = ''
+                med.rx_info.dose_strength = dose
+                med.rx_info.dose_form = form if form else getattr(med.rx_info, 'dose_form', '')
     return medications
 
 
@@ -439,6 +492,47 @@ def _get_uspstf_recommendations(age, sex):
     return recs
 
 
+def _auto_evaluate_care_gaps(user_id, mrn):
+    """
+    Trigger the USPSTF care gap engine for one patient.
+    Called after XML upload and on chart load when gaps are empty.
+    Fails silently — care gaps are not critical path.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from flask import current_app
+        from agent.caregap_engine import evaluate_and_persist_gaps
+
+        record = PatientRecord.query.filter_by(user_id=user_id, mrn=mrn).first()
+        if not record:
+            return
+
+        diagnoses = PatientDiagnosis.query.filter_by(
+            user_id=user_id, mrn=mrn, status='active'
+        ).all()
+        immunizations = PatientImmunization.query.filter_by(
+            user_id=user_id, mrn=mrn
+        ).all()
+
+        patient_data = {
+            'patient_name': record.patient_name or '',
+            'patient_dob': record.patient_dob or '',
+            'patient_sex': record.patient_sex or '',
+            'diagnoses': [
+                {'name': d.diagnosis_name, 'icd10': d.icd10_code or ''}
+                for d in diagnoses
+            ],
+            'immunizations': [
+                {'name': i.vaccine_name or '', 'date_given': str(i.date_given) if i.date_given else ''}
+                for i in immunizations
+            ],
+        }
+        evaluate_and_persist_gaps(user_id, mrn, patient_data, current_app._get_current_object())
+    except Exception as e:
+        logger.debug('Care gap auto-evaluation failed for %s: %s', mrn, e)
+
+
 # ======================================================================
 # GET /patient/<mrn> — Patient Chart (widget layout)
 # ======================================================================
@@ -483,6 +577,13 @@ def chart(mrn):
     care_gaps = CareGap.query.filter_by(
         user_id=current_user.id, mrn=mrn
     ).all()
+
+    # Auto-evaluate care gaps on first chart load (when none exist yet)
+    if not care_gaps and record and record.last_xml_parsed:
+        _auto_evaluate_care_gaps(current_user.id, mrn)
+        care_gaps = CareGap.query.filter_by(
+            user_id=current_user.id, mrn=mrn
+        ).all()
 
     specialists = PatientSpecialist.query.filter_by(
         user_id=current_user.id, mrn=mrn
@@ -605,6 +706,9 @@ def upload_xml(mrn):
         for diag in PatientDiagnosis.query.filter_by(user_id=current_user.id, mrn=mrn).all():
             diag.diagnosis_category = _classify_diagnosis(diag.diagnosis_name, diag.icd10_code)
         db.session.commit()
+
+        # Evaluate care gaps now that we have fresh clinical data
+        _auto_evaluate_care_gaps(current_user.id, mrn)
 
         sections = [k for k, v in parsed.items() if v and k not in ('patient_name', 'patient_mrn', 'patient_dob')]
         return jsonify({
@@ -835,10 +939,11 @@ def claim_patient(mrn):
         db.session.add(record)
 
     # Populate patient_name if missing
-    if not record.patient_name:
+    _reject_names = {'unknown patient', 'unknown', ''}
+    if not record.patient_name or record.patient_name.lower() in _reject_names:
         # 1) Accept from POST body (chart header knows the name)
         name_from_body = (data.get('patient_name') or '').strip()
-        if name_from_body:
+        if name_from_body and name_from_body.lower() not in _reject_names:
             record.patient_name = name_from_body
         else:
             # 2) Look up from schedule data
