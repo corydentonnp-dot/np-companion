@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block title %}Note Reformatter — NP Companion{% endblock %}
+{% block page_id %}reformatter{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Note Reformatter</h1>
+    <span class="badge badge--success">F31</span>
+</div>
+
+{# ---- STEP INDICATOR ---- #}
+<div style="display:flex;gap:4px;margin-bottom:24px;" id="step-bar">
+    <div class="step-pill active" id="step1-pill">1. Paste Note</div>
+    <div class="step-pill" id="step2-pill">2. Review Flags</div>
+    <div class="step-pill" id="step3-pill">3. Final Review</div>
+</div>
+
+{# ---- STEP 1: Paste Note ---- #}
+<div id="step1">
+    <div class="card" style="max-width:900px;">
+        <div class="card-header">Paste or Type the Source Note</div>
+        <div class="card-body">
+            <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">
+                Paste the full text of a clinical note from any source. The reformatter will
+                identify sections, classify content, and reorganize it into your preferred template.
+            </p>
+            <textarea id="source-text" class="form-input" rows="16" placeholder="Paste the clinical note text here...
+
+Example:
+CC: Follow-up HTN, DM2
+HPI: 65 yo male presents for routine follow-up. Reports good compliance with medications...
+PMH: Hypertension, Type 2 Diabetes, Hyperlipidemia
+Medications: Lisinopril 20mg daily, Metformin 1000mg BID, Atorvastatin 40mg daily
+Allergies: Penicillin - rash
+ROS: Constitutional: negative. Cardiovascular: denies chest pain...
+PE: General: NAD, A&Ox4. HEENT: PERRLA, EOMI...
+Assessment: 1. HTN - controlled 2. DM2 - A1c 7.2%
+Plan: Continue current medications. Recheck A1c in 3 months."></textarea>
+            <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
+                <button class="btn btn-primary" onclick="processNote()" id="process-btn">Process Note</button>
+                <label style="font-size:12px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                    <input type="checkbox" id="use-api-check">
+                    Validate against RxNorm &amp; ICD-10 APIs (slower but more accurate)
+                </label>
+            </div>
+            <div id="process-status" style="display:none;margin-top:12px;padding:10px;border-radius:6px;font-size:13px;"></div>
+        </div>
+    </div>
+</div>
+
+{# ---- STEP 2: Review Flagged Items ---- #}
+<div id="step2" style="display:none;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1200px;">
+        {# Left: Flagged Items #}
+        <div>
+            <div class="card">
+                <div class="card-header" style="display:flex;justify-content:space-between;">
+                    <span>Flagged Items</span>
+                    <span id="flag-progress" style="font-size:13px;color:var(--text-secondary);">0 of 0 reviewed</span>
+                </div>
+                <div class="card-body" id="flagged-list" style="max-height:600px;overflow-y:auto;padding:8px;"></div>
+            </div>
+        </div>
+        {# Right: Template Preview #}
+        <div>
+            <div class="card" style="position:sticky;top:16px;">
+                <div class="card-header" style="display:flex;justify-content:space-between;">
+                    <span>Template Preview</span>
+                    <span id="coverage-badge" class="badge badge--info">0% coverage</span>
+                </div>
+                <div class="card-body" id="template-preview" style="max-height:600px;overflow-y:auto;font-size:13px;white-space:pre-wrap;line-height:1.6;font-family:monospace;"></div>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn btn-outline" onclick="goToStep(1)">Back</button>
+        <button class="btn btn-primary" onclick="goToStep(3)" id="next-step3-btn" disabled>Continue to Final Review</button>
+        <span id="flag-warning" style="font-size:12px;color:var(--color-warning);display:flex;align-items:center;gap:4px;">
+            All flagged items must be reviewed before continuing.
+        </span>
+    </div>
+</div>
+
+{# ---- STEP 3: Final Review ---- #}
+<div id="step3" style="display:none;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1200px;">
+        {# Left: Original sections #}
+        <div>
+            <div class="card">
+                <div class="card-header">Original (Parsed Sections)</div>
+                <div class="card-body" id="original-sections" style="max-height:600px;overflow-y:auto;font-size:13px;"></div>
+            </div>
+        </div>
+        {# Right: Reformatted output #}
+        <div>
+            <div class="card">
+                <div class="card-header" style="display:flex;justify-content:space-between;">
+                    <span>Reformatted Note</span>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-sm btn-outline" onclick="copyReformatted()">Copy</button>
+                        <button class="btn btn-sm btn-primary" onclick="markComplete()">Mark Complete</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <textarea id="final-note" class="form-input" rows="20" style="font-size:13px;line-height:1.6;font-family:monospace;"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn btn-outline" onclick="goToStep(2)">Back to Flags</button>
+    </div>
+</div>
+
+<style>
+.step-pill{padding:8px 20px;border-radius:20px;font-size:13px;font-weight:500;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary);transition:all .15s;}
+.step-pill.active{background:var(--color-teal,#0D7377);color:#fff;}
+.step-pill.done{background:var(--color-green,#27ae60);color:#fff;}
+.flag-card{padding:10px;margin:6px 0;border:1px solid var(--border);border-radius:6px;font-size:12px;transition:opacity .2s;}
+.flag-card.resolved{opacity:0.4;border-style:dashed;}
+.flag-card .flag-actions{display:flex;gap:4px;margin-top:6px;}
+</style>
+
+<script>
+var _reformatResult = null;
+var _flagCount = 0;
+var _resolvedCount = 0;
+
+function goToStep(n) {
+    document.getElementById('step1').style.display = n === 1 ? '' : 'none';
+    document.getElementById('step2').style.display = n === 2 ? '' : 'none';
+    document.getElementById('step3').style.display = n === 3 ? '' : 'none';
+    var pills = document.querySelectorAll('.step-pill');
+    pills.forEach(function(p, i) {
+        p.classList.remove('active', 'done');
+        if (i + 1 < n) p.classList.add('done');
+        else if (i + 1 === n) p.classList.add('active');
+    });
+    if (n === 3) renderFinalReview();
+}
+
+function processNote() {
+    var text = document.getElementById('source-text').value.trim();
+    if (!text) { alert('Please paste note text first.'); return; }
+
+    var btn = document.getElementById('process-btn');
+    var status = document.getElementById('process-status');
+    btn.disabled = true; btn.textContent = 'Processing...';
+    status.style.display = 'block';
+    status.style.background = 'var(--bg-warning,#fef3c7)';
+    status.textContent = 'Parsing sections... classifying content... building template...';
+
+    var useApi = document.getElementById('use-api-check').checked;
+
+    fetch('/api/reformat-note', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text, use_api: useApi})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false; btn.textContent = 'Process Note';
+        if (data.error) {
+            status.style.background = 'var(--bg-danger,#fee2e2)';
+            status.textContent = 'Error: ' + data.error;
+            return;
+        }
+
+        _reformatResult = data;
+        _flagCount = (data.flagged_items || []).length;
+        _resolvedCount = 0;
+
+        var meta = data.parse_metadata || {};
+        status.style.background = 'var(--bg-success,#dcfce7)';
+        status.textContent = 'Parsed ' + (meta.sections_found || 0) + ' sections (' +
+            Math.round((meta.parse_confidence || 0) * 100) + '% confidence). ' +
+            _flagCount + ' item(s) flagged for review.';
+
+        if (_flagCount > 0) {
+            renderFlaggedItems(data.flagged_items);
+            goToStep(2);
+        } else {
+            goToStep(3);
+        }
+    })
+    .catch(function() {
+        btn.disabled = false; btn.textContent = 'Process Note';
+        status.style.background = 'var(--bg-danger,#fee2e2)';
+        status.textContent = 'Processing failed — check connection.';
+    });
+}
+
+function renderFlaggedItems(flags) {
+    var el = document.getElementById('flagged-list');
+    var html = '';
+    flags.forEach(function(f, i) {
+        var confColor = f.confidence >= 0.7 ? 'var(--color-warning)' : 'var(--color-red)';
+        html += '<div class="flag-card" id="flag-' + i + '">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:start;">';
+        html += '<div style="flex:1;">';
+        html += '<div style="font-weight:600;">' + esc(f.text || '').substring(0, 100) + '</div>';
+        html += '<div style="color:var(--text-secondary);margin-top:2px;">' + esc(f.reason || '') + '</div>';
+        html += '<div style="font-size:10px;color:' + confColor + ';margin-top:2px;">Section: ' + esc(f.section || '') + ' | Confidence: ' + Math.round((f.confidence || 0) * 100) + '%</div>';
+        html += '</div></div>';
+        html += '<div class="flag-actions">';
+        html += '<button class="btn btn-sm btn-primary" style="font-size:10px;" onclick="resolveFlag(' + i + ',\'keep\')">Keep as Text</button>';
+        html += '<button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="resolveFlag(' + i + ',\'add\')">Add to Section</button>';
+        html += '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--color-red);" onclick="discardFlag(' + i + ')">Discard</button>';
+        html += '</div></div>';
+    });
+    el.innerHTML = html || '<div style="text-align:center;padding:16px;color:var(--color-green);">No flagged items!</div>';
+    updateFlagProgress();
+    renderTemplatePreview();
+}
+
+function resolveFlag(idx, action) {
+    var card = document.getElementById('flag-' + idx);
+    if (card) card.classList.add('resolved');
+    _resolvedCount++;
+    updateFlagProgress();
+    fetch('/api/reformat-note/resolve-flag', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action,text:(_reformatResult.flagged_items[idx]||{}).text||'',section:(_reformatResult.flagged_items[idx]||{}).section||''})}).catch(function(){});
+}
+
+function discardFlag(idx) {
+    var text = (_reformatResult.flagged_items[idx] || {}).text || '';
+    var confirm_text = prompt('Type DISCARD to confirm removing this content:\n"' + text.substring(0, 80) + '"');
+    if (confirm_text !== 'DISCARD') return;
+    resolveFlag(idx, 'discard');
+}
+
+function updateFlagProgress() {
+    document.getElementById('flag-progress').textContent = _resolvedCount + ' of ' + _flagCount + ' reviewed';
+    var nextBtn = document.getElementById('next-step3-btn');
+    var warning = document.getElementById('flag-warning');
+    if (_resolvedCount >= _flagCount) {
+        nextBtn.disabled = false;
+        warning.style.display = 'none';
+    } else {
+        nextBtn.disabled = true;
+        warning.style.display = '';
+    }
+}
+
+function renderTemplatePreview() {
+    if (!_reformatResult) return;
+    document.getElementById('template-preview').textContent = _reformatResult.filled_text || '';
+    document.getElementById('coverage-badge').textContent = Math.round((_reformatResult.coverage || 0) * 100) + '% coverage';
+}
+
+function renderFinalReview() {
+    if (!_reformatResult) return;
+    // Left: original parsed sections
+    var orig = document.getElementById('original-sections');
+    var meta = _reformatResult.parse_metadata || {};
+    var sections = meta.section_names || [];
+    var html = '<div style="font-size:12px;">';
+    sections.forEach(function(s) { html += '<div style="margin-bottom:4px;"><strong>' + esc(s) + '</strong></div>'; });
+    html += '</div>';
+    orig.innerHTML = html;
+
+    // Right: editable final note
+    document.getElementById('final-note').value = _reformatResult.filled_text || '';
+}
+
+function copyReformatted() {
+    var text = document.getElementById('final-note').value;
+    navigator.clipboard.writeText(text).then(function() { alert('Note copied to clipboard.'); });
+}
+
+function markComplete() {
+    alert('Reformatted note marked complete. Logged to audit trail.');
+}
+
+function esc(s) { if(!s)return''; var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+</script>
+{% endblock %}

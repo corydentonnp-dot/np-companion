@@ -177,6 +177,64 @@ def billing_review(mrn):
 
 
 # ======================================================================
+# F31: Note Reformatter Wizard (full pipeline)
+# ======================================================================
+@intel_bp.route('/reformatter')
+@login_required
+def reformatter():
+    """Note Reformatter wizard — paste text, parse, classify, review, output."""
+    return render_template('reformatter.html')
+
+
+@intel_bp.route('/api/reformat-note', methods=['POST'])
+@login_required
+def api_reformat_note():
+    """
+    Complete reformatter pipeline: parse → classify → template fill.
+    Returns filled note, flagged items, and coverage stats.
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+    use_api = data.get('use_api', False)
+
+    if not text:
+        return jsonify({'error': 'No text provided'})
+
+    try:
+        from agent.note_reformatter import reformat_note
+        result = reformat_note(text, use_api=use_api)
+        return jsonify(result)
+    except Exception as e:
+        logger.debug('Reformat failed: %s', e)
+        return jsonify({'error': str(e)})
+
+
+@intel_bp.route('/api/reformat-note/resolve-flag', methods=['POST'])
+@login_required
+def resolve_flag():
+    """
+    Resolve a flagged item from the reformatter:
+    action = 'add_to_section' | 'keep_as_text' | 'discard'
+    """
+    data = request.get_json(silent=True) or {}
+    # This endpoint exists for the audit trail — the actual text
+    # manipulation happens client-side. We log the decision.
+    action = data.get('action', '')
+    flagged_text = data.get('text', '')
+    section = data.get('section', '')
+
+    if action == 'discard':
+        # Log discarded items for audit trail
+        from models.reformatter import ReformatLog
+        logger.info(
+            'Reformatter: user %s discarded flagged item from section %s: %s',
+            current_user.id, section, flagged_text[:100]
+        )
+
+    return jsonify({'success': True, 'action': action})
+
+
+# ======================================================================
 # F31 Step 2: Note Section Parser (standalone, no AC dependency)
 # ======================================================================
 @intel_bp.route('/api/parse-note', methods=['POST'])

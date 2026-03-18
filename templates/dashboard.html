@@ -145,6 +145,17 @@
     </div>
     {% endif %}
 
+    {# ---- SCHEDULING INTELLIGENCE WIDGET (AWV/CCM candidates) ---- #}
+    <div class="dash-widget dash-widget-full fw-widget" data-widget-id="scheduling-intel" style="display:none;" id="sched-intel-widget">
+        <div class="dash-widget-header">
+            <span>&#128197; Scheduling Opportunities</span>
+            <span id="sched-intel-badge" class="badge badge--info" style="margin-left:8px;">0</span>
+        </div>
+        <div class="dash-widget-body" id="sched-intel-body" style="padding:0;">
+            <div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:13px;">Loading scheduling analysis...</div>
+        </div>
+    </div>
+
     {# ---- APPOINTMENT SCHEDULE WIDGET ---- #}
     <div class="dash-widget dash-widget-wide fw-widget" data-widget-id="schedule">
         <div class="dash-widget-header">
@@ -436,5 +447,60 @@ function dismissBillingOpp(id) {
             else alert(d.error || 'Failed to dismiss');
         });
 }
+
+/* ---- Scheduling Intelligence (async) ---- */
+(function loadSchedulingIntel() {
+    fetch('/api/scheduling-intelligence')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var awv = data.awv_candidates || [];
+            var ccm = data.ccm_candidates || [];
+            var total = awv.length + ccm.length;
+            if (total === 0) return;
+
+            var widget = document.getElementById('sched-intel-widget');
+            var badge = document.getElementById('sched-intel-badge');
+            var body = document.getElementById('sched-intel-body');
+            widget.style.display = '';
+            badge.textContent = total;
+
+            var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">';
+
+            // AWV column
+            html += '<div style="border-right:1px solid var(--border,#e2e8f0);">';
+            html += '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;color:var(--color-teal);">AWV Candidates (' + awv.length + ')</div>';
+            if (awv.length > 0) {
+                awv.forEach(function(p) {
+                    html += '<div style="padding:8px 14px;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;display:flex;justify-content:space-between;">';
+                    html += '<a href="/patient/' + encodeURIComponent(p.mrn) + '" style="font-weight:500;color:inherit;text-decoration:none;">' + escHtml(p.name) + '</a>';
+                    html += '<span style="color:var(--text-secondary);font-size:11px;">' + escHtml(p.reason) + '</span>';
+                    html += '</div>';
+                });
+            } else {
+                html += '<div style="padding:16px 14px;color:var(--text-secondary);font-size:12px;text-align:center;">No AWV candidates</div>';
+            }
+            html += '</div>';
+
+            // CCM column
+            html += '<div>';
+            html += '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:13px;color:var(--color-green);">CCM Candidates (' + ccm.length + ')</div>';
+            if (ccm.length > 0) {
+                ccm.forEach(function(p) {
+                    html += '<div style="padding:8px 14px;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;display:flex;justify-content:space-between;">';
+                    html += '<a href="/patient/' + encodeURIComponent(p.mrn) + '" style="font-weight:500;color:inherit;text-decoration:none;">' + escHtml(p.name) + '</a>';
+                    html += '<span style="color:var(--text-secondary);font-size:11px;">' + p.chronic_count + ' conditions</span>';
+                    html += '</div>';
+                });
+            } else {
+                html += '<div style="padding:16px 14px;color:var(--text-secondary);font-size:12px;text-align:center;">No CCM candidates</div>';
+            }
+            html += '</div></div>';
+
+            body.innerHTML = html;
+        })
+        .catch(function() {});
+
+    function escHtml(s) { if(!s)return''; var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+})();
 </script>
 {% endblock %}
