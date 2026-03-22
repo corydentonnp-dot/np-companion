@@ -159,35 +159,36 @@ if %SKIP_GIT%==1 (
 :: ------------------------------------------------------------------
 :: STEP 6: Start server + launch app
 :: ------------------------------------------------------------------
-set "SERVERLOG=%PROJECT%\data\server.log"
 if %DEV_MODE%==1 (
     echo [6/6] Starting dev server ^(hot-reload^)...
     start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
 ) else (
-    echo [6/6] Starting server + agent...
-    start /min /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=server --log "%SERVERLOG%"
+    echo [6/6] Starting server...
+    start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=server
 )
 
-:: Wait for server to be ready (check port with fast socket probe)
-echo       Waiting for server...
+:: Wait for server to be ready — uses netstat (fast, no Python spawn)
+echo       Waiting for server to bind port 5000...
 set RETRIES=0
 :WAIT_SERVER
 timeout /t 2 /nobreak >nul
-"%PYTHON%" -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',5000)); s.close()" >nul 2>&1
+netstat -ano | findstr ":5000 " | findstr "LISTENING" >nul 2>&1
 if !errorlevel! neq 0 (
     set /a RETRIES+=1
     echo       Still waiting... ^(!RETRIES!/15^)
     if !RETRIES! geq 15 (
-        echo ERROR: Server did not start within 30 seconds. >> "%ERRORLOG%"
-        echo --- Server log --- >> "%ERRORLOG%"
-        if exist "%SERVERLOG%" type "%SERVERLOG%" >> "%ERRORLOG%"
-        goto :ERROR
+        echo.
+        echo       Server did not bind port 5000 within 30 seconds.
+        echo       Check the "CareCompanion Server" window for errors.
+        echo       Launching Chrome anyway...
+        goto :LAUNCH_APP
     )
     goto :WAIT_SERVER
 )
 echo       Server is running on port 5000.
 
 :: Launch app
+:LAUNCH_APP
 if %DEV_MODE%==1 (
     echo       Opening Chrome...
     start "" "chrome" "http://127.0.0.1:5000/dashboard"
@@ -195,7 +196,7 @@ if %DEV_MODE%==1 (
     echo       Launching desktop app...
     start "" "%EXE%"
 ) else (
-    echo       EXE not found — opening Chrome instead...
+    echo       Opening Chrome...
     start "" "chrome" "http://127.0.0.1:5000/dashboard"
 )
 
@@ -225,12 +226,6 @@ if exist "%ERRORLOG%" (
     type "%ERRORLOG%"
     echo.
     echo Error log saved to: %ERRORLOG%
-)
-if exist "%SERVERLOG%" (
-    echo.
-    echo --- Server log ---
-    type "%SERVERLOG%"
-    echo.
 )
 echo.
 echo Press any key to close...
