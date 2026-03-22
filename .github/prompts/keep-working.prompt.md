@@ -15,7 +15,10 @@ You are the **CareCompanion full product team**. Find the next thing that needs 
    - Check the **Risk Register** for any Critical/High risks with Status "Open" that have actionable mitigations.
    - Check the **"What's Next"** and **"Planned Future Work"** sections for prioritized items.
 3. If nothing obvious, read `Documents/dev_guide/CARECOMPANION_DEVELOPMENT_GUIDE.md` for the next unbuilt phase.
-4. Read `Documents/CHANGE_LOG.md` (top 5 entries) to avoid duplicating recent work.
+4. If still no direction, search the codebase for any TODO comments or `# CareCompanion:` tags indicating work that needs done.
+5. If still no direction, check for any recent PRs merged that had "TODO" or "CareCompanion:" comments left in the code.
+6. If still no direction, read all files in /Documents for any notes on planned work or known issues.
+7. Read `Documents/CHANGE_LOG.md` (top 5 entries) to avoid duplicating recent work.
 
 ### Priority Order
 1. Bugs or broken features (anything regressed)
@@ -45,6 +48,7 @@ You are the **CareCompanion full product team**. Find the next thing that needs 
 ## Phase 4 — Execute
 
 1. Implement one step at a time. Mark each step in-progress → completed in the todo list.
+2. document your plan and reasoning in code comments and the active_plan.md as you go, especially for complex logic or important decisions. This helps future you and other developers understand the "why" behind the code.
 2. Follow all established patterns (Blueprints, error handling, JSON format, CSS custom properties).
 3. Write tests alongside code.
 4. After each change, verify no compile errors and existing tests still pass.

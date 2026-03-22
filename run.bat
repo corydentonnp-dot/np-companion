@@ -75,7 +75,7 @@ if %errorlevel%==0 (
         netstat -ano | findstr ":5000 " >> "%ERRORLOG%"
         goto :ERROR
     )
-    echo       Port 5000 still in use, waiting... (attempt !RETRIES!/10^)
+    echo       Port 5000 still in use, waiting... ^(attempt !RETRIES!/10^)
     timeout /t 2 /nobreak >nul
     goto :CHECK_PORT
 )
@@ -97,7 +97,7 @@ echo       Python OK.
 :: STEP 4: Run verification tests (unless --skip-tests)
 :: ------------------------------------------------------------------
 if %SKIP_TESTS%==1 (
-    echo [4/6] Skipping tests (--skip-tests flag)
+    echo [4/6] Skipping tests ^(--skip-tests flag^)
 ) else (
     echo [4/6] Running verification tests...
     echo.
@@ -121,9 +121,9 @@ if %SKIP_TESTS%==1 (
 :: STEP 5: Git commit + push (unless --skip-git or no .git)
 :: ------------------------------------------------------------------
 if %SKIP_GIT%==1 (
-    echo [5/6] Skipping git (--skip-git flag)
+    echo [5/6] Skipping git ^(--skip-git flag^)
 ) else if not exist "%PROJECT%\.git" (
-    echo [5/6] Skipping git (no .git repository found)
+    echo [5/6] Skipping git ^(no .git repository found^)
     echo       Run 'git init' to enable auto-commit on launch.
 ) else (
     echo [5/6] Git commit + push...
@@ -160,7 +160,7 @@ if %SKIP_GIT%==1 (
 :: STEP 6: Start server + launch app
 :: ------------------------------------------------------------------
 if %DEV_MODE%==1 (
-    echo [6/6] Starting dev server (hot-reload)...
+    echo [6/6] Starting dev server ^(hot-reload^)...
     start "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
 ) else (
     echo [6/6] Starting server + agent...
