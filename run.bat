@@ -149,7 +149,7 @@ if %SKIP_GIT%==1 (
         if !errorlevel!==0 (
             echo       Pushed to remote.
         ) else (
-            echo       Warning: git push failed (offline or auth issue), continuing...
+            echo       Warning: git push failed ^(offline or auth issue^), continuing...
         )
     ) else (
         echo       No remote configured, skipping push.
