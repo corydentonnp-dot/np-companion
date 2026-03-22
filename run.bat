@@ -159,24 +159,28 @@ if %SKIP_GIT%==1 (
 :: ------------------------------------------------------------------
 :: STEP 6: Start server + launch app
 :: ------------------------------------------------------------------
+set "SERVERLOG=%PROJECT%\data\server.log"
 if %DEV_MODE%==1 (
     echo [6/6] Starting dev server ^(hot-reload^)...
     start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
 ) else (
     echo [6/6] Starting server + agent...
-    start /min /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=server
+    start /min /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=server --log "%SERVERLOG%"
 )
 
-:: Wait for server to be ready
+:: Wait for server to be ready (check port with fast socket probe)
 echo       Waiting for server...
 set RETRIES=0
 :WAIT_SERVER
-timeout /t 1 /nobreak >nul
-"%PYTHON%" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=3)" >nul 2>&1
-if %errorlevel% neq 0 (
+timeout /t 2 /nobreak >nul
+"%PYTHON%" -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',5000)); s.close()" >nul 2>&1
+if !errorlevel! neq 0 (
     set /a RETRIES+=1
-    if !RETRIES! geq 20 (
-        echo ERROR: Server did not start within 20 seconds. >> "%ERRORLOG%"
+    echo       Still waiting... ^(!RETRIES!/15^)
+    if !RETRIES! geq 15 (
+        echo ERROR: Server did not start within 30 seconds. >> "%ERRORLOG%"
+        echo --- Server log --- >> "%ERRORLOG%"
+        if exist "%SERVERLOG%" type "%SERVERLOG%" >> "%ERRORLOG%"
         goto :ERROR
     )
     goto :WAIT_SERVER
@@ -221,6 +225,12 @@ if exist "%ERRORLOG%" (
     type "%ERRORLOG%"
     echo.
     echo Error log saved to: %ERRORLOG%
+)
+if exist "%SERVERLOG%" (
+    echo.
+    echo --- Server log ---
+    type "%SERVERLOG%"
+    echo.
 )
 echo.
 echo Press any key to close...

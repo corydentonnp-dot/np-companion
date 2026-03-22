@@ -83,9 +83,12 @@ def _run_flask_production():
     """Flask production server in a thread (no reloader)."""
     from app import create_app
     app = create_app()
+    host = app.config.get('HOST', '0.0.0.0')
+    port = app.config.get('PORT', 5000)
+    logger.info('Starting Flask production server on %s:%d', host, port)
     app.run(
-        host=app.config.get('HOST', '0.0.0.0'),
-        port=app.config.get('PORT', 5000),
+        host=host,
+        port=port,
         debug=False,
         use_reloader=False,
     )
@@ -306,7 +309,21 @@ def main():
         default='all',
         help='Run mode (default: all)',
     )
+    parser.add_argument(
+        '--log',
+        default=None,
+        help='Log file path — redirect stdout/stderr to this file',
+    )
     args = parser.parse_args()
+
+    # Redirect stdout/stderr to log file if requested (used by run.bat)
+    if args.log:
+        try:
+            log_fh = open(args.log, 'w', buffering=1)
+            sys.stdout = log_fh
+            sys.stderr = log_fh
+        except Exception as exc:
+            print(f'Warning: could not open log file {args.log}: {exc}')
 
     _setup_env()
 
