@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}NP Companion{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}CareCompanion{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,6 +12,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500;600&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body data-page="{% block page_id %}{% endblock %}" data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}" data-lock-timeout="{{ current_user.get_pref('lock_timeout_minutes', 5) if current_user.is_authenticated else 5 }}">
+{% if current_user.is_authenticated %}
+<script>
+/* Sync server-side preferences to localStorage on authenticated page load */
+(function(){
+    var pt = {{ current_user.get_pref('page_transition','none')|tojson }};
+    if (pt && pt !== localStorage.getItem('pageTransition')) {
+        localStorage.setItem('pageTransition', pt);
+    }
+    var sp = {{ current_user.get_pref('split_max_panes', 2)|tojson }};
+    if (sp && String(sp) !== localStorage.getItem('splitMaxPanes')) {
+        localStorage.setItem('splitMaxPanes', String(sp));
+    }
+})();
+</script>
+{% endif %}
+
+<a href="#main-content" class="skip-link">Skip to main content</a>
 
 {% if current_user.is_authenticated %}
 {# ================================================================
@@ -18,11 +36,162 @@
    ================================================================ #}
 <div class="app-layout">
 
+    {# ---- MENU BAR (4.1) ----------------------------------------- #}
+    <nav class="app-menu-bar" id="app-menu-bar">
+        {# Hamburger for mobile #}
+        <button class="menu-hamburger" id="menu-hamburger" aria-label="Open menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        {# — File — #}
+        <div class="menu-group" data-menu="file">
+            <button class="menu-btn">File</button>
+            <div class="menu-dropdown">
+                <button class="menu-dd-item" data-url="/settings/account"><span class="menu-dd-icon">⚙</span>Settings<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="/logout"><span class="menu-dd-icon">↪</span>Log Out<span class="menu-dd-shortcut"></span></button>
+            </div>
+        </div>
+
+        {# — View — #}
+        <div class="menu-group" data-menu="view">
+            <button class="menu-btn">View</button>
+            <div class="menu-dropdown">
+                <button class="menu-dd-item" data-action="toggleSidebar"><span class="menu-dd-icon">☰</span>Toggle Sidebar<span class="menu-dd-shortcut">Ctrl+B</span></button>
+                <button class="menu-dd-item" data-action="toggleBookmarks"><span class="menu-dd-icon">★</span>Toggle Bookmarks Bar<span class="menu-dd-shortcut">Ctrl+Shift+B</span></button>
+                <div class="menu-separator"></div>
+                {% if user_can_access('briefing') and feature_enabled('briefing') %}
+                <button class="menu-dd-item" data-url="/briefing"><span class="menu-dd-icon">☀</span>Morning Briefing<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/briefing/commute"><span class="menu-dd-icon">🚗</span>Commute Mode<span class="menu-dd-shortcut"></span></button>
+                {% endif %}
+                {% if user_can_access('metrics') and feature_enabled('metrics') %}
+                <button class="menu-dd-item" data-url="/metrics"><span class="menu-dd-icon">📊</span>Metrics<span class="menu-dd-shortcut"></span></button>
+                {% endif %}
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-action="toggleCompactMode"><span class="menu-dd-icon">▫</span>Compact Mode<span class="menu-dd-shortcut"></span></button>
+            </div>
+        </div>
+
+        {# — Tools — #}
+        <div class="menu-group" data-menu="tools">
+            <button class="menu-btn">Tools</button>
+            <div class="menu-dropdown">
+                {% if user_can_access('patient_gen') and feature_enabled('patient_gen') %}
+                <button class="menu-dd-item" data-url="/patient-generator"><span class="menu-dd-icon">🧪</span>Patient Generator<span class="menu-dd-shortcut"></span></button>
+                {% endif %}
+                {% if user_can_access('reformatter') and feature_enabled('reformatter') %}
+                <button class="menu-dd-item" data-url="/reformatter"><span class="menu-dd-icon">📝</span>Note Reformatter<span class="menu-dd-shortcut"></span></button>
+                {% endif %}
+                {% if user_can_access('medref') and feature_enabled('medref') %}
+                <button class="menu-dd-item" data-url="/medref"><span class="menu-dd-icon">📖</span>Med Reference<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/medref/review-needed"><span class="menu-dd-icon">⚠️</span>Guideline Review<span class="menu-dd-shortcut"></span></button>
+                {% endif %}
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="/tickler"><span class="menu-dd-icon">🔔</span>Tickler<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/cs-tracker"><span class="menu-dd-icon">📋</span>CS Tracker<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/pa"><span class="menu-dd-icon">📄</span>PA Tool<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/referral"><span class="menu-dd-icon">🔗</span>Referral Tracker<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/coding"><span class="menu-dd-icon">🏷</span>Coding Helper<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/tools/macros"><span class="menu-dd-icon">⌨️</span>Macro Library<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/tools/dot-phrases"><span class="menu-dd-icon">💬</span>Dot Phrases<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/settings/phrases"><span class="menu-dd-icon">📝</span>Billing Phrases<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/messages"><span class="menu-dd-icon">💬</span>Delayed Messages<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/tools/templates"><span class="menu-dd-icon">📑</span>Result Templates<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/tools/eod"><span class="menu-dd-icon">🌙</span>EOD Checker<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="/notifications"><span class="menu-dd-icon">🔔</span>Notifications<span class="menu-dd-shortcut"></span></button>
+            </div>
+        </div>
+
+        {# — References — #}
+        <div class="menu-group" data-menu="references">
+            <button class="menu-btn">References</button>
+            <div class="menu-dropdown">
+                <button class="menu-dd-item" data-url="https://www.uptodate.com" data-external="true"><span class="menu-dd-icon">📚</span>UpToDate<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="https://www.mdcalc.com" data-external="true"><span class="menu-dd-icon">🧮</span>MDCalc<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="https://www.dynamed.com" data-external="true"><span class="menu-dd-icon">📘</span>DynaMed<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="https://www.epocrates.com" data-external="true"><span class="menu-dd-icon">💊</span>Epocrates<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/medref"><span class="menu-dd-icon">📖</span>Med Reference (local)<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="https://pubmed.ncbi.nlm.nih.gov" data-external="true"><span class="menu-dd-icon">🔬</span>PubMed<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="https://www.uspreventiveservicestaskforce.org" data-external="true"><span class="menu-dd-icon">✅</span>USPSTF<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="https://www.cdc.gov/guidelines" data-external="true"><span class="menu-dd-icon">🏛</span>CDC Guidelines<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="https://www.acc.org/guidelines" data-external="true"><span class="menu-dd-icon">❤</span>AHA/ACC<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="https://medlineplus.gov" data-external="true"><span class="menu-dd-icon">🌐</span>MedlinePlus<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="https://medlineplus.gov/spanish" data-external="true"><span class="menu-dd-icon">🌐</span>MedlinePlus (Español)<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="/icd10"><span class="menu-dd-icon">🔍</span>ICD-10 Lookup (local)<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="https://www.cms.gov/medicare/payment/physician-fee-schedule" data-external="true"><span class="menu-dd-icon">💰</span>CMS Fee Schedule<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="/calculators"><span class="menu-dd-icon">🧮</span>Clinical Calculators<span class="menu-dd-shortcut">⌃⇧K</span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-action="openManageReferences"><span class="menu-dd-icon">⚙</span>Manage References…<span class="menu-dd-shortcut"></span></button>
+            </div>
+        </div>
+
+        {# — Admin (admin only) — #}
+        {% if current_user.is_authenticated and current_user.role == 'admin' %}
+        <div class="menu-group" data-menu="admin">
+            <button class="menu-btn">Admin</button>
+            <div class="menu-dropdown">
+                <button class="menu-dd-item" data-url="/admin/users"><span class="menu-dd-icon">👥</span>User Management<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="/admin"><span class="menu-dd-icon">📊</span>Practice Overview<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/admin/config"><span class="menu-dd-icon">⚙</span>Configuration<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/caregap/rules"><span class="menu-dd-icon">📋</span>Care Gap Rules<span class="menu-dd-shortcut"></span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-url="/admin/updates"><span class="menu-dd-icon">⬆</span>Updates<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/admin/sitemap"><span class="menu-dd-icon">🗺</span>Site Map<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-action="restartServer" onclick="restartServer(event)"><span class="menu-dd-icon">🔄</span>Server Restart<span class="menu-dd-shortcut"></span></button>
+            </div>
+        </div>
+        {% endif %}
+
+        {# — Help — #}
+        <div class="menu-group" data-menu="help">
+            <button class="menu-btn">Help</button>
+            <div class="menu-dropdown">
+                <button class="menu-dd-item" data-url="/help"><span class="menu-dd-icon">📖</span>Feature Guide<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-url="/setup"><span class="menu-dd-icon">📘</span>API Setup Guide<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-action="openKeyboardShortcuts"><span class="menu-dd-icon">⌨</span>Keyboard Shortcuts<span class="menu-dd-shortcut">?</span></button>
+                <div class="menu-separator"></div>
+                <button class="menu-dd-item" data-action="openWhatsNew"><span class="menu-dd-icon">🆕</span>What's New<span class="menu-dd-shortcut"></span></button>
+                <button class="menu-dd-item" data-action="openAbout"><span class="menu-dd-icon">ℹ</span>About<span class="menu-dd-shortcut"></span></button>
+            </div>
+        </div>
+    </nav>
+
+    {# ---- BOOKMARKS BAR (4.2) ------------------------------------ #}
+    <div class="bookmarks-bar" id="bookmarks-bar">
+        {# Practice bookmarks (admin-managed, shown to all) #}
+        <div class="bm-practice-section" id="bm-practice-chips">
+            {# Populated by JS from GET /api/bookmarks #}
+        </div>
+        {# Personal bookmarks (per-user) #}
+        <div class="bm-personal-section" id="bm-personal-chips">
+            {# Populated by JS from GET /api/bookmarks #}
+        </div>
+        <button class="bm-add-btn" id="bm-add-btn" title="Add bookmark">+</button>
+        <div class="bm-add-popover" id="bm-add-popover" style="display:none;">
+            <input type="text" id="bm-add-label" class="form-control" placeholder="Label" maxlength="40" style="font-size:12px;margin-bottom:4px;">
+            <input type="url" id="bm-add-url" class="form-control" placeholder="https://..." maxlength="2048" style="font-size:12px;margin-bottom:6px;">
+            <div style="display:flex;gap:4px;justify-content:flex-end;">
+                <button class="btn btn-sm btn-secondary" id="bm-add-cancel">Cancel</button>
+                <button class="btn btn-sm btn-primary" id="bm-add-save">Add</button>
+            </div>
+        </div>
+    </div>
+
+    {# ---- BREADCRUMB TRAIL (PH44-6) ------------------------------ #}
+    <nav class="breadcrumb-trail" id="breadcrumb-trail" aria-label="Recent pages"></nav>
+
     {# ---- SIDEBAR ------------------------------------------------ #}
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="sidebar-logo">NP</div>
-            <span class="sidebar-title">NP Companion</span>
+            <span class="sidebar-title">CareCompanion</span>
         </div>
 
         <nav class="sidebar-nav">
@@ -95,8 +264,8 @@
                 </li>
                 {% endif %}
 
-                {# Orders #}
-                {% if user_can_access('orders') %}
+                {# Orders (Advanced tier) #}
+                {% if user_can_access('orders') and feature_enabled('orders') %}
                 <li class="nav-item {% if request.path.startswith('/orders') or request.path.startswith('/prep') %}active{% endif %}">
                     <a href="/orders" class="nav-link" title="Orders">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -108,21 +277,10 @@
                 </li>
                 {% endif %}
 
-                {# Med Ref #}
-                {% if user_can_access('medref') %}
-                <li class="nav-item {% if request.path.startswith('/medref') %}active{% endif %}">
-                    <a href="/medref" class="nav-link" title="Med Reference">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                        </svg>
-                        <span class="nav-label">Med Ref</span>
-                    </a>
-                </li>
-                {% endif %}
+                {# Med Ref — moved to Tools menu (4.3) #}
 
-                {# Lab Track #}
-                {% if user_can_access('labtrack') %}
+                {# Lab Track (Standard tier) #}
+                {% if user_can_access('labtrack') and feature_enabled('labtrack') %}
                 <li class="nav-item {% if request.path.startswith('/labtrack') %}active{% endif %}">
                     <a href="/labtrack" class="nav-link" title="Lab Tracker">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -133,8 +291,8 @@
                 </li>
                 {% endif %}
 
-                {# Care Gaps #}
-                {% if user_can_access('caregap') %}
+                {# Care Gaps (Standard tier) #}
+                {% if user_can_access('caregap') and feature_enabled('caregap') %}
                 <li class="nav-item {% if request.path.startswith('/caregap') %}active{% endif %}">
                     <a href="/caregap" class="nav-link" title="Care Gaps">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -146,82 +304,106 @@
                 </li>
                 {% endif %}
 
-                {# Morning Briefing #}
-                <li class="nav-item {% if request.path.startswith('/briefing') %}active{% endif %}">
-                    <a href="/briefing" class="nav-link" title="Morning Briefing">
+                {# Bonus Tracker #}
+                {% if user_can_access('bonus') %}
+                <li class="nav-item {% if request.path.startswith('/bonus') %}active{% endif %}">
+                    <a href="/bonus" class="nav-link" title="Bonus Tracker">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="5"/>
-                            <line x1="12" y1="1" x2="12" y2="3"/>
-                            <line x1="12" y1="21" x2="12" y2="23"/>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                            <line x1="1" y1="12" x2="3" y2="12"/>
-                            <line x1="21" y1="12" x2="23" y2="12"/>
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                            <line x1="12" y1="1" x2="12" y2="23"/>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                         </svg>
-                        <span class="nav-label">Briefing</span>
-                    </a>
-                </li>
-
-                {# Note Reformatter #}
-                <li class="nav-item {% if request.path.startswith('/reformatter') %}active{% endif %}">
-                    <a href="/reformatter" class="nav-link" title="Note Reformatter">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                            <line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/>
-                        </svg>
-                        <span class="nav-label">Reformatter</span>
-                    </a>
-                </li>
-
-                {# Metrics #}
-                {% if user_can_access('metrics') %}
-                <li class="nav-item {% if request.path.startswith('/metrics') %}active{% endif %}">
-                    <a href="/metrics" class="nav-link" title="Metrics">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="18" y1="20" x2="18" y2="10"/>
-                            <line x1="12" y1="20" x2="12" y2="4"/>
-                            <line x1="6" y1="20" x2="6" y2="14"/>
-                        </svg>
-                        <span class="nav-label">Metrics</span>
+                        <span class="nav-label">Bonus</span>
                     </a>
                 </li>
                 {% endif %}
 
-                {# Tools #}
-                {% if user_can_access('tools') %}
-                <li class="nav-item {% if request.path.startswith('/tools') or request.path.startswith('/tickler') or request.path.startswith('/cs-tracker') or request.path.startswith('/pa') or request.path.startswith('/referral') or request.path.startswith('/macros') or request.path.startswith('/coding') or request.path.startswith('/notifications') %}active{% endif %}">
-                    <a href="/tools" class="nav-link" title="Tools">
+                {# TCM Watch #}
+                {% if user_can_access('intelligence') %}
+                <li class="nav-item {% if request.path.startswith('/tcm') %}active{% endif %}">
+                    <a href="/tcm/watch-list" class="nav-link" title="TCM Watch">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <polyline points="9 22 9 12 15 12 15 22"/>
                         </svg>
-                        <span class="nav-label">Tools</span>
+                        <span class="nav-label">TCM</span>
                     </a>
                 </li>
                 {% endif %}
+
+                {# CCM Registry #}
+                {% if user_can_access('ccm') %}
+                <li class="nav-item {% if request.path.startswith('/ccm') %}active{% endif %}">
+                    <a href="/ccm/registry" class="nav-link" title="CCM Registry">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        <span class="nav-label">CCM</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                {# Monitoring Calendar (Phase 23.D1) #}
+                <li class="nav-item {% if request.path.startswith('/monitoring') %}active{% endif %}">
+                    <a href="/monitoring/calendar" class="nav-link" title="Monitoring Calendar">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/>
+                            <line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        <span class="nav-label">Monitoring</span>
+                    </a>
+                </li>
+
+                {# Preventive Gaps (Phase 23.D6) #}
+                <li class="nav-item {% if request.path.startswith('/care-gaps/preventive') %}active{% endif %}">
+                    <a href="/care-gaps/preventive" class="nav-link" title="Preventive Gaps">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        </svg>
+                        <span class="nav-label">Preventive</span>
+                    </a>
+                </li>
+
+                {# Staff Billing Tasks (Phase 20.6) #}
+                {% if user_can_access('intelligence') %}
+                <li class="nav-item {% if request.path.startswith('/staff') %}active{% endif %}">
+                    <a href="/staff/billing-tasks" class="nav-link" title="Staff Tasks">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 11l3 3L22 4"/>
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                        </svg>
+                        <span class="nav-label">Staff Tasks</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                {# Morning Briefing — moved to View menu (4.3) #}
+                {# Note Reformatter — moved to Tools menu (4.3) #}
+                {# Metrics — moved to View menu (4.3) #}
+                {# Tools — moved to Tools menu (4.3) #}
+                {# Admin — moved to Admin menu (4.3) #}
 
             </ul>
         </nav>
 
-        {# ---- Admin section (admin role only) — single link to hub ---- #}
-        {% if current_user.is_authenticated and current_user.role == 'admin' %}
-        <nav class="sidebar-nav" style="margin-top:0;">
+        {# ---- Pinned Items section (4.4) ---- #}
+        {% set pinned_items = current_user.get_pref('pinned_menu_items', []) if current_user.is_authenticated else [] %}
+        {% if pinned_items %}
+        <nav class="sidebar-nav pinned-section" id="pinned-section" style="margin-top:0;">
             <div style="padding:4px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;opacity:.55;">
-                Admin
+                Pinned
             </div>
             <ul class="nav-list">
-                <li class="nav-item {% if request.path.startswith('/admin') %}active{% endif %}">
-                    <a href="/admin" class="nav-link" title="Admin Dashboard">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
-                        <span class="nav-label">Admin</span>
+                {% for pin in pinned_items %}
+                <li class="nav-item pinned-item" data-pin-url="{{ pin.url }}">
+                    <a href="{{ pin.url }}" class="nav-link" title="{{ pin.label }}">
+                        <span class="nav-icon" style="font-size:14px;width:20px;text-align:center;">{{ pin.icon|default('📌') }}</span>
+                        <span class="nav-label">{{ pin.label }}</span>
                     </a>
                 </li>
+                {% endfor %}
             </ul>
         </nav>
         {% endif %}
@@ -244,6 +426,11 @@
         </div>
     </aside>
 
+    {# ---- CONTEXT SUB-PANEL (PH44-1) ----------------------------- #}
+    <aside class="context-panel" id="context-panel">
+        {% block subpanel %}{% endblock %}
+    </aside>
+
     {# ---- HEADER ------------------------------------------------- #}
     <header class="header" id="header">
         {# Mobile hamburger #}
@@ -260,6 +447,13 @@
             <span class="status-dot status-dot--unknown" id="agent-status" title="Agent: checking..."></span>
             {# NetPractice auth dot — green/yellow/red updated by JS #}
             <span class="status-dot status-dot--unknown" id="auth-status" title="NetPractice: checking..."></span>
+            {# Page help icon (PH44-9D) #}
+            <button class="help-icon" id="page-help-icon" data-help-id="{{ self.page_id() }}" title="Help for this page" aria-label="Help" style="display:none;">?</button>
+            <div class="help-popover" id="page-help-popover" role="tooltip" aria-hidden="true">
+                <div class="help-popover-title" id="page-help-title"></div>
+                <div class="help-popover-body" id="page-help-body"></div>
+                <a class="help-popover-link" id="page-help-link" href="/help">Read more →</a>
+            </div>
         </div>
 
         <div class="header-right">
@@ -285,7 +479,7 @@
             </a>
 
             {# Refresh button #}
-            <button class="notification-bell" id="refresh-btn" title="Refresh page" onclick="location.reload()" style="padding:4px;">
+            <button class="notification-bell" id="refresh-btn" title="Refresh page" aria-label="Refresh page" onclick="location.reload()" style="padding:4px;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">
                     <polyline points="23 4 23 10 17 10"/>
                     <polyline points="1 20 1 14 7 14"/>
@@ -295,7 +489,7 @@
 
             {# Notification bell #}
             <div style="position:relative;" id="notification-wrapper">
-                <button class="notification-bell" id="notification-bell" title="Notifications">
+                <button class="notification-bell" id="notification-bell" title="Notifications" aria-label="Notifications" aria-haspopup="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -303,15 +497,38 @@
                     <span class="notification-badge" id="notification-count" style="display:none;">0</span>
                 </button>
                 <div id="notification-dropdown" class="notification-dropdown" style="display:none;">
-                    <div class="notif-dd-header">Notifications</div>
+                    <div class="notif-dd-header" style="display:flex;align-items:center;">
+                        Notifications
+                        <a href="/notifications" style="font-size:12px;font-weight:normal;margin-left:auto;">View all →</a>
+                    </div>
                     <div id="notification-list" class="notif-dd-body">
-                        <p class="notif-dd-empty">No new notifications</p>
+                        <p class="notif-dd-empty">🔔 All caught up! Notifications appear when labs, messages, or alerts arrive.</p>
                     </div>
                 </div>
             </div>
 
+            {# Phase 12: P1 Interrupt Modal — full-screen overlay for critical notifications #}
+            <div id="p1-modal-overlay" class="p1-modal-overlay" data-blocking="true" style="display:none;">
+                <div class="p1-modal">
+                    <div class="p1-modal-header">⚠ Action Required</div>
+                    <div class="p1-modal-body" id="p1-modal-message"></div>
+                    <div class="p1-modal-actions">
+                        <button class="btn btn-primary" id="p1-acknowledge-btn" onclick="acknowledgeP1()">Acknowledge</button>
+                        <button class="btn btn-secondary" id="p1-snooze-btn" onclick="snoozeP1(5)">Snooze 5 min</button>
+                    </div>
+                </div>
+            </div>
+
+            {# Split View toggle (PH44-3) #}
+            <button class="split-toggle-btn" id="split-toggle-btn" title="Split View (Ctrl+Click any link)" aria-label="Toggle split view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+                    <rect x="3" y="3" width="7" height="18" rx="1"/>
+                    <rect x="14" y="3" width="7" height="18" rx="1"/>
+                </svg>
+            </button>
+
             {# Dark mode toggle #}
-            <button class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle dark mode">
+            <button class="dark-mode-toggle" id="dark-mode-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
                 <span id="dark-mode-icon"></span>
             </button>
 
@@ -343,14 +560,23 @@
     </header>
 
     {# ---- MAIN CONTENT ------------------------------------------- #}
-    <main class="main-content" id="main-content">
+    <main class="main-content" id="main-content" data-breadcrumb-badge="{% block breadcrumb_badge %}{% endblock %}">
 
-        {# Flash messages from Flask's flash() function #}
+        {# Flash messages from Flask's flash() function (Phase 10.4) #}
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div class="flash-container">
+        <div class="flash-container" role="alert" aria-live="polite">
             {% for category, message in messages %}
-            <div class="flash flash--{{ category }}">
+            <div class="flash flash--{{ category }}" data-auto-dismiss="{{ '0' if category in ('error', 'danger') else '8000' }}">
+                {% if category in ('success',) %}
+                <svg class="flash-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                {% elif category in ('warning',) %}
+                <svg class="flash-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                {% elif category in ('error', 'danger') %}
+                <svg class="flash-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                {% else %}
+                <svg class="flash-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                {% endif %}
                 <span>{{ message }}</span>
                 <button class="flash-close" aria-label="Dismiss">&times;</button>
             </div>
@@ -359,9 +585,157 @@
         {% endif %}
         {% endwith %}
 
+        {# ---- WHAT'S NEW BANNER (4.8) ---- #}
+        {% set last_seen = current_user.get_pref('last_seen_version', '') if current_user.is_authenticated else app_version %}
+        {% if last_seen != app_version %}
+        <div class="whats-new-banner" id="whats-new-banner">
+            <span class="whats-new-text">🆕 <strong>CareCompanion v{{ app_version }}</strong> — See what's new in this update.</span>
+            <a href="#" class="whats-new-link" id="whats-new-details" data-action="openWhatsNew">Details</a>
+            <button class="whats-new-dismiss" id="whats-new-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+        </div>
+        {% endif %}
+
         {% block content %}{% endblock %}
 
     </main>
+
+    {# ---- COMMAND PALETTE (4.5) ---------------------------------- #}
+    <div class="cmd-palette-backdrop" id="command-palette" style="display:none;">
+        <div class="cmd-palette-box">
+            <input type="text" class="cmd-palette-input" id="cmd-palette-input" placeholder="Type a command or page name…" autocomplete="off" spellcheck="false">
+            <ul class="cmd-result-list" id="cmd-result-list">
+                {# Populated by JS #}
+            </ul>
+        </div>
+    </div>
+
+    {# ---- MANAGE REFERENCES MODAL (4.6) -------------------------- #}
+    <div class="modal-backdrop" id="manage-refs-modal" style="display:none;">
+        <div class="modal-dialog" style="max-width:560px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Manage References</h3>
+                <button class="modal-close" data-dismiss="manage-refs-modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tab-group" id="refs-tabs">
+                    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                    <button class="tab-btn active" data-tab="refs-practice">Practice</button>
+                    {% endif %}
+                    <button class="tab-btn {% if not (current_user.is_authenticated and current_user.role == 'admin') %}active{% endif %}" data-tab="refs-personal">Personal</button>
+                </div>
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <div class="tab-panel active" id="refs-practice">
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Practice-wide bookmarks visible to all users.</p>
+                    <ul class="refs-list" id="refs-practice-list">
+                        {# Populated by JS #}
+                    </ul>
+                    <div style="display:flex;gap:4px;margin-top:8px;">
+                        <input type="text" id="refs-practice-label" class="form-control" placeholder="Label" maxlength="40" style="flex:1;font-size:12px;">
+                        <input type="url" id="refs-practice-url" class="form-control" placeholder="https://..." maxlength="2048" style="flex:2;font-size:12px;">
+                        <button class="btn btn-sm btn-primary" id="refs-practice-add">Add</button>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="tab-panel {% if not (current_user.is_authenticated and current_user.role == 'admin') %}active{% endif %}" id="refs-personal">
+                    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Your personal bookmarks (max 20).</p>
+                    <ul class="refs-list" id="refs-personal-list">
+                        {# Populated by JS #}
+                    </ul>
+                    <div style="display:flex;gap:4px;margin-top:8px;">
+                        <input type="text" id="refs-personal-label" class="form-control" placeholder="Label" maxlength="40" style="flex:1;font-size:12px;">
+                        <input type="url" id="refs-personal-url" class="form-control" placeholder="https://..." maxlength="2048" style="flex:2;font-size:12px;">
+                        <button class="btn btn-sm btn-primary" id="refs-personal-add">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- KEYBOARD SHORTCUTS MODAL (4.7) ------------------------- #}
+    <div class="modal-backdrop" id="keyboard-shortcuts-modal" style="display:none;">
+        <div class="modal-dialog" style="max-width:420px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Keyboard Shortcuts</h3>
+                <button class="modal-close" data-dismiss="keyboard-shortcuts-modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <table class="shortcuts-table" style="width:100%;font-size:13px;">
+                    <tbody>
+                        <tr>
+                            <td style="padding:6px 0;"><kbd>Ctrl</kbd> + <kbd>K</kbd></td>
+                            <td style="padding:6px 0;">Open Command Palette</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 0;"><kbd>Ctrl</kbd> + <kbd>B</kbd></td>
+                            <td style="padding:6px 0;">Toggle Sidebar</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 0;"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd></td>
+                            <td style="padding:6px 0;">Toggle Bookmarks Bar</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 0;"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>K</kbd></td>
+                            <td style="padding:6px 0;">Clinical Calculators</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 0;"><kbd>?</kbd></td>
+                            <td style="padding:6px 0;">Show this help</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 0;"><kbd>Escape</kbd></td>
+                            <td style="padding:6px 0;">Close menus / palettes / modals</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 0;"><kbd>F5</kbd></td>
+                            <td style="padding:6px 0;">Refresh page</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ---- WHAT'S NEW MODAL (14.4) -------------------------------- #}
+    <div class="modal-backdrop" id="whats-new-modal" style="display:none;">
+        <div class="modal-dialog" style="max-width:520px;">
+            <div class="modal-header">
+                <h3 class="modal-title">🆕 What's New</h3>
+                <button class="modal-close" data-dismiss="whats-new-modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" id="whats-new-body" style="max-height:420px;overflow-y:auto;">
+                <p style="color:var(--text-secondary);font-size:13px;">Loading changelog…</p>
+            </div>
+        </div>
+    </div>
+
+    {# ---- ABOUT POPOVER (4.9) ------------------------------------ #}
+    <div class="modal-backdrop" id="about-modal" style="display:none;">
+        <div class="modal-dialog" style="max-width:360px;">
+            <div class="modal-header">
+                <h3 class="modal-title">About CareCompanion</h3>
+                <button class="modal-close" data-dismiss="about-modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align:center;padding:24px;">
+                <div style="font-size:32px;font-weight:700;color:var(--color-primary);margin-bottom:8px;">NP</div>
+                <div style="font-size:18px;font-weight:600;margin-bottom:4px;">CareCompanion</div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">Version {{ app_version }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">
+                    Logged in as <strong>{{ current_user.display_name or current_user.username }}</strong>
+                    ({{ current_user.role|capitalize }})
+                </div>
+                <div style="font-size:11px;color:var(--text-tertiary,var(--text-secondary));margin-top:16px;">
+                    &copy; 2026 CareCompanion. All rights reserved.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- PIN CONTEXT MENU (4.5 supplement) ---------------------- #}
+    <div class="pin-ctx-menu" id="pin-ctx-menu" style="display:none;">
+        <button class="pin-ctx-item" data-action="pin-item">📌 Pin to Sidebar</button>
+        <button class="pin-ctx-item" data-action="unpin-item">❌ Unpin from Sidebar</button>
+    </div>
+
 </div>
 
 {# ---- CUSTOM RIGHT-CLICK CONTEXT MENU ------------------------------- #}
@@ -442,6 +816,9 @@
     </button>
 </div>
 
+{# ---- POPUP TASKBAR (PH44-2) ---------------------------------------- #}
+<div class="popup-taskbar" id="popup-taskbar"></div>
+
 {# ---- AI CHAT PANEL ------------------------------------------------- #}
 {% if user_ai_enabled() %}
 <div id="ai-panel" class="ai-panel" style="display:none;">
@@ -465,7 +842,7 @@
 </div>
 
 {# ---- HIPAA ACKNOWLEDGMENT MODAL ------------------------------------ #}
-<div id="hipaa-modal" class="hipaa-modal-overlay" style="display:none;">
+<div id="hipaa-modal" class="hipaa-modal-overlay" data-blocking="true" style="display:none;">
     <div class="hipaa-modal">
         <div class="hipaa-modal-header">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:28px;height:28px;color:var(--color-red,#e74c3c);"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -497,7 +874,7 @@
 {% endif %}
 
 {# ---- AUTO-LOCK OVERLAY ----------------------------------------- #}
-<div class="lock-overlay" id="lock-overlay">
+<div class="lock-overlay" id="lock-overlay" data-blocking="true">
     <div class="lock-dialog">
         <div class="lock-logo">NP</div>
         <h2 class="lock-title">Session Locked</h2>
@@ -528,13 +905,65 @@
 </div>
 {% endif %}
 
+<script src="{{ url_for('static', filename='js/error-handler.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/free_widgets.js') }}"></script>
 <script>
-/* Admin: Restart the Flask server */
+/* Route index for Command Palette (4.5) */
+window.__npRoutes = [
+    {label: 'Dashboard', url: '/dashboard', category: 'Pages'},
+    {label: 'My Patients', url: '/patients', category: 'Pages'},
+    {% if user_can_access('timer') %}{label: 'Timer', url: '/timer', category: 'Pages'},{% endif %}
+    {% if user_can_access('inbox') %}{label: 'Inbox', url: '/inbox', category: 'Pages'},{% endif %}
+    {% if user_can_access('oncall') %}{label: 'On-Call', url: '/oncall', category: 'Pages'},{% endif %}
+    {% if user_can_access('orders') %}{label: 'Orders', url: '/orders', category: 'Pages'},{% endif %}
+    {% if user_can_access('labtrack') %}{label: 'Lab Track', url: '/labtrack', category: 'Pages'},{% endif %}
+    {% if user_can_access('caregap') %}{label: 'Care Gaps', url: '/caregap', category: 'Pages'},{% endif %}
+    {% if user_can_access('briefing') %}{label: 'Morning Briefing', url: '/briefing', category: 'Pages'},{% endif %}
+    {% if user_can_access('reformatter') %}{label: 'Note Reformatter', url: '/reformatter', category: 'Tools'},{% endif %}
+    {% if user_can_access('metrics') %}{label: 'Metrics', url: '/metrics', category: 'Pages'},{% endif %}
+    {% if user_can_access('medref') %}{label: 'Med Reference', url: '/medref', category: 'Tools'},{% endif %}
+    {% if user_can_access('patient_gen') %}{label: 'Patient Generator', url: '/patient-generator', category: 'Tools'},{% endif %}
+    {label: 'Tickler', url: '/tickler', category: 'Tools'},
+    {label: 'CS Tracker', url: '/cs-tracker', category: 'Tools'},
+    {label: 'PA Tool', url: '/pa', category: 'Tools'},
+    {label: 'Referral Tracker', url: '/referral', category: 'Tools'},
+    {label: 'Coding Helper', url: '/coding', category: 'Tools'},
+    {label: 'Notifications', url: '/notifications', category: 'Tools'},
+    {label: 'Settings', url: '/settings/account', category: 'System'},
+    {label: 'Feature Guide', url: '/help', category: 'Help'},
+    {label: 'API Setup Guide', url: '/setup', category: 'Help'},
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    {label: 'Admin Dashboard', url: '/admin', category: 'Admin'},
+    {label: 'User Management', url: '/admin/users', category: 'Admin'},
+    {label: 'Configuration', url: '/admin/config', category: 'Admin'},
+    {label: 'Care Gap Rules', url: '/caregap/rules', category: 'Admin'},
+    {label: 'Updates', url: '/admin/updates', category: 'Admin'},
+    {label: 'Site Map', url: '/admin/sitemap', category: 'Admin'},
+    {% endif %}
+];
+
+/* Preload help guide data for help popovers (PH44-9D) */
+window.__npHelp = {};
+(function(){
+    fetch('/api/help/items')
+        .then(function(r){ return r.ok ? r.json() : []; })
+        .then(function(items){
+            items.forEach(function(item){
+                window.__npHelp[item.id] = item;
+            });
+            /* Show page help icon if we have data for this page */
+            var pageId = document.body.getAttribute('data-page') || '';
+            var btn = document.getElementById('page-help-icon');
+            if (btn && pageId && window.__npHelp[pageId]) {
+                btn.style.display = '';
+            }
+        })
+        .catch(function(){});
+})();
 function restartServer(e) {
     e.preventDefault();
-    if (!confirm('Restart the NP Companion server? The page will reload in a few seconds.')) return;
+    if (!confirm('Restart the CareCompanion server? The page will reload in a few seconds.')) return;
     fetch('/admin/server/restart', { method: 'POST' })
         .then(function(res) { return res.json(); })
         .then(function(data) {
@@ -542,7 +971,7 @@ function restartServer(e) {
                 document.body.style.opacity = '0.5';
                 setTimeout(function() { location.reload(); }, 4000);
             } else {
-                alert('Restart failed: ' + (data.error || 'Unknown error'));
+                showError(data.error || 'Restart failed. Try again.');
             }
         })
         .catch(function() {
@@ -571,6 +1000,11 @@ function restartServer(e) {
     var results = document.getElementById('patient-search-results');
     if (!input || !results) return;
     var timer = null;
+    function _escHtml(s) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(s || ''));
+        return d.innerHTML;
+    }
     input.addEventListener('input', function() {
         clearTimeout(timer);
         var q = input.value.trim();
@@ -584,10 +1018,10 @@ function restartServer(e) {
                     } else {
                         var html = '';
                         data.forEach(function(p) {
-                            html += '<a href="/patient/' + p.mrn + '" style="display:block;padding:8px 12px;text-decoration:none;color:inherit;border-bottom:1px solid var(--border,#eee);">'
-                                + '<strong>' + p.name + '</strong>'
-                                + '<span style="float:right;font-size:12px;color:var(--text-secondary);">****' + p.mrn_last4 + '</span>'
-                                + (p.last_seen ? '<br><span style="font-size:11px;color:var(--text-secondary);">Last: ' + p.last_seen + '</span>' : '')
+                            html += '<a href="/patient/' + encodeURIComponent(p.mrn) + '" style="display:block;padding:8px 12px;text-decoration:none;color:inherit;border-bottom:1px solid var(--border,#eee);">'
+                                + '<strong>' + _escHtml(p.name) + '</strong>'
+                                + '<span style="float:right;font-size:12px;color:var(--text-secondary);">****' + _escHtml(p.mrn_last4) + '</span>'
+                                + (p.last_seen ? '<br><span style="font-size:11px;color:var(--text-secondary);">Last: ' + _escHtml(p.last_seen) + '</span>' : '')
                                 + '</a>';
                         });
                         results.innerHTML = html;
@@ -604,5 +1038,990 @@ function restartServer(e) {
     });
 })();
 </script>
+<script>
+/* ---- CSRF Protection (11.1) ---- */
+(function() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    if (!meta) return;
+    var token = meta.getAttribute('content');
+
+    /* Auto-inject hidden csrf_token input on every form submit */
+    document.addEventListener('submit', function(e) {
+        var form = e.target;
+        if (form.tagName !== 'FORM') return;
+        if (form.method && form.method.toUpperCase() === 'GET') return;
+        if (!form.querySelector('input[name="csrf_token"]')) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'csrf_token';
+            input.value = token;
+            form.appendChild(input);
+        }
+    }, true);
+
+    /* Override fetch to auto-include X-CSRFToken header on unsafe methods */
+    var _origFetch = window.fetch;
+    window.fetch = function(url, opts) {
+        opts = opts || {};
+        var method = (opts.method || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+            opts.headers = opts.headers || {};
+            /* Support both Headers object and plain object */
+            if (opts.headers instanceof Headers) {
+                if (!opts.headers.has('X-CSRFToken')) {
+                    opts.headers.set('X-CSRFToken', token);
+                }
+            } else {
+                if (!opts.headers['X-CSRFToken']) {
+                    opts.headers['X-CSRFToken'] = token;
+                }
+            }
+        }
+        return _origFetch.call(this, url, opts);
+    };
+})();
+</script>
+
+{# ---- Phase 14 — Global Dismiss Dialog ---- #}
+<div id="dismiss-overlay" class="dismiss-overlay">
+    <div class="dismiss-dialog">
+        <div class="dismiss-dialog-header">Dismiss Suggestion</div>
+        <div class="dismiss-dialog-body">
+            <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px;">Select a reason for dismissing this suggestion:</p>
+            <div class="dismiss-reasons">
+                <label><input type="radio" name="dismiss_reason" value="Already addressed" checked> Already addressed</label>
+                <label><input type="radio" name="dismiss_reason" value="Not applicable"> Not applicable</label>
+                <label><input type="radio" name="dismiss_reason" value="Will address next visit"> Will address next visit</label>
+                <label><input type="radio" name="dismiss_reason" value="Disagree with recommendation"> Disagree with recommendation</label>
+                <label><input type="radio" name="dismiss_reason" value="__custom"> Other (specify below)</label>
+            </div>
+            <textarea class="dismiss-custom-reason" placeholder="Enter custom reason..." style="display:none;"></textarea>
+        </div>
+        <div class="dismiss-dialog-footer">
+            <button class="btn btn-outline btn-sm" onclick="closeDismissDialog()">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="submitDismiss()">Dismiss</button>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+    var overlay = document.getElementById('dismiss-overlay');
+    if (!overlay) return;
+    var radios = overlay.querySelectorAll('input[name="dismiss_reason"]');
+    var custom = overlay.querySelector('.dismiss-custom-reason');
+    radios.forEach(function(r) {
+        r.addEventListener('change', function() {
+            custom.style.display = this.value === '__custom' ? '' : 'none';
+        });
+    });
+})();
+</script>
+
+{# ---- PHASE 44 — UI Overhaul Systems -------------------------------- #}
+<script>
+(function() {
+    'use strict';
+
+    /* ==================================================================
+       PH44-1: CONTEXT SUB-PANEL — Toggle + State Persistence
+       ================================================================== */
+    var panel = document.getElementById('context-panel');
+    var layout = document.querySelector('.app-layout');
+    var pageId = document.body.getAttribute('data-page') || '';
+
+    if (panel && layout) {
+        /* If the panel has content (a child template filled the subpanel block),
+           activate the has-subpanel layout.  Dashboard is excluded. */
+        var hasContent = panel.innerHTML.trim().length > 0;
+        var isDashboard = (pageId === 'dashboard');
+
+        if (hasContent && !isDashboard) {
+            layout.classList.add('has-subpanel');
+
+            /* Insert toggle button */
+            var headerEl = panel.querySelector('.context-panel-header');
+            if (headerEl && !headerEl.querySelector('.cp-toggle')) {
+                var toggle = document.createElement('button');
+                toggle.className = 'cp-toggle';
+                toggle.title = 'Toggle panel';
+                toggle.innerHTML = '&#x276E;'; /* left chevron */
+                toggle.setAttribute('aria-label', 'Toggle context panel');
+                headerEl.appendChild(toggle);
+
+                /* Read persisted state */
+                var storeKey = 'subpanel:' + pageId;
+                if (localStorage.getItem(storeKey) === 'collapsed') {
+                    panel.classList.add('subpanel-collapsed');
+                    layout.classList.add('subpanel-is-collapsed');
+                    toggle.innerHTML = '&#x276F;'; /* right chevron */
+                }
+
+                toggle.addEventListener('click', function() {
+                    var collapsed = panel.classList.toggle('subpanel-collapsed');
+                    layout.classList.toggle('subpanel-is-collapsed', collapsed);
+                    toggle.innerHTML = collapsed ? '&#x276F;' : '&#x276E;';
+                    localStorage.setItem(storeKey, collapsed ? 'collapsed' : 'open');
+                });
+            }
+        } else {
+            /* No sub-panel content — hide the container entirely */
+            panel.style.display = 'none';
+        }
+    }
+
+
+    /* ==================================================================
+       PH44-2: POPUP TASKBAR — ModalTaskbar Class
+       ================================================================== */
+    window.ModalTaskbar = (function() {
+        var _tabs = new Map();
+        var _nextId = 0;
+        var taskbar = document.getElementById('popup-taskbar');
+
+        function _getLabel(modalEl) {
+            /* Try to extract "Patient Name — Modal Title" */
+            var patientName = modalEl.getAttribute('data-patient-name');
+            if (!patientName) {
+                var pnEl = modalEl.querySelector('.patient-name, .chart-header-name');
+                if (pnEl) patientName = pnEl.textContent.trim();
+            }
+            var title = '';
+            var titleEl = modalEl.querySelector('.modal-title, h3, h2');
+            if (titleEl) title = titleEl.textContent.trim();
+            if (!title) title = modalEl.id || 'Popup';
+            return patientName ? (patientName + ' — ' + title) : title;
+        }
+
+        function _saveState(modalEl) {
+            var state = {};
+            /* Save all form input values */
+            var inputs = modalEl.querySelectorAll('input, select, textarea, [contenteditable]');
+            inputs.forEach(function(el, i) {
+                var key = el.id || el.name || ('_el_' + i);
+                if (el.type === 'checkbox' || el.type === 'radio') {
+                    state[key] = el.checked;
+                } else if (el.hasAttribute('contenteditable')) {
+                    state[key] = el.innerHTML;
+                } else {
+                    state[key] = el.value;
+                }
+            });
+            /* Save scroll position */
+            var scrollable = modalEl.querySelector('.modal-body') || modalEl;
+            state._scrollTop = scrollable.scrollTop || 0;
+            return state;
+        }
+
+        function _restoreState(modalEl, state) {
+            if (!state) return;
+            var inputs = modalEl.querySelectorAll('input, select, textarea, [contenteditable]');
+            inputs.forEach(function(el, i) {
+                var key = el.id || el.name || ('_el_' + i);
+                if (key in state) {
+                    if (el.type === 'checkbox' || el.type === 'radio') {
+                        el.checked = state[key];
+                    } else if (el.hasAttribute('contenteditable')) {
+                        el.innerHTML = state[key];
+                    } else {
+                        el.value = state[key];
+                    }
+                }
+            });
+            var scrollable = modalEl.querySelector('.modal-body') || modalEl;
+            scrollable.scrollTop = state._scrollTop || 0;
+        }
+
+        function _recalcWidths() {
+            if (!taskbar) return;
+            var tabs = taskbar.querySelectorAll('.popup-taskbar-tab');
+            /* Equal-width flex handles this via CSS flex: 1 1 0 */
+        }
+
+        function minimize(modalEl) {
+            if (!modalEl || !taskbar) return;
+            if (modalEl.getAttribute('data-blocking') === 'true') return;
+
+            var tabId = 'ptab_' + (_nextId++);
+            var label = _getLabel(modalEl);
+            var state = _saveState(modalEl);
+
+            /* Hide the modal */
+            modalEl.style.display = 'none';
+
+            /* Create taskbar tab */
+            var tab = document.createElement('div');
+            tab.className = 'popup-taskbar-tab';
+            tab.setAttribute('data-tab-id', tabId);
+            var labelSpan = document.createElement('span');
+            labelSpan.className = 'tab-label';
+            labelSpan.textContent = label;
+            var closeBtn = document.createElement('button');
+            closeBtn.className = 'tab-close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.title = 'Close';
+            tab.appendChild(labelSpan);
+            tab.appendChild(closeBtn);
+            taskbar.appendChild(tab);
+
+            _tabs.set(tabId, { modalEl: modalEl, state: state, label: label, tabEl: tab });
+
+            /* Click tab label → restore */
+            labelSpan.addEventListener('click', function() {
+                ModalTaskbar.restore(tabId);
+            });
+
+            /* Click close → discard */
+            closeBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                ModalTaskbar.close(tabId);
+            });
+
+            _recalcWidths();
+        }
+
+        function restore(tabId) {
+            var entry = _tabs.get(tabId);
+            if (!entry) return;
+
+            entry.modalEl.style.display = 'flex';
+            _restoreState(entry.modalEl, entry.state);
+
+            /* Remove tab */
+            entry.tabEl.remove();
+            _tabs.delete(tabId);
+            _recalcWidths();
+        }
+
+        function close(tabId) {
+            var entry = _tabs.get(tabId);
+            if (!entry) return;
+
+            /* Discard — do not reopen modal */
+            entry.tabEl.remove();
+            _tabs.delete(tabId);
+            _recalcWidths();
+        }
+
+        return { minimize: minimize, restore: restore, close: close };
+    })();
+
+    /* Rewire modal backdrop clicks → minimize to taskbar (PH44 step 25) */
+    document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+        /* Remove old click handler by cloning (preserves children) */
+        var newBackdrop = backdrop.cloneNode(true);
+        backdrop.parentNode.replaceChild(newBackdrop, backdrop);
+
+        newBackdrop.addEventListener('click', function(e) {
+            if (e.target !== newBackdrop) return;
+            /* Check if blocking */
+            if (newBackdrop.getAttribute('data-blocking') === 'true') return;
+            /* Minimize instead of closing */
+            ModalTaskbar.minimize(newBackdrop);
+        });
+
+        /* Re-attach data-dismiss close buttons */
+        newBackdrop.querySelectorAll('.modal-close[data-dismiss]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var modalId = btn.getAttribute('data-dismiss');
+                var modal = document.getElementById(modalId);
+                if (modal) modal.style.display = 'none';
+            });
+        });
+    });
+
+
+    /* ==================================================================
+       PH44-6: BREADCRUMB TRAIL
+       ================================================================== */
+    (function() {
+        var trail = document.getElementById('breadcrumb-trail');
+        if (!trail) return;
+
+        var MAX_CRUMBS = 5;
+        var storageKey = 'breadcrumbs';
+        var currentUrl = window.location.pathname + window.location.search;
+        var currentLabel = document.title.replace(' — CareCompanion', '').replace(' - CareCompanion', '').trim() || pageId || 'Page';
+
+        /* Read badge context from main content data attribute */
+        var mainEl = document.getElementById('main-content');
+        var badge = (mainEl && mainEl.getAttribute('data-breadcrumb-badge')) || '';
+
+        /* Load existing crumbs */
+        var crumbs = [];
+        try {
+            crumbs = JSON.parse(sessionStorage.getItem(storageKey)) || [];
+        } catch(e) { crumbs = []; }
+
+        /* Deduplicate: remove existing entry for this URL */
+        crumbs = crumbs.filter(function(c) { return c.url !== currentUrl; });
+
+        /* Add current page to front */
+        crumbs.unshift({ url: currentUrl, label: currentLabel, badge: badge, ts: Date.now() });
+
+        /* Cap at MAX_CRUMBS */
+        if (crumbs.length > MAX_CRUMBS) crumbs = crumbs.slice(0, MAX_CRUMBS);
+
+        /* Save back */
+        sessionStorage.setItem(storageKey, JSON.stringify(crumbs));
+
+        /* Render chips */
+        trail.innerHTML = '';
+        crumbs.forEach(function(c, idx) {
+            var chip = document.createElement('a');
+            chip.className = 'breadcrumb-chip' + (idx === 0 ? ' active' : '');
+            chip.href = c.url;
+            chip.textContent = c.label;
+            if (c.badge) {
+                var badgeSpan = document.createElement('span');
+                badgeSpan.className = 'bc-badge';
+                badgeSpan.textContent = c.badge;
+                chip.appendChild(document.createTextNode(' '));
+                chip.appendChild(badgeSpan);
+            }
+            trail.appendChild(chip);
+        });
+    })();
+
+
+    /* ==================================================================
+       PH44-7: TYPE-AHEAD FILTERING
+       ================================================================== */
+    (function() {
+        var filterText = '';
+        var indicator = null;
+
+        function getOrCreateIndicator() {
+            if (indicator) return indicator;
+            indicator = document.createElement('div');
+            indicator.className = 'type-ahead-indicator';
+            indicator.innerHTML = '<span class="ta-text"></span><span class="ta-clear">✕</span>';
+            document.body.appendChild(indicator);
+
+            indicator.querySelector('.ta-clear').addEventListener('click', function() {
+                clearFilter();
+            });
+            return indicator;
+        }
+
+        function applyFilter() {
+            var ind = getOrCreateIndicator();
+            ind.querySelector('.ta-text').textContent = '🔍 ' + filterText;
+            ind.classList.toggle('visible', filterText.length > 0);
+
+            var items = document.querySelectorAll('[data-filterable]');
+            if (items.length === 0) return;
+
+            var lowerFilter = filterText.toLowerCase();
+            items.forEach(function(el) {
+                if (filterText.length === 0) {
+                    el.classList.remove('ta-hidden');
+                } else {
+                    var text = el.textContent.toLowerCase();
+                    el.classList.toggle('ta-hidden', text.indexOf(lowerFilter) === -1);
+                }
+            });
+        }
+
+        function clearFilter() {
+            filterText = '';
+            applyFilter();
+        }
+
+        var debounceTimer = null;
+        document.addEventListener('keydown', function(e) {
+            /* Skip if focused on input/textarea/select/contenteditable */
+            var tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            if (e.target.isContentEditable) return;
+            /* Skip modifier combos (Ctrl+K for command palette etc.) */
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            if (e.key === 'Escape') {
+                clearFilter();
+                return;
+            }
+            if (e.key === 'Backspace') {
+                if (filterText.length > 0) {
+                    e.preventDefault();
+                    filterText = filterText.slice(0, -1);
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(applyFilter, 100);
+                }
+                return;
+            }
+
+            /* Only capture printable single characters */
+            if (e.key.length === 1) {
+                /* Don't capture if no filterable items on page */
+                var items = document.querySelectorAll('[data-filterable]');
+                if (items.length === 0) return;
+                e.preventDefault();
+                filterText += e.key;
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(applyFilter, 100);
+            }
+        });
+    })();
+
+
+    /* ==================================================================
+       PH44-8: PAGE TRANSITIONS
+       ================================================================== */
+    (function() {
+        var preset = localStorage.getItem('pageTransition') || 'none';
+
+        /* Apply enter animation on page load */
+        if (preset && preset !== 'none') {
+            document.documentElement.classList.add('page-transition-' + preset);
+        }
+
+        /* Intercept internal navigation for exit animation */
+        document.addEventListener('click', function(e) {
+            if (preset === 'none') return;
+            var link = e.target.closest('a[href]');
+            if (!link) return;
+            var href = link.getAttribute('href');
+            /* Only intercept internal same-origin links */
+            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            if (link.getAttribute('target') === '_blank') return;
+            if (link.getAttribute('data-external') === 'true') return;
+            if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+            try {
+                var url = new URL(href, window.location.origin);
+                if (url.origin !== window.location.origin) return;
+            } catch(ex) { return; }
+
+            e.preventDefault();
+            document.documentElement.classList.remove('page-transition-' + preset);
+            document.documentElement.classList.add('page-exit-' + preset);
+
+            setTimeout(function() {
+                window.location.href = href;
+            }, 150);
+        });
+    })();
+
+
+    /* ==================================================================
+       PH44-3: SPLIT VIEW MANAGER
+       ================================================================== */
+    window.SplitViewManager = (function() {
+        var _active = false;
+        var _splitContainer = null;
+        var _primaryPane = null;
+        var _secondaryPane = null;
+        var _divider = null;
+        var _maxPanes = parseInt(localStorage.getItem('splitMaxPanes') || '2', 10);
+        var _mainEl = document.getElementById('main-content');
+        var _splitBtn = document.getElementById('split-toggle-btn');
+
+        if (!_mainEl) return { open: function(){}, close: function(){}, toggle: function(){} };
+
+        function _buildContainerIfNeeded() {
+            if (_splitContainer) return;
+
+            /* Create the split panes wrapper */
+            _splitContainer = document.createElement('div');
+            _splitContainer.className = 'split-panes';
+            _splitContainer.id = 'split-panes';
+
+            /* Primary pane wraps existing content */
+            _primaryPane = document.createElement('div');
+            _primaryPane.className = 'split-pane pane-primary';
+            _primaryPane.id = 'split-pane-primary';
+            /* Move all children of main into primary */
+            while (_mainEl.firstChild) {
+                _primaryPane.appendChild(_mainEl.firstChild);
+            }
+
+            /* Draggable divider */
+            _divider = document.createElement('div');
+            _divider.className = 'split-divider';
+            _divider.id = 'split-divider';
+
+            /* Secondary pane */
+            _secondaryPane = document.createElement('div');
+            _secondaryPane.className = 'split-pane pane-secondary';
+            _secondaryPane.id = 'split-pane-secondary';
+            var header = document.createElement('div');
+            header.className = 'split-pane-header';
+            var titleSpan = document.createElement('span');
+            titleSpan.className = 'pane-title';
+            titleSpan.id = 'split-pane-title';
+            titleSpan.textContent = 'Loading…';
+            var closeBtn = document.createElement('button');
+            closeBtn.className = 'pane-close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.title = 'Close split view';
+            closeBtn.addEventListener('click', function() { SplitViewManager.close(); });
+            header.appendChild(titleSpan);
+            header.appendChild(closeBtn);
+            var iframe = document.createElement('iframe');
+            iframe.id = 'split-iframe';
+            iframe.src = 'about:blank';
+            iframe.title = 'Split view pane';
+            _secondaryPane.appendChild(header);
+            _secondaryPane.appendChild(iframe);
+
+            _splitContainer.appendChild(_primaryPane);
+            _splitContainer.appendChild(_divider);
+            _splitContainer.appendChild(_secondaryPane);
+            _mainEl.appendChild(_splitContainer);
+            _mainEl.classList.add('split-active');
+
+            /* Divider drag resize */
+            _divider.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                _divider.classList.add('dragging');
+                var startX = e.clientX;
+                var startFlex = _primaryPane.getBoundingClientRect().width;
+                var totalWidth = _splitContainer.getBoundingClientRect().width;
+
+                function onMove(ev) {
+                    var dx = ev.clientX - startX;
+                    var newPrimary = Math.max(200, Math.min(totalWidth - 200, startFlex + dx));
+                    var newSecondary = totalWidth - newPrimary - 5; /* 5px divider */
+                    _primaryPane.style.flex = 'none';
+                    _primaryPane.style.width = newPrimary + 'px';
+                    _secondaryPane.style.flex = 'none';
+                    _secondaryPane.style.width = newSecondary + 'px';
+                }
+                function onUp() {
+                    _divider.classList.remove('dragging');
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+
+        function open(url) {
+            _buildContainerIfNeeded();
+            _active = true;
+            var iframe = document.getElementById('split-iframe');
+            var titleEl = document.getElementById('split-pane-title');
+            if (iframe) {
+                iframe.src = url;
+                iframe.onload = function() {
+                    try {
+                        titleEl.textContent = iframe.contentDocument.title || url;
+                    } catch(e) { titleEl.textContent = url; }
+                };
+            }
+            if (_splitBtn) _splitBtn.classList.add('split-active');
+        }
+
+        function close() {
+            if (!_splitContainer) return;
+            _active = false;
+            /* Restore primary pane children back to main */
+            if (_primaryPane) {
+                while (_primaryPane.firstChild) {
+                    _mainEl.insertBefore(_primaryPane.firstChild, _splitContainer);
+                }
+            }
+            _splitContainer.remove();
+            _splitContainer = null;
+            _primaryPane = null;
+            _secondaryPane = null;
+            _divider = null;
+            _mainEl.classList.remove('split-active');
+            if (_splitBtn) _splitBtn.classList.remove('split-active');
+        }
+
+        function toggle() {
+            if (_active) {
+                close();
+            } else {
+                /* Open command palette to pick a URL, fallback to /dashboard */
+                var cmdInput = document.getElementById('cmd-palette-input');
+                if (window.openCommandPalette) {
+                    /* hook: after selection, open in split */
+                    window.__splitPendingOpen = true;
+                }
+                open('/dashboard');
+            }
+        }
+
+        /* Split button click */
+        if (_splitBtn) {
+            _splitBtn.addEventListener('click', function() { toggle(); });
+        }
+
+        /* Ctrl+click interceptor for links */
+        if (!window._splitClickRegistered) {
+        document.addEventListener('click', function(e) {
+            if (!e.ctrlKey && !e.metaKey) return;
+            var link = e.target.closest('a[href]:not([target="_blank"]):not([data-external="true"])');
+            if (!link) return;
+            var href = link.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            try {
+                var url = new URL(href, window.location.origin);
+                if (url.origin !== window.location.origin) return;
+            } catch(ex) { return; }
+            e.preventDefault();
+            e.stopPropagation();
+            open(href);
+        }, true);
+        window._splitClickRegistered = true;
+        }
+
+        return { open: open, close: close, toggle: toggle };
+    })();
+
+
+    /* ==================================================================
+       PH44-4: PIP MANAGER
+       ================================================================== */
+    window.PipManager = (function() {
+        var _windows = new Map();
+        var _nextId = 0;
+
+        function create(sourceEl, options) {
+            options = options || {};
+            var pipId = 'pip_' + (_nextId++);
+            var title = options.title || sourceEl.getAttribute('data-pip-title') || 'Widget';
+
+            /* Clone the source element's inner content */
+            var clonedBody = sourceEl.cloneNode(true);
+            /* Remove pip-eligible marker + pop-out button from clone to avoid infinite nesting */
+            clonedBody.removeAttribute('data-pip');
+            var popBtns = clonedBody.querySelectorAll('.pip-popout-btn');
+            popBtns.forEach(function(b) { b.remove(); });
+
+            /* Build the pip window */
+            var win = document.createElement('div');
+            win.className = 'pip-window';
+            win.id = pipId;
+            win.style.left = (60 + _windows.size * 20) + 'px';
+            win.style.top  = (100 + _windows.size * 20) + 'px';
+
+            var header = document.createElement('div');
+            header.className = 'pip-header';
+            header.title = 'Drag to move';
+            var titleSpan = document.createElement('span');
+            titleSpan.className = 'pip-title';
+            titleSpan.textContent = title;
+            var actions = document.createElement('div');
+            actions.className = 'pip-header-actions';
+
+            var minBtn = document.createElement('button');
+            minBtn.className = 'pip-btn pip-minimize';
+            minBtn.innerHTML = '&#8722;';
+            minBtn.title = 'Minimize';
+            minBtn.addEventListener('click', function(e) { e.stopPropagation(); PipManager.minimize(pipId); });
+
+            var closeBtn = document.createElement('button');
+            closeBtn.className = 'pip-btn pip-close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.title = 'Close';
+            closeBtn.addEventListener('click', function(e) { e.stopPropagation(); PipManager.destroy(pipId); });
+
+            actions.appendChild(minBtn);
+            actions.appendChild(closeBtn);
+            header.appendChild(titleSpan);
+            header.appendChild(actions);
+
+            var body = document.createElement('div');
+            body.className = 'pip-body';
+            body.appendChild(clonedBody);
+
+            var resizeHandle = document.createElement('div');
+            resizeHandle.className = 'pip-resize-handle';
+
+            win.appendChild(header);
+            win.appendChild(body);
+            win.appendChild(resizeHandle);
+            document.body.appendChild(win);
+
+            /* Drag via header */
+            _makeDraggable(win, header);
+            /* Resize via handle */
+            _makeResizable(win, resizeHandle);
+
+            _windows.set(pipId, { element: win, minimized: false, title: title });
+            return pipId;
+        }
+
+        function destroy(pipId) {
+            var entry = _windows.get(pipId);
+            if (!entry) return;
+            entry.element.remove();
+            _windows.delete(pipId);
+        }
+
+        function minimize(pipId) {
+            var entry = _windows.get(pipId);
+            if (!entry) return;
+            entry.minimized = true;
+            entry.element.classList.add('pip-minimized');
+        }
+
+        function restore(pipId) {
+            var entry = _windows.get(pipId);
+            if (!entry) return;
+            entry.minimized = false;
+            entry.element.classList.remove('pip-minimized');
+        }
+
+        function _makeDraggable(win, handle) {
+            handle.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                var startX = e.clientX - win.offsetLeft;
+                var startY = e.clientY - win.offsetTop;
+                function onMove(ev) {
+                    win.style.left = Math.max(0, ev.clientX - startX) + 'px';
+                    win.style.top  = Math.max(0, ev.clientY - startY) + 'px';
+                    win.style.right = 'auto';
+                    win.style.bottom = 'auto';
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+
+        function _makeResizable(win, handle) {
+            handle.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                var startX = e.clientX;
+                var startY = e.clientY;
+                var startW = win.offsetWidth;
+                var startH = win.offsetHeight;
+                function onMove(ev) {
+                    var newW = Math.max(240, startW + (ev.clientX - startX));
+                    var newH = Math.max(180, startH + (ev.clientY - startY));
+                    win.style.width  = newW + 'px';
+                    win.style.height = newH + 'px';
+                }
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+
+        /* Wire up all .pip-popout-btn clicks */
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.pip-popout-btn');
+            if (!btn) return;
+            var widget = btn.closest('[data-pip="true"]');
+            if (!widget) return;
+            e.stopPropagation();
+            create(widget);
+        });
+
+        /* Double-click pip header to restore if minimized */
+        document.addEventListener('dblclick', function(e) {
+            var header = e.target.closest('.pip-header');
+            if (!header) return;
+            var win = header.closest('.pip-window');
+            if (!win) return;
+            var pipId = win.id;
+            var entry = _windows.get(pipId);
+            if (entry && entry.minimized) restore(pipId);
+        });
+
+        return { create: create, destroy: destroy, minimize: minimize, restore: restore };
+    })();
+
+
+    /* ==================================================================
+       PH44-5: DRAG-TO-BOOKMARK
+       ================================================================== */
+    (function() {
+        var bmBar = document.getElementById('bookmarks-bar');
+        var bmPersonal = document.getElementById('bm-personal-chips');
+        if (!bmBar || !bmPersonal) return;
+
+        /* Make all eligible links draggable */
+        function markDraggable() {
+            document.querySelectorAll('a[href]:not([data-no-drag]):not([data-external="true"])').forEach(function(link) {
+                if (!link.hasAttribute('draggable')) {
+                    link.setAttribute('draggable', 'true');
+                }
+                link.addEventListener('dragstart', function(e) {
+                    var href = link.getAttribute('href');
+                    var label = link.textContent.trim() || link.title || href;
+                    try {
+                        var abs = new URL(href, window.location.origin);
+                        if (abs.origin !== window.location.origin) return;
+                        e.dataTransfer.setData('text/plain', abs.pathname + abs.search);
+                        e.dataTransfer.setData('text/np-label', label.substring(0,40));
+                        e.dataTransfer.effectAllowed = 'copy';
+                    } catch(ex) {}
+                }, { once: false });
+            });
+        }
+
+        /* Re-mark after dynamic content loads */
+        markDraggable();
+        var _markTimer;
+        var _observer = new MutationObserver(function() {
+            clearTimeout(_markTimer);
+            _markTimer = setTimeout(markDraggable, 400);
+        });
+        _observer.observe(document.body, { childList: true, subtree: true });
+
+        /* Bookmarks bar drag target */
+        bmBar.addEventListener('dragover', function(e) {
+            var href = e.dataTransfer.types && (e.dataTransfer.types.indexOf('text/plain') !== -1 || e.dataTransfer.types.indexOf('text/np-label') !== -1);
+            if (!href) return;
+            e.preventDefault();
+            bmBar.classList.add('drag-over');
+            e.dataTransfer.dropEffect = 'copy';
+        });
+        bmBar.addEventListener('dragleave', function(e) {
+            if (!bmBar.contains(e.relatedTarget)) bmBar.classList.remove('drag-over');
+        });
+        bmBar.addEventListener('drop', function(e) {
+            e.preventDefault();
+            bmBar.classList.remove('drag-over');
+            var url = e.dataTransfer.getData('text/plain');
+            var label = e.dataTransfer.getData('text/np-label') || url;
+            if (!url) return;
+            /* Check if dropped on a folder */
+            var folder = e.target.closest('.bm-folder');
+            if (folder) {
+                var folderLabel = folder.getAttribute('data-folder-label') || '';
+                _addBookmark(url, label, folderLabel);
+            } else {
+                _addBookmark(url, label, null);
+            }
+        });
+
+        function _addBookmark(url, label, folderLabel) {
+            var payload = folderLabel
+                ? { url: url, label: label, folder: folderLabel }
+                : { url: url, label: label };
+            fetch('/api/bookmarks/personal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    /* Reload bookmarks bar */
+                    if (typeof window.loadBookmarks === 'function') window.loadBookmarks();
+                }
+            })
+            .catch(function(){});
+        }
+
+        /* Make .bm-folder elements drop targets */
+        document.addEventListener('dragover', function(e) {
+            var folder = e.target.closest('.bm-folder');
+            if (folder) {
+                e.preventDefault();
+                folder.classList.add('drag-over');
+                e.dataTransfer.dropEffect = 'copy';
+            }
+        });
+        document.addEventListener('dragleave', function(e) {
+            var folder = e.target.closest('.bm-folder');
+            if (folder && !folder.contains(e.relatedTarget)) {
+                folder.classList.remove('drag-over');
+            }
+        });
+    })();
+
+
+    /* ==================================================================
+       PH44-9D: HELP POPOVERS
+       ================================================================== */
+    (function() {
+        var _openPopover = null;
+
+        function _showPopover(btn, popover, helpId) {
+            var item = window.__npHelp && window.__npHelp[helpId];
+            if (!item) return;
+            var title = popover.querySelector('.help-popover-title');
+            var body  = popover.querySelector('.help-popover-body');
+            var link  = popover.querySelector('.help-popover-link');
+            if (title) title.textContent = item.name || helpId;
+            if (body)  body.textContent  = (item.description || '').substring(0, 200);
+            if (link)  link.href = '/help/' + helpId;
+
+            /* Position near button */
+            var rect = btn.getBoundingClientRect();
+            popover.style.left = Math.max(8, rect.left) + 'px';
+            popover.style.top  = (rect.bottom + 6) + 'px';
+            popover.setAttribute('aria-hidden', 'false');
+            popover.classList.add('open');
+            _openPopover = popover;
+        }
+
+        function _hideAll() {
+            document.querySelectorAll('.help-popover.open').forEach(function(p) {
+                p.classList.remove('open');
+                p.setAttribute('aria-hidden', 'true');
+            });
+            _openPopover = null;
+        }
+
+        /* Delegate click for all .help-icon buttons */
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.help-icon');
+            if (btn) {
+                e.stopPropagation();
+                var helpId = btn.getAttribute('data-help-id');
+                /* Find associated popover — by id convention or next sibling */
+                var popoverId = btn.id ? btn.id.replace('-icon', '-popover') : null;
+                var popover = (popoverId && document.getElementById(popoverId))
+                    || btn.nextElementSibling;
+                if (!popover || !popover.classList.contains('help-popover')) return;
+                if (popover.classList.contains('open')) {
+                    _hideAll();
+                } else {
+                    _hideAll();
+                    _showPopover(btn, popover, helpId);
+                }
+                return;
+            }
+            /* Click outside → dismiss */
+            if (_openPopover && !_openPopover.contains(e.target)) {
+                _hideAll();
+            }
+        });
+
+        /* Escape to dismiss */
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && _openPopover) _hideAll();
+        });
+
+        /* Hover tooltip: show popover on mouseenter of .help-icon */
+        document.addEventListener('mouseenter', function(e) {
+            var btn = e.target.closest('.help-icon');
+            if (!btn || _openPopover) return;
+            var helpId = btn.getAttribute('data-help-id');
+            var popoverId = btn.id ? btn.id.replace('-icon', '-popover') : null;
+            var popover = (popoverId && document.getElementById(popoverId))
+                || btn.nextElementSibling;
+            if (!popover || !popover.classList.contains('help-popover')) return;
+            _showPopover(btn, popover, helpId);
+        }, true);
+        document.addEventListener('mouseleave', function(e) {
+            var btn = e.target.closest('.help-icon');
+            if (!btn || !_openPopover) return;
+            /* Small delay so user can mouse into the popover */
+            setTimeout(function() {
+                if (_openPopover && !_openPopover.matches(':hover')) _hideAll();
+            }, 200);
+        }, true);
+    })();
+
+})();
+
 </body>
 </html>

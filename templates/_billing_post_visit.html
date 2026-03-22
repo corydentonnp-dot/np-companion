@@ -1,0 +1,213 @@
+{#
+  Post-Visit Billing Summary — modal overlay
+  Phase 19E.2
+
+  Included in timer.html.
+  Triggered when ?show_billing=1&billing_mrn=XXX is present after face_stop().
+  Fetches pending billing opportunities and displays accept/dismiss for each.
+#}
+<div id="post-visit-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.55);padding:24px;overflow-y:auto;">
+    <div style="max-width:620px;margin:40px auto;background:var(--bg-card,#fff);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);overflow:hidden;">
+        {# Header #}
+        <div style="background:linear-gradient(90deg,#27ae60 0%,#1a7a42 100%);padding:16px 20px;color:#fff;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:22px;">&#128176;</span>
+                    <div>
+                        <div style="font-weight:700;font-size:16px;">Post-Visit Billing Review</div>
+                        <div style="font-size:12px;opacity:0.85;">Don't leave money on the table</div>
+                    </div>
+                </div>
+                <button onclick="closePostVisitModal()" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px;">&#10005;</button>
+            </div>
+        </div>
+        {# Revenue summary #}
+        <div id="pv-summary" style="padding:12px 20px;background:var(--bg-secondary,#f8f9fa);font-size:13px;display:flex;justify-content:space-between;align-items:center;">
+            <span id="pv-count">Loading...</span>
+            <span id="pv-total" style="font-weight:700;font-size:18px;color:#27ae60;"></span>
+        </div>
+        {# Opportunities list #}
+        <div id="pv-list" style="padding:16px 20px;max-height:400px;overflow-y:auto;">
+            <div style="text-align:center;padding:20px;color:var(--text-secondary);">Loading opportunities...</div>
+        </div>
+        {# Footer #}
+        <div style="padding:12px 20px;border-top:1px solid var(--border-color,#e2e8f0);display:flex;justify-content:space-between;align-items:center;">
+            <button class="btn btn-sm btn-outline" onclick="closePostVisitModal()">Close</button>
+            <button class="btn btn-sm btn-primary" id="pv-accept-all-btn" style="display:none;" onclick="pvAcceptAll()">&#10003; Accept All</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var params = new URLSearchParams(window.location.search);
+    var showBilling = params.get('show_billing');
+    var billingMrn = params.get('billing_mrn');
+    if (showBilling !== '1' || !billingMrn) return;
+
+    /* Strip query params from URL bar without reload */
+    var cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+
+    document.getElementById('post-visit-overlay').style.display = '';
+
+    fetch('/api/patient/' + encodeURIComponent(billingMrn) + '/billing-opportunities')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var opps = data.opportunities || [];
+            var listEl = document.getElementById('pv-list');
+            var countEl = document.getElementById('pv-count');
+            var totalEl = document.getElementById('pv-total');
+            var acceptBtn = document.getElementById('pv-accept-all-btn');
+
+            if (opps.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);">No pending billing opportunities for this visit.</div>';
+                countEl.textContent = '0 opportunities';
+                return;
+            }
+
+            var total = 0;
+            opps.forEach(function(o) { total += o.revenue || 0; });
+            countEl.textContent = opps.length + ' opportunit' + (opps.length === 1 ? 'y' : 'ies') + ' detected';
+            totalEl.textContent = '~$' + Math.round(total);
+            acceptBtn.style.display = '';
+
+            var html = '';
+            opps.forEach(function(o) {
+                var pColor = o.priority === 'high' ? '#ef4444' : o.priority === 'medium' ? '#f59e0b' : '#6b7280';
+                html += '<div class="pv-opp-row" data-opp-id="' + o.id + '" style="border:1px solid var(--border-color,#e2e8f0);border-radius:8px;padding:10px 12px;margin-bottom:8px;">';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+                html += '<div style="display:flex;align-items:center;gap:8px;">';
+                html += '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + pColor + ';"></span>';
+                html += '<strong style="font-size:13px;">' + _pvEsc(o.opportunity_code || o.type) + '</strong>';
+                html += '<span style="font-size:11px;color:var(--text-secondary);">' + _pvEsc(o.category || '') + '</span>';
+                html += '</div>';
+                html += '<span style="font-weight:700;color:#27ae60;">~$' + Math.round(o.revenue) + '</span>';
+                html += '</div>';
+                html += '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">' + _pvEsc(o.codes || '') + ' — ' + _pvEsc((o.basis || '').substring(0, 120)) + '</div>';
+
+                /* Checklist */
+                if (o.checklist && o.checklist.length > 0) {
+                    html += '<div style="margin-top:6px;padding:4px 0;">';
+                    o.checklist.forEach(function(item) {
+                        html += '<div style="font-size:11px;padding:1px 0;">&#9744; ' + _pvEsc(item) + '</div>';
+                    });
+                    html += '</div>';
+                }
+
+                html += '<div style="margin-top:6px;display:flex;gap:6px;">';
+                html += '<button class="btn btn-sm btn-primary" style="font-size:11px;padding:3px 10px;" onclick="pvCapture(' + o.id + ',this)">&#10003; Accept</button>';
+                html += '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 10px;" onclick="pvDismiss(' + o.id + ',this)">&#10005; Dismiss</button>';
+                html += '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 10px;" onclick="pvTogglePhrases(\'' + _pvEsc(o.opportunity_code || o.type) + '\',this)">&#128221; Doc Language</button>';
+                html += '</div>';
+                html += '<div class="pv-phrase-panel" id="pv-phrases-' + _pvEsc(o.opportunity_code || o.type) + '" style="display:none;margin-top:6px;padding:6px 8px;background:var(--bg-secondary,#f1f5f9);border-radius:6px;font-size:11px;"></div>';
+                html += '</div>';
+            });
+            listEl.innerHTML = html;
+
+            /* Phase 22.4: Why-not link */
+            fetch('/api/billing/why-not/' + encodeURIComponent(billingMrn))
+                .then(function(r) { return r.json(); })
+                .then(function(wnData) {
+                    if (wnData.count > 0) {
+                        var wnHtml = '<div style="margin-top:8px;padding:6px 12px;text-align:right;">' +
+                            '<a href="/billing/why-not/' + encodeURIComponent(billingMrn) + '" style="color:var(--color-green,#27ae60);font-size:11px;text-decoration:underline;" target="_blank">' +
+                            '&#10067; ' + wnData.count + ' opportunit' + (wnData.count === 1 ? 'y' : 'ies') + ' not shown &mdash; see why</a></div>';
+                        listEl.insertAdjacentHTML('beforeend', wnHtml);
+                    }
+                })
+                .catch(function() { /* silent */ });
+        })
+        .catch(function() {
+            document.getElementById('pv-list').innerHTML = '<div style="text-align:center;padding:20px;color:#ef4444;">Failed to load billing data.</div>';
+        });
+})();
+
+function _pvEsc(s) {
+    if (!s) return '';
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+}
+
+function closePostVisitModal() {
+    document.getElementById('post-visit-overlay').style.display = 'none';
+}
+
+function pvCapture(id, btn) {
+    fetch('/api/billing/opportunity/' + id + '/capture', {method:'POST', headers:{'Content-Type':'application/json'}})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                var row = btn.closest('.pv-opp-row');
+                if (row) { row.style.opacity = '0.4'; row.style.pointerEvents = 'none'; }
+            }
+        });
+}
+
+function pvDismiss(id, btn) {
+    var reason = prompt('Dismiss reason (optional):');
+    if (reason === null) return;
+    fetch('/api/billing/opportunity/' + id + '/dismiss', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({reason:reason})})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                var row = btn.closest('.pv-opp-row');
+                if (row) { row.style.opacity = '0.3'; row.style.pointerEvents = 'none'; }
+            }
+        });
+}
+
+function pvAcceptAll() {
+    var rows = document.querySelectorAll('.pv-opp-row');
+    rows.forEach(function(row) {
+        if (row.style.pointerEvents === 'none') return;
+        var oppId = row.getAttribute('data-opp-id');
+        fetch('/api/billing/opportunity/' + oppId + '/capture', {method:'POST', headers:{'Content-Type':'application/json'}})
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) { row.style.opacity = '0.4'; row.style.pointerEvents = 'none'; }
+            });
+    });
+}
+
+/* Phase 21.6: Post-visit documentation phrase reminder */
+function pvTogglePhrases(oppCode, btn) {
+    var panel = document.getElementById('pv-phrases-' + oppCode);
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    if (panel.getAttribute('data-loaded')) { panel.style.display = ''; return; }
+    panel.innerHTML = '<span style="color:var(--text-secondary);">Loading...</span>';
+    panel.style.display = '';
+    fetch('/api/billing/phrases-for-code/' + encodeURIComponent(oppCode))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var phrases = data.phrases || [];
+            if (phrases.length === 0) {
+                panel.innerHTML = '<span style="color:var(--text-secondary);">No phrases available.</span>';
+                panel.setAttribute('data-loaded', '1');
+                return;
+            }
+            var h = '<div style="font-weight:600;margin-bottom:4px;color:var(--color-green);">Documentation Language — click to copy</div>';
+            phrases.forEach(function(p) {
+                h += '<div style="padding:6px 8px;margin-bottom:4px;border:1px solid var(--border-color,#e2e8f0);border-radius:4px;cursor:pointer;background:var(--bg-card,#fff);" ' +
+                     'onclick="pvCopyPhrase(this)" data-phrase-text="' + _pvEsc(p.text) + '">';
+                h += '<div style="font-weight:600;font-size:11px;">' + _pvEsc(p.title) + '</div>';
+                h += '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;max-height:50px;overflow:hidden;">' + _pvEsc(p.text).substring(0, 180) + '...</div>';
+                h += '</div>';
+            });
+            panel.innerHTML = h;
+            panel.setAttribute('data-loaded', '1');
+        })
+        .catch(function() { panel.innerHTML = '<span style="color:#ef4444;">Failed to load.</span>'; });
+}
+
+function pvCopyPhrase(el) {
+    var text = el.getAttribute('data-phrase-text');
+    navigator.clipboard.writeText(text).then(function() {
+        el.style.borderColor = '#10b981';
+        el.style.background = '#d1fae5';
+        setTimeout(function() { el.style.borderColor = ''; el.style.background = ''; }, 1200);
+    });
+}
+</script>

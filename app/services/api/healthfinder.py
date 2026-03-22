@@ -1,5 +1,5 @@
 """
-NP Companion — AHRQ HealthFinder Preventive Care Service
+CareCompanion — AHRQ HealthFinder Preventive Care Service
 File: app/services/api/healthfinder.py
 
 Returns USPSTF-aligned preventive care recommendations personalized to
@@ -13,7 +13,7 @@ Dependencies:
 - app/services/api/base_client.py (BaseAPIClient)
 - app/api_config.py (HEALTHFINDER_BASE_URL, HEALTHFINDER_CACHE_TTL_DAYS)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Care Gap Tracker (F15) — replaces all hardcoded USPSTF rules
 - Care gap auto-population (F15a) — evaluates gaps on schedule pull
 - Panel-wide gap report (F15c) — consistent recommendation definitions
@@ -25,6 +25,7 @@ NP Companion features that rely on this module:
 import logging
 from app.api_config import HEALTHFINDER_BASE_URL, HEALTHFINDER_CACHE_TTL_DAYS
 from app.services.api.base_client import BaseAPIClient, APIUnavailableError
+from models.api_cache import HealthFinderCache
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +79,16 @@ class HealthFinderService(BaseAPIClient):
                     "pregnant": 1 if pregnant else 0,
                 },
             )
-            return self._parse_recommendations(data)
+            return self._parse_and_cache_recommendations(data)
         except APIUnavailableError:
             logger.warning(f"HealthFinder unavailable for age={age}, sex={sex}")
             return []
+
+    def _parse_and_cache_recommendations(self, data):
+        """Parse and save recommendations to structured cache."""
+        recs = self._parse_recommendations(data)
+        _save_recommendations_to_cache(self.cache.db, recs)
+        return recs
 
     def _parse_recommendations(self, data: dict) -> list:
         """
@@ -105,7 +112,7 @@ class HealthFinderService(BaseAPIClient):
 
             # Extract grade information if present
             sections = topic.get("Sections", {}).get("section") or []
-            grade = "B"  # Default to Grade B if not specified
+            grade = "I"  # Default to insufficient evidence until parsed
             description = ""
             frequency = ""
 
@@ -137,11 +144,43 @@ def _extract_grade(text: str) -> str:
     """
     Extract USPSTF grade letter from text.
     Returns "A", "B", "C", "D", or "I" (insufficient evidence).
+    Defaults to "B/C" with low confidence when grade cannot be determined.
     """
     if not text:
-        return "B"
+        return "I"
+    import re
     text_upper = text.upper()
-    for grade in ["A", "B", "C", "D"]:
+    # Try broad regex: "USPSTF Grade A", "Grade: B", "[Grade A]", "Recommendation A"
+    match = re.search(
+        r'(?:USPSTF\s+)?(?:Grade|Recommendation)\s*[:\-]?\s*([A-DI])\b',
+        text_upper
+    )
+    if match:
+        return match.group(1)
+    # Fallback: check for standalone grade mentions
+    for grade in ["A", "B", "C", "D", "I"]:
         if f"GRADE {grade}" in text_upper or f"GRADE: {grade}" in text_upper:
             return grade
-    return "B"  # Default
+    return "I"  # Insufficient evidence — safer than assuming positive recommendation
+
+
+def _save_recommendations_to_cache(db_obj, recommendations):
+    """Persist parsed recommendations to the HealthFinderCache table."""
+    try:
+        for rec in recommendations:
+            title = rec.get('title', '')
+            if not title:
+                continue
+            # Use title as topic_id since the API doesn't provide one consistently
+            topic_key = title[:30]
+            existing = HealthFinderCache.query.filter_by(topic_id=topic_key).first()
+            if not existing:
+                db_obj.session.add(HealthFinderCache(
+                    topic_id=topic_key,
+                    title=title[:300],
+                    category=rec.get('category', '')[:100] if isinstance(rec.get('category'), str) else 'Screening',
+                    url='',
+                ))
+        db_obj.session.commit()
+    except Exception:
+        db_obj.session.rollback()

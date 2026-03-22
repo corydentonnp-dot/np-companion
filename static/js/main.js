@@ -1,6 +1,6 @@
 /**
- * NP Companion — Main JavaScript
- * File location: np-companion/static/js/main.js
+ * CareCompanion — Main JavaScript
+ * File location: carecompanion/static/js/main.js
  *
  * Handles all shared client-side behaviour:
  *   1. Dark mode toggle (persists to localStorage + server)
@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initAutoLock();
     initSidebar();
     initNotifications();
+    initP1Poll();
     initFlashMessages();
     initAgentStatus();
     initAuthStatus();
@@ -27,6 +28,12 @@ document.addEventListener('DOMContentLoaded', function () {
     initUserPopover();
     initContextMenu();
     initAIPanel();
+    initMenuBar();
+    initBookmarksBar();
+    initCommandPalette();
+    initPinSystem();
+    initKeyboardShortcuts();
+    initWhatsNewBanner();
 });
 
 
@@ -300,16 +307,56 @@ function initNotifications() {
                         var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;border-bottom:1px solid var(--border-color,#eee);">' +
                             '<strong style="font-size:13px;">Notifications</strong>' +
                             '<button class="btn btn-sm btn-outline" onclick="markAllNotificationsRead()" style="font-size:11px;padding:2px 8px;">Mark all read</button></div>';
-                        items.forEach(function (n) {
-                            html += '<div class="notif-dd-item' + (n.is_read ? '' : ' notif-dd-unread') + '" data-notif-id="' + (n.id || '') + '">' +
+                        /* Phase 12: group into "New" (last hour) and "Earlier Today" */
+                        var now = Date.now();
+                        var oneHour = 60 * 60 * 1000;
+                        var newItems = [];
+                        var earlierItems = [];
+                        items.forEach(function(n) {
+                            /* Parse time from "MM/DD HH:MM AM/PM" — rough heuristic */
+                            var ts = n.time ? Date.parse(n.time.replace(/(\d{2})\/(\d{2})/, new Date().getFullYear() + '-$1-$2')) : 0;
+                            if (ts && (now - ts) < oneHour) {
+                                newItems.push(n);
+                            } else {
+                                earlierItems.push(n);
+                            }
+                        });
+
+                        function renderItem(n) {
+                            var pClass = n.priority === 1 ? ' notif-dd-item--p1' : (n.priority === 2 ? ' notif-dd-item--p2' : '');
+                            return '<div class="notif-dd-item' + pClass + ' notif-dd-unread" data-notif-id="' + (n.id || '') + '">' +
                                 '<div style="flex:1;">' +
                                 '<span class="notif-dd-text">' + escapeHtml(n.message || n.text || '') + '</span>' +
                                 (n.sender ? '<div style="font-size:11px;color:var(--text-muted);">From: ' + escapeHtml(n.sender) + '</div>' : '') +
                                 '</div>' +
                                 '<span class="notif-dd-time">' + escapeHtml(n.time || '') + '</span>' +
                                 '</div>';
-                        });
+                        }
+
+                        if (newItems.length > 0) {
+                            html += '<div class="notif-dd-section-label">New</div>';
+                            newItems.forEach(function(n) { html += renderItem(n); });
+                        }
+                        if (earlierItems.length > 0) {
+                            html += '<div class="notif-dd-section-label">Earlier Today</div>';
+                            earlierItems.forEach(function(n) { html += renderItem(n); });
+                        }
+
                         listEl.innerHTML = html;
+
+                        /* Phase 12: Append P3 morning briefing teaser */
+                        fetch('/api/notifications/p3-count')
+                            .then(function(r) { return r.json(); })
+                            .then(function(d) {
+                                if (d.p3_count > 0) {
+                                    var teaser = document.createElement('div');
+                                    teaser.className = 'notif-dd-section-label';
+                                    teaser.innerHTML = '☀️ <a href="/briefing" style="color:inherit;text-decoration:underline;">' +
+                                        d.p3_count + ' item' + (d.p3_count !== 1 ? 's' : '') + ' in your morning briefing</a>';
+                                    listEl.appendChild(teaser);
+                                }
+                            }).catch(function() {});
+
                         // Click on an unread notification to mark it read
                         listEl.querySelectorAll('.notif-dd-item[data-notif-id]').forEach(function(item) {
                             item.addEventListener('click', function() {
@@ -354,6 +401,71 @@ function escapeHtml(s) {
 
 
 /* ==========================================================
+   5b. P1 INTERRUPT MODAL — polls every 15 seconds (Phase 12)
+   ========================================================== */
+var _p1SnoozedIds = {};
+
+function initP1Poll() {
+    function pollP1() {
+        fetch('/api/notifications/p1')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var items = data.notifications || [];
+                // Find first unacknowledged P1 not currently snoozed
+                for (var i = 0; i < items.length; i++) {
+                    var n = items[i];
+                    if (_p1SnoozedIds[n.id]) continue;
+                    showP1Modal(n);
+                    return;
+                }
+            })
+            .catch(function() {});
+    }
+    pollP1();
+    setInterval(pollP1, 15000);
+}
+
+function showP1Modal(notif) {
+    var overlay = document.getElementById('p1-modal-overlay');
+    var msgEl = document.getElementById('p1-modal-message');
+    if (!overlay || !msgEl) return;
+    msgEl.textContent = notif.message || 'Critical notification requires acknowledgment.';
+    overlay.setAttribute('data-notif-id', notif.id);
+    overlay.style.display = 'flex';
+}
+
+function acknowledgeP1() {
+    var overlay = document.getElementById('p1-modal-overlay');
+    var nid = overlay ? overlay.getAttribute('data-notif-id') : null;
+    if (!nid) return;
+    fetch('/api/notifications/' + nid + '/acknowledge', { method: 'POST' })
+        .then(function() {
+            overlay.style.display = 'none';
+            delete _p1SnoozedIds[nid];
+            // Refresh bell badge
+            var badge = document.getElementById('notification-count');
+            if (badge) {
+                fetch('/api/notifications').then(function(r) { return r.json(); }).then(function(d) {
+                    var c = d.unread_count || 0;
+                    badge.textContent = c > 99 ? '99+' : c;
+                    badge.style.display = c > 0 ? 'inline-block' : 'none';
+                });
+            }
+        });
+}
+
+function snoozeP1(minutes) {
+    var overlay = document.getElementById('p1-modal-overlay');
+    var nid = overlay ? overlay.getAttribute('data-notif-id') : null;
+    if (!nid) return;
+    _p1SnoozedIds[nid] = true;
+    overlay.style.display = 'none';
+    // Remove snooze after specified minutes
+    setTimeout(function() { delete _p1SnoozedIds[nid]; }, minutes * 60 * 1000);
+}
+
+
+/* ==========================================================
    6.  FLASH MESSAGE DISMISSAL
    ========================================================== */
 
@@ -361,8 +473,25 @@ function initFlashMessages() {
     document.querySelectorAll('.flash-close').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var flash = btn.closest('.flash');
-            if (flash) flash.remove();
+            if (flash) {
+                flash.style.opacity = '0';
+                flash.style.transform = 'translateY(-8px)';
+                setTimeout(function () { flash.remove(); }, 300);
+            }
         });
+    });
+    /* Auto-dismiss (Phase 10.4): non-error flashes dismiss after data-auto-dismiss ms */
+    document.querySelectorAll('.flash[data-auto-dismiss]').forEach(function (flash) {
+        var ms = parseInt(flash.getAttribute('data-auto-dismiss'), 10);
+        if (ms > 0) {
+            setTimeout(function () {
+                if (flash.parentNode) {
+                    flash.style.opacity = '0';
+                    flash.style.transform = 'translateY(-8px)';
+                    setTimeout(function () { flash.remove(); }, 300);
+                }
+            }, ms);
+        }
     });
 }
 
@@ -582,7 +711,7 @@ function _safeClipboardWrite(text) {
     ];
     for (var i = 0; i < keyPatterns.length; i++) {
         if (keyPatterns[i].test(text)) {
-            console.warn('[NP Companion] Blocked clipboard write — text matched API key pattern');
+            console.warn('[CareCompanion] Blocked clipboard write — text matched API key pattern');
             return Promise.resolve();
         }
     }
@@ -763,6 +892,635 @@ function openInPreferredBrowser(url) {
 
 
 /* ==========================================================
+   15.  MENU BAR — VS Code-style open/close/hover-switch (5.1)
+   ========================================================== */
+
+function initMenuBar() {
+    var menuBar = document.getElementById('app-menu-bar');
+    if (!menuBar) return;
+
+    var groups = menuBar.querySelectorAll('.menu-group');
+    var _openGroup = null;
+
+    function closeAll() {
+        groups.forEach(function (g) { g.classList.remove('open'); });
+        _openGroup = null;
+    }
+
+    /* Click a menu button → toggle its dropdown */
+    groups.forEach(function (group) {
+        var btn = group.querySelector('.menu-btn');
+        if (!btn) return;
+
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (group.classList.contains('open')) {
+                closeAll();
+            } else {
+                closeAll();
+                group.classList.add('open');
+                _openGroup = group;
+            }
+        });
+
+        /* Hover-switch: if one menu is already open, entering another opens it instead */
+        btn.addEventListener('mouseenter', function () {
+            if (_openGroup && _openGroup !== group) {
+                closeAll();
+                group.classList.add('open');
+                _openGroup = group;
+            }
+        });
+    });
+
+    /* Click a dropdown item → navigate or fire action */
+    menuBar.addEventListener('click', function (e) {
+        var item = e.target.closest('.menu-dd-item');
+        if (!item) return;
+        e.stopPropagation();
+
+        var action = item.getAttribute('data-action');
+        var url = item.getAttribute('data-url');
+        var external = item.getAttribute('data-external') === 'true';
+
+        closeAll();
+
+        if (action) {
+            _menuActions[action] && _menuActions[action](e);
+        } else if (url) {
+            if (external) {
+                openInPreferredBrowser(url);
+            } else {
+                window.location.href = url;
+            }
+        }
+    });
+
+    /* Document click → close menus */
+    document.addEventListener('click', function () {
+        closeAll();
+    });
+
+    /* Escape → close menus */
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && _openGroup) {
+            closeAll();
+        }
+    });
+
+    /* Mobile hamburger */
+    var hamburger = document.getElementById('menu-hamburger');
+    if (hamburger) {
+        hamburger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            menuBar.classList.toggle('mobile-open');
+        });
+    }
+}
+
+/* Map of action names → handler functions for menu items with data-action */
+var _menuActions = {
+    toggleSidebar: function () {
+        var sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.toggle('collapsed');
+    },
+    toggleBookmarks: function () {
+        var bar = document.getElementById('bookmarks-bar');
+        if (bar) bar.classList.toggle('collapsed');
+    },
+    toggleCompactMode: function () {
+        document.body.classList.toggle('compact-mode');
+    },
+    openManageReferences: function () {
+        var modal = document.getElementById('manage-refs-modal');
+        if (modal) modal.style.display = 'flex';
+    },
+    openKeyboardShortcuts: function () {
+        var modal = document.getElementById('keyboard-shortcuts-modal');
+        if (modal) modal.style.display = 'flex';
+    },
+    openWhatsNew: function () {
+        var modal = document.getElementById('whats-new-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        var body = document.getElementById('whats-new-body');
+        if (body && !body.dataset.loaded) {
+            fetch('/static/changelog.json?' + Date.now())
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .then(function (entries) {
+                    if (!entries || !entries.length) {
+                        body.innerHTML = '<p style="color:var(--text-secondary);">No changelog data available.</p>';
+                        return;
+                    }
+                    var html = '';
+                    entries.forEach(function (e) {
+                        html += '<div style="margin-bottom:16px;">';
+                        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+                        html += '<strong style="font-size:15px;">v' + (e.version || '?') + '</strong>';
+                        if (e.date) html += '<span style="font-size:12px;color:var(--text-secondary);">' + e.date + '</span>';
+                        html += '</div>';
+                        if (e.highlights && e.highlights.length) {
+                            html += '<ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.7;">';
+                            e.highlights.forEach(function (h) { html += '<li>' + h + '</li>'; });
+                            html += '</ul>';
+                        }
+                        html += '</div>';
+                    });
+                    body.innerHTML = html;
+                    body.dataset.loaded = '1';
+                })
+                .catch(function () {
+                    body.innerHTML = '<p style="color:var(--text-secondary);">Could not load changelog.</p>';
+                });
+        }
+        /* Also dismiss the banner */
+        var banner = document.getElementById('whats-new-banner');
+        if (banner) banner.style.display = 'none';
+        fetch('/api/settings/dismiss-whats-new', { method: 'POST' }).catch(function () {});
+    },
+    openAbout: function () {
+        var modal = document.getElementById('about-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+};
+
+
+/* ==========================================================
+   16.  BOOKMARKS BAR — load, render chips, add/remove (5.2)
+   ========================================================== */
+
+function initBookmarksBar() {
+    var bar = document.getElementById('bookmarks-bar');
+    if (!bar) return;
+
+    var practiceContainer = document.getElementById('bm-practice-chips');
+    var personalContainer = document.getElementById('bm-personal-chips');
+    var addBtn = document.getElementById('bm-add-btn');
+    var addPopover = document.getElementById('bm-add-popover');
+    var addLabel = document.getElementById('bm-add-label');
+    var addUrl = document.getElementById('bm-add-url');
+    var addSave = document.getElementById('bm-add-save');
+    var addCancel = document.getElementById('bm-add-cancel');
+
+    function renderChips(items, container, type) {
+        container.innerHTML = '';
+        if (!items || !items.length) return;
+        items.forEach(function (bm, idx) {
+            var chip = document.createElement('button');
+            chip.className = 'bm-chip';
+            chip.title = bm.url;
+            chip.textContent = (type === 'practice' ? '🌐 ' : '📌 ') + bm.label;
+            chip.addEventListener('click', function () {
+                openInPreferredBrowser(bm.url);
+            });
+            chip.addEventListener('contextmenu', function (e) {
+                e.preventDefault();
+                if (type === 'personal') {
+                    if (confirm('Remove bookmark "' + bm.label + '"?')) {
+                        removePersonalBookmark(idx);
+                    }
+                }
+            });
+            container.appendChild(chip);
+        });
+    }
+
+    function loadBookmarks() {
+        fetch('/api/bookmarks')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                renderChips(data.practice || [], practiceContainer, 'practice');
+                renderChips(data.personal || [], personalContainer, 'personal');
+            })
+            .catch(function () { /* silently fail — bookmarks not critical */ });
+    }
+
+    function removePersonalBookmark(index) {
+        fetch('/api/bookmarks/personal/' + index, { method: 'DELETE' })
+            .then(function (r) { return r.json(); })
+            .then(function () { loadBookmarks(); })
+            .catch(function () {});
+    }
+
+    if (addBtn && addPopover) {
+        addBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            addPopover.style.display = addPopover.style.display === 'none' ? 'block' : 'none';
+            if (addPopover.style.display === 'block' && addLabel) addLabel.focus();
+        });
+    }
+
+    if (addCancel) {
+        addCancel.addEventListener('click', function () {
+            addPopover.style.display = 'none';
+            if (addLabel) addLabel.value = '';
+            if (addUrl) addUrl.value = '';
+        });
+    }
+
+    if (addSave) {
+        addSave.addEventListener('click', function () {
+            var label = (addLabel.value || '').trim();
+            var url = (addUrl.value || '').trim();
+            if (!label || !url) return;
+            fetch('/api/bookmarks/personal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ label: label, url: url })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    addPopover.style.display = 'none';
+                    addLabel.value = '';
+                    addUrl.value = '';
+                    loadBookmarks();
+                }
+            })
+            .catch(function () {});
+        });
+    }
+
+    /* Close popover on outside click */
+    document.addEventListener('click', function (e) {
+        if (addPopover && !addPopover.contains(e.target) && e.target !== addBtn) {
+            addPopover.style.display = 'none';
+        }
+    });
+
+    loadBookmarks();
+}
+
+
+/* ==========================================================
+   17.  COMMAND PALETTE — Ctrl+K fuzzy nav (5.3)
+   ========================================================== */
+
+function initCommandPalette() {
+    var backdrop = document.getElementById('command-palette');
+    if (!backdrop) return;
+
+    var input = document.getElementById('cmd-palette-input');
+    var list = document.getElementById('cmd-result-list');
+    var routes = window.__npRoutes || [];
+    var _activeIdx = -1;
+
+    function open() {
+        backdrop.style.display = 'flex';
+        input.value = '';
+        renderResults('');
+        setTimeout(function () { input.focus(); }, 50);
+    }
+
+    function close() {
+        backdrop.style.display = 'none';
+        input.value = '';
+        _activeIdx = -1;
+    }
+
+    function renderResults(query) {
+        list.innerHTML = '';
+        var q = (query || '').toLowerCase();
+        var filtered = routes.filter(function (r) {
+            return !q || r.label.toLowerCase().indexOf(q) !== -1 || (r.category && r.category.toLowerCase().indexOf(q) !== -1);
+        });
+
+        /* Limit to top 12 */
+        filtered = filtered.slice(0, 12);
+
+        /* Group by category */
+        var groups = {};
+        filtered.forEach(function (r) {
+            var cat = r.category || 'Other';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(r);
+        });
+
+        var idx = 0;
+        Object.keys(groups).forEach(function (cat) {
+            var header = document.createElement('li');
+            header.className = 'cmd-result-cat';
+            header.textContent = cat;
+            list.appendChild(header);
+
+            groups[cat].forEach(function (r) {
+                var li = document.createElement('li');
+                li.className = 'cmd-result-item';
+                li.textContent = r.label;
+                li.setAttribute('data-url', r.url);
+                li.setAttribute('data-idx', idx);
+                li.addEventListener('click', function () {
+                    navigate(r.url);
+                });
+                li.addEventListener('mouseenter', function () {
+                    setActive(parseInt(li.getAttribute('data-idx'), 10));
+                });
+                list.appendChild(li);
+                idx++;
+            });
+        });
+
+        _activeIdx = -1;
+        if (idx > 0) setActive(0);
+    }
+
+    function setActive(idx) {
+        var items = list.querySelectorAll('.cmd-result-item');
+        items.forEach(function (el) { el.classList.remove('active'); });
+        if (items[idx]) {
+            items[idx].classList.add('active');
+            items[idx].scrollIntoView({ block: 'nearest' });
+        }
+        _activeIdx = idx;
+    }
+
+    function navigate(url) {
+        close();
+        /* Save to recent in sessionStorage */
+        try {
+            var recent = JSON.parse(sessionStorage.getItem('cmd_recent') || '[]');
+            recent = recent.filter(function (r) { return r !== url; });
+            recent.unshift(url);
+            if (recent.length > 5) recent = recent.slice(0, 5);
+            sessionStorage.setItem('cmd_recent', JSON.stringify(recent));
+        } catch (_) {}
+        window.location.href = url;
+    }
+
+    input.addEventListener('input', function () {
+        renderResults(input.value);
+    });
+
+    input.addEventListener('keydown', function (e) {
+        var items = list.querySelectorAll('.cmd-result-item');
+        var count = items.length;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActive((_activeIdx + 1) % count);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActive((_activeIdx - 1 + count) % count);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (items[_activeIdx]) {
+                navigate(items[_activeIdx].getAttribute('data-url'));
+            }
+        } else if (e.key === 'Escape') {
+            close();
+        }
+    });
+
+    /* Click backdrop to close */
+    backdrop.addEventListener('click', function (e) {
+        if (e.target === backdrop) close();
+    });
+
+    /* Ctrl+K to open */
+    document.addEventListener('keydown', function (e) {
+        if (e.ctrlKey && e.key === 'k') {
+            e.preventDefault();
+            if (backdrop.style.display === 'flex') { close(); } else { open(); }
+        }
+    });
+}
+
+
+/* ==========================================================
+   18.  PIN SYSTEM — right-click menu item → pin to sidebar (5.4)
+   ========================================================== */
+
+function initPinSystem() {
+    var ctxMenu = document.getElementById('pin-ctx-menu');
+    if (!ctxMenu) return;
+
+    var _targetItem = null;
+
+    /* Listen for right-click on any .menu-dd-item that has a data-url */
+    document.addEventListener('contextmenu', function (e) {
+        var item = e.target.closest('.menu-dd-item[data-url]');
+        if (!item || item.getAttribute('data-external') === 'true') return;
+        e.preventDefault();
+        _targetItem = item;
+
+        /* Position the context menu */
+        ctxMenu.style.left = e.clientX + 'px';
+        ctxMenu.style.top = e.clientY + 'px';
+        ctxMenu.style.display = 'block';
+
+        /* Show pin or unpin based on current state */
+        var url = item.getAttribute('data-url');
+        var pinBtn = ctxMenu.querySelector('[data-action="pin-item"]');
+        var unpinBtn = ctxMenu.querySelector('[data-action="unpin-item"]');
+        var isPinned = document.querySelector('.pinned-item[data-pin-url="' + url + '"]');
+        if (pinBtn) pinBtn.style.display = isPinned ? 'none' : '';
+        if (unpinBtn) unpinBtn.style.display = isPinned ? '' : 'none';
+    });
+
+    /* Pin action */
+    ctxMenu.querySelector('[data-action="pin-item"]').addEventListener('click', function () {
+        if (!_targetItem) return;
+        var url = _targetItem.getAttribute('data-url');
+        var iconSpan = _targetItem.querySelector('.menu-dd-icon');
+        var label = _targetItem.textContent.replace(/[\s]+/g, ' ').trim();
+        /* Remove icon text and shortcut from label */
+        if (iconSpan) label = label.replace(iconSpan.textContent, '').trim();
+        var shortcutSpan = _targetItem.querySelector('.menu-dd-shortcut');
+        if (shortcutSpan && shortcutSpan.textContent) label = label.replace(shortcutSpan.textContent, '').trim();
+        var icon = iconSpan ? iconSpan.textContent.trim() : '📌';
+
+        fetch('/api/prefs/pin-menu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: label, url: url, icon: icon })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.success) {
+                _addPinnedItemToDOM(label, url, icon);
+            }
+        })
+        .catch(function () {});
+        ctxMenu.style.display = 'none';
+    });
+
+    /* Unpin action */
+    ctxMenu.querySelector('[data-action="unpin-item"]').addEventListener('click', function () {
+        if (!_targetItem) return;
+        var url = _targetItem.getAttribute('data-url');
+
+        fetch('/api/prefs/unpin-menu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.success) {
+                _removePinnedItemFromDOM(url);
+            }
+        })
+        .catch(function () {});
+        ctxMenu.style.display = 'none';
+    });
+
+    /* Close pin context on outside click */
+    document.addEventListener('click', function () {
+        ctxMenu.style.display = 'none';
+    });
+}
+
+/* Helper: inject a pinned item into the sidebar DOM */
+function _addPinnedItemToDOM(label, url, icon) {
+    var section = document.getElementById('pinned-section');
+    if (!section) {
+        /* Create the pinned section dynamically */
+        var sidebar = document.getElementById('sidebar');
+        var footer = sidebar ? sidebar.querySelector('.sidebar-footer') : null;
+        if (!sidebar || !footer) return;
+        section = document.createElement('nav');
+        section.className = 'sidebar-nav pinned-section';
+        section.id = 'pinned-section';
+        section.style.marginTop = '0';
+        section.innerHTML = '<div style="padding:4px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;opacity:.55;">Pinned</div><ul class="nav-list"></ul>';
+        sidebar.insertBefore(section, footer);
+    }
+    var list = section.querySelector('.nav-list');
+    if (!list) return;
+
+    var li = document.createElement('li');
+    li.className = 'nav-item pinned-item';
+    li.setAttribute('data-pin-url', url);
+    li.innerHTML = '<a href="' + url + '" class="nav-link" title="' + label + '"><span class="nav-icon" style="font-size:14px;width:20px;text-align:center;">' + icon + '</span><span class="nav-label">' + label + '</span></a>';
+    list.appendChild(li);
+}
+
+/* Helper: remove a pinned item from sidebar DOM */
+function _removePinnedItemFromDOM(url) {
+    var item = document.querySelector('.pinned-item[data-pin-url="' + url + '"]');
+    if (item) item.remove();
+
+    /* If no pinned items left, remove the section */
+    var section = document.getElementById('pinned-section');
+    if (section) {
+        var remaining = section.querySelectorAll('.pinned-item');
+        if (remaining.length === 0) section.remove();
+    }
+}
+
+
+/* ==========================================================
+   19.  KEYBOARD SHORTCUTS — Ctrl+B, Ctrl+Shift+B, ? (5.5)
+   ========================================================== */
+
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', function (e) {
+        /* Skip if user is typing in a text field */
+        var tag = (e.target.tagName || '').toLowerCase();
+        var isInput = (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable);
+
+        /* Ctrl+B → toggle sidebar */
+        if (e.ctrlKey && !e.shiftKey && e.key === 'b') {
+            e.preventDefault();
+            _menuActions.toggleSidebar();
+            return;
+        }
+
+        /* Ctrl+Shift+B → toggle bookmarks bar */
+        if (e.ctrlKey && e.shiftKey && (e.key === 'B' || e.key === 'b')) {
+            e.preventDefault();
+            _menuActions.toggleBookmarks();
+            return;
+        }
+
+        /* Ctrl+Shift+K → Clinical Calculators */
+        if (e.ctrlKey && e.shiftKey && (e.key === 'K' || e.key === 'k')) {
+            e.preventDefault();
+            window.location.href = '/calculators';
+            return;
+        }
+
+        /* ? → keyboard shortcuts (only when not in an input field) */
+        if (!isInput && e.key === '?' && !e.ctrlKey && !e.altKey) {
+            e.preventDefault();
+            _menuActions.openKeyboardShortcuts();
+            return;
+        }
+
+        /* Escape → close modals */
+        if (e.key === 'Escape') {
+            var modals = document.querySelectorAll('.modal-backdrop[style*="flex"]');
+            modals.forEach(function (m) { m.style.display = 'none'; });
+        }
+    });
+
+    /* Wire up modal close buttons (data-dismiss attribute) */
+    document.querySelectorAll('.modal-close[data-dismiss]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var modalId = btn.getAttribute('data-dismiss');
+            var modal = document.getElementById(modalId);
+            if (modal) modal.style.display = 'none';
+        });
+    });
+
+    /* Click modal backdrop to close */
+    document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+        backdrop.addEventListener('click', function (e) {
+            if (e.target === backdrop) backdrop.style.display = 'none';
+        });
+    });
+
+    /* Tab switching inside modals */
+    document.querySelectorAll('.tab-group').forEach(function (group) {
+        group.querySelectorAll('.tab-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tabId = btn.getAttribute('data-tab');
+                /* Deactivate siblings */
+                group.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                /* Show matching panel, hide others */
+                var parent = group.parentElement;
+                parent.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+                var panel = document.getElementById(tabId);
+                if (panel) panel.classList.add('active');
+            });
+        });
+    });
+}
+
+
+/* ==========================================================
+   20.  WHAT'S NEW BANNER — dismiss + persist (5.6)
+   ========================================================== */
+
+function initWhatsNewBanner() {
+    var banner = document.getElementById('whats-new-banner');
+    if (!banner) return;
+
+    var dismissBtn = document.getElementById('whats-new-dismiss');
+    var detailsLink = document.getElementById('whats-new-details');
+
+    if (dismissBtn) {
+        dismissBtn.addEventListener('click', function () {
+            banner.style.display = 'none';
+            fetch('/api/settings/dismiss-whats-new', { method: 'POST' })
+                .catch(function () {});
+        });
+    }
+
+    if (detailsLink) {
+        detailsLink.addEventListener('click', function (e) {
+            e.preventDefault();
+            banner.style.display = 'none';
+            fetch('/api/settings/dismiss-whats-new', { method: 'POST' })
+                .catch(function () {});
+            /* Open the What's New modal */
+            if (_menuActions.openWhatsNew) _menuActions.openWhatsNew();
+        });
+    }
+}
+
+
+/* ==========================================================
    14.  AI ASSISTANT PANEL
    ========================================================== */
 
@@ -929,4 +1687,69 @@ function _renderAIMessage(container, role, text) {
     div.textContent = text;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+}
+
+/* ================================================================
+   Phase 14 — WhyLink popover toggle + dismiss dialog
+   ================================================================ */
+function whyBadge(reason, source) {
+    return '<span class="why-link" tabindex="0" role="button">Why?<span class="why-popover"><span class="why-popover-reason">' +
+        escHtml(reason) + '</span><span class="why-popover-source">Source: ' + escHtml(source) + '</span></span></span>';
+}
+
+(function initWhyLinks() {
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('.why-link');
+        /* Close all open popovers first */
+        document.querySelectorAll('.why-link.why-open').forEach(function (el) {
+            if (el !== link) el.classList.remove('why-open');
+        });
+        if (link) {
+            e.preventDefault();
+            link.classList.toggle('why-open');
+        }
+    });
+})();
+
+/* Global dismiss dialog helper */
+var _dismissPending = null;
+
+function showDismissDialog(itemType, itemId, endpoint) {
+    _dismissPending = { type: itemType, id: itemId, endpoint: endpoint };
+    var overlay = document.getElementById('dismiss-overlay');
+    if (!overlay) return;
+    overlay.classList.add('dismiss-open');
+    /* Reset form */
+    var radios = overlay.querySelectorAll('input[name="dismiss_reason"]');
+    radios.forEach(function (r) { r.checked = false; });
+    var custom = overlay.querySelector('.dismiss-custom-reason');
+    if (custom) custom.value = '';
+    radios[0].checked = true;
+}
+
+function closeDismissDialog() {
+    var overlay = document.getElementById('dismiss-overlay');
+    if (overlay) overlay.classList.remove('dismiss-open');
+    _dismissPending = null;
+}
+
+function submitDismiss() {
+    if (!_dismissPending) return;
+    var overlay = document.getElementById('dismiss-overlay');
+    var checked = overlay.querySelector('input[name="dismiss_reason"]:checked');
+    var reason = checked ? checked.value : '';
+    if (reason === '__custom') {
+        reason = (overlay.querySelector('.dismiss-custom-reason').value || '').trim();
+        if (!reason) { alert('Please enter a reason.'); return; }
+    }
+    fetch(_dismissPending.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+        if (d.success) location.reload();
+    });
+    closeDismissDialog();
 }

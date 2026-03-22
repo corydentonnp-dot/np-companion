@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Provider Defaults — Admin{% endblock %}
+{% block content %}
+<div class="container" style="max-width:800px;margin:0 auto;padding:24px;">
+
+    <h2 style="margin-bottom:24px;">Provider Feature Tier Defaults</h2>
+
+    <div class="card" style="margin-bottom:24px;">
+        <div class="card-body" style="padding:24px;">
+            <h3 style="margin:0 0 8px;font-size:16px;">Default Tier per Role</h3>
+            <p style="color:var(--text-secondary);font-size:13px;margin:0 0 16px;">
+                Set the default feature tier for new users by role. Existing users keep their current tier.
+                Individual users can always upgrade or downgrade in Settings.
+            </p>
+
+            <form method="POST">
+                <table class="table" style="width:100%;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">Role</th>
+                            <th style="text-align:left;">Default Tier</th>
+                            <th style="text-align:left;">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Provider</strong> (NP / PA / MD)</td>
+                            <td>
+                                <select name="default_tier_provider" class="form-control" style="width:auto;">
+                                    <option value="essential" {% if defaults.provider == 'essential' %}selected{% endif %}>🟢 Essential</option>
+                                    <option value="standard" {% if defaults.provider == 'standard' %}selected{% endif %}>🟡 Standard</option>
+                                    <option value="advanced" {% if defaults.provider == 'advanced' %}selected{% endif %}>🔵 Advanced</option>
+                                </select>
+                            </td>
+                            <td style="color:var(--text-secondary);font-size:13px;">{{ tier_descriptions.get(defaults.provider, '') }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Medical Assistant</strong></td>
+                            <td>
+                                <select name="default_tier_ma" class="form-control" style="width:auto;">
+                                    <option value="essential" {% if defaults.ma == 'essential' %}selected{% endif %}>🟢 Essential</option>
+                                    <option value="standard" {% if defaults.ma == 'standard' %}selected{% endif %}>🟡 Standard</option>
+                                    <option value="advanced" {% if defaults.ma == 'advanced' %}selected{% endif %}>🔵 Advanced</option>
+                                </select>
+                            </td>
+                            <td style="color:var(--text-secondary);font-size:13px;">{{ tier_descriptions.get(defaults.ma, '') }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:16px;text-align:right;">
+                    <button type="submit" class="btn btn-primary">Save Defaults</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body" style="padding:24px;">
+            <h3 style="margin:0 0 8px;font-size:16px;">Current User Tiers</h3>
+            <p style="color:var(--text-secondary);font-size:13px;margin:0 0 16px;">
+                Shows each active user's current feature tier. Users can change their own tier in Settings → Features.
+            </p>
+
+            <table class="table" style="width:100%;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">User</th>
+                        <th style="text-align:left;">Role</th>
+                        <th style="text-align:left;">Feature Tier</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in user_tiers %}
+                    <tr>
+                        <td>{{ u.name }}</td>
+                        <td>{{ u.role }}</td>
+                        <td>
+                            {% if u.tier == 'essential' %}🟢{% elif u.tier == 'standard' %}🟡{% else %}🔵{% endif %}
+                            {{ u.tier | capitalize }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not user_tiers %}
+                    <tr>
+                        <td colspan="3" style="text-align:center;color:var(--text-secondary);">No active users found.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

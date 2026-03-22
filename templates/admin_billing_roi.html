@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Admin Billing ROI — CareCompanion{% endblock %}
+{% block page_id %}admin-billing-roi{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Billing ROI Dashboard — {{ quarter_label }}</h1>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+        <a href="/campaigns" class="btn btn-sm btn-outline">Campaigns</a>
+        <button onclick="window.print()" class="btn btn-sm btn-outline">Print</button>
+    </div>
+</div>
+
+{# ---- Revenue by Feature Family ---- #}
+{% if family_list %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Quarterly Revenue by Feature Family</h3>
+        <table class="data-table" style="width:100%;font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:8px 12px;">Category</th>
+                    <th style="text-align:center;">Detected</th>
+                    <th style="text-align:center;">Captured</th>
+                    <th style="text-align:right;">Revenue</th>
+                    <th style="text-align:center;">Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat, d in family_list %}
+                <tr>
+                    <td style="padding:6px 12px;font-weight:600;">{{ cat }}</td>
+                    <td style="text-align:center;">{{ d.detected }}</td>
+                    <td style="text-align:center;color:#059669;">{{ d.captured }}</td>
+                    <td style="text-align:right;color:#059669;">${{ d.rev|round|int }}</td>
+                    <td style="text-align:center;">
+                        {% set r = (d.captured / d.detected * 100)|round|int if d.detected else 0 %}
+                        <span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:{% if r >= 70 %}#d1fae5{% elif r >= 40 %}#fef3c7{% else %}#fee2e2{% endif %};">{{ r }}%</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Top 5 Leakage Families ---- #}
+{% if leakage_families %}
+<div class="card" style="margin-bottom:24px;border-left:4px solid #dc2626;">
+    <div class="card-body">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Top 5 Revenue Leakage Families</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+            {% for lf in leakage_families %}
+            <div style="padding:12px;border-radius:8px;background:#fef2f2;text-align:center;">
+                <div style="font-size:22px;font-weight:700;color:#dc2626;">${{ lf.gap|round|int }}</div>
+                <div style="font-size:12px;font-weight:600;">{{ lf.category }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Top 3 Workflow Bottlenecks ---- #}
+{% if top_bottlenecks %}
+<div class="card" style="margin-bottom:24px;border-left:4px solid #f59e0b;">
+    <div class="card-body">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Top Workflow Bottlenecks</h3>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            {% for name, count in top_bottlenecks %}
+            <div style="padding:12px 20px;border-radius:8px;background:#fffbeb;text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#f59e0b;">{{ count }}</div>
+                <div style="font-size:12px;font-weight:600;">{{ name }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Bonus Acceleration ---- #}
+{% if bonus_proj %}
+<div class="card" style="margin-bottom:24px;border-left:4px solid #7c3aed;">
+    <div class="card-body">
+        <h3 style="margin:0 0 8px 0;font-size:15px;">Bonus Acceleration</h3>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div style="text-align:center;">
+                <div style="font-size:20px;font-weight:700;">${{ bonus_proj.threshold|round|int }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Quarterly Threshold</div>
+            </div>
+            {% if bonus_proj.projected_first_bonus_quarter %}
+            <div style="text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:#7c3aed;">{{ bonus_proj.projected_first_bonus_quarter }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Projected First Bonus</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Campaign Status ---- #}
+{% if campaigns %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Campaign Implementation Tracker</h3>
+        <table class="data-table" style="width:100%;font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:8px 12px;">Campaign</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Est Revenue</th>
+                    <th style="text-align:right;">Actual</th>
+                    <th style="text-align:center;">Progress</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in campaigns %}
+                <tr>
+                    <td style="padding:6px 12px;font-weight:600;">{{ c.campaign_name }}</td>
+                    <td><span style="padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600;background:{% if c.status == 'active' %}#dbeafe{% elif c.status == 'completed' %}#d1fae5{% elif c.status == 'paused' %}#fef3c7{% else %}#e5e7eb{% endif %};">{{ c.status }}</span></td>
+                    <td style="text-align:right;">${{ (c.estimated_revenue or 0)|round|int }}</td>
+                    <td style="text-align:right;color:#059669;">${{ (c.actual_revenue or 0)|round|int }}</td>
+                    <td style="text-align:center;">{{ c.completion_pct() }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

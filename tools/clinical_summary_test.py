@@ -1,7 +1,7 @@
 """
-NP Companion — Clinical Summary Integration Test
+CareCompanion — Clinical Summary Integration Test
 
-File location: np-companion/tools/clinical_summary_test.py
+File location: carecompanion/tools/clinical_summary_test.py
 
 Standalone script to test the clinical summary pipeline on the work PC
 where Amazing Charts is actually installed. Validates:
@@ -49,7 +49,8 @@ def find_xml_file(explicit_path=None):
 
     # Fall back to sample XML
     sample = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                          'Documents', 'ac_interface_reference', 'sample_clinical_summary.xml')
+                          'Documents', 'xml_test_patients',
+                          'ClinicalSummary_PatientId_62815_20260317_142457.xml')
     if os.path.isfile(sample):
         print(f'Using sample XML: {sample}')
         return sample

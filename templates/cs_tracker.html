@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Controlled Substance Tracker — NP Companion{% endblock %}
+{% block title %}Controlled Substance Tracker — CareCompanion{% endblock %}
 {% block page_id %}cs-tracker{% endblock %}
 
 {% block content %}
@@ -132,7 +132,7 @@ document.getElementById('add-form').addEventListener('submit', function(e) {
         .then(function(r){return r.json();})
         .then(function(d){
             if (d.success) location.reload();
-            else alert(d.error || 'Failed to add');
+            else showError(d.error || 'Failed to add');
         });
 });
 function recordFill(id) {
@@ -162,18 +162,18 @@ function autoPDMP(id) {
                 d.prescriptions.forEach(function(rx) {
                     msg += rx.date_filled + ' | ' + rx.drug_name + ' | Qty: ' + rx.quantity + ' | ' + rx.days_supply + 'd | ' + rx.prescriber + '\n';
                 });
-                alert(msg);
+                showInfo(msg, {duration: 0});
                 location.reload();
             } else if (d.success) {
-                alert('PDMP check complete — no controlled substance prescriptions found.');
+                showSuccess('PDMP check complete — no controlled substance prescriptions found.');
                 location.reload();
             } else {
-                alert('PDMP lookup: ' + (d.error || 'Unknown error'));
+                showError(d.error || 'PDMP lookup failed');
             }
         })
         .catch(function(){
             btn.disabled = false; btn.textContent = 'Auto';
-            alert('PDMP connection failed');
+            showError('PDMP connection failed');
         });
 }
 </script>

@@ -1,0 +1,234 @@
+{# 
+  Billing Alert Bar — compact top-of-chart banner
+  Phase 19E.1
+  
+  Included in patient_chart.html via {% include '_billing_alert_bar.html' %}
+  Fetches billing opportunities via /api/patient/<mrn>/billing-opportunities
+  Shows expandable checklist with capture/dismiss per opportunity.
+#}
+<div id="billing-alert-bar" style="display:none;margin:0 0 8px;padding:10px 16px;background:linear-gradient(90deg,var(--color-green,#27ae60) 0%,#1a7a42 100%);border-radius:8px;color:#fff;font-size:13px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleBillingAlertExpand()">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:18px;">&#128176;</span>
+            <strong id="billing-alert-count">0 Billing Opportunities</strong>
+            <span id="billing-alert-revenue" style="font-weight:700;font-size:15px;"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <button id="billing-alert-expand-btn" class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:none;font-size:11px;padding:3px 10px;border-radius:4px;">
+                &#9660; Details
+            </button>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:11px;padding:3px 10px;border-radius:4px;" onclick="event.stopPropagation();document.getElementById('billing-alert-bar').style.display='none';">
+                &#10005;
+            </button>
+        </div>
+    </div>
+    <div id="billing-alert-details" style="display:none;margin-top:10px;max-height:340px;overflow-y:auto;">
+        {# Populated by JS #}
+    </div>
+    {# Phase 20.3: Visit Stack Indicator #}
+    <div id="billing-stack-row" style="display:none;margin-top:6px;padding:6px 10px;background:rgba(255,255,255,0.12);border-radius:6px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;font-weight:600;opacity:0.8;">STACK:</span>
+            <span id="billing-stack-items" style="font-size:11px;"></span>
+            <span id="billing-stack-total" style="font-weight:700;font-size:12px;margin-left:auto;"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var MRN_VAL = typeof MRN !== 'undefined' ? MRN : '';
+    if (!MRN_VAL) return;
+
+    fetch('/api/patient/' + MRN_VAL + '/billing-opportunities')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var opps = data.opportunities || [];
+            if (opps.length === 0) return;
+
+            var bar = document.getElementById('billing-alert-bar');
+            var countEl = document.getElementById('billing-alert-count');
+            var revEl = document.getElementById('billing-alert-revenue');
+            var detailEl = document.getElementById('billing-alert-details');
+            if (!bar) return;
+
+            var total = 0;
+            opps.forEach(function(o) { total += o.revenue || 0; });
+
+            bar.style.display = '';
+            countEl.textContent = opps.length + ' Billing Opportunit' + (opps.length === 1 ? 'y' : 'ies');
+            revEl.textContent = '(~$' + Math.round(total) + ')';
+
+            /* Group by category */
+            var groups = {};
+            opps.forEach(function(o) {
+                var cat = o.category || o.type || 'other';
+                if (!groups[cat]) groups[cat] = [];
+                groups[cat].push(o);
+            });
+
+            var html = '';
+            for (var cat in groups) {
+                var items = groups[cat];
+                var catRev = 0;
+                items.forEach(function(o) { catRev += o.revenue || 0; });
+                html += '<div style="margin-bottom:8px;">';
+                html += '<div style="font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;opacity:0.85;margin-bottom:4px;">' +
+                        escHtml(cat.replace(/_/g,' ')) + ' — $' + Math.round(catRev) + '</div>';
+                items.forEach(function(o) {
+                    var confColor = o.confidence === 'HIGH' ? '#a7f3d0' : o.confidence === 'MEDIUM' ? '#fde68a' : '#e2e8f0';
+                    html += '<div style="background:rgba(255,255,255,0.1);border-radius:6px;padding:8px 10px;margin-bottom:4px;">';
+                    html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+                    html += '<span style="font-weight:600;">' + escHtml(o.opportunity_code || o.type) + '</span>';
+                    html += '<span style="font-weight:700;">~$' + Math.round(o.revenue) + '</span></div>';
+                    html += '<div style="font-size:11px;opacity:0.85;margin-top:2px;">' + escHtml(o.codes || '') + ' — ' + escHtml(o.basis || '').substring(0, 100) + '</div>';
+                    /* Phase 38.3: calculator context line */
+                    if (o.category === 'calculator_billing') {
+                        var ctxSnippet = (o.basis || '').split('.')[0];
+                        html += '<div style="font-size:11px;color:#a7f3d0;margin-top:2px;">&#128200; ' + escHtml(ctxSnippet) + '</div>';
+                    }
+
+                    /* Documentation checklist */
+                    if (o.checklist && o.checklist.length > 0) {
+                        html += '<div style="margin-top:4px;">';
+                        o.checklist.forEach(function(item, idx) {
+                            html += '<label style="display:flex;align-items:center;gap:6px;font-size:11px;padding:1px 0;cursor:pointer;">' +
+                                    '<input type="checkbox" style="accent-color:#fff;" data-opp="' + o.id + '" data-idx="' + idx + '"> ' +
+                                    escHtml(item) + '</label>';
+                        });
+                        html += '</div>';
+                    }
+
+                    html += '<div style="margin-top:4px;display:flex;gap:6px;">';
+                    html += '<button class="btn btn-sm" style="background:rgba(255,255,255,0.25);color:#fff;border:none;font-size:10px;padding:2px 8px;" onclick="alertBarCapture(' + o.id + ',this)">&#10003; Capture</button>';
+                    html += '<button class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:#fff;border:none;font-size:10px;padding:2px 8px;" onclick="alertBarDismiss(' + o.id + ',this)">&#10005; Dismiss</button>';
+                    html += '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:10px;padding:2px 8px;" onclick="toggleDocPhrases(\'' + escHtml(o.opportunity_code || o.type) + '\',this)">&#128221; Doc Language</button>';
+                    html += '</div>';
+                    html += '<div class="doc-phrase-panel" id="doc-phrases-' + escHtml(o.opportunity_code || o.type) + '" style="display:none;margin-top:6px;padding:6px 8px;background:rgba(255,255,255,0.08);border-radius:4px;font-size:11px;"></div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+            detailEl.innerHTML = html;
+
+            /* Phase 22.4: Why-not link — show suppressed count */
+            fetch('/api/billing/why-not/' + MRN_VAL)
+                .then(function(r) { return r.json(); })
+                .then(function(wnData) {
+                    if (wnData.count > 0) {
+                        var wnHtml = '<div style="margin-top:8px;text-align:right;">' +
+                            '<a href="/billing/why-not/' + MRN_VAL + '" style="color:#a7f3d0;font-size:11px;text-decoration:underline;">' +
+                            '&#10067; ' + wnData.count + ' opportunit' + (wnData.count === 1 ? 'y' : 'ies') + ' not shown &mdash; see why</a></div>';
+                        detailEl.insertAdjacentHTML('beforeend', wnHtml);
+                    }
+                })
+                .catch(function() { /* silent */ });
+        })
+        .catch(function() { /* silent */ });
+
+    /* Phase 20.3: Load stack indicator */
+    fetch('/api/patient/' + MRN_VAL + '/billing-stack?visit_type=chronic_longitudinal')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var stack = data.stack;
+            if (!stack || !stack.items || stack.items.length === 0) return;
+            var row = document.getElementById('billing-stack-row');
+            var itemsEl = document.getElementById('billing-stack-items');
+            var totalEl = document.getElementById('billing-stack-total');
+            if (!row) return;
+            var chips = stack.items.map(function(it) {
+                return '<span style="background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:3px;font-size:10px;">' +
+                       escHtml(it.opportunity_code) + ' $' + Math.round(it.net_value || it.revenue) + '</span>';
+            });
+            itemsEl.innerHTML = chips.join(' ');
+            totalEl.textContent = 'Stack Total: ~$' + Math.round(stack.total_net_value || stack.total_revenue);
+            row.style.display = '';
+        })
+        .catch(function() { /* silent */ });
+})();
+
+function toggleBillingAlertExpand() {
+    var det = document.getElementById('billing-alert-details');
+    var btn = document.getElementById('billing-alert-expand-btn');
+    if (!det) return;
+    if (det.style.display === 'none') {
+        det.style.display = '';
+        if (btn) btn.innerHTML = '&#9650; Hide';
+    } else {
+        det.style.display = 'none';
+        if (btn) btn.innerHTML = '&#9660; Details';
+    }
+}
+
+function alertBarCapture(id, btn) {
+    fetch('/api/billing/opportunity/' + id + '/capture', {method:'POST', headers:{'Content-Type':'application/json'}})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                var row = btn.closest('div[style*="background:rgba(255,255,255,0.1)"]');
+                if (row) { row.style.opacity = '0.4'; row.style.pointerEvents = 'none'; }
+            }
+        });
+}
+
+function alertBarDismiss(id, btn) {
+    var reason = prompt('Dismiss reason (optional):');
+    if (reason === null) return;
+    fetch('/api/billing/opportunity/' + id + '/dismiss', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({reason:reason})})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                var row = btn.closest('div[style*="background:rgba(255,255,255,0.1)"]');
+                if (row) { row.style.opacity = '0.3'; row.style.pointerEvents = 'none'; }
+            }
+        });
+}
+
+/* Phase 21.5: Documentation phrase clipboard integration */
+function toggleDocPhrases(oppCode, btn) {
+    var panel = document.getElementById('doc-phrases-' + oppCode);
+    if (!panel) return;
+    if (panel.style.display !== 'none') {
+        panel.style.display = 'none';
+        return;
+    }
+    if (panel.getAttribute('data-loaded')) {
+        panel.style.display = '';
+        return;
+    }
+    panel.innerHTML = '<span style="opacity:0.7;">Loading phrases...</span>';
+    panel.style.display = '';
+    fetch('/api/billing/phrases-for-code/' + encodeURIComponent(oppCode))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var phrases = data.phrases || [];
+            if (phrases.length === 0) {
+                panel.innerHTML = '<span style="opacity:0.6;">No documentation phrases available.</span>';
+                panel.setAttribute('data-loaded', '1');
+                return;
+            }
+            var h = '<div style="font-weight:600;margin-bottom:4px;opacity:0.8;">Documentation Language — click to copy</div>';
+            phrases.forEach(function(p) {
+                h += '<div style="padding:4px 6px;margin-bottom:3px;background:rgba(255,255,255,0.06);border-radius:3px;cursor:pointer;" ' +
+                     'onclick="copyDocPhrase(this,\'' + p.text.replace(/'/g, "\\'").replace(/\n/g, "\\n") + '\')" title="Click to copy">';
+                h += '<div style="font-weight:600;font-size:10px;">' + escHtml(p.title) + '</div>';
+                h += '<div style="font-size:10px;opacity:0.85;max-height:40px;overflow:hidden;">' + escHtml(p.text).substring(0, 150) + '...</div>';
+                h += '</div>';
+            });
+            h += '<a href="/settings/phrases" style="font-size:10px;color:#a7f3d0;text-decoration:underline;">View full library &rarr;</a>';
+            panel.innerHTML = h;
+            panel.setAttribute('data-loaded', '1');
+        })
+        .catch(function() {
+            panel.innerHTML = '<span style="color:#fca5a5;">Failed to load phrases.</span>';
+        });
+}
+
+function copyDocPhrase(el, text) {
+    navigator.clipboard.writeText(text).then(function() {
+        var orig = el.style.background;
+        el.style.background = 'rgba(16,185,129,0.3)';
+        setTimeout(function() { el.style.background = orig; }, 1000);
+    });
+}
+</script>

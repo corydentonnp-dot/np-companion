@@ -1,7 +1,7 @@
 """
-NP Companion — Care Gap Rules Engine
+CareCompanion — Care Gap Rules Engine
 
-File location: np-companion/agent/caregap_engine.py
+File location: carecompanion/agent/caregap_engine.py
 
 Evaluates which USPSTF preventive care screenings are due for a given
 patient based on age, sex, diagnoses, immunization history, and the
@@ -20,7 +20,7 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
-logger = logging.getLogger('np_companion.caregap_engine')
+logger = logging.getLogger('carecompanion.caregap_engine')
 
 # ======================================================================
 # Hardcoded USPSTF default rules
@@ -348,6 +348,8 @@ def _has_risk_factors(required_factors, patient_diagnoses):
     """
     Check if the patient has the required risk factors based on
     their diagnosis list.  Maps risk factor keys to diagnosis keywords.
+    Also checks SNOMED parent concepts for broader condition matching
+    (e.g., "Diabetic nephropathy" → both Diabetes and CKD).
     """
     if not required_factors:
         return True
@@ -362,10 +364,35 @@ def _has_risk_factors(required_factors, patient_diagnoses):
                        'bmi > 30', 'bmi>30'],
     }
 
+    # SNOMED parent→child condition groups: if a patient has a specific
+    # subtype diagnosis, also match the parent condition risk factor
+    SNOMED_CONDITION_GROUPS = {
+        'diabetes': ['diabetic', 'diabetes', 'dm ', 'dm1', 'dm2', 'type 1',
+                     'type 2', 'niddm', 'iddm', 'diabetic nephropathy',
+                     'diabetic retinopathy', 'diabetic neuropathy'],
+        'ckd': ['chronic kidney', 'ckd', 'renal failure', 'nephropathy',
+                'glomerulonephritis', 'nephrotic', 'dialysis', 'esrd',
+                'diabetic nephropathy'],
+        'cardiovascular': ['coronary', 'cad', 'chf', 'heart failure',
+                           'atrial fibrillation', 'afib', 'cardiomyopathy',
+                           'myocardial', 'angina', 'pvd', 'peripheral vascular'],
+        'hypertension': ['hypertension', 'htn', 'high blood pressure',
+                         'hypertensive'],
+    }
+
     for factor in required_factors:
+        # First try standard keyword matching
         keywords = factor_keywords.get(factor, [factor])
-        if not any(kw in diag_text for kw in keywords):
-            return False
+        if any(kw in diag_text for kw in keywords):
+            continue
+
+        # Then try SNOMED condition group matching
+        group_keywords = SNOMED_CONDITION_GROUPS.get(factor, [])
+        if group_keywords and any(kw in diag_text for kw in group_keywords):
+            continue
+
+        # Factor not matched
+        return False
     return True
 
 
@@ -552,3 +579,157 @@ def evaluate_and_persist_gaps(user_id, mrn, patient_data, app):
 
         db.session.commit()
         return new_count
+
+
+# ======================================================================
+# Phase 35.4 — Calculator-Driven Care Gap Evaluation
+# ======================================================================
+
+# Rules triggered by CalculatorResult values (thresholds, not demographics)
+_CALC_GAP_RULES = [
+    {
+        'gap_type': 'obesity_counseling',
+        'gap_name': 'Obesity Counseling (BMI ≥ 30)',
+        'description': (
+            'BMI ≥ 30 — obesity counseling indicated. Eligible for '
+            'G0447 (intensive behavioral therapy) or 99401-99404.'
+        ),
+        'billing_code_suggested': 'G0447',
+        'calc_keys': ['bmi'],
+        'threshold': 30.0,
+        'age_min': None,
+        'age_max': None,
+    },
+    {
+        'gap_type': 'statin_therapy_discussion',
+        'gap_name': 'Statin Therapy Discussion (PREVENT ≥ 7.5%)',
+        'description': (
+            'PREVENT 10yr CVD risk ≥ 7.5% — ACC/AHA statin therapy '
+            'discussion recommended (shared decision-making).'
+        ),
+        'billing_code_suggested': '99401-99215',
+        'calc_keys': ['prevent'],
+        'threshold': 7.5,
+        'age_min': None,
+        'age_max': None,
+    },
+    {
+        'gap_type': 'fh_evaluation',
+        'gap_name': 'Familial Hypercholesterolemia Evaluation (LDL ≥ 190)',
+        'description': (
+            'LDL ≥ 190 mg/dL — evaluate for familial hypercholesterolemia '
+            'per Dutch FH criteria. Consider genetic testing (81401).'
+        ),
+        'billing_code_suggested': '81401',
+        'calc_keys': ['ldl', 'ldl_calculated'],
+        'threshold': 190.0,
+        'age_min': None,
+        'age_max': None,
+    },
+    {
+        'gap_type': 'lung_cancer_screening',
+        'gap_name': 'Lung Cancer Screening — LDCT (pack-years ≥ 20)',
+        'description': (
+            'Pack-year history ≥ 20 — eligible for annual LDCT lung cancer '
+            'screening per USPSTF Grade B recommendation (age 50-80, '
+            'current smoker or quit within 15 years). '
+            'Order 71271 + G0296 counseling visit.'
+        ),
+        'billing_code_suggested': '71271 / G0296',
+        'calc_keys': ['pack_years'],
+        'threshold': 20.0,
+        'age_min': 50,
+        'age_max': 80,
+    },
+]
+
+
+def evaluate_calculator_care_gaps(mrn: str, user_id: int, patient_age, app) -> int:
+    """
+    Phase 35.4 — Create CareGap records triggered by CalculatorResult thresholds.
+
+    Parameters
+    ----------
+    mrn : str
+    user_id : int
+    patient_age : float | None  — used for age-gated rules (LDCT)
+    app : Flask app instance
+
+    Returns
+    -------
+    int — number of new gaps created or reopened
+    """
+    from models import db
+    from models.calculator import CalculatorResult
+    from models.caregap import CareGap
+    from datetime import datetime, timezone
+
+    new_count = 0
+
+    with app.app_context():
+        for rule in _CALC_GAP_RULES:
+            try:
+                # Age gate (if applicable)
+                if rule['age_min'] is not None:
+                    if patient_age is None:
+                        continue
+                    if not (rule['age_min'] <= patient_age <= rule['age_max']):
+                        continue
+
+                # Find best matching CalculatorResult for any of the calc_keys
+                row = None
+                for ck in rule['calc_keys']:
+                    row = (CalculatorResult.query
+                           .filter_by(mrn=mrn, calculator_key=ck, is_current=True)
+                           .order_by(CalculatorResult.computed_at.desc())
+                           .first())
+                    if row and row.score_value is not None:
+                        break
+
+                if row is None or row.score_value is None:
+                    continue
+                if row.score_value < rule['threshold']:
+                    continue
+
+                # Check existing gap record
+                existing = (CareGap.query
+                            .filter_by(user_id=user_id, mrn=mrn, gap_type=rule['gap_type'])
+                            .first())
+
+                if existing:
+                    if not existing.is_addressed:
+                        continue  # already open — do not duplicate
+                    # Threshold still met but was addressed — re-open
+                    existing.is_addressed = False
+                    existing.status = 'open'
+                    existing.completed_date = None
+                    existing.updated_at = datetime.now(timezone.utc)
+                    new_count += 1
+                else:
+                    new_gap = CareGap(
+                        user_id=user_id,
+                        mrn=mrn,
+                        patient_name='',
+                        gap_type=rule['gap_type'],
+                        gap_name=rule['gap_name'],
+                        description=rule['description'],
+                        billing_code_suggested=rule['billing_code_suggested'],
+                        status='open',
+                        is_addressed=False,
+                    )
+                    db.session.add(new_gap)
+                    new_count += 1
+
+            except Exception as e:
+                logger.debug(
+                    'evaluate_calculator_care_gaps(%s, %s): %s',
+                    mrn, rule['gap_type'], e
+                )
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            logger.error('evaluate_calculator_care_gaps commit error: %s', e)
+            db.session.rollback()
+
+    return new_count

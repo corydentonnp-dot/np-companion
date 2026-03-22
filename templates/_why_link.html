@@ -1,0 +1,20 @@
+{#
+    WhyLink macro — Phase 14
+    Renders a small "Why?" badge that opens a popover with the AI reasoning
+    and source citation for a suggestion.
+
+    Usage:
+        {% from '_why_link.html' import why_link %}
+        {{ why_link("Patient has 3 chronic conditions qualifying for CCM", "CMS CCM billing rules", "/help/ccm") }}
+#}
+{% macro why_link(reason, source, detail_url=None) %}
+<span class="why-link" tabindex="0" role="button" aria-label="Why this suggestion">Why?
+    <span class="why-popover">
+        <span class="why-popover-reason">{{ reason }}</span>
+        <span class="why-popover-source">Source: {{ source }}</span>
+        {% if detail_url %}
+        <a class="why-popover-detail" href="{{ detail_url }}" target="_blank" rel="noopener">Learn more &rarr;</a>
+        {% endif %}
+    </span>
+</span>
+{% endmacro %}

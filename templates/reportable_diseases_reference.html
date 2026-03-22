@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Reportable Disease Guide — CareCompanion</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            color: #222;
+            padding: 0.6in;
+            line-height: 1.45;
+        }
+        @media print {
+            @page { margin: 0.5in; size: letter; }
+            body { padding: 0; font-size: 9pt; }
+            .no-print { display: none !important; }
+            .disease-card { page-break-inside: avoid; }
+        }
+        h1 { font-size: 18pt; margin-bottom: 4px; color: #1a1a1a; }
+        .subtitle { font-size: 10pt; color: #666; margin-bottom: 16px; }
+        .search-bar {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .search-bar input {
+            padding: 6px 12px;
+            font-size: 11pt;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 350px;
+        }
+        .category-filter {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .cat-btn {
+            padding: 3px 10px;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            font-size: 8.5pt;
+            cursor: pointer;
+            background: #fff;
+            color: #444;
+        }
+        .cat-btn:hover, .cat-btn.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+
+        .disease-card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+        }
+        .disease-card.urgent { border-left: 4px solid #dc3545; }
+        .disease-card.standard { border-left: 4px solid #0d6efd; }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .disease-name { font-size: 13pt; font-weight: 700; color: #111; }
+        .badges { display: flex; gap: 4px; flex-wrap: wrap; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 7.5pt;
+            font-weight: 600;
+        }
+        .badge.nat-notif { background: #d4edda; color: #155724; }
+        .badge.not-nat { background: #e9ecef; color: #666; }
+        .badge.urgent { background: #f8d7da; color: #721c24; }
+        .badge.category { background: #e8e0f3; color: #5b3d8c; }
+
+        .meta-row {
+            font-size: 9pt;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        .meta-row strong { color: #333; }
+
+        .section-label {
+            font-weight: 700;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: #555;
+            margin-top: 8px;
+            margin-bottom: 3px;
+        }
+        .obligation-list {
+            list-style: none;
+            padding: 0;
+        }
+        .obligation-list li {
+            padding: 2px 0;
+            padding-left: 18px;
+            position: relative;
+            font-size: 9pt;
+        }
+        .obligation-list li::before {
+            content: "☐";
+            position: absolute;
+            left: 0;
+            font-size: 10pt;
+        }
+        .notes-box {
+            margin-top: 6px;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border-left: 3px solid #0d6efd;
+            font-size: 8.5pt;
+            color: #444;
+        }
+        .notes-box.highlight {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .print-btn {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .print-btn button {
+            padding: 6px 20px;
+            font-size: 11pt;
+            cursor: pointer;
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+        }
+        .footer { margin-top: 20px; font-size: 8pt; color: #999; text-align: center; border-top: 1px solid #ddd; padding-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="print-btn no-print">
+        <button onclick="window.print()">&#128424; Print Disease Guide</button>
+    </div>
+
+    <h1>Reportable Infectious Disease Guide</h1>
+    <div class="subtitle">{{ disease_count }} conditions &bull; CDC nationally notifiable conditions &amp; state-level requirements &bull; Quick clinical reference</div>
+
+    <div class="search-bar no-print">
+        <input type="text" id="disease-search" placeholder="Search conditions (e.g., TB, syphilis, hepatitis...)" oninput="filterDiseases()">
+    </div>
+
+    {% if not diseases %}
+    <p style="color:#888;font-style:italic;text-align:center;padding:40px;">Disease guide not loaded. Check data/reportable_diseases.json.</p>
+    {% endif %}
+
+    {% for d in diseases %}
+    <div class="disease-card {% if 'IMMEDIATELY' in d.reporting_timeframe or '24 hours' in d.reporting_timeframe %}urgent{% else %}standard{% endif %}"
+         data-search="{{ d.condition|lower }} {{ d.category|lower }} {{ d.what_to_report|default('')|lower }}"
+         data-category="{{ d.category|lower }}">
+
+        <div class="card-header">
+            <span class="disease-name">{{ d.condition }}</span>
+            <div class="badges">
+                <span class="badge category">{{ d.category }}</span>
+                {% if d.nationally_notifiable %}
+                <span class="badge nat-notif">Nationally Notifiable</span>
+                {% else %}
+                <span class="badge not-nat">State-Varies</span>
+                {% endif %}
+                {% if 'IMMEDIATELY' in d.reporting_timeframe %}
+                <span class="badge urgent">URGENT</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="meta-row">
+            <strong>Report within:</strong> {{ d.reporting_timeframe }}<br>
+            <strong>Report to:</strong> {{ d.report_to }}
+        </div>
+
+        {% if d.what_to_report %}
+        <div class="meta-row">
+            <strong>What to report:</strong> {{ d.what_to_report }}
+        </div>
+        {% endif %}
+
+        <div class="section-label">Provider Obligations</div>
+        <ul class="obligation-list">
+            {% for ob in d.provider_obligations %}
+            <li>{{ ob }}</li>
+            {% endfor %}
+        </ul>
+
+        {% if d.notes %}
+        <div class="notes-box {% if 'user' in d.notes|lower and 'question' in d.notes|lower %}highlight{% endif %}">
+            <strong>Clinical Notes:</strong> {{ d.notes }}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        CareCompanion Reportable Disease Guide &bull; For clinical reference only &bull; Always verify current reporting requirements with your local/state health department<br>
+        State health department contact: search "your state" + "reportable diseases" for your jurisdiction's specific list and reporting forms
+    </div>
+
+    <script>
+    function filterDiseases() {
+        const query = document.getElementById('disease-search').value.toLowerCase().trim();
+        document.querySelectorAll('.disease-card').forEach(function(card) {
+            const text = card.getAttribute('data-search') || '';
+            card.style.display = (!query || text.indexOf(query) !== -1) ? '' : 'none';
+        });
+    }
+    </script>
+</body>
+</html>

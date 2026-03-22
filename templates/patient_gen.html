@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}Patient Generator — CareCompanion{% endblock %}
+{% block page_id %}patient-gen{% endblock %}
+
+{% block content %}
+<style>
+    .pg-layout { display: grid; grid-template-columns: 380px 1fr; gap: 24px; max-width: 1400px; }
+    .pg-form-panel { }
+    .pg-results-panel { min-height: 400px; }
+
+    /* Tabs */
+    .pg-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--color-mid-gray); margin-bottom: 16px; }
+    .pg-tab { padding: 8px 18px; cursor: pointer; font-size: 14px; font-weight: 500; border: none; background: none;
+              border-bottom: 2px solid transparent; margin-bottom: -2px; color: var(--color-navy); }
+    .pg-tab.active { border-bottom-color: var(--color-teal); color: var(--color-teal); }
+    .pg-tab:hover:not(.active) { background: var(--color-lt-gray); }
+    .pg-tab-content { display: none; }
+    .pg-tab-content.active { display: block; }
+
+    /* Form controls */
+    .pg-field { margin-bottom: 12px; }
+    .pg-field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #555; }
+    .pg-field input, .pg-field select { width: 100%; padding: 6px 10px; border: 1px solid var(--color-mid-gray);
+                                         border-radius: 4px; font-size: 14px; }
+    .pg-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pg-complexity-group { display: flex; gap: 8px; margin-top: 4px; }
+    .pg-complexity-group label { display: flex; align-items: center; gap: 4px; font-weight: 400; cursor: pointer; font-size: 14px; }
+    .pg-complexity-group input[type="radio"] { margin: 0; }
+    .pg-count-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+    .pg-count-row input[type="number"] { width: 70px; text-align: center; }
+
+    /* Generate button */
+    .pg-generate-btn { margin-top: 18px; padding: 10px 28px; background: var(--color-teal); color: #fff;
+                       border: none; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer;
+                       width: 100%; transition: background .15s; }
+    .pg-generate-btn:hover { background: #0a5c5e; }
+    .pg-generate-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Warning banner */
+    .pg-warning { background: var(--color-lt-yellow); border: 1px solid var(--color-gold); border-radius: 6px;
+                  padding: 10px 16px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .pg-warning strong { color: #b8860b; }
+
+    /* Results table */
+    .pg-results-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .pg-results-table th { background: var(--color-lt-gray); padding: 8px 10px; text-align: left; font-weight: 600;
+                           border-bottom: 2px solid var(--color-mid-gray); font-size: 13px; }
+    .pg-results-table td { padding: 8px 10px; border-bottom: 1px solid var(--color-lt-gray); vertical-align: top; }
+    .pg-results-table tr:hover td { background: #f0f8ff; }
+    .pg-dl-btn { padding: 4px 10px; font-size: 12px; background: var(--color-navy); color: #fff; border: none;
+                 border-radius: 4px; cursor: pointer; white-space: nowrap; }
+    .pg-dl-btn:hover { background: #14305a; }
+    .pg-zip-btn { margin-top: 12px; padding: 8px 20px; background: var(--color-navy); color: #fff; border: none;
+                  border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .pg-zip-btn:hover { background: #14305a; }
+
+    /* Spinner */
+    .pg-spinner { display: none; text-align: center; padding: 40px; }
+    .pg-spinner.active { display: block; }
+    .pg-spinner::after { content: ''; display: inline-block; width: 32px; height: 32px;
+                         border: 3px solid var(--color-mid-gray); border-top-color: var(--color-teal);
+                         border-radius: 50%; animation: pg-spin .7s linear infinite; }
+    @keyframes pg-spin { to { transform: rotate(360deg); } }
+
+    /* Empty state */
+    .pg-empty { text-align: center; padding: 60px 20px; color: #999; }
+    .pg-empty svg { width: 64px; height: 64px; opacity: .25; margin-bottom: 12px; }
+
+    /* Dx chips */
+    .pg-dx { font-size: 12px; color: #666; max-width: 260px; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+        .pg-layout { grid-template-columns: 1fr; }
+    }
+</style>
+
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+    <h1 style="margin:0;">Patient Generator</h1>
+    <span class="badge badge--info">Test Data</span>
+</div>
+
+<div class="pg-warning">
+    <strong>⚠ TEST DATA ONLY</strong>
+    <span>Generated patients are entirely fictional. MRNs start with "T" to clearly identify test data. Do not use in production clinical systems.</span>
+</div>
+
+<div class="pg-layout">
+    <!-- LEFT: Form Panel -->
+    <div class="pg-form-panel card">
+        <div class="pg-tabs">
+            <button class="pg-tab active" data-tab="demographics" type="button">Demographics</button>
+            <button class="pg-tab" data-tab="clinical" type="button">Clinical Options</button>
+        </div>
+
+        <!-- Demographics Tab -->
+        <div class="pg-tab-content active" id="tab-demographics">
+            <div class="pg-field-row">
+                <div class="pg-field">
+                    <label>First Name</label>
+                    <input type="text" id="pg-first-name" placeholder="Random">
+                </div>
+                <div class="pg-field">
+                    <label>Last Name</label>
+                    <input type="text" id="pg-last-name" placeholder="Random">
+                </div>
+            </div>
+            <div class="pg-field">
+                <label>Sex</label>
+                <select id="pg-sex">
+                    <option value="">Random</option>
+                    <option value="M">Male</option>
+                    <option value="F">Female</option>
+                </select>
+            </div>
+            <div class="pg-field-row">
+                <div class="pg-field">
+                    <label>Age Min</label>
+                    <input type="number" id="pg-age-min" min="0" max="110" placeholder="0">
+                </div>
+                <div class="pg-field">
+                    <label>Age Max</label>
+                    <input type="number" id="pg-age-max" min="0" max="110" placeholder="110">
+                </div>
+            </div>
+            <div class="pg-field">
+                <label>Race</label>
+                <select id="pg-race">
+                    <option value="">Random</option>
+                </select>
+            </div>
+            <div class="pg-field">
+                <label>Religion</label>
+                <input type="text" id="pg-religion" placeholder="Random">
+            </div>
+            <div class="pg-field">
+                <label>Language</label>
+                <select id="pg-language">
+                    <option value="">Random</option>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="French">French</option>
+                    <option value="Mandarin">Mandarin</option>
+                    <option value="Vietnamese">Vietnamese</option>
+                    <option value="Korean">Korean</option>
+                    <option value="Arabic">Arabic</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Portuguese">Portuguese</option>
+                    <option value="Russian">Russian</option>
+                    <option value="Tagalog">Tagalog</option>
+                    <option value="Japanese">Japanese</option>
+                    <option value="Haitian Creole">Haitian Creole</option>
+                </select>
+            </div>
+            <div class="pg-field-row">
+                <div class="pg-field">
+                    <label>City</label>
+                    <input type="text" id="pg-city" placeholder="Random">
+                </div>
+                <div class="pg-field">
+                    <label>State</label>
+                    <input type="text" id="pg-state" placeholder="Random" maxlength="2">
+                </div>
+            </div>
+        </div>
+
+        <!-- Clinical Options Tab -->
+        <div class="pg-tab-content" id="tab-clinical">
+            <div class="pg-field">
+                <label>Complexity</label>
+                <div class="pg-complexity-group">
+                    <label><input type="radio" name="pg-complexity" value="Simple"> Simple</label>
+                    <label><input type="radio" name="pg-complexity" value="Moderate" checked> Moderate</label>
+                    <label><input type="radio" name="pg-complexity" value="Complex"> Complex</label>
+                </div>
+                <div style="margin-top:8px;font-size:12px;color:#888;">
+                    <strong>Simple:</strong> 1–3 dx, 0–3 meds &nbsp;
+                    <strong>Moderate:</strong> 3–7 dx, 3–8 meds &nbsp;
+                    <strong>Complex:</strong> 7–18 dx, 8–20 meds
+                </div>
+            </div>
+            <div class="pg-count-row">
+                <label style="font-size:14px;font-weight:600;">Number of Patients</label>
+                <input type="number" id="pg-count" min="1" max="20" value="1">
+            </div>
+        </div>
+
+        <button class="pg-generate-btn" id="pg-generate-btn" type="button">Generate Patients</button>
+    </div>
+
+    <!-- RIGHT: Results Panel -->
+    <div class="pg-results-panel">
+        <div class="pg-spinner" id="pg-spinner"></div>
+
+        <div class="pg-empty" id="pg-empty">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+            <div>Configure options and click <strong>Generate Patients</strong> to create test data.</div>
+        </div>
+
+        <div id="pg-results" style="display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <h3 style="margin:0;">Generated Patients <span id="pg-result-count" class="badge badge--success"></span></h3>
+                <button class="pg-zip-btn" id="pg-zip-btn" type="button" style="display:none;">⬇ Download All as ZIP</button>
+            </div>
+            <table class="pg-results-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>MRN</th>
+                        <th>Age</th>
+                        <th>Sex</th>
+                        <th>Diagnoses</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="pg-results-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // --- Tab switching ---
+    document.querySelectorAll('.pg-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.pg-tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.pg-tab-content').forEach(function(c) { c.classList.remove('active'); });
+            tab.classList.add('active');
+            document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        });
+    });
+
+    var generateBtn = document.getElementById('pg-generate-btn');
+    var spinner = document.getElementById('pg-spinner');
+    var emptyState = document.getElementById('pg-empty');
+    var resultsDiv = document.getElementById('pg-results');
+    var resultsBody = document.getElementById('pg-results-body');
+    var resultCount = document.getElementById('pg-result-count');
+    var zipBtn = document.getElementById('pg-zip-btn');
+    var _patients = [];
+
+    // --- Generate ---
+    generateBtn.addEventListener('click', function() {
+        var complexity = document.querySelector('input[name="pg-complexity"]:checked').value;
+        var count = parseInt(document.getElementById('pg-count').value) || 1;
+        count = Math.max(1, Math.min(count, 20));
+
+        var overrides = {};
+        var v;
+        v = document.getElementById('pg-first-name').value.trim(); if (v) overrides.first_name = v;
+        v = document.getElementById('pg-last-name').value.trim(); if (v) overrides.last_name = v;
+        v = document.getElementById('pg-sex').value; if (v) overrides.sex = v;
+        v = document.getElementById('pg-age-min').value; if (v) overrides.age_min = parseInt(v);
+        v = document.getElementById('pg-age-max').value; if (v) overrides.age_max = parseInt(v);
+        v = document.getElementById('pg-religion').value.trim(); if (v) overrides.religion = v;
+        v = document.getElementById('pg-language').value; if (v) overrides.language = v;
+        v = document.getElementById('pg-city').value.trim(); if (v) overrides.city = v;
+        v = document.getElementById('pg-state').value.trim(); if (v) overrides.state = v;
+
+        generateBtn.disabled = true;
+        emptyState.style.display = 'none';
+        resultsDiv.style.display = 'none';
+        spinner.classList.add('active');
+
+        fetch('/api/patient-generator/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ complexity: complexity, count: count, overrides: overrides })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            spinner.classList.remove('active');
+            generateBtn.disabled = false;
+
+            if (data.error) {
+                emptyState.style.display = 'block';
+                emptyState.innerHTML = '<div style="color:var(--color-red);">Error: ' + data.error + '</div>';
+                return;
+            }
+
+            _patients = data.patients || [];
+            resultsBody.innerHTML = '';
+
+            _patients.forEach(function(p, i) {
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td><strong>' + escHtml(p.name) + '</strong></td>' +
+                    '<td><code>' + escHtml(p.mrn) + '</code></td>' +
+                    '<td>' + p.age + '</td>' +
+                    '<td>' + escHtml(p.sex) + '</td>' +
+                    '<td><div class="pg-dx">' + escHtml(p.diagnoses_summary) + '</div></td>' +
+                    '<td><button class="pg-dl-btn" data-idx="' + i + '">⬇ XML</button></td>';
+                resultsBody.appendChild(tr);
+            });
+
+            resultCount.textContent = _patients.length;
+            zipBtn.style.display = _patients.length > 1 ? '' : 'none';
+            resultsDiv.style.display = 'block';
+        })
+        .catch(function(err) {
+            spinner.classList.remove('active');
+            generateBtn.disabled = false;
+            emptyState.style.display = 'block';
+            emptyState.innerHTML = '<div style="color:var(--color-red);">Network error. Please try again.</div>';
+        });
+    });
+
+    // --- Download single XML ---
+    document.addEventListener('click', function(e) {
+        if (!e.target.classList.contains('pg-dl-btn')) return;
+        var idx = parseInt(e.target.dataset.idx);
+        var p = _patients[idx];
+        if (!p) return;
+        downloadXml(p.filename, p.xml_b64);
+    });
+
+    function downloadXml(filename, b64) {
+        var bytes = atob(b64);
+        var arr = new Uint8Array(bytes.length);
+        for (var i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        var blob = new Blob([arr], { type: 'application/xml' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // --- Download ZIP ---
+    zipBtn.addEventListener('click', function() {
+        if (!_patients.length) return;
+        var files = _patients.map(function(p) {
+            return { filename: p.filename, xml_b64: p.xml_b64 };
+        });
+
+        zipBtn.disabled = true;
+        zipBtn.textContent = 'Building ZIP...';
+
+        fetch('/api/patient-generator/zip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: files })
+        })
+        .then(function(r) { return r.blob(); })
+        .then(function(blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url; a.download = 'test_patients.zip'; a.click();
+            URL.revokeObjectURL(url);
+            zipBtn.disabled = false;
+            zipBtn.textContent = '⬇ Download All as ZIP';
+        })
+        .catch(function() {
+            zipBtn.disabled = false;
+            zipBtn.textContent = '⬇ Download All as ZIP';
+        });
+    });
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+})();
+</script>
+{% endblock %}

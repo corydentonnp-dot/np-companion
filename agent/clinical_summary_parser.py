@@ -1,7 +1,7 @@
 """
-NP Companion — Clinical Summary Exporter & Parser
+CareCompanion — Clinical Summary Exporter & Parser
 
-File location: np-companion/agent/clinical_summary_parser.py
+File location: carecompanion/agent/clinical_summary_parser.py
 
 Two-phase batch workflow for extracting patient data from
 Amazing Charts Clinical Summary CDA XML exports.
@@ -22,12 +22,13 @@ folder and auto-deleted after CLINICAL_SUMMARY_RETENTION_DAYS.
 Audit logs use sha256(mrn)[:12] only — never patient names.
 """
 
-import hashlib
 import logging
 import os
 import re
 import time
 import xml.etree.ElementTree as ET
+
+from utils import safe_patient_id
 from datetime import datetime, timedelta, timezone
 
 import config
@@ -53,11 +54,12 @@ SECTION_LOINC = {
     'goals': '61146-7',
     'health_concerns': '75310-3',
     'patient_demographics': '10154-3',
+    'insurance': '48768-6',
 }
 
 
 def _hash_mrn(mrn):
-    return hashlib.sha256(mrn.encode()).hexdigest()[:12]
+    return safe_patient_id(mrn)[:12]
 
 
 def open_patient_chart(mrn, patient_name):
@@ -260,6 +262,17 @@ def export_clinical_summary(mrn):
                     mtime = os.path.getmtime(fpath)
                     if time.time() - mtime < 30:
                         logger.info(f'Export found: {fname}')
+                        # Rename file to use hashed MRN instead of raw MRN
+                        hashed_name = fname.replace(
+                            f'PatientId_{mrn}_',
+                            f'PatientId_{safe_patient_id(mrn)[:12]}_',
+                        )
+                        new_fpath = os.path.join(export_folder, hashed_name)
+                        try:
+                            os.rename(fpath, new_fpath)
+                            fpath = new_fpath
+                        except OSError:
+                            pass  # Keep original if rename fails
                         return fpath
             time.sleep(1)
 
@@ -342,7 +355,22 @@ def parse_clinical_summary(xml_path):
         except Exception as e:
             logger.debug(f'Section {section_name} parse error: {e}')
 
-    sections_found = [k for k, v in result.items() if v and k not in ('patient_name', 'patient_mrn', 'patient_dob')]
+    # ---- Classify insurer from extracted insurance section ----
+    try:
+        from app.services.insurer_classifier import classify_insurer
+        insurance_entries = result.get('insurance', [])
+        raw_payer_text = ' '.join(
+            ' '.join(v for v in row.values() if isinstance(v, str))
+            for row in insurance_entries
+        )
+        result['insurer_type'] = classify_insurer(raw_payer_text)
+        if result['insurer_type'] != 'unknown':
+            logger.info(f'Insurer auto-detected: {result["insurer_type"]}')
+    except Exception as e:
+        logger.debug(f'Insurer classification error: {e}')
+        result['insurer_type'] = 'unknown'
+
+    sections_found = [k for k, v in result.items() if v and k not in ('patient_name', 'patient_mrn', 'patient_dob', 'insurer_type')]
     logger.info(f'Parsed {len(sections_found)} sections: {", ".join(sections_found)}')
 
     return result
@@ -438,6 +466,68 @@ def _parse_date(date_str):
     return None
 
 
+def detect_new_medications(user_id, mrn, parsed):
+    """
+    Compare medications in the new XML against the patient's existing
+    medications in the database.  Returns list of new medication dicts.
+
+    Must be called BEFORE store_parsed_summary() deletes old records.
+
+    Returns
+    -------
+    list[dict]
+        Each dict: {'drug_name': str, 'rxcui': str, 'start_date': str}
+    """
+    from models.patient import PatientMedication
+
+    # Snapshot current DB medications for this patient
+    existing = PatientMedication.query.filter_by(
+        user_id=user_id, mrn=mrn, status='active'
+    ).all()
+    existing_names = {m.drug_name.strip().lower() for m in existing if m.drug_name}
+
+    # If no prior medications exist, don't flag everything as "new"
+    if not existing_names:
+        return []
+
+    new_meds = []
+    for row in parsed.get('medications', []):
+        if 'text' in row:
+            continue
+        status = (row.get('Status') or 'active').strip().lower()
+        if status != 'active':
+            continue
+        drug_text = row.get('Medication', '')
+        display_name, code_sys, code_val = _parse_code_from_text(drug_text)
+        name = (display_name or drug_text).strip()
+        if not name:
+            continue
+        # Check if this medication is genuinely new
+        if name.lower() not in existing_names:
+            rxnorm_cui = code_val if code_sys.lower() in ('rxnorm', 'rx') else ''
+            new_meds.append({
+                'drug_name': name,
+                'rxcui': rxnorm_cui,
+                'start_date': row.get('Start Date', ''),
+            })
+
+    return new_meds
+
+
+def _trigger_new_med_education(user_id, mrn, new_meds):
+    """
+    Trigger 2: Auto-draft education messages for newly detected medications.
+    Runs in a try/except — never blocks the main parse pipeline.
+    """
+    if not new_meds:
+        return
+    try:
+        from routes.intelligence import auto_draft_education_message
+        auto_draft_education_message(user_id, mrn, new_meds)
+    except Exception as e:
+        logger.warning(f'Trigger 2 (new-med education) failed for MRN hash {_hash_mrn(mrn)}: {e}')
+
+
 def store_parsed_summary(user_id, mrn, parsed):
     """
     Write parsed clinical summary data to the database.
@@ -454,10 +544,15 @@ def store_parsed_summary(user_id, mrn, parsed):
     from models.patient import (
         PatientVitals, PatientRecord, PatientMedication,
         PatientDiagnosis, PatientAllergy, PatientImmunization,
+        PatientLabResult, PatientSocialHistory,
     )
     from models.audit import AuditLog
+    from billing_engine.shared import hash_mrn
 
     now = datetime.now(timezone.utc)
+
+    # ---- Trigger 2: detect new medications BEFORE clearing old data ----
+    new_meds = detect_new_medications(user_id, mrn, parsed)
 
     # ---- Upsert PatientRecord ----
     record = (
@@ -478,9 +573,14 @@ def store_parsed_summary(user_id, mrn, parsed):
     record.patient_dob = raw_dob
     record.patient_sex = parsed.get('patient_sex', '')
 
+    # Insurer auto-detection from CDA XML insurance section
+    detected_insurer = parsed.get('insurer_type', 'unknown')
+    if detected_insurer and detected_insurer != 'unknown':
+        record.insurer_type = detected_insurer
+
     # ---- Clear old data for this patient before re-importing ----
     for model in (PatientMedication, PatientDiagnosis, PatientAllergy,
-                  PatientImmunization, PatientVitals):
+                  PatientImmunization, PatientVitals, PatientLabResult):
         model.query.filter_by(user_id=user_id, mrn=mrn).delete()
 
     # ---- Medications ----
@@ -586,7 +686,110 @@ def store_parsed_summary(user_id, mrn, parsed):
             )
             db.session.add(vital)
 
-    # ---- Audit log (no PHI — hash only) ----
+    # ---- Lab Results (Phase 15.4 — previously parsed but discarded) ----
+    mrn_hash = hash_mrn(mrn)
+    for row in parsed.get('lab_results', []):
+        if 'text' in row:
+            continue
+        test_text = row.get('Test Name', row.get('Test', ''))
+        display_name, code_sys, code_val = _parse_code_from_text(test_text)
+        loinc = code_val if code_sys.upper() == 'LOINC' else ''
+        result_val = (row.get('Result') or row.get('Value') or '').strip()
+        result_units = (row.get('Units') or '').strip()
+        result_flag_raw = (row.get('Flag') or row.get('Interpretation') or 'normal').strip().lower()
+        if result_flag_raw in ('h', 'high', 'abnormal', 'a'):
+            result_flag = 'abnormal'
+        elif result_flag_raw in ('hh', 'critical', 'c', 'll'):
+            result_flag = 'critical'
+        else:
+            result_flag = 'normal'
+        lab = PatientLabResult(
+            user_id=user_id,
+            mrn=mrn,
+            patient_mrn_hash=mrn_hash,
+            test_name=display_name or test_text,
+            loinc_code=loinc,
+            result_value=result_val,
+            result_units=result_units,
+            result_date=_parse_date(row.get('Date') or row.get('Collection Date')),
+            result_flag=result_flag,
+            source='xml_import',
+        )
+        db.session.add(lab)
+
+    # ---- Social History (Phase 15.4 — previously parsed but discarded) ----
+    social_rows = parsed.get('social_history', [])
+    if social_rows:
+        # Upsert: one social history record per patient
+        social = PatientSocialHistory.query.filter_by(
+            user_id=user_id, mrn=mrn
+        ).first()
+        if not social:
+            social = PatientSocialHistory(
+                user_id=user_id, mrn=mrn, patient_mrn_hash=mrn_hash
+            )
+            db.session.add(social)
+        for row in social_rows:
+            if 'text' in row:
+                text_lower = row['text'].lower()
+                if 'tobacco' in text_lower or 'smoking' in text_lower or 'smoker' in text_lower:
+                    if any(w in text_lower for w in ('current', 'every day', 'daily', 'yes')):
+                        social.tobacco_status = 'current'
+                    elif any(w in text_lower for w in ('former', 'quit', 'ex-')):
+                        social.tobacco_status = 'former'
+                    elif any(w in text_lower for w in ('never', 'no', 'non-')):
+                        social.tobacco_status = 'never'
+                if 'alcohol' in text_lower or 'drink' in text_lower:
+                    if any(w in text_lower for w in ('current', 'yes', 'social', 'moderate', 'heavy')):
+                        social.alcohol_status = 'current'
+                    elif any(w in text_lower for w in ('former', 'quit', 'stopped')):
+                        social.alcohol_status = 'former'
+                    elif any(w in text_lower for w in ('never', 'no', 'none', 'denied')):
+                        social.alcohol_status = 'never'
+                    social.alcohol_frequency = row['text'].strip()[:100]
+                continue
+            # Structured social history rows
+            category = (row.get('Social History Element') or row.get('Type') or '').lower()
+            value = (row.get('Description') or row.get('Value') or '').strip()
+            if 'tobacco' in category or 'smoking' in category:
+                val_lower = value.lower()
+                if any(w in val_lower for w in ('current', 'every day', 'daily', 'yes')):
+                    social.tobacco_status = 'current'
+                elif any(w in val_lower for w in ('former', 'quit', 'ex-')):
+                    social.tobacco_status = 'former'
+                elif any(w in val_lower for w in ('never', 'no', 'non-')):
+                    social.tobacco_status = 'never'
+            elif 'alcohol' in category or 'drink' in category:
+                val_lower = value.lower()
+                if any(w in val_lower for w in ('current', 'yes', 'social', 'moderate', 'heavy')):
+                    social.alcohol_status = 'current'
+                elif any(w in val_lower for w in ('former', 'quit', 'stopped')):
+                    social.alcohol_status = 'former'
+                elif any(w in val_lower for w in ('never', 'no', 'none', 'denied')):
+                    social.alcohol_status = 'never'
+                social.alcohol_frequency = value[:100]
+            elif 'substance' in category or 'drug' in category:
+                social.substance_use_status = value[:100]
+            elif 'sexual' in category:
+                social.sexual_activity = value[:100]
+
+    # ---- Populate last_awv_date from BillingOpportunity history (Phase 15.5) ----
+    try:
+        from models.billing import BillingOpportunity
+        awv_opp = (
+            BillingOpportunity.query
+            .filter(
+                BillingOpportunity.patient_mrn_hash == hash_mrn(mrn),
+                BillingOpportunity.opportunity_type.in_(['AWV', 'G0438', 'G0439', 'G0402']),
+                BillingOpportunity.status == 'captured',
+            )
+            .order_by(BillingOpportunity.visit_date.desc())
+            .first()
+        )
+        if awv_opp and awv_opp.visit_date:
+            record.last_awv_date = awv_opp.visit_date
+    except Exception:
+        pass  # BillingOpportunity may not have AWV data yet
     sections_found = [k for k, v in parsed.items()
                       if v and k not in ('patient_name', 'patient_mrn', 'patient_dob')]
     meds_count = len(parsed.get('medications', []))
@@ -599,6 +802,72 @@ def store_parsed_summary(user_id, mrn, parsed):
 
     db.session.commit()
     logger.info(f'Stored parsed summary for MRN hash {_hash_mrn(mrn)}')
+
+    # ---- Phase 23 (C3): Auto-populate monitoring rules from new data ----
+    try:
+        from app.services.monitoring_rule_engine import MonitoringRuleEngine
+        engine = MonitoringRuleEngine(db)
+
+        # Refresh rules for medications with RxNorm CUIs
+        for row in parsed.get('medications', []):
+            if 'text' in row:
+                continue
+            drug_text = row.get('Medication', '')
+            display_name, code_sys, code_val = _parse_code_from_text(drug_text)
+            rxnorm_cui = code_val if code_sys.lower() in ('rxnorm', 'rx') else ''
+            if rxnorm_cui:
+                engine.refresh_rules_for_medication(display_name or drug_text, rxnorm_cui)
+
+        # Refresh condition-driven rules for new diagnoses
+        for row in parsed.get('diagnoses', []):
+            if 'text' in row:
+                continue
+            problem_text = row.get('Problem', '')
+            _, code_sys, code_val = _parse_code_from_text(problem_text)
+            icd10 = code_val if code_sys.upper() in ('ICD10', 'ICD-10') else ''
+            if icd10:
+                engine.refresh_condition_rules(icd10)
+    except Exception as exc:
+        logger.debug("Phase 23 monitoring refresh skipped: %s", exc)
+
+    # ---- Trigger 2: auto-draft education for new medications ----
+    if new_meds:
+        logger.info(f'Trigger 2: {len(new_meds)} new med(s) detected for MRN hash {_hash_mrn(mrn)}')
+        _trigger_new_med_education(user_id, mrn, new_meds)
+
+
+def detect_pregnancy(user_id, mrn):
+    """Phase 15.6: Scan PatientDiagnosis for O-codes (O00-O9A) indicating pregnancy."""
+    from models.patient import PatientDiagnosis
+    o_codes = PatientDiagnosis.query.filter_by(
+        user_id=user_id, mrn=mrn, status='active'
+    ).all()
+    for dx in o_codes:
+        code = (dx.icd10_code or '').upper().strip()
+        if code and code[0] == 'O' and len(code) >= 3:
+            return True
+    return False
+
+
+def populate_last_awv_date(record):
+    """Phase 15.5: Populate last_awv_date from BillingOpportunity history."""
+    try:
+        from models.billing import BillingOpportunity
+        from billing_engine.shared import hash_mrn
+        awv_opp = (
+            BillingOpportunity.query
+            .filter(
+                BillingOpportunity.patient_mrn_hash == hash_mrn(record.mrn),
+                BillingOpportunity.opportunity_type.in_(['AWV', 'G0438', 'G0439', 'G0402']),
+                BillingOpportunity.status == 'captured',
+            )
+            .order_by(BillingOpportunity.visit_date.desc())
+            .first()
+        )
+        if awv_opp and awv_opp.visit_date:
+            record.last_awv_date = awv_opp.visit_date
+    except Exception:
+        pass
 
 
 def schedule_deletion(xml_path, days=None):
@@ -634,6 +903,35 @@ def _delete_file(path):
             logger.info(f'Deleted XML file: {os.path.basename(path)}')
     except Exception as e:
         logger.error(f'Failed to delete {path}: {e}')
+
+
+def run_scheduled_deletions():
+    """
+    Delete XML files older than CLINICAL_SUMMARY_RETENTION_DAYS.
+    Called daily by the scheduler at 2 AM.
+    """
+    retention_days = getattr(config, 'CLINICAL_SUMMARY_RETENTION_DAYS', 183)
+    folder = getattr(config, 'CLINICAL_SUMMARY_EXPORT_FOLDER', 'data/clinical_summaries/')
+    if not os.path.isabs(folder):
+        folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), folder)
+    if not os.path.isdir(folder):
+        return
+
+    cutoff = time.time() - (retention_days * 86400)
+    deleted = 0
+    for fname in os.listdir(folder):
+        if not fname.endswith('.xml'):
+            continue
+        fpath = os.path.join(folder, fname)
+        try:
+            if os.path.getmtime(fpath) < cutoff:
+                os.remove(fpath)
+                deleted += 1
+        except Exception as e:
+            logger.error(f'Failed to delete expired XML {fname}: {e}')
+
+    if deleted:
+        logger.info(f'XML cleanup: deleted {deleted} expired file(s)')
 
 
 # ---- Watchdog file observer handler ----
@@ -710,6 +1008,15 @@ def start_xml_watcher(user_id, user=None):
     as a periodic fallback regardless.
     """
     global _watcher_observer  # noqa: PLW0603
+
+    # Stop any previously running observer to prevent thread leaks
+    if _watcher_observer is not None:
+        try:
+            _watcher_observer.stop()
+            _watcher_observer.join(timeout=5)
+        except Exception:
+            pass
+        _watcher_observer = None
 
     folder = get_export_folder(user)
     os.makedirs(folder, exist_ok=True)

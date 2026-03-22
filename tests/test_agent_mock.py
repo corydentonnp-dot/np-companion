@@ -1,7 +1,7 @@
 """
-NP Companion — Agent Mock Test Suite
+CareCompanion — Agent Mock Test Suite
 
-File location: np-companion/tests/test_agent_mock.py
+File location: carecompanion/tests/test_agent_mock.py
 
 Tests the agent pipeline against reference screenshots instead of
 a live Amazing Charts installation.  Run this on any machine to
@@ -41,7 +41,7 @@ def run_mock_tests():
     passed = []
     failed = []
 
-    _header('NP Companion — Agent Mock Tests')
+    _header('CareCompanion — Agent Mock Tests')
     print(f'AC_MOCK_MODE: {config.AC_MOCK_MODE}')
     print(f'TESSERACT_PATH: {getattr(config, "TESSERACT_PATH", "not set")}')
 

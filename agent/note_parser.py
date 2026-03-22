@@ -1,5 +1,5 @@
 """
-NP Companion — Clinical Note Section Parser
+CareCompanion — Clinical Note Section Parser
 File: agent/note_parser.py
 
 Standalone text parsing engine that identifies and extracts clinical

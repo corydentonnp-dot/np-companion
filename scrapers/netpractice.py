@@ -1,7 +1,7 @@
 """
-NP Companion — CGM webPRACTICE Schedule Scraper
+CareCompanion — CGM webPRACTICE Schedule Scraper
 
-File location: np-companion/scrapers/netpractice.py
+File location: carecompanion/scrapers/netpractice.py
 
 Uses Playwright to connect to Google Chrome (via CDP) and read the
 day's appointment schedule directly from the DOM.
@@ -43,11 +43,11 @@ import asyncio
 import json
 import logging
 import os
-import pickle
+import json
 import re
 from datetime import date, datetime, timedelta, timezone
 
-logger = logging.getLogger('np_companion.scraper')
+logger = logging.getLogger('carecompanion.scraper')
 
 
 class NetPracticeScraper:
@@ -222,8 +222,8 @@ class NetPracticeScraper:
         if not os.path.exists(self.cookie_file):
             return
         try:
-            with open(self.cookie_file, 'rb') as f:
-                cookies = pickle.load(f)
+            with open(self.cookie_file, 'r', encoding='utf-8') as f:
+                cookies = json.load(f)
             await context.add_cookies(cookies)
             logger.info('Loaded saved webPRACTICE session cookies')
         except Exception as e:
@@ -234,8 +234,8 @@ class NetPracticeScraper:
         try:
             cookies = await context.cookies()
             os.makedirs(os.path.dirname(self.cookie_file), exist_ok=True)
-            with open(self.cookie_file, 'wb') as f:
-                pickle.dump(cookies, f)
+            with open(self.cookie_file, 'w', encoding='utf-8') as f:
+                json.dump(cookies, f)
             logger.info('Saved webPRACTICE session cookies')
         except Exception as e:
             logger.warning(f'Could not save session cookies: {e}')
@@ -256,9 +256,151 @@ class NetPracticeScraper:
         except Exception:
             return False
 
-    async def _login(self, page, np_user, np_pass, client_number):
+    async def _is_mfa_page(self, page):
+        """
+        Check if the current page is an MFA / TOTP code prompt.
+
+        After credential submit, webPRACTICE loads a new page in the same
+        window with a code input field.  This page does NOT have a password
+        field (that distinguishes it from the login page).
+
+        CUSTOMIZE: Update these selectors after inspecting the actual MFA
+        page HTML in webPRACTICE.
+        """
+        try:
+            # No password field = not a login page
+            password_fields = page.locator('input[type="password"]')
+            if await password_fields.count() > 0:
+                return False
+
+            # Look for code/OTP input patterns
+            mfa_selectors = [
+                'input[name*="code" i]',
+                'input[name*="otp" i]',
+                'input[name*="totp" i]',
+                'input[name*="token" i]',
+                'input[name*="mfa" i]',
+                'input[placeholder*="code" i]',
+                'input[placeholder*="digit" i]',
+                'input[placeholder*="authenticat" i]',
+                'input[autocomplete="one-time-code"]',
+            ]
+            for sel in mfa_selectors:
+                if await page.locator(sel).count() > 0:
+                    return True
+
+            # Fallback: check page text for MFA keywords
+            body_text = await page.inner_text('body')
+            mfa_keywords = [
+                'verification code', 'authenticat', 'two-factor',
+                'two factor', '2fa', 'one-time', 'enter code',
+                'security code', '6-digit', 'six-digit',
+            ]
+            body_lower = body_text.lower()
+            for kw in mfa_keywords:
+                if kw in body_lower:
+                    # Confirm there's a text input on the page (the code field)
+                    text_inputs = page.locator('input[type="text"], input:not([type])')
+                    if await text_inputs.count() > 0:
+                        return True
+
+            return False
+        except Exception:
+            return False
+
+    def _generate_totp(self, secret):
+        """
+        Generate current 6-digit TOTP code from a base32 secret key.
+
+        The secret is the string shown when setting up Google Authenticator
+        (displayed below the QR code, looks like: JBSWY3DPEHPK3PXP).
+        """
+        try:
+            import pyotp
+            totp = pyotp.TOTP(secret)
+            return totp.now()
+        except ImportError:
+            raise RuntimeError(
+                "pyotp not installed. Run: pip install pyotp"
+            )
+
+    async def _handle_mfa(self, page, totp_secret):
+        """
+        Fill in the MFA code on the TOTP prompt page.
+
+        Returns 'success', 'no_secret', or 'error'.
+        """
+        if not totp_secret:
+            logger.warning('MFA page detected but no TOTP secret configured')
+            return 'no_secret'
+
+        try:
+            code = self._generate_totp(totp_secret)
+            logger.info('Generated TOTP code for MFA')
+
+            # CUSTOMIZE: Find the code input field on the MFA page.
+            # Try specific selectors first, then fall back to generic text input.
+            code_selectors = [
+                'input[name*="code" i]',
+                'input[name*="otp" i]',
+                'input[name*="totp" i]',
+                'input[name*="token" i]',
+                'input[name*="mfa" i]',
+                'input[placeholder*="code" i]',
+                'input[placeholder*="digit" i]',
+                'input[autocomplete="one-time-code"]',
+            ]
+
+            code_field = None
+            for sel in code_selectors:
+                locator = page.locator(sel).first
+                if await locator.count() > 0:
+                    code_field = locator
+                    break
+
+            if not code_field:
+                # Last resort: first visible text input on the page
+                text_inputs = page.locator('input[type="text"], input:not([type])')
+                if await text_inputs.count() > 0:
+                    code_field = text_inputs.first
+                else:
+                    logger.error('Could not find MFA code input field')
+                    return 'error'
+
+            await code_field.fill(code)
+            logger.info('Filled MFA code field')
+
+            # Click submit / verify button
+            submit_btn = page.locator(
+                'input[type="submit"], button[type="submit"], '
+                'button:has-text("Verify"), button:has-text("Submit"), '
+                'button:has-text("Continue"), button:has-text("Log In")'
+            ).first
+            if await submit_btn.count():
+                await submit_btn.click()
+                logger.info('Clicked MFA submit button')
+            else:
+                await code_field.press('Enter')
+                logger.info('Pressed Enter to submit MFA code')
+
+            await page.wait_for_load_state('networkidle', timeout=15000)
+
+            # Verify MFA succeeded — should no longer be on MFA or login page
+            if await self._is_mfa_page(page) or await self._is_login_page(page):
+                logger.error('Still on MFA/login page after code submission — code may be wrong')
+                return 'error'
+
+            logger.info('MFA authentication successful')
+            return 'success'
+
+        except Exception as e:
+            logger.error(f'MFA handling failed: {e}')
+            return 'error'
+
+    async def _login(self, page, np_user, np_pass, client_number, totp_secret=None):
         """
         Fill in the CGM webPRACTICE login form and submit.
+        Handles MFA prompt automatically if TOTP secret is configured.
 
         The login page has three fields:
           - Client Number (pre-filled with the practice's number)
@@ -266,7 +408,10 @@ class NetPracticeScraper:
           - Password
         And a "Log In" submit button.
 
-        Returns True if login appeared successful, False otherwise.
+        After submit, webPRACTICE may load an MFA code page in the same
+        window — this is handled automatically via TOTP.
+
+        Returns: 'success', 'mfa_required', 'credentials_failed', or 'error'
         """
         logger.info('Filling webPRACTICE login form...')
 
@@ -322,18 +467,30 @@ class NetPracticeScraper:
             # Wait for navigation after login
             await page.wait_for_load_state('networkidle', timeout=15000)
 
-            # Check that we're past the login page
+            # Check if we're still on the login page (bad credentials)
             still_on_login = await self._is_login_page(page)
             if still_on_login:
                 logger.error('Still on login page after submitting — credentials may be wrong')
-                return False
+                return 'credentials_failed'
 
-            logger.info('Login successful')
-            return True
+            # Check if MFA page appeared (new page loaded in same window)
+            if await self._is_mfa_page(page):
+                logger.info('MFA prompt detected after login')
+                mfa_result = await self._handle_mfa(page, totp_secret)
+                if mfa_result == 'success':
+                    logger.info('Login + MFA complete')
+                    return 'success'
+                elif mfa_result == 'no_secret':
+                    return 'mfa_required'
+                else:
+                    return 'error'
+
+            logger.info('Login successful (no MFA required)')
+            return 'success'
 
         except Exception as e:
             logger.error(f'Login failed: {e}')
-            return False
+            return 'error'
 
     def _resolve_nav_value(self, value, provider_name):
         """
@@ -909,6 +1066,15 @@ class NetPracticeScraper:
         fields['patient_dob'] = find_field('Date of Birth')
         fields['patient_phone'] = find_field('Phone')
 
+        # CUSTOMIZE: Try multiple label variations for the insurer field
+        fields['insurer'] = (
+            find_field('Insurance') or
+            find_field('Insurer') or
+            find_field('Primary Insurance') or
+            find_field('Payer') or
+            find_field('Plan')
+        )
+
         units_str = find_field('Units')
         try:
             fields['units'] = int(units_str) if units_str else 1
@@ -944,7 +1110,6 @@ class NetPracticeScraper:
         cdp_url = f'http://127.0.0.1:{self._cdp_port}'
         try:
             browser = await pw.chromium.connect_over_cdp(cdp_url)
-            # CDP gives us the default context (the user's existing Chrome)
             contexts = browser.contexts
             if contexts:
                 context = contexts[0]
@@ -953,7 +1118,28 @@ class NetPracticeScraper:
             logger.info(f'Connected to Chrome via CDP on port {self._cdp_port}')
             return browser, context, 'cdp'
         except Exception as e:
-            logger.info(f'Chrome CDP not available ({e}) — launching headless Chromium')
+            logger.info(f'Chrome CDP not available ({e}) — attempting auto-launch')
+
+        # Auto-launch Chrome debug profile and retry CDP
+        try:
+            from utils.chrome_launcher import ensure_chrome_debug
+            import asyncio
+            exe = self.app.config.get('CHROME_EXE_PATH', '')
+            pdir = self.app.config.get('CHROME_DEBUG_PROFILE_DIR', '')
+            if exe and pdir:
+                launched = ensure_chrome_debug(exe, pdir, self._cdp_port)
+                if launched:
+                    await asyncio.sleep(3)
+                    try:
+                        browser = await pw.chromium.connect_over_cdp(cdp_url)
+                        contexts = browser.contexts
+                        context = contexts[0] if contexts else await browser.new_context()
+                        logger.info('Connected to Chrome via CDP after auto-launch')
+                        return browser, context, 'cdp'
+                    except Exception as e2:
+                        logger.info(f'CDP retry after auto-launch failed ({e2})')
+        except ImportError:
+            pass
 
         # Fallback: launch headless Chromium
         browser = await pw.chromium.launch(headless=True)
@@ -969,18 +1155,18 @@ class NetPracticeScraper:
         """
         Scrape all appointments for a given date and save to the database.
 
-        Steps:
-        1. Load user's credentials and nav steps from database
-        2. Connect to Chrome via CDP (or launch headless Chromium)
-        3. Navigate to webPRACTICE URL
-        4. If login page shown → fill Client Number/Username/Password and submit
-        5. Replay user's navigation steps to reach the schedule page
-        6. Navigate to the target date if needed
-        7. Parse the entire schedule DOM in one pass (no per-patient clicking)
-        8. Optionally enrich new/complex patients with detail page clicks
-        9. Save all collected appointments to database
-        10. Save cookies for next run
+        Two-pass approach:
+          Pass 1 — Read the calendar DOM in one shot (time, name, MRN, type)
+          Pass 2 — Click each appointment for detail page fields
+                   (DOB, phone, insurer, reason, comment, entered_by)
+
+        MFA is handled automatically via TOTP if the secret is configured.
+        Progress is written to data/scrape_progress.json so the UI can poll.
+        Final status is written to data/np_scrape_status.json.
         """
+        import time as _time
+        start_time = _time.time()
+
         settings = self._read_settings()
         np_url = settings.get('netpractice_url', '')
         client_number = settings.get('client_number', '')
@@ -988,35 +1174,44 @@ class NetPracticeScraper:
 
         if not np_url:
             logger.warning('NetPractice URL not configured — skipping scrape')
+            self._write_scrape_status(target_date, 'error', 0, ['URL not configured'])
             return
 
-        # Load user's credentials and nav steps from the database
+        # Load user's credentials, TOTP secret, and nav steps from the database
         with self.app.app_context():
+            from models import db
             from models.user import User
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 logger.error(f'User {user_id} not found')
+                self._write_scrape_status(target_date, 'error', 0, ['User not found'])
                 return
             if not user.has_np_credentials():
                 logger.warning(f'User {user.username} has no NP credentials — skipping')
+                self._write_scrape_status(target_date, 'error', 0, ['No NP credentials'])
                 return
 
             np_user = user.get_np_username()
             np_pass = user.get_np_password()
+            totp_secret = user.get_np_totp_secret()
             nav_steps = user.nav_steps
             provider_name = user.np_provider_name or ''
 
         if not nav_steps:
             logger.warning(f'User {user_id} has no navigation steps configured — skipping')
+            self._write_scrape_status(target_date, 'error', 0, ['No nav steps configured'])
             return
 
         try:
             from playwright.async_api import async_playwright
         except ImportError:
             logger.error('Playwright not installed — cannot scrape')
+            self._write_scrape_status(target_date, 'error', 0, ['Playwright not installed'])
             return
 
         logger.info(f'Starting schedule scrape for {target_date} (user {user_id})')
+        self._write_scrape_progress('Starting scrape...', 0, 0)
+        errors = []
 
         try:
             async with async_playwright() as pw:
@@ -1025,6 +1220,7 @@ class NetPracticeScraper:
 
                 try:
                     # Step 1: Go to webPRACTICE
+                    self._write_scrape_progress('Connecting to webPRACTICE...', 0, 0)
                     await page.goto(np_url, timeout=20000)
                     await page.wait_for_load_state('networkidle', timeout=15000)
 
@@ -1032,30 +1228,54 @@ class NetPracticeScraper:
                     needs_login = await self._is_login_page(page)
                     if needs_login:
                         logger.info('Login page detected — entering credentials')
-                        login_ok = await self._login(page, np_user, np_pass, client_number)
-                        if not login_ok:
-                            logger.error('Login failed — setting reauth flag')
+                        self._write_scrape_progress('Logging in...', 0, 0)
+                        login_result = await self._login(
+                            page, np_user, np_pass, client_number, totp_secret
+                        )
+                        if login_result == 'credentials_failed':
+                            logger.error('Login failed — bad credentials')
                             self._set_reauth_flag(True)
+                            self._write_scrape_status(target_date, 'error', 0,
+                                                      ['Login failed — check credentials'])
                             return
+                        elif login_result == 'mfa_required':
+                            logger.warning('MFA required but no TOTP secret configured')
+                            self._set_reauth_flag(True)
+                            self._notify_mfa_required(user_id)
+                            self._write_scrape_status(target_date, 'error', 0,
+                                                      ['MFA required — add TOTP secret in Settings'])
+                            return
+                        elif login_result == 'error':
+                            logger.error('Login failed — unknown error')
+                            self._set_reauth_flag(True)
+                            self._write_scrape_status(target_date, 'error', 0,
+                                                      ['Login failed — see logs'])
+                            return
+                        # login_result == 'success' — continue
                     else:
                         logger.info('Session still valid — skipping login')
 
                     self._set_reauth_flag(False)
 
                     # Step 3: Replay navigation steps to reach schedule page
+                    self._write_scrape_progress('Navigating to schedule...', 0, 0)
                     nav_ok = await self._replay_nav_steps(page, nav_steps, provider_name)
                     if not nav_ok:
                         logger.error('Navigation to schedule page failed')
+                        errors.append('Navigation replay failed')
                         if conn_type == 'headless':
                             await self._save_cookies(context)
+                        self._write_scrape_status(target_date, 'error', 0, errors)
                         return
 
                     # Step 4: Navigate to the target date if not today
                     date_ok = await self._navigate_to_date(page, target_date)
                     if not date_ok:
                         logger.error('Could not navigate to target date')
+                        errors.append('Date navigation failed')
                         if conn_type == 'headless':
                             await self._save_cookies(context)
+                        self._write_scrape_status(target_date, 'error', 0, errors)
                         return
 
                     # Step 5: Verify we're on the right schedule page
@@ -1066,14 +1286,15 @@ class NetPracticeScraper:
                                 f'Provider name "{provider_name}" not found on schedule page'
                             )
 
-                    # Step 6: Parse the ENTIRE schedule from the DOM in one pass
+                    # ── PASS 1: Parse entire schedule from the DOM ────────
+                    self._write_scrape_progress('Reading calendar...', 0, 0)
                     appointments, blocked_slots = await self._parse_schedule_dom(page, max_hour)
                     logger.info(
-                        f'DOM parse complete: {len(appointments)} patients, '
+                        f'Pass 1 complete: {len(appointments)} patients, '
                         f'{len(blocked_slots)} blocked slots'
                     )
 
-                    # Step 7: Build appointment records for database
+                    # Build appointment records
                     raw_appointments = []
                     for appt in appointments:
                         raw_appointments.append({
@@ -1087,9 +1308,9 @@ class NetPracticeScraper:
                             'provider_name': provider_name,
                             'bg_color': appt.get('bg_color', ''),
                             'verification': appt.get('verification', ''),
-                            # Fields that require detail page click (empty for now)
                             'patient_dob': '',
                             'patient_phone': '',
+                            'insurer': '',
                             'reason': '',
                             'location': '',
                             'status': 'scheduled',
@@ -1098,24 +1319,77 @@ class NetPracticeScraper:
                             'is_new_patient_flag': False,
                         })
 
-                    # Step 8: Save cookies (headless mode only — CDP shares Chrome's cookies)
+                    # ── PASS 2: Click each appointment for detail fields ──
+                    details_collected = 0
+                    total = len(raw_appointments)
+                    if total > 0:
+                        logger.info(f'Starting Pass 2 for {total} appointments')
+
+                    for i, appt in enumerate(raw_appointments):
+                        name = appt.get('patient_name', 'Unknown')
+                        self._write_scrape_progress(
+                            f'Collecting details: {name}',
+                            i + 1, total,
+                        )
+
+                        try:
+                            details = await self._enrich_patient_details(page, appt)
+                            if details:
+                                appt['patient_dob'] = details.get('patient_dob', '')
+                                appt['patient_phone'] = details.get('patient_phone', '')
+                                appt['insurer'] = details.get('insurer', '')
+                                appt['reason'] = details.get('reason', '')
+                                appt['location'] = details.get('location', '')
+                                appt['status'] = details.get('status', appt['status'])
+                                appt['comment'] = details.get('comment', '')
+                                appt['entered_by'] = details.get('entered_by', '')
+                                appt['is_new_patient_flag'] = details.get(
+                                    'is_new_patient_flag', False
+                                )
+                                details_collected += 1
+                        except Exception as e:
+                            err_msg = f'Pass 2 error for {name}: {e}'
+                            logger.warning(err_msg)
+                            errors.append(err_msg)
+                            # Try to recover by closing any open detail panel
+                            try:
+                                await page.go_back(timeout=5000)
+                                await page.wait_for_load_state('networkidle', timeout=5000)
+                            except Exception:
+                                pass
+
+                    logger.info(
+                        f'Pass 2 complete: {details_collected}/{total} details collected'
+                    )
+
+                    # Step 8: Save cookies
                     if conn_type == 'headless':
                         await self._save_cookies(context)
 
                 finally:
-                    # Close the tab we opened, not the whole browser
                     await page.close()
                     if conn_type == 'headless':
                         await browser.close()
 
             # Step 9: Store in database
             self._store_appointments(user_id, target_date, raw_appointments)
+
+            duration = round(_time.time() - start_time, 1)
+            status = 'success' if not errors else 'partial'
+            self._write_scrape_status(
+                target_date, status, len(raw_appointments), errors, duration
+            )
             logger.info(
-                f'Scrape complete: {len(raw_appointments)} appointments for {target_date}'
+                f'Scrape complete: {len(raw_appointments)} appointments for '
+                f'{target_date} in {duration}s ({details_collected} details)'
             )
 
         except Exception as e:
             logger.error(f'Schedule scrape failed for {target_date}: {e}')
+            self._write_scrape_status(
+                target_date, 'error', 0, [str(e)],
+                round(_time.time() - start_time, 1),
+            )
 
     # ==================================================================
     # Database storage
@@ -1171,6 +1445,7 @@ class NetPracticeScraper:
                     patient_mrn=appt.get('patient_mrn', ''),
                     patient_dob=appt.get('patient_dob', ''),
                     patient_phone=appt.get('patient_phone', ''),
+                    insurer=appt.get('insurer', ''),
                     visit_type=appt.get('visit_type', ''),
                     visit_type_code=appt.get('visit_type_code', ''),
                     reason=appt.get('reason', ''),
@@ -1242,6 +1517,59 @@ class NetPracticeScraper:
             )
         except Exception as e:
             logger.warning('Care gap evaluation failed: %s', e)
+
+    # ==================================================================
+    # Scrape progress / status file writers
+    # ==================================================================
+
+    def _write_scrape_progress(self, message, current=0, total=0, errors=None):
+        """Write real-time scrape progress to data/scrape_progress.json for UI polling."""
+        path = os.path.join(self.app.root_path, 'data', 'scrape_progress.json')
+        data = {
+            'message': message,
+            'current': current,
+            'total': total,
+            'errors': errors or [],
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w') as f:
+                json.dump(data, f)
+        except Exception:
+            pass
+
+    def _write_scrape_status(self, target_date, status, appointment_count,
+                             errors=None, duration=None):
+        """Write final scrape result to data/np_scrape_status.json."""
+        path = os.path.join(self.app.root_path, 'data', 'np_scrape_status.json')
+        data = {
+            'last_scrape_at': datetime.now(timezone.utc).isoformat(),
+            'status': status,
+            'date_scraped': str(target_date),
+            'appointment_count': appointment_count,
+            'errors': errors or [],
+            'duration_seconds': duration,
+        }
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, 'w') as f:
+                json.dump(data, f, indent=2)
+        except Exception:
+            pass
+
+    def _notify_mfa_required(self, user_id):
+        """Send a Pushover notification that MFA is required and no TOTP is configured."""
+        try:
+            from agent.notifier import send_inbox_notification
+            send_inbox_notification(
+                user_id,
+                'NetPractice MFA required. Add your TOTP secret in '
+                'Settings → Account → NetPractice Login to enable '
+                'automatic MFA, or log in manually via Chrome.',
+            )
+        except Exception as e:
+            logger.warning(f'Could not send MFA notification: {e}')
 
     # ==================================================================
     # Live MRN extraction — read MRN from whichever NP page is open

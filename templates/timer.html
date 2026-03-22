@@ -1,15 +1,54 @@
 {% extends "base.html" %}
-{% block title %}Timer — NP Companion{% endblock %}
+{% block title %}Timer — CareCompanion{% endblock %}
 {% block page_id %}timer{% endblock %}
+{% block breadcrumb_badge %}{{ session_count }} session{{ 's' if session_count != 1 }}{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>Timer</h3></div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Daily Summary</div>
+    <div class="cp-stat"><span>Sessions</span><span class="cp-stat-value">{{ session_count }}</span></div>
+    <div class="cp-stat"><span>Total Time</span><span class="cp-stat-value">{{ '%d:%02d' % (total_duration // 3600, (total_duration % 3600) // 60) }}</span></div>
+    <div class="cp-stat"><span>Avg Duration</span><span class="cp-stat-value">{{ '%d:%02d' % (avg_duration // 60, avg_duration % 60) }}</span></div>
+    <div class="cp-stat"><span>Total F2F</span><span class="cp-stat-value">{{ '%d:%02d' % (total_f2f // 3600, (total_f2f % 3600) // 60) }}</span></div>
+    <div class="cp-stat"><span>Complex</span><span class="cp-stat-value">{{ complex_count }}</span></div>
+</div>
+
+{% if em_dist %}
+<div class="context-panel-section">
+    <div class="cp-section-label">E&M Distribution</div>
+    {% set colors = {'99211':'#94a3b8','99212':'#60a5fa','99213':'#34d399','99214':'#fbbf24','99215':'#f87171','99201':'#c4b5fd','99202':'#67e8f9','99203':'#86efac','99204':'#fcd34d','99205':'#fca5a5','AWV':'#a78bfa','Unbilled':'#e2e8f0'} %}
+    <div style="display:flex;gap:2px;height:20px;border-radius:4px;overflow:hidden;margin:4px 8px;">
+        {% for lvl, cnt in em_dist.items() %}
+        <div style="flex:{{ cnt }};background:{{ colors.get(lvl, '#cbd5e1') }};min-width:16px;" title="{{ lvl }}: {{ cnt }}"></div>
+        {% endfor %}
+    </div>
+    <div style="padding:2px 8px;font-size:10px;color:var(--text-secondary);">
+        {% for lvl, cnt in em_dist.items() %}{{ lvl }}:{{ cnt }}{{ ' ' if not loop.last }}{% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="context-panel-section">
+    <a href="/timer/export" class="cp-action">&#128190; Export CSV</a>
+</div>
+
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/billing/staff-tasks" class="cp-link">Billing Tasks</a>
+    <a href="/bonus" class="cp-link">Bonus Tracker</a>
+    <a href="/patients" class="cp-link">My Patients</a>
+</div>
+{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+<div style="margin-bottom:24px;">
     <h1 style="margin:0;">Visit Timer</h1>
-    <a href="/timer/export" class="btn btn-sm btn-outline" title="Export CSV">&#128190; Export CSV</a>
 </div>
 
 {# ---- Active Session Card ---- #}
-<div class="card" style="max-width:720px;margin-bottom:24px;">
+<div class="card" style="max-width:720px;margin-bottom:24px;" data-pip="true" data-pip-title="Active Timer">
     <div class="card-header">Active Session</div>
     <div class="card-body" id="active-session">
         {% if active_session %}
@@ -102,6 +141,25 @@
         {% endif %}
     </div>
 </div>
+
+{# ---- AWV Interactive Checklist Panel (F16a) ---- #}
+{% if active_session and active_session.visit_type == 'awv' %}
+<div class="card awv-checklist" id="awv-checklist-panel" style="max-width:720px;margin-bottom:24px;border-left:4px solid var(--color-teal,#14b8a6);">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="document.getElementById('awv-checklist-body').style.display = document.getElementById('awv-checklist-body').style.display === 'none' ? 'block' : 'none'">
+        <span>&#9745; AWV Documentation Checklist</span>
+        <span id="awv-progress" style="font-size:12px;color:var(--text-secondary);">0/8</span>
+    </div>
+    <div class="card-body" id="awv-checklist-body">
+        <div id="awv-items" style="display:grid;gap:8px;">
+            <div style="color:var(--text-secondary);font-size:13px;">Loading checklist...</div>
+        </div>
+        <div id="awv-addons" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color,#e2e8f0);display:none;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Eligible Add-On Codes</div>
+            <div id="awv-addon-list" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {# ---- E&M Calculator Widget (F14a — Inline) ---- #}
 <div class="card" style="max-width:720px;margin-bottom:24px;">
@@ -216,7 +274,7 @@
             </thead>
             <tbody>
             {% for s in sessions %}
-                <tr>
+                <tr data-filterable>
                     <td>{% if s.manual_entry %}&#9998;{% endif %}</td>
                     <td>****{{ s.mrn[-4:] if s.mrn and s.mrn|length >= 4 else s.mrn }}</td>
                     <td style="white-space:nowrap;">
@@ -366,5 +424,80 @@ function useThisLevel() {
         }
     }
 }
+
+// F16a — AWV Interactive Checklist
+{% if active_session and active_session.visit_type == 'awv' %}
+(function() {
+    var sessionId = {{ active_session.id }};
+
+    function loadChecklist() {
+        fetch('/timer/awv-checklist/' + sessionId)
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.success) return;
+                renderChecklist(d);
+            })
+            .catch(function(){});
+    }
+
+    function renderChecklist(d) {
+        var container = document.getElementById('awv-items');
+        container.innerHTML = '';
+        d.items.forEach(function(item) {
+            var row = document.createElement('label');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;' +
+                (item.checked ? 'background:var(--bg-success,#f0fdf4);' : '');
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = item.checked;
+            cb.style.cssText = 'width:18px;height:18px;accent-color:var(--color-teal,#14b8a6);';
+            cb.onchange = function() { toggleItem(item.key, cb.checked); };
+            row.appendChild(cb);
+            var lbl = document.createElement('span');
+            lbl.textContent = item.label;
+            if (item.checked) lbl.style.textDecoration = 'line-through';
+            row.appendChild(lbl);
+            if (item.code) {
+                var badge = document.createElement('span');
+                badge.style.cssText = 'margin-left:auto;font-size:11px;font-weight:600;color:var(--color-teal,#14b8a6);';
+                badge.textContent = item.code;
+                row.appendChild(badge);
+            }
+            container.appendChild(row);
+        });
+
+        document.getElementById('awv-progress').textContent = d.checked_count + '/' + d.total_count;
+
+        var addonsDiv = document.getElementById('awv-addons');
+        var addonList = document.getElementById('awv-addon-list');
+        if (d.eligible_addon_codes.length > 0) {
+            addonsDiv.style.display = 'block';
+            addonList.innerHTML = '';
+            d.eligible_addon_codes.forEach(function(c) {
+                var tag = document.createElement('span');
+                tag.style.cssText = 'padding:4px 8px;background:var(--color-teal,#14b8a6);color:#fff;border-radius:4px;font-size:12px;font-weight:600;';
+                tag.textContent = c.code + (c.rvu ? ' (' + c.rvu + ' RVU)' : '');
+                addonList.appendChild(tag);
+            });
+        } else {
+            addonsDiv.style.display = 'none';
+        }
+    }
+
+    function toggleItem(key, checked) {
+        fetch('/timer/awv-checklist/' + sessionId, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_key: key, checked: checked})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (d.success) renderChecklist(d); })
+        .catch(function(){});
+    }
+
+    loadChecklist();
+})();
+{% endif %}
 </script>
+{% include '_billing_post_visit.html' %}
 {% endblock %}

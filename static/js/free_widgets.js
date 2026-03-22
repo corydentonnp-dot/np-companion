@@ -1,5 +1,5 @@
 /**
- * NP Companion — Free-Form Widget Positioning
+ * CareCompanion — Free-Form Widget Positioning
  * File: static/js/free_widgets.js
  *
  * Provides drag-to-move, resize, snap-to-grid, z-index management,
@@ -28,8 +28,15 @@
     }
 
     function _loadPositions() {
-        try { return JSON.parse(localStorage.getItem(_storageKey('pos')) || '{}'); }
-        catch (e) { return {}; }
+        var local;
+        try { local = JSON.parse(localStorage.getItem(_storageKey('pos')) || 'null'); }
+        catch (e) { local = null; }
+        if (local && Object.keys(local).length > 0) return local;
+        // Server fallback
+        if (window._fwServerPositions && typeof window._fwServerPositions === 'object') {
+            return window._fwServerPositions;
+        }
+        return {};
     }
 
     function _savePositions(container) {
@@ -49,10 +56,68 @@
     }
 
     function _getMode() {
-        return localStorage.getItem(_storageKey('mode')) || 'free';
+        // Server-side preference (data attribute) → localStorage → default 'grid'
+        var container = document.querySelector('.fw-container');
+        var serverMode = container && container.getAttribute('data-server-mode');
+        if (serverMode && (serverMode === 'grid' || serverMode === 'free')) return serverMode;
+        return localStorage.getItem(_storageKey('mode')) || 'grid';
     }
 
     function _snap(v) { return Math.round(v / SNAP_SIZE) * SNAP_SIZE; }
+
+    /* ---- Server persistence helpers ---- */
+    function _savePreferenceToServer(key, value) {
+        fetch('/settings/account/preference', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key: key, value: value})
+        }).catch(function() {});
+    }
+
+    function _savePositionsToServer(container) {
+        var widgets = container.querySelectorAll('.fw-widget');
+        var pos = {};
+        widgets.forEach(function (w, i) {
+            var wid = w.getAttribute('data-widget-id') || ('w' + i);
+            pos[wid] = {
+                x: parseInt(w.style.left) || 0,
+                y: parseInt(w.style.top) || 0,
+                w: w.offsetWidth,
+                h: w.offsetHeight,
+                z: parseInt(w.style.zIndex) || 1
+            };
+        });
+        _savePreferenceToServer('chart_free_widget_positions', pos);
+    }
+
+    /* ---- Reflow widgets below a resized widget in same column ---- */
+    function _reflowBelow(resizedWidget, container) {
+        if (_getMode() !== 'free') return;
+        var GAP = 16;
+        var allWidgets = Array.from(container.querySelectorAll('.fw-widget'));
+        var resizedLeft = parseInt(resizedWidget.style.left) || 0;
+
+        // Find widgets in the same approximate column, sorted by top
+        var colWidgets = allWidgets.filter(function(w) {
+            var left = parseInt(w.style.left) || 0;
+            return Math.abs(left - resizedLeft) < 50;
+        }).sort(function(a, b) {
+            return (parseInt(a.style.top) || 0) - (parseInt(b.style.top) || 0);
+        });
+
+        // Cascade: ensure no overlaps between consecutive widgets
+        for (var i = 0; i < colWidgets.length - 1; i++) {
+            var curr = colWidgets[i];
+            var next = colWidgets[i + 1];
+            var currBottom = (parseInt(curr.style.top) || 0) + curr.offsetHeight;
+            var nextTop = parseInt(next.style.top) || 0;
+            if (currBottom + GAP > nextTop) {
+                next.style.transition = 'top 0.2s ease';
+                next.style.top = (currBottom + GAP) + 'px';
+                setTimeout((function(el) { return function() { el.style.transition = ''; }; })(next), 250);
+            }
+        }
+    }
 
     /* ---- Bring to front ---- */
     function _bringToFront(widget, container) {
@@ -131,8 +196,9 @@
     function _endDrag() {
         if (_dragState) {
             var h = _dragState.el.querySelector('.fw-drag-handle');
-            if (h) { h.style.opacity = '0'; h.style.height = '6px'; }
+            if (h) { h.style.opacity = '0.3'; h.style.height = '6px'; }
             _savePositions(_dragState.container);
+            _savePositionsToServer(_dragState.container);
             _updateMinHeight(_dragState.container);
         }
         _dragState = null;
@@ -149,6 +215,7 @@
         if (!widget || !container) return;
         if (widget.classList.contains('fw-pinned')) return;
         _bringToFront(widget, container);
+        widget.classList.add('fw-resizing');
         _resizeState = {
             el: widget,
             container: container,
@@ -174,7 +241,10 @@
 
     function _endResize() {
         if (_resizeState) {
+            _resizeState.el.classList.remove('fw-resizing');
+            _reflowBelow(_resizeState.el, _resizeState.container);
             _savePositions(_resizeState.container);
+            _savePositionsToServer(_resizeState.container);
             _updateMinHeight(_resizeState.container);
         }
         _resizeState = null;
@@ -191,11 +261,11 @@
             handle.title = 'Drag to move';
             handle.innerHTML = '&#9776;';
             handle.style.cssText = 'position:absolute;top:0;left:0;right:0;height:6px;cursor:move;' +
-                'background:var(--color-teal);opacity:0;transition:opacity .15s,height .15s;z-index:5;' +
+                'background:var(--color-teal);opacity:0.3;transition:opacity .15s,height .15s;z-index:5;' +
                 'border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;' +
                 'font-size:10px;color:#fff;';
-            handle.addEventListener('mouseenter', function () { handle.style.opacity = '0.7'; handle.style.height = '14px'; });
-            handle.addEventListener('mouseleave', function () { if (!_dragState) { handle.style.opacity = '0'; handle.style.height = '6px'; } });
+            handle.addEventListener('mouseenter', function () { handle.style.opacity = '1'; handle.style.height = '14px'; });
+            handle.addEventListener('mouseleave', function () { if (!_dragState) { handle.style.opacity = '0.3'; handle.style.height = '6px'; } });
             handle.addEventListener('mousedown', _startDrag);
             w.style.overflow = 'visible';
             w.insertBefore(handle, w.firstChild);
@@ -218,6 +288,7 @@
 
     function setLayout(mode) {
         localStorage.setItem(_storageKey('mode'), mode);
+        _savePreferenceToServer('chart_layout_mode', mode);
 
         var containers = document.querySelectorAll('.fw-container');
         containers.forEach(function (container) {
@@ -241,6 +312,18 @@
                 container.style.minHeight = '800px';
 
                 var saved = _loadPositions();
+                // Merge server-side positions as fallback
+                if (window._fwServerPositions && typeof window._fwServerPositions === 'object') {
+                    var serverPos = window._fwServerPositions;
+                    for (var key in serverPos) {
+                        if (!saved[key]) saved[key] = serverPos[key];
+                    }
+                }
+
+                var cw = container.offsetWidth || 900;
+                var defW = Math.round((cw - 40) / 3);
+                var GAP = 16;
+                var unsavedWidgets = [];
 
                 widgets.forEach(function (w, idx) {
                     var wid = w.getAttribute('data-widget-id') || ('w' + idx);
@@ -254,17 +337,34 @@
                         if (pos.h) w.style.height = pos.h + 'px';
                         if (pos.z) w.style.zIndex = pos.z;
                     } else {
-                        var col = idx % 3;
-                        var row = Math.floor(idx / 3);
-                        var cw = container.offsetWidth || 900;
-                        var defW = Math.round((cw - 40) / 3);
-                        w.style.left = (col * (defW + 16)) + 'px';
-                        w.style.top = (row * 300) + 'px';
+                        // Temporary placement for waterfall measurement
+                        w.style.left = '0px';
+                        w.style.top = '0px';
                         w.style.width = defW + 'px';
+                        unsavedWidgets.push(w);
                     }
                     w.style.zIndex = w.style.zIndex || 1;
                     _decorateWidget(w);
                 });
+
+                // Waterfall layout for widgets without saved positions
+                if (unsavedWidgets.length > 0) {
+                    requestAnimationFrame(function() {
+                        var colHeights = [0, 0, 0];
+                        unsavedWidgets.forEach(function (w) {
+                            // Find shortest column
+                            var col = 0;
+                            for (var c = 1; c < 3; c++) {
+                                if (colHeights[c] < colHeights[col]) col = c;
+                            }
+                            w.style.left = (col * (defW + GAP)) + 'px';
+                            w.style.top = colHeights[col] + 'px';
+                            colHeights[col] += w.offsetHeight + GAP;
+                        });
+                        _savePositions(container);
+                        _updateMinHeight(container);
+                    });
+                }
                 _updateMinHeight(container);
             }
         });

@@ -1,7 +1,7 @@
 """
-NP Companion — Lab Tracking Models
+CareCompanion — Lab Tracking Models
 
-File location: np-companion/models/labtrack.py
+File location: carecompanion/models/labtrack.py
 
 Tables:
   - LabTrack: defines WHICH lab to monitor for a patient, how

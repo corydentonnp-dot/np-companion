@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Guideline Review — CareCompanion{% endblock %}
+{% block page_id %}medref-review{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Guideline Review</h1>
+    <span class="badge badge--warning">{{ flagged_count }} Flagged</span>
+    <a href="/medref" class="btn btn-sm" style="margin-left:auto;">← Back to Med Reference</a>
+</div>
+
+{# ---- Filter Bar ---- #}
+<div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="/medref/review-needed?filter=all" class="btn btn-sm {% if filter_status == 'all' %}btn-primary{% endif %}">All</a>
+    <a href="/medref/review-needed?filter=obsolete" class="btn btn-sm {% if filter_status == 'obsolete' %}btn-primary{% endif %}">Obsolete</a>
+    <a href="/medref/review-needed?filter=remapped" class="btn btn-sm {% if filter_status == 'remapped' %}btn-primary{% endif %}">Remapped</a>
+    <a href="/medref/review-needed?filter=retired" class="btn btn-sm {% if filter_status == 'retired' %}btn-primary{% endif %}">Retired</a>
+    <a href="/medref/review-needed?filter=flagged" class="btn btn-sm {% if filter_status == 'flagged' %}btn-primary{% endif %}">Flagged</a>
+    <a href="/medref/review-needed?filter=dismissed" class="btn btn-sm {% if filter_status == 'dismissed' %}btn-primary{% endif %}">Dismissed</a>
+</div>
+
+{# ---- Flagged Medications Table ---- #}
+{% if flagged %}
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <div class="table-wrap">
+        <table class="schedule-table" style="font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:8px 10px;">Drug Name</th>
+                    <th style="padding:8px 10px;">Condition</th>
+                    <th style="padding:8px 10px;">Line</th>
+                    <th style="padding:8px 10px;">Status</th>
+                    <th style="padding:8px 10px;">Remapped To</th>
+                    <th style="padding:8px 10px;">Owner</th>
+                    <th style="padding:8px 10px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in flagged %}
+                <tr>
+                    <td style="font-weight:500;padding:8px 10px;">{{ item.entry.drug_name }}</td>
+                    <td style="padding:8px 10px;">{{ item.entry.condition }}</td>
+                    <td style="padding:8px 10px;">
+                        <span class="badge" style="font-size:10px;background:var(--bg-secondary);text-transform:uppercase;">
+                            {{ item.entry.line or 'first' }}
+                        </span>
+                    </td>
+                    <td style="padding:8px 10px;">
+                        {% if item.status == 'obsolete' %}
+                        <span class="badge" style="background:var(--color-red,#e74c3c);color:#fff;font-size:10px;">OBSOLETE</span>
+                        {% elif item.status == 'remapped' %}
+                        <span class="badge" style="background:var(--color-yellow,#f39c12);color:#fff;font-size:10px;">REMAPPED</span>
+                        {% elif item.status == 'retired' %}
+                        <span class="badge" style="background:var(--text-secondary);color:#fff;font-size:10px;">RETIRED</span>
+                        {% elif item.status == 'flagged' %}
+                        <span class="badge" style="background:var(--color-orange,#e67e22);color:#fff;font-size:10px;">FLAGGED</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:8px 10px;font-family:monospace;font-size:12px;">
+                        {% if item.remapped_to %}
+                        RXCUI: {{ item.remapped_to }}
+                        {% else %}
+                        &mdash;
+                        {% endif %}
+                    </td>
+                    <td style="padding:8px 10px;">
+                        {% if item.entry.user_id %}
+                        Personal
+                        {% elif item.entry.is_shared %}
+                        Shared
+                        {% else %}
+                        System
+                        {% endif %}
+                    </td>
+                    <td style="padding:8px 10px;white-space:nowrap;">
+                        <form method="post" action="/medref/review-needed/{{ item.entry.id }}/dismiss" style="display:inline;">
+                            <button type="submit" class="btn btn-sm" title="Mark as reviewed" style="font-size:11px;">Dismiss</button>
+                        </form>
+                        {% if item.remapped_to %}
+                        <form method="post" action="/medref/review-needed/{{ item.entry.id }}/update-rxcui" style="display:inline;margin-left:4px;">
+                            <input type="hidden" name="new_rxcui" value="{{ item.remapped_to }}">
+                            <button type="submit" class="btn btn-sm btn-primary" title="Update to remapped drug" style="font-size:11px;">Update Drug</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px;">
+        <div style="font-size:48px;margin-bottom:12px;">✅</div>
+        <h3 style="margin:0 0 8px;">No Flagged Medications</h3>
+        <p style="color:var(--text-secondary);margin:0;">All medication entries have active RxNorm status. Nothing needs review.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,5 +1,5 @@
 """
-NP Companion — NCBI PubMed Literature Search Service
+CareCompanion — NCBI PubMed Literature Search Service
 File: app/services/api/pubmed.py
 
 Programmatic access to PubMed's 35+ million biomedical citations.
@@ -15,7 +15,7 @@ Dependencies:
 - app/api_config.py (PUBMED_BASE_URL, PUBMED_CACHE_TTL_DAYS,
   PUBMED_MAX_RESULTS, PUBMED_LOOKBACK_YEARS)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Guideline Lookup Panel (Feature C from API intelligence plan)
 - Pre-visit note prep — evidence-based pre-loading for scheduled patients
 - Morning Briefing — guideline freshness checking
@@ -30,6 +30,7 @@ from app.api_config import (
     PUBMED_LOOKBACK_YEARS,
 )
 from app.services.api.base_client import BaseAPIClient, APIUnavailableError
+from models.api_cache import PubmedCache
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,29 @@ class PubMedService(BaseAPIClient):
             logger.warning(f"PubMed unavailable for condition: {condition}")
             return []
 
+    def _save_to_structured_cache(self, articles):
+        """Persist article metadata to the structured PubmedCache table."""
+        db = self.cache.db
+        try:
+            for a in articles:
+                pmid = a.get('pmid')
+                if not pmid:
+                    continue
+                existing = PubmedCache.query.filter_by(pmid=pmid).first()
+                if not existing:
+                    db.session.add(PubmedCache(
+                        pmid=pmid,
+                        title=a.get('title', ''),
+                        abstract_text=a.get('abstract', ''),
+                        authors=a.get('authors', ''),
+                        journal=a.get('journal', ''),
+                        mesh_terms=[],
+                    ))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.debug(f'PubmedCache save error: {e}')
+
     def _parse_summaries(self, data: dict, stale: bool = False) -> list:
         """Parse eSummary JSON response into article records."""
         result_map = data.get("result") or {}
@@ -171,4 +195,74 @@ class PubMedService(BaseAPIClient):
                 "_stale": stale,
             })
 
+        self._save_to_structured_cache(articles)
+        return articles
+
+    def fetch_abstract(self, pmid: str) -> str:
+        """
+        Fetch the full abstract text for a single PMID via the efetch endpoint.
+        The esummary endpoint does not return abstracts; efetch is required.
+
+        Parameters
+        ----------
+        pmid : str
+            PubMed ID
+
+        Returns
+        -------
+        str — Full abstract text, or empty string if unavailable
+        """
+        if not pmid:
+            return ""
+        try:
+            # efetch returns XML by default — request abstract in text format
+            data = self._get(
+                "/efetch.fcgi",
+                params={
+                    "db": "pubmed",
+                    "id": pmid,
+                    "rettype": "abstract",
+                    "retmode": "text",
+                    **({"api_key": self._api_key} if self._api_key else {}),
+                },
+            )
+            # The response is raw text wrapped in a dict by our cache layer
+            # When _get returns, it may be a string (from raw text) or dict
+            if isinstance(data, dict):
+                # If it got JSON-parsed, check for common structures
+                abstract_text = data.get("abstract", "") or str(data)
+            else:
+                abstract_text = str(data)
+
+            # Clean up: extract just the abstract portion from efetch text
+            abstract_text = abstract_text.strip()
+            if len(abstract_text) > 5000:
+                abstract_text = abstract_text[:5000]
+
+            # Persist to structured cache
+            try:
+                existing = PubmedCache.query.filter_by(pmid=pmid).first()
+                if existing and not existing.abstract_text:
+                    existing.abstract_text = abstract_text[:2000]
+                    self.cache.db.session.commit()
+            except Exception:
+                self.cache.db.session.rollback()
+
+            return abstract_text
+        except APIUnavailableError:
+            logger.warning("PubMed efetch unavailable for PMID: %s", pmid)
+            return ""
+
+    def search_guidelines_with_abstracts(self, condition: str, max_results: int = None) -> list:
+        """
+        Search for guidelines and include full abstracts.
+        Calls search_guidelines() then enriches each result with fetch_abstract().
+        """
+        articles = self.search_guidelines(condition, max_results=max_results)
+        for article in articles:
+            pmid = article.get("pmid")
+            if pmid and not article.get("abstract"):
+                abstract = self.fetch_abstract(pmid)
+                if abstract:
+                    article["abstract"] = abstract[:2000]
         return articles

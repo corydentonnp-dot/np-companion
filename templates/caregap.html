@@ -1,36 +1,46 @@
 {% extends "base.html" %}
-{% block title %}Care Gaps — NP Companion{% endblock %}
+{% block title %}Care Gaps — CareCompanion{% endblock %}
 {% block page_id %}caregap{% endblock %}
+{% block breadcrumb_badge %}{{ total_gaps }} gap{{ 's' if total_gaps != 1 }}{% endblock %}
 
-{% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Care Gaps</h1>
-    {% if total_gaps > 0 %}
-    <span class="badge badge--warning">{{ total_gaps }} open gap{{ 's' if total_gaps != 1 }}</span>
-    {% else %}
-    <span class="badge badge--success">No gaps for today</span>
-    {% endif %}
-    <a href="/caregap/panel" class="btn btn-secondary btn-sm" style="margin-left:auto;">Panel Report</a>
+{% block subpanel %}
+<div class="context-panel-header"><h3>Care Gaps</h3></div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Date</div>
+    <div style="display:flex;align-items:center;gap:4px;padding:4px 8px;">
+        <a href="/caregap?date={{ yesterday.isoformat() }}" class="cp-link" style="padding:4px 6px;">&#8592;</a>
+        <a href="/caregap" class="cp-link {% if is_today %}active{% endif %}" style="flex:1;text-align:center;padding:4px 6px;">Today</a>
+        <a href="/caregap?date={{ tomorrow.isoformat() }}" class="cp-link" style="padding:4px 6px;">&#8594;</a>
+    </div>
+    <div style="padding:2px 8px;font-size:11px;color:var(--text-secondary);">{{ view_date.strftime('%a, %b %d').replace(' 0', ' ') }}</div>
 </div>
 
-{# ---- DATE NAVIGATION ---- #}
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
-    <a href="/caregap?date={{ yesterday.isoformat() }}" class="btn btn-secondary btn-sm">
-        ← {{ yesterday.strftime('%b %d').replace(' 0', ' ') }}
-    </a>
-    <a href="/caregap" class="btn {% if is_today %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
-        Today
-    </a>
-    <a href="/caregap?date={{ tomorrow.isoformat() }}" class="btn btn-secondary btn-sm">
-        {{ tomorrow.strftime('%b %d').replace(' 0', ' ') }} →
-    </a>
-    <span style="font-size:14px;color:var(--text-secondary);margin-left:8px;">
-        {{ view_date.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}
-    </span>
+<div class="context-panel-section">
+    <div class="cp-section-label">Stats</div>
+    <div class="cp-stat"><span>Open Gaps</span><span class="cp-stat-value" style="{{ 'color:#ef4444;' if total_gaps > 0 else '' }}">{{ total_gaps }}</span></div>
+    <div class="cp-stat"><span>Patients Today</span><span class="cp-stat-value">{{ patients|length }}</span></div>
+</div>
+
+<div class="context-panel-section">
+    <a href="/caregap/panel" class="cp-action">Panel Report</a>
+</div>
+
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/care-gaps/preventive" class="cp-link">Preventive Gaps</a>
+    <a href="/labtrack" class="cp-link">Lab Tracker</a>
+    <a href="/patients" class="cp-link">My Patients</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:24px;">
+    <h1 style="margin:0;">Care Gaps</h1>
 </div>
 
 {# ---- SCHEDULED PATIENTS WITH GAPS ---- #}
-<div class="card" style="margin-bottom:20px;">
+<div class="card" style="margin-bottom:20px;" data-pip="true" data-pip-title="Care Gap List">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
         <span>Scheduled Patients</span>
         <span class="badge badge--info">{{ patients|length }} patient{{ 's' if patients|length != 1 }}</span>
@@ -51,7 +61,7 @@
             </thead>
             <tbody>
                 {% for p in patients %}
-                <tr>
+                <tr data-filterable>
                     <td class="schedule-time">{{ p.time }}</td>
                     <td>{{ p.name }}</td>
                     <td style="font-family:monospace;font-size:13px;">{{ p.mrn_display }}</td>
@@ -129,7 +139,7 @@
             </thead>
             <tbody>
                 {% for p in unscheduled_with_gaps %}
-                <tr>
+                <tr data-filterable>
                     <td>{{ p.name or '—' }}</td>
                     <td style="font-family:monospace;font-size:13px;">{{ p.mrn_display }}</td>
                     <td><span class="badge badge--warning">{{ p.gap_count }}</span></td>

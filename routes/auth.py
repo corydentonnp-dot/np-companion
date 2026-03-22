@@ -1,7 +1,7 @@
 """
-NP Companion — Authentication & Account Routes
+CareCompanion — Authentication & Account Routes
 
-File location: np-companion/routes/auth.py
+File location: carecompanion/routes/auth.py
 
 Handles login, logout, registration, account settings, notification
 preferences, user admin, and the PIN-verify API endpoint.
@@ -17,6 +17,7 @@ Key rules (from copilot-instructions.md):
 import json
 import os
 import subprocess
+import time
 import webbrowser
 from datetime import datetime, timezone
 from functools import wraps
@@ -30,6 +31,11 @@ from flask_login import (
 )
 from models import db
 from models.user import User
+from models.orderset import OrderSet, OrderItem
+from models.medication import MedicationEntry
+from models.tools import PriorAuthorization
+from models.macro import DotPhrase
+from models.result_template import ResultTemplate
 
 
 auth_bp = Blueprint('auth', __name__)
@@ -130,6 +136,9 @@ def login():
 @auth_bp.route('/')
 def dashboard_redirect():
     if current_user.is_authenticated:
+        # Auto-redirect new users to onboarding wizard on first login
+        if not current_user.get_pref('onboarding_complete') and not current_user.setup_completed_at:
+            return redirect(url_for('auth.onboarding'))
         return redirect('/dashboard')
     return redirect(url_for('auth.login'))
 
@@ -309,6 +318,7 @@ def settings_account():
             np_user = request.form.get('np_username', '').strip()
             np_pass = request.form.get('np_password', '')
             np_prov = request.form.get('np_provider_name', '').strip()
+            np_totp = request.form.get('np_totp_secret', '').strip()
 
             # Only update password if a new one was typed
             if np_pass:
@@ -320,6 +330,11 @@ def settings_account():
                 )
 
             current_user.np_provider_name = np_prov
+
+            # Save TOTP secret if provided (blank = keep existing)
+            if np_totp:
+                current_user.set_np_totp_secret(np_totp)
+
             db.session.commit()
             flash('NetPractice credentials saved.', 'success')
 
@@ -393,6 +408,19 @@ def settings_account():
             db.session.commit()
             flash('Billing preferences saved.', 'success')
 
+        # ---- Set billing category toggles --------------------------------
+        elif action == 'set_billing_categories':
+            category_keys = [
+                'ccm', 'awv', 'g2211', 'tcm', 'prolonged_service', 'bhi',
+                'rpm', 'care_gap_screenings', 'tobacco_cessation',
+                'alcohol_screening', 'cognitive_assessment', 'obesity_nutrition',
+                'acp_standalone', 'sti_screening', 'preventive_visit', 'vaccine_admin',
+            ]
+            cats = {k: (k in request.form) for k in category_keys}
+            current_user.set_pref('billing_categories_enabled', cats)
+            db.session.commit()
+            flash('Billing category preferences saved.', 'success')
+
         # ---- Set preferred browser --------------------------------------
         elif action == 'set_preferred_browser':
             browser = request.form.get('preferred_browser', 'chrome').strip()
@@ -412,6 +440,22 @@ def settings_account():
         return redirect(url_for('auth.settings_account'))
 
     return render_template('settings.html')
+
+
+# ======================================================================
+# ======================================================================
+# FEATURE TIER SETTINGS (Phase 13)
+# ======================================================================
+@auth_bp.route('/settings/feature-tier', methods=['POST'])
+@login_required
+def settings_feature_tier():
+    """Save user's chosen feature tier."""
+    tier = request.form.get('feature_tier', 'essential')
+    if tier in ('essential', 'standard', 'advanced'):
+        current_user.set_pref('feature_tier', tier)
+        db.session.commit()
+        flash(f'Feature level updated to {tier.capitalize()}.', 'success')
+    return redirect(url_for('auth.settings'))
 
 
 # ======================================================================
@@ -445,6 +489,33 @@ def settings_notifications():
 
         # Critical value alerts — always on, cannot be disabled
         prefs['notify_critical_values'] = True
+
+        # Spell check confidence threshold (14.2)
+        sc_raw = request.form.get('spell_check_confidence', '0.6')
+        try:
+            sc_val = max(0.0, min(1.0, float(sc_raw)))
+        except (ValueError, TypeError):
+            sc_val = 0.6
+        prefs['spell_check_confidence'] = sc_val
+
+        # EOD checklist categories (F20c / 17.1)
+        eod_all_keys = ['pending_orders', 'pending_messages', 'inbox_items',
+                        'overdue_ticklers', 'due_today_ticklers']
+        eod_enabled = [k for k in eod_all_keys if f'eod_{k}' in request.form]
+        prefs['eod_checklist_items'] = eod_enabled
+
+        # Phase 12: Per-type priority overrides
+        priority_types = ['meeting', 'lab_result', 'radiology_result',
+                          'inbox_message', 'schedule_change', 'policy_update',
+                          'training', 'maintenance', 'eod_reminder', 'morning_briefing']
+        overrides = {}
+        for ptype in priority_types:
+            raw = request.form.get(f'priority_override_{ptype}', '')
+            if raw in ('1', '2', '3'):
+                overrides[ptype] = int(raw)
+        # Critical value always P1
+        overrides['critical_value'] = 1
+        prefs['notification_priority_overrides'] = overrides
 
         current_user.preferences = prefs
         db.session.commit()
@@ -494,6 +565,12 @@ def admin_change_role(user_id):
         flash('User not found.', 'error')
         return redirect(url_for('auth.admin_users'))
 
+    # Require admin password confirmation
+    admin_password = request.form.get('admin_password', '')
+    if not admin_password or not current_user.check_password(admin_password):
+        flash('Incorrect admin password — role change denied.', 'error')
+        return redirect(url_for('auth.admin_users'))
+
     new_role = request.form.get('role', '')
     if new_role not in ('provider', 'ma', 'admin'):
         flash('Invalid role.', 'error')
@@ -506,8 +583,14 @@ def admin_change_role(user_id):
             flash('Cannot remove the only admin account.', 'error')
             return redirect(url_for('auth.admin_users'))
 
+    old_role = user.role
     user.role = new_role
     db.session.commit()
+    current_app.logger.info(
+        'AUDIT: admin %s (id=%d) changed role of %s (id=%d) from %s to %s',
+        current_user.username, current_user.id,
+        user.username, user.id, old_role, new_role,
+    )
     flash(f'{user.display_name} is now {new_role}.', 'success')
     return redirect(url_for('auth.admin_users'))
 
@@ -555,7 +638,7 @@ def admin_toggle_active(user_id):
         if deactivate_mode == 'scheduled' and schedule_date:
             try:
                 dt = datetime.strptime(schedule_date, '%Y-%m-%d')
-                user.deactivate_at = dt.replace(tzinfo=timezone.utc)
+                user.deactivate_at = dt  # naive local time — scheduler uses datetime.now()
                 db.session.commit()
                 flash(f'{user.display_name} scheduled for deactivation on {schedule_date}.', 'success')
             except ValueError:
@@ -604,6 +687,13 @@ def admin_change_username(user_id):
     if not user:
         flash('User not found.', 'error')
         return redirect(url_for('auth.admin_users'))
+
+    # Require admin password confirmation
+    admin_password = request.form.get('admin_password', '')
+    if not admin_password or not current_user.check_password(admin_password):
+        flash('Incorrect admin password — username change denied.', 'error')
+        return redirect(url_for('auth.admin_users'))
+
     new_username = request.form.get('new_username', '').strip()
     if not new_username:
         flash('Username cannot be empty.', 'error')
@@ -614,6 +704,11 @@ def admin_change_username(user_id):
     old = user.username
     user.username = new_username
     db.session.commit()
+    current_app.logger.info(
+        'AUDIT: admin %s (id=%d) changed username of user id=%d from %s to %s',
+        current_user.username, current_user.id,
+        user.id, old, new_username,
+    )
     flash(f'Username changed from \'{old}\' to \'{new_username}\'.', 'success')
     return redirect(url_for('auth.admin_users'))
 
@@ -662,15 +757,62 @@ def admin_toggle_ai(user_id):
 # ======================================================================
 # API — PIN verification (for auto-lock overlay in main.js)
 # ======================================================================
+
+# In-memory PIN attempt tracking: {user_id: {"count": int, "locked_until": float}}
+_pin_attempts: dict = {}
+_PIN_MAX_ATTEMPTS = 5
+_PIN_LOCKOUT_SECONDS = 300  # 5 minutes
+
+
 @auth_bp.route('/api/verify-pin', methods=['POST'])
 @login_required
 def api_verify_pin():
-    """Check the 4-digit PIN without exposing the hash."""
+    """Check the 4-digit PIN without exposing the hash.
+
+    After 5 consecutive failures the user is locked out for 5 minutes.
+    """
+    uid = current_user.id
+    now = time.time()
+
+    record = _pin_attempts.get(uid, {"count": 0, "locked_until": 0.0})
+
+    # Check if still in lockout window
+    if record["locked_until"] > now:
+        remaining = int(record["locked_until"] - now)
+        return jsonify({
+            'success': False,
+            'error': f'Too many failed attempts. Try again in {remaining}s.',
+            'locked': True,
+            'retry_after': remaining,
+        }), 429
+
     data = request.get_json(silent=True) or {}
     pin = data.get('pin', '')
+
     if current_user.check_pin(pin):
+        # Reset on success
+        _pin_attempts.pop(uid, None)
         return jsonify({'success': True})
-    return jsonify({'success': False, 'error': 'Incorrect PIN'}), 401
+
+    # Increment failure count
+    record["count"] += 1
+    if record["count"] >= _PIN_MAX_ATTEMPTS:
+        record["locked_until"] = now + _PIN_LOCKOUT_SECONDS
+        record["count"] = 0  # reset counter for next window
+        _pin_attempts[uid] = record
+        return jsonify({
+            'success': False,
+            'error': f'Too many failed attempts. Locked for {_PIN_LOCKOUT_SECONDS // 60} minutes.',
+            'locked': True,
+            'retry_after': _PIN_LOCKOUT_SECONDS,
+        }), 429
+
+    _pin_attempts[uid] = record
+    remaining_attempts = _PIN_MAX_ATTEMPTS - record["count"]
+    return jsonify({
+        'success': False,
+        'error': f'Incorrect PIN ({remaining_attempts} attempts remaining)',
+    }), 401
 
 
 # ======================================================================
@@ -705,10 +847,32 @@ def api_set_theme():
             accent = ''
         current_user.set_pref('theme_accent', accent)
 
+    page_transition = data.get('page_transition')
+    if page_transition is not None:
+        if page_transition not in {'none', 'fade', 'slide', 'zoom', 'subtle'}:
+            page_transition = 'none'
+        current_user.set_pref('page_transition', page_transition)
+
     db.session.commit()
     return jsonify({'success': True, 'theme': theme,
                     'font': current_user.get_pref('theme_font', 'system'),
                     'accent': current_user.get_pref('theme_accent', '')})
+
+
+@auth_bp.route('/api/settings/split_panes', methods=['POST'])
+@login_required
+def api_set_split_panes():
+    """Save split_max_panes user preference (2-4)."""
+    data = request.get_json(silent=True) or {}
+    panes = data.get('split_max_panes', 2)
+    try:
+        panes = int(panes)
+    except (TypeError, ValueError):
+        panes = 2
+    panes = max(2, min(4, panes))
+    current_user.set_pref('split_max_panes', panes)
+    db.session.commit()
+    return jsonify({'success': True, 'split_max_panes': panes})
 
 
 # ======================================================================
@@ -720,11 +884,12 @@ def api_notifications():
     """Returns unread notification count and list from in-app notifications + system sources."""
     from models.notification import Notification
 
-    # In-app notifications
+    # In-app notifications — P1 and P2 only (P3 suppressed from bell)
     notifs = (
         Notification.query
         .filter_by(user_id=current_user.id, is_read=False)
-        .order_by(Notification.created_at.desc())
+        .filter(Notification.priority.in_([1, 2]))
+        .order_by(Notification.priority.asc(), Notification.created_at.desc())
         .limit(50)
         .all()
     )
@@ -740,12 +905,60 @@ def api_notifications():
             'message': n.message,
             'time': n.created_at.strftime('%m/%d %I:%M %p') if n.created_at else '',
             'sender': sender_name,
+            'priority': n.priority or 2,
+            'is_critical': n.is_critical,
+            'acknowledged': n.acknowledged_at is not None,
         })
 
     return jsonify({
         'unread_count': unread_count,
         'notifications': items,
     })
+
+
+# ======================================================================
+# API — P1 fast-poll endpoint (15-second interval)
+# ======================================================================
+@auth_bp.route('/api/notifications/p1')
+@login_required
+def api_notifications_p1():
+    """Fast poll for P1 interrupt notifications. Uses composite index for <50ms."""
+    from models.notification import Notification
+
+    p1_notifs = (
+        Notification.query
+        .filter_by(user_id=current_user.id, priority=1)
+        .filter(Notification.acknowledged_at.is_(None))
+        .order_by(Notification.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    return jsonify({
+        'p1_count': len(p1_notifs),
+        'notifications': [{
+            'id': n.id,
+            'message': n.message,
+            'time': n.created_at.strftime('%m/%d %I:%M %p') if n.created_at else '',
+            'is_critical': n.is_critical,
+        } for n in p1_notifs],
+    })
+
+
+# ======================================================================
+# API — P3 morning-only count (for bell dropdown teaser)
+# ======================================================================
+@auth_bp.route('/api/notifications/p3-count')
+@login_required
+def api_notifications_p3_count():
+    """Returns count of unread P3 (morning-only) notifications for dropdown teaser."""
+    from models.notification import Notification
+    count = (
+        Notification.query
+        .filter_by(user_id=current_user.id, priority=3, is_read=False)
+        .count()
+    )
+    return jsonify({'p3_count': count})
 
 
 # ======================================================================
@@ -760,6 +973,22 @@ def api_mark_notification_read(notif_id):
         n.is_read = True
         db.session.commit()
     return jsonify({'ok': True})
+
+
+# ======================================================================
+# API — Acknowledge critical notification (F21b — stops escalation)
+# ======================================================================
+@auth_bp.route('/api/notifications/<int:notif_id>/acknowledge', methods=['POST'])
+@login_required
+def api_acknowledge_notification(notif_id):
+    from models.notification import Notification
+    n = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first()
+    if n and n.is_critical and not n.acknowledged_at:
+        n.acknowledged_at = datetime.now(timezone.utc)
+        n.is_read = True
+        db.session.commit()
+        return jsonify({'ok': True, 'acknowledged': True})
+    return jsonify({'ok': True, 'acknowledged': False})
 
 
 # ======================================================================
@@ -907,6 +1136,635 @@ def api_open_url():
 
 
 # ======================================================================
+# API — Pin / Unpin menu items to sidebar (6.1, 6.2)
+# ======================================================================
+@auth_bp.route('/api/prefs/pin-menu', methods=['POST'])
+@login_required
+def api_pin_menu():
+    """Pin a menu item to the sidebar. Max 8 pinned items."""
+    data = request.get_json(silent=True) or {}
+    label = (data.get('label') or '').strip()[:80]
+    url = (data.get('url') or '').strip()[:200]
+    icon = (data.get('icon') or '📌').strip()[:4]
+
+    if not label or not url or not url.startswith('/'):
+        return jsonify({'success': False, 'error': 'Invalid label or URL'}), 400
+
+    pinned = current_user.get_pref('pinned_menu_items', [])
+    if not isinstance(pinned, list):
+        pinned = []
+
+    # Don't duplicate
+    for p in pinned:
+        if p.get('url') == url:
+            return jsonify({'success': True, 'message': 'Already pinned'})
+
+    if len(pinned) >= 8:
+        return jsonify({'success': False, 'error': 'Maximum 8 pinned items'}), 400
+
+    pinned.append({'label': label, 'url': url, 'icon': icon})
+    current_user.set_pref('pinned_menu_items', pinned)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@auth_bp.route('/api/prefs/unpin-menu', methods=['POST'])
+@login_required
+def api_unpin_menu():
+    """Remove a pinned menu item by URL."""
+    data = request.get_json(silent=True) or {}
+    url = (data.get('url') or '').strip()
+    if not url:
+        return jsonify({'success': False, 'error': 'URL required'}), 400
+
+    pinned = current_user.get_pref('pinned_menu_items', [])
+    if not isinstance(pinned, list):
+        pinned = []
+
+    pinned = [p for p in pinned if p.get('url') != url]
+    current_user.set_pref('pinned_menu_items', pinned)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# API — Bookmarks: practice + personal (6.3, 6.4, 6.5, 6.6)
+# ======================================================================
+
+def _migrate_bookmarks(personal):
+    """Migrate old flat {label, url} bookmark entries to the new typed schema.
+    Returns the (possibly updated) list in-place.
+    """
+    changed = False
+    for i, item in enumerate(personal):
+        if not isinstance(item, dict):
+            continue
+        if 'type' not in item:
+            personal[i] = {'type': 'link', 'label': item.get('label', ''), 'url': item.get('url', '')}
+            changed = True
+    return personal
+@auth_bp.route('/api/bookmarks', methods=['GET'])
+@login_required
+def api_get_bookmarks():
+    """Return practice (from DB) + personal (from user prefs) bookmarks."""
+    from models.bookmark import PracticeBookmark
+
+    practice_bms = PracticeBookmark.query.order_by(
+        PracticeBookmark.sort_order
+    ).all()
+    practice = [{'label': b.label, 'url': b.url, 'icon_url': b.icon_url or ''}
+                for b in practice_bms]
+
+    personal = current_user.get_pref('bookmarks', [])
+    if not isinstance(personal, list):
+        personal = []
+    personal = _migrate_bookmarks(personal)
+
+    return jsonify({'practice': practice, 'personal': personal})
+
+
+@auth_bp.route('/api/bookmarks/personal', methods=['POST'])
+@login_required
+def api_add_personal_bookmark():
+    """Add a personal bookmark (plain link or folder). Max 20 top-level items.
+
+    Accepts:
+      { "label": str, "url": str }                         — plain link
+      { "label": str, "url": str, "folder": str }          — link inside folder
+      { "type": "folder", "label": str }                   — create new folder
+    Backward-compatible: plain {label, url} still works.
+    """
+    data = request.get_json(silent=True) or {}
+    label = (data.get('label') or '').strip()[:80]
+    url = (data.get('url') or '').strip()[:2048]
+    item_type = (data.get('type') or 'link').strip()
+    folder_name = (data.get('folder') or '').strip()[:60]
+
+    personal = current_user.get_pref('bookmarks', [])
+    if not isinstance(personal, list):
+        personal = []
+
+    # Migrate any old flat {label, url} entries to new schema on-the-fly
+    personal = _migrate_bookmarks(personal)
+
+    if item_type == 'folder':
+        # Create a new folder (if name not already taken)
+        if not label:
+            return jsonify({'success': False, 'error': 'Folder name required'}), 400
+        if len(personal) >= 20:
+            return jsonify({'success': False, 'error': 'Maximum 20 items'}), 400
+        for item in personal:
+            if item.get('type') == 'folder' and item.get('label') == label:
+                return jsonify({'success': False, 'error': 'Folder already exists'}), 400
+        personal.append({'type': 'folder', 'label': label, 'children': []})
+    elif folder_name:
+        # Add link inside an existing folder
+        if not label or not url:
+            return jsonify({'success': False, 'error': 'Label and URL required'}), 400
+        for item in personal:
+            if item.get('type') == 'folder' and item.get('label') == folder_name:
+                children = item.setdefault('children', [])
+                if len(children) >= 20:
+                    return jsonify({'success': False, 'error': 'Folder full'}), 400
+                children.append({'type': 'link', 'label': label, 'url': url})
+                current_user.set_pref('bookmarks', personal)
+                db.session.commit()
+                return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Folder not found'}), 404
+    else:
+        # Plain top-level link
+        if not label or not url:
+            return jsonify({'success': False, 'error': 'Label and URL required'}), 400
+        if len(personal) >= 20:
+            return jsonify({'success': False, 'error': 'Maximum 20 personal bookmarks'}), 400
+        personal.append({'type': 'link', 'label': label, 'url': url})
+
+    current_user.set_pref('bookmarks', personal)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@auth_bp.route('/api/bookmarks/personal/<int:index>', methods=['DELETE'])
+@login_required
+def api_delete_personal_bookmark(index):
+    """Remove a personal bookmark by index."""
+    personal = current_user.get_pref('bookmarks', [])
+    if not isinstance(personal, list):
+        personal = []
+
+    if index < 0 or index >= len(personal):
+        return jsonify({'success': False, 'error': 'Invalid index'}), 400
+
+    personal.pop(index)
+    current_user.set_pref('bookmarks', personal)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@auth_bp.route('/api/bookmarks/personal/reorder', methods=['POST'])
+@login_required
+def api_reorder_personal_bookmarks():
+    """Accept a new order array of indices and reorder personal bookmarks."""
+    data = request.get_json(silent=True) or {}
+    order = data.get('order', [])
+
+    personal = current_user.get_pref('bookmarks', [])
+    if not isinstance(personal, list):
+        personal = []
+
+    if sorted(order) != list(range(len(personal))):
+        return jsonify({'success': False, 'error': 'Invalid order array'}), 400
+
+    reordered = [personal[i] for i in order]
+    current_user.set_pref('bookmarks', reordered)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@auth_bp.route('/api/bookmarks/personal/folder/rename', methods=['POST'])
+@login_required
+def api_rename_bookmark_folder():
+    """Rename a personal bookmark folder."""
+    data = request.get_json(silent=True) or {}
+    old_label = (data.get('old_label') or '').strip()
+    new_label = (data.get('new_label') or '').strip()[:60]
+    if not old_label or not new_label:
+        return jsonify({'success': False, 'error': 'old_label and new_label required'}), 400
+
+    personal = current_user.get_pref('bookmarks', [])
+    if not isinstance(personal, list):
+        personal = []
+    personal = _migrate_bookmarks(personal)
+
+    for item in personal:
+        if item.get('type') == 'folder' and item.get('label') == old_label:
+            item['label'] = new_label
+            current_user.set_pref('bookmarks', personal)
+            db.session.commit()
+            return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Folder not found'}), 404
+
+
+@auth_bp.route('/api/bookmarks/personal/folder/delete', methods=['POST'])
+@login_required
+def api_delete_bookmark_folder():
+    """Delete a personal bookmark folder and all its contents."""
+    data = request.get_json(silent=True) or {}
+    label = (data.get('label') or '').strip()
+    if not label:
+        return jsonify({'success': False, 'error': 'label required'}), 400
+
+    personal = current_user.get_pref('bookmarks', [])
+    if not isinstance(personal, list):
+        personal = []
+    personal = _migrate_bookmarks(personal)
+
+    original_len = len(personal)
+    personal = [item for item in personal
+                if not (item.get('type') == 'folder' and item.get('label') == label)]
+    if len(personal) == original_len:
+        return jsonify({'success': False, 'error': 'Folder not found'}), 404
+
+    current_user.set_pref('bookmarks', personal)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@auth_bp.route('/admin/bookmarks/practice', methods=['POST'])
+@login_required
+@require_role('admin')
+def api_add_practice_bookmark():
+    """Admin: add a practice-wide bookmark."""
+    from models.bookmark import PracticeBookmark
+
+    data = request.get_json(silent=True) or {}
+    label = (data.get('label') or '').strip()[:100]
+    url = (data.get('url') or '').strip()[:500]
+
+    if not label or not url:
+        return jsonify({'success': False, 'error': 'Label and URL required'}), 400
+
+    max_order = db.session.query(
+        db.func.coalesce(db.func.max(PracticeBookmark.sort_order), 0)
+    ).scalar()
+
+    bm = PracticeBookmark(
+        label=label,
+        url=url,
+        sort_order=max_order + 1,
+        created_by=current_user.id,
+    )
+    db.session.add(bm)
+    db.session.commit()
+    return jsonify({'success': True, 'id': bm.id})
+
+
+@auth_bp.route('/admin/bookmarks/practice/<int:bm_id>', methods=['DELETE'])
+@login_required
+@require_role('admin')
+def api_delete_practice_bookmark(bm_id):
+    """Admin: remove a practice-wide bookmark."""
+    from models.bookmark import PracticeBookmark
+
+    bm = db.session.get(PracticeBookmark, bm_id)
+    if not bm:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    db.session.delete(bm)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# API — Dismiss What's New banner (6.7)
+# ======================================================================
+@auth_bp.route('/api/settings/dismiss-whats-new', methods=['POST'])
+@login_required
+def api_dismiss_whats_new():
+    """Set last_seen_version to current app version to hide the banner."""
+    version = current_app.config.get('APP_VERSION', '')
+    current_user.set_pref('last_seen_version', version)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# ONBOARDING WIZARD — 5-step guided setup for new providers (F28)
+# ======================================================================
+
+def _onboarding_current_step(user):
+    """Determine the highest step this user should see based on saved progress."""
+    return user.get_pref('onboarding_step', 1)
+
+
+@auth_bp.route('/setup/onboarding')
+@login_required
+def onboarding():
+    """
+    Render the 5-step onboarding wizard.  Accepts ?step=N to jump to a step
+    (capped at the user's current progress + 1).
+    """
+    if current_user.get_pref('onboarding_complete'):
+        return redirect(url_for('auth.setup_page'))
+
+    saved_step = _onboarding_current_step(current_user)
+    requested = request.args.get('step', saved_step, type=int)
+    step = max(1, min(requested, 5))
+
+    # Gather context for the current step
+    ctx = {'step': step, 'total_steps': 5}
+
+    if step == 1:
+        ctx['display_name'] = current_user.display_name or ''
+        ctx['specialty'] = current_user.get_pref('specialty', '')
+        ctx['npi'] = current_user.get_pref('npi', '')
+        ctx['role'] = current_user.role
+    elif step == 2:
+        ctx['np_username'] = current_user.get_np_username()
+        ctx['np_provider_name'] = current_user.np_provider_name or ''
+        ctx['has_np_creds'] = current_user.has_np_credentials()
+        ctx['ac_username'] = current_user.get_ac_username()
+        ctx['has_ac_creds'] = current_user.has_ac_credentials()
+    elif step == 3:
+        prefs = current_user.preferences
+        ctx['theme'] = prefs.get('theme', 'light')
+        ctx['notify_new_labs'] = prefs.get('notify_new_labs', True)
+        ctx['notify_new_radiology'] = prefs.get('notify_new_radiology', True)
+        ctx['notify_new_messages'] = prefs.get('notify_new_messages', True)
+        ctx['notify_eod_reminder'] = prefs.get('notify_eod_reminder', True)
+        ctx['notify_morning_briefing'] = prefs.get('notify_morning_briefing', True)
+        ctx['quiet_hours_start'] = prefs.get('quiet_hours_start', 22)
+        ctx['quiet_hours_end'] = prefs.get('quiet_hours_end', 7)
+    elif step == 4:
+        # Module descriptions for the tour cards, grouped by tier
+        from utils.feature_gates import FEATURE_TIERS
+        ctx['modules'] = [
+            {'key': 'mod_schedule',   'name': 'Schedule Viewer',     'icon': '📅', 'desc': 'View your daily patient schedule pulled from webPRACTICE.', 'tier': 'essential', 'why': 'Know who you are seeing today.'},
+            {'key': 'mod_inbox',      'name': 'Inbox Monitor',       'icon': '📬', 'desc': 'Real-time alerts for new labs, radiology results, and messages.', 'tier': 'essential', 'why': 'Never miss a critical result.'},
+            {'key': 'mod_orders',     'name': 'Order Tracking',      'icon': '📋', 'desc': 'Track open orders and get reminders for unsigned items.', 'tier': 'advanced', 'why': 'Keep orders from falling through the cracks.'},
+            {'key': 'mod_macros',     'name': 'Macro Library',       'icon': '⌨️', 'desc': 'AutoHotkey macros and dot-phrase text expansion for Amazing Charts.', 'tier': 'advanced', 'why': 'Speed up documentation with reusable templates.'},
+            {'key': 'mod_briefing',   'name': 'Morning Briefing',    'icon': '☀️', 'desc': 'Daily summary with weather, schedule stats, and care gaps.', 'tier': 'standard', 'why': 'Start each day with a clear overview.'},
+            {'key': 'mod_eod',        'name': 'EOD Checker',         'icon': '🌙', 'desc': 'End-of-day checklist to ensure nothing is missed before leaving.', 'tier': 'standard', 'why': 'Close out the day without lingering tasks.'},
+            {'key': 'mod_billing',    'name': 'Billing Tools',       'icon': '💰', 'desc': 'CPT/ICD-10 lookup, billing rule validation, and claim tracking.', 'tier': 'standard', 'why': 'Catch missed charges and improve revenue.'},
+            {'key': 'mod_caregaps',   'name': 'Care Gap Alerts',     'icon': '🩺', 'desc': 'Identify overdue screenings and preventive care opportunities.', 'tier': 'standard', 'why': 'Close preventive care gaps before visits.'},
+        ]
+        # Load current enable/disable states (default all enabled)
+        for m in ctx['modules']:
+            m['enabled'] = current_user.get_pref(m['key'], True)
+        ctx['current_tier'] = current_user.get_pref('feature_tier', 'essential')
+
+    return render_template('onboarding.html', **ctx)
+
+
+@auth_bp.route('/setup/step/<int:step>', methods=['POST'])
+@login_required
+def onboarding_step_save(step):
+    """Save one onboarding wizard step and advance to the next."""
+    if step < 1 or step > 5:
+        return redirect(url_for('auth.onboarding'))
+
+    if step == 1:
+        # Profile: display name, specialty, NPI
+        dn = request.form.get('display_name', '').strip()
+        if dn:
+            current_user.display_name = dn
+        current_user.set_pref('specialty', request.form.get('specialty', '').strip())
+        current_user.set_pref('npi', request.form.get('npi', '').strip())
+
+    elif step == 2:
+        # Credentials: NP + AC
+        np_user = request.form.get('np_username', '').strip()
+        np_pass = request.form.get('np_password', '')
+        np_prov = request.form.get('np_provider_name', '').strip()
+        if np_pass:
+            current_user.set_np_credentials(np_user, np_pass)
+        elif np_user:
+            current_user.set_np_credentials(np_user, current_user.get_np_password())
+        current_user.np_provider_name = np_prov
+
+        ac_user = request.form.get('ac_username', '').strip()
+        ac_pass = request.form.get('ac_password', '')
+        if ac_pass:
+            current_user.set_ac_credentials(ac_user, ac_pass)
+        elif ac_user:
+            current_user.set_ac_credentials(ac_user, current_user.get_ac_password())
+
+    elif step == 3:
+        # Preferences
+        prefs = current_user.preferences
+        prefs['theme'] = request.form.get('theme', 'light')
+        prefs['notify_new_labs'] = 'notify_new_labs' in request.form
+        prefs['notify_new_radiology'] = 'notify_new_radiology' in request.form
+        prefs['notify_new_messages'] = 'notify_new_messages' in request.form
+        prefs['notify_eod_reminder'] = 'notify_eod_reminder' in request.form
+        prefs['notify_morning_briefing'] = 'notify_morning_briefing' in request.form
+        qs = request.form.get('quiet_hours_start', '22:00')
+        prefs['quiet_hours_start'] = int(qs.split(':')[0]) if ':' in qs else int(qs or 22)
+        qe = request.form.get('quiet_hours_end', '07:00')
+        prefs['quiet_hours_end'] = int(qe.split(':')[0]) if ':' in qe else int(qe or 7)
+        current_user.preferences = prefs
+
+    elif step == 4:
+        # Module toggles
+        modules = ['mod_schedule', 'mod_inbox', 'mod_orders', 'mod_macros',
+                    'mod_briefing', 'mod_eod', 'mod_billing', 'mod_caregaps']
+        for key in modules:
+            current_user.set_pref(key, key in request.form)
+        # Phase 13: save selected feature tier
+        tier = request.form.get('feature_tier', 'essential')
+        if tier in ('essential', 'standard', 'advanced'):
+            current_user.set_pref('feature_tier', tier)
+        # Phase 9: redirect to starter pack import before step 5
+        current_user.set_pref('onboarding_step', max(
+            current_user.get_pref('onboarding_step', 1), step + 1
+        ))
+        db.session.commit()
+        return redirect(url_for('auth.starter_pack_page'))
+
+    elif step == 5:
+        # Finish onboarding
+        current_user.set_pref('onboarding_complete', True)
+        current_user.set_pref('onboarding_step', 5)
+        if not current_user.setup_completed_at:
+            current_user.setup_completed_at = datetime.now(timezone.utc)
+        db.session.commit()
+        flash('Welcome to CareCompanion! Your setup is complete.', 'success')
+        return redirect('/dashboard')
+
+    # Advance the step tracker
+    current_user.set_pref('onboarding_step', max(
+        current_user.get_pref('onboarding_step', 1), step + 1
+    ))
+    db.session.commit()
+
+    return redirect(url_for('auth.onboarding', step=step + 1))
+
+
+@auth_bp.route('/setup/skip/<int:step>', methods=['POST'])
+@login_required
+def onboarding_step_skip(step):
+    """Skip on onboarding step and advance to the next."""
+    if step < 1 or step > 5:
+        return redirect(url_for('auth.onboarding'))
+
+    if step == 5:
+        # Skipping the final step = complete onboarding
+        current_user.set_pref('onboarding_complete', True)
+        current_user.set_pref('onboarding_step', 5)
+        if not current_user.setup_completed_at:
+            current_user.setup_completed_at = datetime.now(timezone.utc)
+        db.session.commit()
+        return redirect('/dashboard')
+
+    current_user.set_pref('onboarding_step', max(
+        current_user.get_pref('onboarding_step', 1), step + 1
+    ))
+    db.session.commit()
+    # Phase 9: skip step 4 also goes to starter pack
+    if step == 4:
+        return redirect(url_for('auth.starter_pack_page'))
+    return redirect(url_for('auth.onboarding', step=step + 1))
+# ======================================================================
+
+STARTER_PACK_CATEGORIES = [
+    {'key': 'order_sets',   'label': 'Order Sets',           'icon': '📋'},
+    {'key': 'medications',  'label': 'Medication Reference',  'icon': '💊'},
+    {'key': 'pa_templates', 'label': 'PA Templates',          'icon': '📝'},
+    {'key': 'dot_phrases',  'label': 'Dot Phrases',           'icon': '⌨️'},
+]
+
+
+def _get_shared_resources(user_id):
+    """Return dict of shared resources available for import."""
+    order_sets = OrderSet.query.filter_by(is_shared=True, is_retracted=False).all()
+    medications = MedicationEntry.query.filter_by(is_shared=True).all()
+    pa_templates = PriorAuthorization.query.filter_by(is_shared=True).all()
+    dot_phrases = DotPhrase.query.filter_by(is_shared=True, is_active=True).all()
+
+    # Exclude items already forked by this user
+    owned_os_sources = {os.forked_from_id for os in
+                        OrderSet.query.filter_by(user_id=user_id).all()
+                        if os.forked_from_id}
+    owned_med_conditions = {(m.condition, m.drug_name) for m in
+                            MedicationEntry.query.filter_by(user_id=user_id).all()}
+    owned_pa_sources = {pa.forked_from_id for pa in
+                        PriorAuthorization.query.filter_by(user_id=user_id).all()
+                        if pa.forked_from_id}
+    owned_dp_abbrevs = {dp.abbreviation for dp in
+                        DotPhrase.query.filter_by(user_id=user_id).all()}
+
+    return {
+        'order_sets': [o for o in order_sets if o.id not in owned_os_sources],
+        'medications': [m for m in medications
+                        if (m.condition, m.drug_name) not in owned_med_conditions],
+        'pa_templates': [p for p in pa_templates if p.id not in owned_pa_sources],
+        'dot_phrases': [d for d in dot_phrases if d.abbreviation not in owned_dp_abbrevs],
+    }
+
+
+@auth_bp.route('/setup/starter-pack')
+@login_required
+def starter_pack_page():
+    """Render the starter pack import page (onboarding step 4b or settings)."""
+    resources = _get_shared_resources(current_user.id)
+    onboarding_mode = not current_user.get_pref('onboarding_complete')
+    return render_template('starter_pack.html',
+                           resources=resources,
+                           categories=STARTER_PACK_CATEGORIES,
+                           onboarding_mode=onboarding_mode)
+
+
+@auth_bp.route('/setup/import-starter-pack', methods=['POST'])
+@login_required
+def import_starter_pack():
+    """Fork/copy selected shared items into the current user's collection."""
+    data = request.get_json(silent=True) or {}
+    imported = {}
+
+    # Order Sets
+    os_ids = data.get('order_sets', [])
+    if os_ids and isinstance(os_ids, list):
+        count = 0
+        for oid in os_ids:
+            src = OrderSet.query.filter_by(id=oid, is_shared=True, is_retracted=False).first()
+            if not src:
+                continue
+            # Duplicate check
+            if OrderSet.query.filter_by(user_id=current_user.id, forked_from_id=src.id).first():
+                continue
+            copy = OrderSet(
+                user_id=current_user.id, name=src.name, visit_type=src.visit_type,
+                forked_from_id=src.id, shared_by_user_id=src.user_id,
+            )
+            db.session.add(copy)
+            db.session.flush()
+            for item in src.items:
+                db.session.add(OrderItem(
+                    orderset_id=copy.id, order_name=item.order_name,
+                    order_tab=item.order_tab, order_label=item.order_label,
+                    is_default=item.is_default, sort_order=item.sort_order,
+                ))
+            count += 1
+        imported['order_sets'] = count
+
+    # Medication Entries
+    med_ids = data.get('medications', [])
+    if med_ids and isinstance(med_ids, list):
+        count = 0
+        for mid in med_ids:
+            src = MedicationEntry.query.filter_by(id=mid, is_shared=True).first()
+            if not src:
+                continue
+            # Duplicate check by condition+drug_name
+            if MedicationEntry.query.filter_by(
+                    user_id=current_user.id, condition=src.condition,
+                    drug_name=src.drug_name).first():
+                continue
+            copy = MedicationEntry(
+                user_id=current_user.id, condition=src.condition,
+                drug_name=src.drug_name, drug_class=src.drug_class,
+                line=src.line, dosing_notes=src.dosing_notes,
+                special_populations=src.special_populations,
+                contraindications=src.contraindications,
+                monitoring=src.monitoring,
+            )
+            db.session.add(copy)
+            count += 1
+        imported['medications'] = count
+
+    # PA Templates
+    pa_ids = data.get('pa_templates', [])
+    if pa_ids and isinstance(pa_ids, list):
+        count = 0
+        for pid in pa_ids:
+            src = PriorAuthorization.query.filter_by(id=pid, is_shared=True).first()
+            if not src:
+                continue
+            if PriorAuthorization.query.filter_by(
+                    user_id=current_user.id, forked_from_id=src.id).first():
+                continue
+            copy = PriorAuthorization(
+                user_id=current_user.id, drug_name=src.drug_name,
+                rxnorm_cui=src.rxnorm_cui, ndc_code=src.ndc_code,
+                diagnosis=src.diagnosis, icd10_code=src.icd10_code,
+                payer_name=src.payer_name,
+                failed_alternatives=src.failed_alternatives,
+                clinical_justification=src.clinical_justification,
+                generated_narrative=src.generated_narrative,
+                status='draft', forked_from_id=src.id,
+            )
+            db.session.add(copy)
+            count += 1
+        imported['pa_templates'] = count
+
+    # Dot Phrases
+    dp_ids = data.get('dot_phrases', [])
+    if dp_ids and isinstance(dp_ids, list):
+        count = 0
+        for did in dp_ids:
+            src = DotPhrase.query.filter_by(id=did, is_shared=True, is_active=True).first()
+            if not src:
+                continue
+            # Duplicate check by abbreviation (unique per user)
+            if DotPhrase.query.filter_by(
+                    user_id=current_user.id, abbreviation=src.abbreviation).first():
+                continue
+            copy = DotPhrase(
+                user_id=current_user.id, abbreviation=src.abbreviation,
+                expansion=src.expansion, category=src.category,
+                placeholders=src.placeholders, copied_from_id=src.id,
+            )
+            db.session.add(copy)
+            count += 1
+        imported['dot_phrases'] = count
+
+    db.session.commit()
+    current_user.set_pref('starter_pack_imported', True)
+    db.session.commit()
+    return jsonify({'success': True, 'imported': imported})
+
+
+# ======================================================================
 # SETUP — onboarding wizard for new users
 # ======================================================================
 @auth_bp.route('/setup', methods=['GET', 'POST'])
@@ -915,7 +1773,11 @@ def setup_page():
     """
     Shows role-based setup tasks and handles form submissions for
     NP credentials, AC credentials, and PC password from this page.
+    New users who haven't completed onboarding are redirected to the wizard.
     """
+    # Redirect to onboarding wizard if not yet completed
+    if not current_user.get_pref('onboarding_complete') and not current_user.setup_completed_at:
+        return redirect(url_for('auth.onboarding'))
     if request.method == 'POST':
         action = request.form.get('action', '')
 

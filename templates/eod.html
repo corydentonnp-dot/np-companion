@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}End-of-Day Checker — CareCompanion{% endblock %}
+{% block page_id %}eod{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">End-of-Day Checker</h1>
+    <span class="badge badge--info">F20</span>
+    {% if result.all_clear %}
+    <span class="badge badge--success" style="font-size:14px;">✅ All Clear</span>
+    {% else %}
+    <span class="badge badge--danger" style="font-size:14px;">{{ result.total_issues }} item{{ 's' if result.total_issues != 1 else '' }} need{{ '' if result.total_issues != 1 else 's' }} attention</span>
+    {% endif %}
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:16px;">
+
+    {% for cat in result.enabled_categories %}
+    <div class="card" style="border-top:3px solid {{ 'var(--color-red,#e74c3c)' if cat.count and cat.level == 'danger' else ('var(--color-warning,#f59e0b)' if cat.count else 'var(--color-teal,#0D7377)') }};">
+        <div class="card-body" style="padding:20px;text-align:center;">
+            <div style="font-size:36px;margin-bottom:8px;">
+                {% if cat.count and cat.level == 'danger' %}❌{% elif cat.count %}⚠️{% else %}✅{% endif %}
+            </div>
+            <div style="font-size:24px;font-weight:700;margin-bottom:4px;">{{ cat.count }}</div>
+            <div style="color:var(--text-secondary);font-size:13px;">{{ cat.label }}</div>
+        </div>
+    </div>
+    {% endfor %}
+
+</div>
+
+<div class="card" style="margin-top:24px;padding:16px;">
+    <p style="margin:0;color:var(--text-secondary);font-size:13px;">
+        💡 The EOD check runs automatically each day at 5:00 PM (when enabled in Settings → Notifications).
+        You can also visit this page anytime for a live status check.
+    </p>
+</div>
+{% endblock %}

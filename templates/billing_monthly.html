@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Monthly Billing Report — NP Companion{% endblock %}
+{% block title %}Monthly Billing Report — CareCompanion{% endblock %}
 {% block page_id %}timer{% endblock %}
 
 {% block content %}
@@ -64,6 +64,12 @@
         <div class="card-body" style="text-align:center;">
             <div style="font-size:32px;font-weight:700;color:{% if anomaly_count > 0 %}#d97706{% else %}var(--color-navy){% endif %};">{{ anomaly_count }}</div>
             <div style="font-size:12px;color:var(--text-secondary);">Anomaly Flags</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ ytd_rvu }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">YTD wRVU ({{ year }})</div>
         </div>
     </div>
 </div>
@@ -196,6 +202,16 @@
 </div>
 {% endif %}
 
+{# 6-Month RVU Trend (F14c / 21.3) #}
+{% if rvu_trend %}
+<div class="card" style="max-width:640px;margin-bottom:24px;">
+    <div class="card-header">6-Month wRVU Trend</div>
+    <div class="card-body">
+        <canvas id="chart-rvu-trend" height="200"></canvas>
+    </div>
+</div>
+{% endif %}
+
 {# Weekly Breakdown #}
 {% if weekly %}
 <div class="card" style="max-width:640px;">
@@ -243,6 +259,31 @@
             plugins: { legend: { display: false } }
         }
     });
+
+    // 6-Month RVU Trend
+    var trendData = {{ rvu_trend|tojson }};
+    if (trendData && trendData.length && document.getElementById('chart-rvu-trend')) {
+        var tLabels = trendData.map(function(t){ return t.label; });
+        var tRvus = trendData.map(function(t){ return t.rvu; });
+        var tPts = trendData.map(function(t){ return t.patients; });
+        new Chart(document.getElementById('chart-rvu-trend'), {
+            type: 'line',
+            data: {
+                labels: tLabels,
+                datasets: [
+                    { label: 'wRVU', data: tRvus, borderColor: '#1e3a5f', backgroundColor: 'rgba(30,58,95,0.1)', fill: true, tension: 0.3, yAxisID: 'y' },
+                    { label: 'Patients', data: tPts, borderColor: '#10b981', borderDash: [4,4], fill: false, tension: 0.3, yAxisID: 'y1' }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'wRVU' }, position: 'left' },
+                    y1: { beginAtZero: true, title: { display: true, text: 'Patients' }, position: 'right', grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}

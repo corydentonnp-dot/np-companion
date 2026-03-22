@@ -1,7 +1,7 @@
 """
-NP Companion — Patient Models
+CareCompanion — Patient Models
 
-File location: np-companion/models/patient.py
+File location: carecompanion/models/patient.py
 
 Two tables for storing parsed clinical summary data:
   - PatientVitals: individual vital signs extracted from CDA XML
@@ -58,6 +58,10 @@ class PatientRecord(db.Model):
     patient_name = db.Column(db.String(200), default='')
     patient_dob = db.Column(db.String(20), default='')
     patient_sex = db.Column(db.String(10), default='')
+    insurer_type = db.Column(db.String(30), default='unknown')
+
+    last_awv_date = db.Column(db.Date, nullable=True)
+    last_discharge_date = db.Column(db.Date, nullable=True)
 
     last_xml_parsed = db.Column(db.DateTime, nullable=True)
 
@@ -245,6 +249,7 @@ class RxNormCache(db.Model):
     dose_form = db.Column(db.String(100), default='')        # e.g. "tablet"
     route = db.Column(db.String(100), default='')             # e.g. "oral"
     tty = db.Column(db.String(20), default='')                # term type: SCD, BN, IN
+    ndc = db.Column(db.String(20), default='')                # first NDC from RxNorm
     source = db.Column(db.String(20), default='rxnorm_api')
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc)
@@ -252,3 +257,55 @@ class RxNormCache(db.Model):
 
     def __repr__(self):
         return f'<RxNormCache {self.rxcui} → {self.generic_name or self.brand_name}>'
+
+class PatientLabResult(db.Model):
+    """Lab result from parsed Clinical Summary XML."""
+    __tablename__ = 'patient_lab_results'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=False, index=True
+    )
+    mrn = db.Column(db.String(20), nullable=False, index=True)
+    patient_mrn_hash = db.Column(db.String(64), nullable=True, index=True)
+    test_name = db.Column(db.String(200), nullable=False)
+    loinc_code = db.Column(db.String(20), default='')
+    result_value = db.Column(db.String(100), default='')
+    result_units = db.Column(db.String(50), default='')
+    result_date = db.Column(db.DateTime, nullable=True)
+    result_flag = db.Column(db.String(20), default='normal')  # normal|abnormal|critical
+    source = db.Column(db.String(20), default='xml_import')  # xml_import|manual
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def __repr__(self):
+        return f'<PatientLabResult {self.id} {self.test_name}>'
+
+
+class PatientSocialHistory(db.Model):
+    """Social history from parsed Clinical Summary XML."""
+    __tablename__ = 'patient_social_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=False, index=True
+    )
+    mrn = db.Column(db.String(20), nullable=False, index=True)
+    patient_mrn_hash = db.Column(db.String(64), nullable=True, index=True)
+    tobacco_status = db.Column(db.String(20), default='unknown')  # current|former|never|unknown
+    tobacco_pack_years = db.Column(db.Float, nullable=True)
+    alcohol_status = db.Column(db.String(20), default='unknown')  # current|former|never|unknown
+    alcohol_frequency = db.Column(db.String(100), default='')
+    substance_use_status = db.Column(db.String(100), default='')
+    sexual_activity = db.Column(db.String(100), default='')
+    last_updated = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def __repr__(self):
+        return f'<PatientSocialHistory {self.id} tobacco={self.tobacco_status}>'

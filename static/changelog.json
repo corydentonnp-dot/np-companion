@@ -1,0 +1,44 @@
+[
+  {
+    "version": "1.1.2",
+    "date": "2026-06-15",
+    "highlights": [
+      "VSAC dynamic value sets for billing code validation",
+      "Pre-visit billing overnight job with dashboard badges",
+      "Patient education → delayed message integration",
+      "Cache staleness indicators on API-powered pages",
+      "Configurable spell check confidence threshold"
+    ]
+  },
+  {
+    "version": "1.1.1",
+    "date": "2026-05-20",
+    "highlights": [
+      "16 billing rule categories with provider toggle controls",
+      "5 clinical intelligence widgets on patient chart",
+      "Care gap → billing bridge integration",
+      "Drug recall scanning with Pushover alerts"
+    ]
+  },
+  {
+    "version": "1.1.0",
+    "date": "2026-04-10",
+    "highlights": [
+      "Full API layer: RxNorm, OpenFDA, NLM, UMLS, ICD-10",
+      "Medication reference page with FDA label data",
+      "Clinical spell check with fuzzy matching",
+      "Lab tracking with trend visualization"
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-03-01",
+    "highlights": [
+      "Initial release: MRN reader, inbox monitor, scheduler",
+      "Patient chart viewer with CDA XML parsing",
+      "Time logging with idle detection",
+      "On-call note management",
+      "Pushover notification integration"
+    ]
+  }
+]

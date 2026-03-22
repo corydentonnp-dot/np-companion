@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Clinical Calculators — CareCompanion{% endblock %}
+{% block page_id %}calculators{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width:1200px;margin:0 auto;padding:20px;">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h1 style="margin:0;font-size:22px;">🧮 Clinical Calculators</h1>
+        <div>
+            <input type="text" id="calc-search" placeholder="Search calculators…"
+                   oninput="filterCalcs(this.value)"
+                   style="padding:6px 12px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;width:220px;">
+        </div>
+    </div>
+
+    {# — Category tabs — #}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;" id="category-tabs">
+        <button class="calc-tab active" onclick="filterCategory('all',this)">All</button>
+        {% for cat in categories %}
+        <button class="calc-tab" onclick="filterCategory('{{ cat }}',this)">{{ cat }}</button>
+        {% endfor %}
+    </div>
+
+    {# — Calculator cards grid — #}
+    <div id="calc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
+        {% for key, calc in registry.items() %}
+        {% set tag = automation_labels.get(calc.automation_tag, {}) %}
+        {% set is_blocked = calc.status == 'restricted_or_licensed' %}
+        <div class="calc-card {% if is_blocked %}calc-card-blocked{% endif %}"
+             data-category="{{ calc.category }}"
+             data-name="{{ calc.name|lower }}"
+             data-desc="{{ calc.description|lower }}"
+             data-key="{{ key }}"
+             title="{{ calc.get('license_note', '') if is_blocked else '' }}"
+             onclick="{% if not is_blocked %}window.location.href='/calculators/{{ key }}'{% endif %}">
+            <div class="calc-card-header">
+                <div>
+                    <div class="calc-name">{{ calc.name }}</div>
+                    <div class="calc-category">{{ calc.category }}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                    <span class="calc-tag-badge tag-{{ calc.automation_tag }}">{{ tag.icon }} {{ tag.label }}</span>
+                    {% if is_blocked %}
+                    <span class="calc-status-badge calc-status-licensed">🔒 Licensed</span>
+                    {% else %}
+                    <span class="calc-status-badge calc-status-ready">✅ Ready</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="calc-desc">{{ calc.description }}</div>
+            {% if not is_blocked %}
+            <div class="calc-card-footer">
+                <span style="font-size:11px;color:var(--text-muted,#999);">{{ calc.inputs|length }} input{{ 's' if calc.inputs|length != 1 }}</span>
+                <span style="font-size:11px;color:var(--color-teal,#0d9488);">Open →</span>
+            </div>
+            {% else %}
+            <div class="calc-card-footer">
+                <span style="font-size:11px;color:var(--text-muted,#999);">Manual score entry</span>
+                <span style="font-size:11px;color:var(--color-teal,#0d9488);">Interpret →</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <div id="calc-no-results" style="display:none;text-align:center;padding:40px;color:var(--text-secondary);">
+        No calculators match your search.
+    </div>
+</div>
+
+<style>
+.calc-tab{padding:5px 14px;border:1px solid var(--border,#e2e8f0);border-radius:20px;background:var(--surface,#fff);cursor:pointer;font-size:12px;font-weight:500;color:var(--text-secondary);}
+.calc-tab.active,.calc-tab:hover{background:var(--color-teal,#0d9488);color:#fff;border-color:var(--color-teal,#0d9488);}
+.calc-card{background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:14px;cursor:pointer;transition:box-shadow 0.15s,transform 0.1s;}
+.calc-card:hover{box-shadow:0 3px 10px rgba(0,0,0,0.12);transform:translateY(-1px);}
+.calc-card-blocked{opacity:0.6;cursor:default;}
+.calc-card-blocked:hover{box-shadow:none;transform:none;}
+.calc-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.calc-name{font-weight:600;font-size:14px;}
+.calc-category{font-size:11px;color:var(--text-muted,#999);margin-top:2px;}
+.calc-desc{font-size:12px;color:var(--text-secondary,#64748b);line-height:1.4;margin-bottom:8px;}
+.calc-card-footer{display:flex;justify-content:space-between;border-top:1px solid var(--border,#f1f5f9);padding-top:6px;margin-top:auto;}
+.calc-tag-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;white-space:nowrap;}
+.calc-status-badge{font-size:10px;padding:2px 7px;border-radius:10px;}
+.tag-auto_ehr{background:#dcfce7;color:#15803d;}
+.tag-semi_auto{background:#fef9c3;color:#854d0e;}
+.tag-patient_reported{background:#dbeafe;color:#1d4ed8;}
+.tag-clinician{background:#ffedd5;color:#c2410c;}
+.calc-status-ready{background:#dcfce7;color:#15803d;}
+.calc-status-licensed{background:#f3f4f6;color:#6b7280;}
+</style>
+
+<script>
+function filterCategory(cat, btn) {
+    document.querySelectorAll('.calc-tab').forEach(function(t){t.classList.remove('active');});
+    btn.classList.add('active');
+    document.querySelectorAll('.calc-card').forEach(function(c){
+        var show = (cat === 'all') || (c.dataset.category === cat);
+        c.style.display = show ? '' : 'none';
+    });
+    checkNoResults();
+}
+
+function filterCalcs(q) {
+    var lq = q.toLowerCase();
+    document.querySelectorAll('.calc-card').forEach(function(c){
+        var match = c.dataset.name.includes(lq) || c.dataset.desc.includes(lq) || c.dataset.key.includes(lq);
+        c.style.display = match ? '' : 'none';
+    });
+    // Reset category tabs to "All" visually
+    if (q) {
+        document.querySelectorAll('.calc-tab').forEach(function(t){t.classList.remove('active');});
+        document.querySelector('.calc-tab').classList.add('active');
+    }
+    checkNoResults();
+}
+
+function checkNoResults() {
+    var visible = Array.from(document.querySelectorAll('.calc-card')).filter(function(c){ return c.style.display !== 'none'; });
+    document.getElementById('calc-no-results').style.display = visible.length === 0 ? '' : 'none';
+}
+</script>
+{% endblock %}

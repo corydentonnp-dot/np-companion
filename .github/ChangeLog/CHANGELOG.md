@@ -1,4 +1,4 @@
-# NP Companion — Consolidated Changelog
+# CareCompanion — Consolidated Changelog
 
 All project changes documented in reverse chronological order.
 Use Ctrl+F to search. Each entry includes date, phase, summary, files changed, and verification steps.
@@ -102,7 +102,7 @@ venv\Scripts\python.exe launcher.py
 #    - Ctrl+= / Ctrl+- → page zooms in/out, persists on reload
 #    - Alt+Left → navigates back
 #    - Click notification bell → dropdown appears
-#    - Sidebar shows version number next to "NP Companion"
+#    - Sidebar shows version number next to "CareCompanion"
 #    - Hover username → popover shows Name/Username/Role
 #    - Patient chart: "Claim" button in header
 #    - Click status badge on a medication → toggles active/inactive
@@ -143,7 +143,7 @@ venv\Scripts\python.exe launcher.py
 | `routes/patient.py` | Updated `send_to_ac()` and `refresh_patient()` with v4-aware logic |
 | `tests/ac_mock.py` | Added 3 mock functions for new ac_window features, expanded `set_mock_state` |
 | `tests/test_agent_mock.py` | Added 3 new tests (tests 11-13), total mock tests now 39+ |
-| `Documents/NP_Companion_Development_Guide.md` | Resolved ACTION ITEMS #42, #43, #45, #46, #48; updated #44, #47 to IN PROGRESS |
+| `Documents/CareCompanion_Development_Guide.md` | Resolved ACTION ITEMS #42, #43, #45, #46, #48; updated #44, #47 to IN PROGRESS |
 | `Documents/VERIFICATION_CHECKLIST.md` | Updated header to CL18, added STEP 16 for v4 retrofit verification |
 
 ### New Files Created
@@ -197,7 +197,7 @@ A full analysis is in `Documents/AC_Retroactive_Update_Guide.md`. Key findings:
 | File | Changes |
 |------|---------|
 | `Documents/copilot-instructions.md` | Updated OS to Windows 11 Pro; rewrote AC Interface Reference section with v4 content, system info table, work PC specs, 50+ screenshot documentation, order catalog summary; added AC Database Direct Access section; added AC State Detection section; expanded AC_SHORTCUTS table with v4 confirmations; updated folder structure to show new subfolders; updated timestamp |
-| `Documents/NP_Companion_Development_Guide.md` | Updated to Windows 11 Pro; resolved ACTION ITEMS #20 (process name), #23 (master order list), #24 (orders tab layout), #25 (order tab names); partially resolved #26 (work PC specs); added 10 new ACTION ITEMS (#41–#50) for DB access testing, state detection, login automation, resurrect dialog, inbox filter, order seeding, new config values, DB schema mapping, provider roster |
+| `Documents/CareCompanion_Development_Guide.md` | Updated to Windows 11 Pro; resolved ACTION ITEMS #20 (process name), #23 (master order list), #24 (orders tab layout), #25 (order tab names); partially resolved #26 (work PC specs); added 10 new ACTION ITEMS (#41–#50) for DB access testing, state detection, login automation, resurrect dialog, inbox filter, order seeding, new config values, DB schema mapping, provider roster |
 | `Documents/VERIFICATION_CHECKLIST.md` | Updated header to CL17; added confirmed Work PC Environment table with all v4 system values; added STEP 15 for verifying v4 integration (7 checks); updated mock test description for 50+ screenshots |
 
 ### New Files Created
@@ -211,7 +211,7 @@ A full analysis is in `Documents/AC_Retroactive_Update_Guide.md`. Key findings:
 Test-Path "Documents\AC_Retroactive_Update_Guide.md"          # Should be True
 Test-Path "Documents\copilot-instructions.md"                  # Should be True
 Test-Path "Documents\VERIFICATION_CHECKLIST.md"                # Should be True
-Test-Path "Documents\NP_Companion_Development_Guide.md"        # Should be True
+Test-Path "Documents\CareCompanion_Development_Guide.md"        # Should be True
 # Verify v4 reference materials are in place:
 Test-Path "Documents\ac_interface_reference\Amazing charts interface\..md files\ac_interface_reference_v4.md"  # Should be True
 (Get-ChildItem "Documents\ac_interface_reference\Amazing charts interface\screenshots\*.png").Count  # Should be 50+
@@ -497,7 +497,7 @@ venv\Scripts\python.exe -c "import config; print('AC_MOCK_MODE:', config.AC_MOCK
 | `agent/mrn_reader.py` | `_try_ocr_mrn()`: Now uses `get_ac_window_rect()` to find AC window position and screenshot its title bar. Falls back to `MRN_CAPTURE_REGION` only if window rect fails. |
 | `config.py` | Section 7 rewritten: header changed from "calibrate per machine" to "AMAZING CHARTS AUTOMATION". Added OCR-first explanation comments. All coordinate variables marked as "Fallback" with explanations. |
 | `Documents/copilot-instructions.md` | PyAutoGUI rules section rewritten for OCR-first. MRN Reader rules updated. Common Mistakes #7 updated. Folder structure updated with `ocr_helpers.py` and `patient.py`. |
-| `Documents/NP_Companion_Development_Guide.md` | ACTION ITEMS rows 1–8 and 19 marked RESOLVED (OCR-first eliminates calibration). Added row 21 for Tesseract path verification. |
+| `Documents/CareCompanion_Development_Guide.md` | ACTION ITEMS rows 1–8 and 19 marked RESOLVED (OCR-first eliminates calibration). Added row 21 for Tesseract path verification. |
 
 ### Architecture: OCR-First Detection Strategy
 The old approach required each machine to have 7 screen coordinate values manually calibrated in config.py. This was fragile because:
@@ -550,7 +550,7 @@ Select-String -Path config.py -Pattern 'TODO: calibrate'
 | `config.py` | Added 4 config vars: `INBOX_DIGEST_ENABLED`, `INBOX_DIGEST_HOURS`, `INBOX_DIGEST_SEND_HOUR`, `INBOX_DIGEST_SEND_MINUTE` |
 | `agent/scheduler.py` | Added optional `digest_fn` cron job parameter to `build_scheduler()` |
 | `agent.py` | Added `job_inbox_digest()` method, wired digest cron job into `start_scheduler()` |
-| `Documents/NP_Companion_Development_Guide.md` | Updated ACTION ITEMS (row 17) and Master Build Checklist (F5e → Done) |
+| `Documents/CareCompanion_Development_Guide.md` | Updated ACTION ITEMS (row 17) and Master Build Checklist (F5e → Done) |
 
 ### Feature Details
 - **Web UI** — New "Digest" tab on `/inbox` page. Configurable lookback period (8h, 12h, 24h, 48h, 72h, 7d). Shows: new/resolved/unresolved/critical/held/overdue counts, trend indicator (improving/stable/growing based on first-half vs second-half snapshot averages), category breakdown table, current inbox totals. CSV export available.
@@ -629,7 +629,7 @@ venv\Scripts\python.exe app.py
 | `templates/admin_dashboard.html` | Added Config Settings card |
 | `requirements.txt` | Added plyer==2.1.0, watchdog==6.0.0 |
 | `Documents/copilot-instructions.md` | Added mandatory table-update instructions |
-| `Documents/NP_Companion_Development_Guide.md` | Added ACTION ITEMS table (top) + Master Build Checklist status table (Section 9) |
+| `Documents/CareCompanion_Development_Guide.md` | Added ACTION ITEMS table (top) + Master Build Checklist status table (Section 9) |
 
 ### Feature Details
 - **F6 MRN Reader** — 3-tier: `win32gui.GetWindowText()` → OCR pink bar → Tesseract. Auto TimeLog create/close. 60s blank timeout. Tray calibration menu.
@@ -703,7 +703,7 @@ venv\Scripts\python.exe app.py
 |------|--------|
 | `Documents/AC_Patient_Info_Guide.md` | NEW — complete patient data pipeline documentation |
 | `Documents/copilot-instructions.md` | AC integration updates (F5, F6, F31, shortcuts, XML, note sections, folder structure) |
-| `Documents/NP_Companion_Development_Guide.md` | Answered questions, 4 new features, 2 updated features, build checklist |
+| `Documents/CareCompanion_Development_Guide.md` | Answered questions, 4 new features, 2 updated features, build checklist |
 | `Documents/ac_interface_reference.md` | Enlarge Textbox Window section |
 
 ### Verification

@@ -1,7 +1,7 @@
 """
-NP Companion — Inbox Monitoring Models
+CareCompanion — Inbox Monitoring Models
 
-File location: np-companion/models/inbox.py
+File location: carecompanion/models/inbox.py
 
 Two tables work together:
   - InboxSnapshot: a point-in-time count of items per category

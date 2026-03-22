@@ -1,5 +1,5 @@
 """
-NP Companion — LOINC Lab Code Service
+CareCompanion — LOINC Lab Code Service
 File: app/services/api/loinc.py
 
 LOINC (Logical Observation Identifiers Names and Codes) is the universal
@@ -14,7 +14,7 @@ Dependencies:
 - app/services/api/base_client.py (BaseAPIClient)
 - app/api_config.py (LOINC_BASE_URL, LOINC_CACHE_TTL_DAYS)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Lab Value Tracker (F11) — test identification, units, reference ranges
 - Lab Panel Grouping (F11d) — automatic panel assembly
 - Abnormal Lab Interpretation (Feature B) — reference range comparison
@@ -26,6 +26,7 @@ import logging
 import base64
 from app.api_config import LOINC_BASE_URL, LOINC_CACHE_TTL_DAYS
 from app.services.api.base_client import BaseAPIClient, APIUnavailableError
+from models.api_cache import LoincCache
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +104,34 @@ class LOINCService(BaseAPIClient):
                     "code": loinc_code,
                 },
             )
-            return self._parse_lookup(loinc_code, data)
+            result = self._parse_lookup(loinc_code, data)
+            self._save_to_structured_cache(result)
+            return result
         except APIUnavailableError:
             logger.warning(f"LOINC unavailable for code: {loinc_code}")
             return {"loinc_code": loinc_code, "_stale": True}
         except Exception as e:
             logger.warning(f"LOINC lookup error for {loinc_code}: {e}")
             return {"loinc_code": loinc_code}
+
+    def _save_to_structured_cache(self, result):
+        """Persist lookup result to the structured LoincCache table."""
+        code = result.get('loinc_code')
+        if not code:
+            return
+        db = self.cache.db
+        try:
+            existing = LoincCache.query.filter_by(loinc_code=code).first()
+            if not existing:
+                db.session.add(LoincCache(
+                    loinc_code=code,
+                    display_name=result.get('display_name', ''),
+                    component=result.get('long_name', ''),
+                ))
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.debug(f'LoincCache save error: {e}')
 
     def _parse_lookup(self, loinc_code: str, data: dict) -> dict:
         """Parse the FHIR CodeSystem $lookup response."""

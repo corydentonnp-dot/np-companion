@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Diagnosis Family Report — CareCompanion{% endblock %}
+{% block page_id %}dx-family-report{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Diagnosis Family Revenue Report</h1>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+        <a href="/reports/revenue/{{ utcnow.year }}/{{ utcnow.month }}" class="btn btn-sm btn-outline">Revenue Report</a>
+        <button onclick="window.print()" class="btn btn-sm btn-outline">Print</button>
+    </div>
+</div>
+
+{% if families %}
+<div style="display:grid;gap:16px;">
+    {% for fam in families %}
+    <div class="card" style="border-left:4px solid {% if fam.key == 'HTN' %}#2563eb{% elif fam.key == 'DM' %}#d97706{% elif fam.key == 'BH' %}#7c3aed{% elif fam.key == 'HLD' %}#059669{% elif fam.key == 'Tobacco' %}#dc2626{% elif fam.key == 'Preventive' %}#0891b2{% else %}#6b7280{% endif %};">
+        <div class="card-body">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:16px;">{{ fam.label }}</h3>
+                <span style="font-size:11px;color:var(--text-secondary);">{{ fam.prefixes|join(', ') }}</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:12px;">
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:700;">{{ fam.encounters }}</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Encounters/yr</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:700;color:#059669;">${{ fam.received|round|int }}</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Received</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:700;">${{ fam.billed|round|int }}</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Billed</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:700;color:{% if fam.adj_rate > 30 %}#dc2626{% else %}var(--text-primary){% endif %};">{{ fam.adj_rate }}%</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Adj Rate</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:700;">{{ fam.opp_total }}</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Opportunities</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:22px;font-weight:700;color:#059669;">{{ fam.opp_capture_pct }}%</div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Captured</div>
+                </div>
+            </div>
+
+            {% if fam.codes %}
+            <div style="font-size:11px;color:var(--text-secondary);">
+                Top codes: {{ fam.codes|join(', ') }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="card-body" style="text-align:center;color:var(--text-secondary);padding:40px;">
+    No diagnosis revenue profile data found. Import practice revenue data to populate this report.
+</div></div>
+{% endif %}
+
+{% endblock %}

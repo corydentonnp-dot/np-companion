@@ -1,7 +1,7 @@
 """
-NP Companion — Time Log Model
+CareCompanion — Time Log Model
 
-File location: np-companion/models/timelog.py
+File location: carecompanion/models/timelog.py
 
 Tracks how long a provider spends in each patient chart.  The MRN
 reader agent creates session_start records automatically; the
@@ -57,6 +57,9 @@ class TimeLog(db.Model):
     # ---- Billing ---------------------------------------------------------
     billed_level = db.Column(db.String(10), default='')
     billing_notes = db.Column(db.Text, default='')
+
+    # ---- AWV Interactive Checklist (F16a) --------------------------------
+    awv_checklist = db.Column(db.Text, nullable=True)  # JSON: {"hra": true, ...}
 
     # ---- Timestamps ------------------------------------------------------
     created_at = db.Column(

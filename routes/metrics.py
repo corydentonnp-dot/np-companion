@@ -1,7 +1,7 @@
 """
-NP Companion — Metrics & Productivity Routes
+CareCompanion — Metrics & Productivity Routes
 
-File location: np-companion/routes/metrics.py
+File location: carecompanion/routes/metrics.py
 
 Provides:
   GET  /metrics                    — Productivity dashboard (F13)
@@ -24,6 +24,7 @@ from models.oncall import OnCallNote
 from models.timelog import TimeLog
 from models.inbox import InboxSnapshot
 from models.user import User
+from utils.feature_gates import require_feature
 
 metrics_bp = Blueprint('metrics', __name__)
 
@@ -33,6 +34,7 @@ metrics_bp = Blueprint('metrics', __name__)
 # --------------------------------------------------------------------------
 @metrics_bp.route('/metrics')
 @login_required
+@require_feature('metrics')
 def index():
     """Productivity dashboard with charts, stats, and burnout indicators."""
     today = date.today()
@@ -260,6 +262,31 @@ def _generate_weekly_summary(user_id):
             direction = 'decreased' if diff < 0 else 'increased'
             notable = f'Your average chart time {direction} by {abs(diff):.1f} minutes compared to last week.'
 
+    # Billing opportunities captured vs. missed this week
+    billing_captured = 0
+    billing_missed = 0
+    billing_revenue_captured = 0.0
+    billing_revenue_missed = 0.0
+    try:
+        from models.billing import BillingOpportunity
+        week_opps = BillingOpportunity.query.filter(
+            BillingOpportunity.user_id == user_id,
+            BillingOpportunity.visit_date >= week_start.date(),
+        ).all()
+        for opp in week_opps:
+            status = (opp.status or '').lower()
+            if status == 'captured':
+                billing_captured += 1
+                billing_revenue_captured += (opp.estimated_revenue or 0)
+            elif status in ('pending', 'dismissed'):
+                billing_missed += 1
+                billing_revenue_missed += (opp.estimated_revenue or 0)
+    except Exception:
+        pass
+
+    # Avg visit duration (minutes)
+    avg_visit_min = round(this_avg, 1) if sessions else 0
+
     return {
         'week_start': week_start.date().isoformat(),
         'patients': patients,
@@ -269,6 +296,11 @@ def _generate_weekly_summary(user_id):
         'inbox_items': inbox_items,
         'oncall_calls': oncall,
         'notable': notable,
+        'avg_visit_min': avg_visit_min,
+        'billing_captured': billing_captured,
+        'billing_missed': billing_missed,
+        'billing_revenue_captured': round(billing_revenue_captured, 2),
+        'billing_revenue_missed': round(billing_revenue_missed, 2),
     }
 
 
@@ -277,18 +309,22 @@ def _generate_weekly_summary(user_id):
 # --------------------------------------------------------------------------
 def _compute_burnout_indicators(user_id):
     """
-    Compute 3 burnout indicators for the last 3 weeks:
-      1. After-hours chart time (outside 7AM-6PM)
-      2. Inbox backlog trend (growing week-over-week)
-      3. F2F ratio trend (documentation growing vs patient time)
+    Compute burnout early-warning indicators over 4 weeks.
 
-    Returns warnings only when an indicator worsens 3 consecutive weeks.
+    Flags worsening trends with specific thresholds:
+      - Documentation time increased ≥15% over 4 weeks
+      - Inbox backlog increased ≥20% over 4 weeks
+      - Average visit duration increased ≥10% over 4 weeks
+    Also retains the original 3-consecutive-week worsening checks for
+    after-hours, inbox backlog growth, and F2F ratio decline.
+
+    Returns warnings and weekly data for the Wellness card.
     """
     now = datetime.now(timezone.utc)
     warnings = []
     weekly_data = []
 
-    for i in range(3):
+    for i in range(4):
         week_end = now - timedelta(weeks=i)
         week_start = week_end - timedelta(weeks=1)
 
@@ -305,6 +341,7 @@ def _compute_burnout_indicators(user_id):
         after_hours_secs = 0
         total_chart_secs = 0
         total_f2f_secs = 0
+        session_count = len(sessions)
         for s in sessions:
             total_chart_secs += (s.duration_seconds or 0)
             total_f2f_secs += (s.face_to_face_seconds or 0)
@@ -330,28 +367,60 @@ def _compute_burnout_indicators(user_id):
         doc_secs = total_chart_secs - total_f2f_secs
         f2f_ratio = round(total_f2f_secs / total_chart_secs * 100, 1) if total_chart_secs > 0 else 0
 
+        # Average visit duration
+        avg_visit_secs = (total_chart_secs / session_count) if session_count > 0 else 0
+
         weekly_data.append({
             'after_hours_min': round(after_hours_secs / 60, 1),
             'inbox_total': inbox_total,
             'f2f_ratio': f2f_ratio,
             'doc_min': round(doc_secs / 60, 1),
+            'avg_visit_min': round(avg_visit_secs / 60, 1),
+            'session_count': session_count,
         })
 
-    # Check for 3-consecutive-week worsening (index 0=most recent, 2=oldest)
-    if len(weekly_data) == 3:
+    # --- 4-week threshold checks (index 0=most recent, 3=oldest) ---
+    if len(weekly_data) >= 4 and weekly_data[3]['session_count'] > 0:
+        oldest = weekly_data[3]
+        newest = weekly_data[0]
+
+        # Doc time +15% over 4 weeks
+        if oldest['doc_min'] > 0:
+            doc_pct = (newest['doc_min'] - oldest['doc_min']) / oldest['doc_min'] * 100
+            if doc_pct >= 15:
+                warnings.append(
+                    f"Documentation time increased {doc_pct:.0f}% over the past 4 weeks "
+                    f"({oldest['doc_min']:.0f} → {newest['doc_min']:.0f} min/week)."
+                )
+
+        # Inbox backlog +20% over 4 weeks
+        if oldest['inbox_total'] > 0:
+            inbox_pct = (newest['inbox_total'] - oldest['inbox_total']) / oldest['inbox_total'] * 100
+            if inbox_pct >= 20:
+                warnings.append(
+                    f"Inbox backlog increased {inbox_pct:.0f}% over the past 4 weeks "
+                    f"({oldest['inbox_total']} → {newest['inbox_total']} items/week)."
+                )
+
+        # Avg visit duration +10% over 4 weeks
+        if oldest['avg_visit_min'] > 0:
+            visit_pct = (newest['avg_visit_min'] - oldest['avg_visit_min']) / oldest['avg_visit_min'] * 100
+            if visit_pct >= 10:
+                warnings.append(
+                    f"Average visit duration increased {visit_pct:.0f}% over the past 4 weeks "
+                    f"({oldest['avg_visit_min']:.1f} → {newest['avg_visit_min']:.1f} min)."
+                )
+
+    # --- 3-consecutive-week worsening (original checks) ---
+    if len(weekly_data) >= 3:
         # After-hours: increasing 3 weeks
-        ah = [w['after_hours_min'] for w in weekly_data]
+        ah = [w['after_hours_min'] for w in weekly_data[:3]]
         if ah[2] < ah[1] < ah[0] and ah[0] > 0:
             pct = round((ah[0] - ah[2]) / max(ah[2], 1) * 100)
             warnings.append(f'After-hours chart time has increased {pct}% over the past 3 weeks.')
 
-        # Inbox backlog: growing
-        ib = [w['inbox_total'] for w in weekly_data]
-        if ib[2] < ib[1] < ib[0] and ib[0] > 0:
-            warnings.append('Inbox backlog has been growing for 3 consecutive weeks.')
-
         # F2F ratio: decreasing (more doc time, less patient time)
-        fr = [w['f2f_ratio'] for w in weekly_data]
+        fr = [w['f2f_ratio'] for w in weekly_data[:3]]
         if fr[2] > fr[1] > fr[0] and fr[2] > 0:
             diff = round(fr[2] - fr[0], 1)
             warnings.append(f'Face-to-face ratio has decreased by {diff}% over the past 3 weeks.')
@@ -473,4 +542,3 @@ def oncall_stats_api():
     """JSON endpoint for on-call stats."""
     stats = _oncall_weekly_stats(current_user.id)
     return jsonify(stats)
-    return jsonify(_oncall_weekly_stats(current_user.id))

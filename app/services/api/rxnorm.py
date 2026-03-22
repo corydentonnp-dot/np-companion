@@ -1,5 +1,5 @@
 """
-NP Companion — RxNorm API Service
+CareCompanion — RxNorm API Service
 File: app/services/api/rxnorm.py
 
 Normalizes drug names into canonical RxCUI identifiers and retrieves
@@ -15,7 +15,7 @@ Dependencies:
 - app/services/api/base_client.py (BaseAPIClient)
 - app/api_config.py (RXNORM_BASE_URL, RXNORM_CACHE_TTL_DAYS, etc.)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Medication Reference (F10) — all drug lookups
 - Note Reformatter (F31) — medication classification
 - Drug Interaction Checker — cross-references via RxCUI
@@ -26,7 +26,11 @@ NP Companion features that rely on this module:
 """
 
 import logging
-from app.api_config import RXNORM_BASE_URL, RXNORM_CACHE_TTL_DAYS, RXNORM_NDC_TTL_DAYS
+from app.api_config import (
+    RXNORM_BASE_URL, RXNORM_CACHE_TTL_DAYS, RXNORM_NDC_TTL_DAYS,
+    RXTERMS_BASE_URL, RXTERMS_CACHE_TTL_DAYS,
+    RXCLASS_BASE_URL, RXCLASS_CACHE_TTL_DAYS,
+)
 from app.services.api.base_client import BaseAPIClient, APIUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -178,3 +182,180 @@ class RxNormService(BaseAPIClient):
             result["original_name"] = name
             results.append(result)
         return results
+
+    def get_rxterms_info(self, rxcui: str) -> dict:
+        """
+        Get structured drug terminology from RxTerms for a known RxCUI.
+
+        RxTerms provides standardized drug name + strength + dosage form + route,
+        used by Note Generator, Patient Education, and PA Generator.
+
+        Parameters
+        ----------
+        rxcui : str
+            The RxCUI identifier
+
+        Returns
+        -------
+        dict with keys:
+            display_name (str) — Full standardized name (e.g. "Metformin 500 mg oral tablet")
+            generic_name (str) — Generic drug name
+            brand_name (str) — Brand name if available
+            strength (str) — Dosage strength (e.g. "500 mg")
+            route (str) — Administration route (e.g. "Oral")
+            dose_form (str) — Dosage form (e.g. "Tab")
+            _stale (bool)
+        """
+        if not rxcui:
+            return {}
+        try:
+            # RxTerms uses a different base URL than the core RxNorm API
+            # We temporarily override base_url for this call
+            original_base = self.base_url
+            self.base_url = RXTERMS_BASE_URL.rstrip("/")
+            try:
+                data = self._get(
+                    f"/rxcui/{rxcui}/allinfo.json",
+                    ttl_days=RXTERMS_CACHE_TTL_DAYS,
+                )
+            finally:
+                self.base_url = original_base
+
+            info = (data.get("rxtermsProperties") or {})
+            return {
+                "display_name": info.get("fullName", ""),
+                "generic_name": info.get("fullGenericName", ""),
+                "brand_name": info.get("brandName", ""),
+                "strength": info.get("strength", ""),
+                "route": info.get("route", ""),
+                "dose_form": info.get("doseForm", ""),
+                "_stale": data.get("_stale", False),
+            }
+        except APIUnavailableError:
+            logger.warning("RxTerms unavailable for RxCUI: %s", rxcui)
+            return {}
+
+    # ------------------------------------------------------------------
+    # RxClass API — therapeutic class lookups
+    # ------------------------------------------------------------------
+
+    def get_classes_for_drug(self, drug_name: str) -> list:
+        """
+        Get therapeutic classes for a drug via the RxClass API.
+
+        Uses the /class/byDrugName endpoint with EPC (Established
+        Pharmacologic Class) relation for FDA-recognized therapeutic classes.
+
+        Returns list of dicts: [{class_id, class_name, class_type}, ...]
+        """
+        if not drug_name:
+            return []
+        try:
+            original_base = self.base_url
+            self.base_url = RXCLASS_BASE_URL.rstrip("/")
+            try:
+                data = self._get(
+                    "/class/byDrugName.json",
+                    params={
+                        "drugName": drug_name,
+                        "relaSource": "MEDRT",
+                        "rela": "may_treat",
+                    },
+                    ttl_days=RXCLASS_CACHE_TTL_DAYS,
+                )
+            finally:
+                self.base_url = original_base
+
+            classes = []
+            for group in (data.get("rxclassDrugInfoList") or {}).get("rxclassDrugInfo") or []:
+                cls_info = group.get("rxclassMinConceptItem") or {}
+                class_id = cls_info.get("classId", "")
+                class_name = cls_info.get("className", "")
+                class_type = cls_info.get("classType", "")
+                if class_name and not any(c["class_name"] == class_name for c in classes):
+                    classes.append({
+                        "class_id": class_id,
+                        "class_name": class_name,
+                        "class_type": class_type,
+                    })
+            return classes
+        except APIUnavailableError:
+            logger.warning("RxClass unavailable for drug: %s", drug_name)
+            return []
+
+    def get_drugs_for_class(self, class_id: str) -> list:
+        """
+        Get drugs belonging to a therapeutic class via RxClass API.
+
+        Uses /class/classMembers endpoint with EPC relation.
+
+        Returns list of dicts: [{rxcui, drug_name}, ...]
+        """
+        if not class_id:
+            return []
+        try:
+            original_base = self.base_url
+            self.base_url = RXCLASS_BASE_URL.rstrip("/")
+            try:
+                data = self._get(
+                    "/classMembers.json",
+                    params={
+                        "classId": class_id,
+                        "relaSource": "MEDRT",
+                        "rela": "may_treat",
+                    },
+                    ttl_days=RXCLASS_CACHE_TTL_DAYS,
+                )
+            finally:
+                self.base_url = original_base
+
+            drugs = []
+            for member in (data.get("drugMemberGroup") or {}).get("drugMember") or []:
+                concept = member.get("minConcept") or {}
+                rxcui = concept.get("rxcui", "")
+                name = concept.get("name", "")
+                if name:
+                    drugs.append({"rxcui": rxcui, "drug_name": name})
+            return drugs
+        except APIUnavailableError:
+            logger.warning("RxClass classMembers unavailable for class: %s", class_id)
+            return []
+
+    def get_therapeutic_classes_for_rxcui(self, rxcui: str) -> list:
+        """
+        Get therapeutic class names for a specific RxCUI.
+
+        Uses /class/byRxcui endpoint with EPC relation. Used by the
+        formulary gap engine to determine if a patient's medications
+        match expected therapeutic classes for their conditions.
+
+        Returns list of class name strings.
+        """
+        if not rxcui:
+            return []
+        try:
+            original_base = self.base_url
+            self.base_url = RXCLASS_BASE_URL.rstrip("/")
+            try:
+                data = self._get(
+                    "/class/byRxcui.json",
+                    params={
+                        "rxcui": rxcui,
+                        "relaSource": "MEDRT",
+                        "rela": "may_treat",
+                    },
+                    ttl_days=RXCLASS_CACHE_TTL_DAYS,
+                )
+            finally:
+                self.base_url = original_base
+
+            class_names = []
+            for group in (data.get("rxclassDrugInfoList") or {}).get("rxclassDrugInfo") or []:
+                cls_info = group.get("rxclassMinConceptItem") or {}
+                name = cls_info.get("className", "")
+                if name and name not in class_names:
+                    class_names.append(name)
+            return class_names
+        except APIUnavailableError:
+            logger.warning("RxClass unavailable for RxCUI: %s", rxcui)
+            return []

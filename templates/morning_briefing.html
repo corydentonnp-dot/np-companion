@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Morning Briefing — NP Companion{% endblock %}
+{% block title %}Morning Briefing — CareCompanion{% endblock %}
 {% block page_id %}morning-briefing{% endblock %}
 
 {% block content %}
@@ -42,6 +42,35 @@
         </div>
     </div>
 
+    {# ---- Air Quality Card ---- #}
+    {% if air_quality and air_quality.get('us_aqi') is not none %}
+    <div class="card" {% if air_quality.us_aqi >= 101 %}style="border-left:4px solid var(--color-red,#e74c3c);"{% endif %}>
+        <div class="card-header">&#127811; Air Quality</div>
+        <div class="card-body">
+            <div style="display:flex;align-items:center;gap:16px;">
+                <div style="font-size:32px;font-weight:700;color:{{ 'var(--color-green,#27ae60)' if air_quality.us_aqi <= 50 else ('var(--color-warning,#f59e0b)' if air_quality.us_aqi <= 100 else 'var(--color-red,#e74c3c)') }};">
+                    {{ air_quality.us_aqi }}
+                </div>
+                <div>
+                    <div style="font-weight:600;">{{ air_quality.category or 'Unknown' }}</div>
+                    {% if air_quality.pm2_5 is not none %}
+                    <div style="font-size:13px;color:var(--text-secondary);">PM2.5: {{ air_quality.pm2_5 }} &micro;g/m&sup3;</div>
+                    {% endif %}
+                    {% if air_quality.pollen_grass or air_quality.pollen_birch %}
+                    <div style="font-size:13px;color:var(--text-secondary);">
+                        Pollen: {% if air_quality.pollen_grass %}Grass {{ air_quality.pollen_grass }}{% endif %}
+                        {% if air_quality.pollen_birch %} Birch {{ air_quality.pollen_birch }}{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if air_quality.clinical_note %}
+            <div style="margin-top:8px;font-size:13px;color:var(--color-red,#e74c3c);font-weight:500;">&#9888; {{ air_quality.clinical_note }}</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     {# ---- Schedule Overview Card ---- #}
     <div class="card">
         <div class="card-header">&#128197; Today's Schedule</div>
@@ -56,6 +85,16 @@
                     <div style="font-size:12px;color:var(--text-secondary);text-transform:uppercase;">Panel Patients</div>
                 </div>
             </div>
+            {% if overlap_count|default(0) > 0 %}
+            <div style="padding:6px 10px;margin-bottom:8px;background:var(--color-red,#e74c3c);color:#fff;border-radius:6px;font-size:13px;font-weight:500;">
+                ⚠ {{ overlap_count }} double-booking{{ 's' if overlap_count != 1 }} today
+            </div>
+            {% endif %}
+            {% if pdmp_overdue_count|default(0) > 0 %}
+            <div style="padding:6px 10px;margin-bottom:8px;background:var(--color-orange,#e67e22);color:#fff;border-radius:6px;font-size:13px;font-weight:500;">
+                💊 {{ pdmp_overdue_count }} PDMP check{{ 's' if pdmp_overdue_count != 1 }} overdue
+            </div>
+            {% endif %}
             {% if appointments %}
             <div style="max-height:150px;overflow-y:auto;font-size:13px;">
                 {% for appt in appointments[:8] %}
@@ -96,7 +135,250 @@
             {% endif %}
         </div>
     </div>
+
+    {# ---- Monitoring Due Card (Phase 23.D3) ---- #}
+    {% if monitoring_rems|default([]) %}
+    <div class="card" style="border-left:4px solid #c0392b;">
+        <div class="card-header" style="color:#c0392b;font-weight:700;">&#9888; REMS Compliance Alerts</div>
+        <div class="card-body">
+            {% for r in monitoring_rems %}
+            <div style="padding:4px 0;font-size:13px;display:flex;justify-content:space-between;border-bottom:1px solid var(--border,#e2e8f0);">
+                <span><strong>{{ r.rems_program_name }}</strong> &mdash; {{ r.mrn_display }}</span>
+                <span style="color:#c0392b;font-size:12px;">Due {{ r.next_due_date }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if monitoring_due_count|default(0) > 0 or monitoring_due|default([]) %}
+    <div class="card">
+        <div class="card-header">&#128300; Labs Due — Tomorrow's Patients</div>
+        <div class="card-body">
+            <div style="font-size:32px;font-weight:700;color:{{ '#e74c3c' if monitoring_due_count|default(0) > 0 else '#27ae60' }};">
+                {{ monitoring_due_count|default(0) }}
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:12px;">Labs Due Within 30 Days</div>
+            {% if monitoring_due|default([]) %}
+            <div style="max-height:180px;overflow-y:auto;font-size:13px;">
+                {% for m in monitoring_due[:15] %}
+                <div style="padding:4px 0;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border,#e2e8f0);">
+                    <div>
+                        {% if m.priority == 'critical' %}
+                        <span style="background:#c0392b;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">CRITICAL</span>
+                        {% elif m.priority == 'high' %}
+                        <span style="background:#e67e22;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;margin-right:4px;">HIGH</span>
+                        {% endif %}
+                        <strong>{{ m.lab_name }}</strong>
+                        <span style="color:var(--text-secondary);font-size:11px;margin-left:4px;">{{ m.mrn_display }}</span>
+                    </div>
+                    <div style="text-align:right;font-size:12px;">
+                        {% if m.overdue %}
+                        <span style="color:#e74c3c;font-weight:600;">Overdue</span>
+                        {% else %}
+                        <span style="color:var(--text-secondary);">Due {{ m.next_due_date }}</span>
+                        {% endif %}
+                        {% if m.clinical_indication %}
+                        <div style="color:var(--text-secondary);font-size:11px;">{{ m.clinical_indication[:50] }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% if monitoring_due|length > 15 %}
+                <div style="padding:4px 0;font-size:12px;color:var(--text-secondary);">+{{ monitoring_due|length - 15 }} more</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            <a href="/monitoring/calendar" style="font-size:12px;color:var(--color-primary,#3498db);margin-top:6px;display:inline-block;">View full calendar &rarr;</a>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ---- Phase 24.4 — Immunization Series Gaps ---- #}
+    {% if imm_gaps|default([]) %}
+    <div class="card" style="border-left:4px solid #8e44ad;">
+        <div class="card-header">&#128137; Vaccine Series — Tomorrow's Patients</div>
+        <div class="card-body">
+            <div style="font-size:28px;font-weight:700;color:#8e44ad;">{{ imm_gaps|length }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);text-transform:uppercase;margin-bottom:12px;">Incomplete Series</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+                {% for g in imm_gaps[:10] %}
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-secondary,#2d2d2d);border-radius:6px;font-size:13px;">
+                    <span style="font-weight:600;min-width:50px;color:var(--text-secondary);">{{ g.mrn_display }}</span>
+                    <span style="font-weight:600;">{{ g.vaccine_group }}</span>
+                    <span style="color:var(--text-secondary);">{{ g.doses_received }}/{{ g.total_doses }} doses</span>
+                    {% if g.overdue %}
+                    <span style="background:#e74c3c;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;">OVERDUE</span>
+                    {% elif g.status == 'in_progress' %}
+                    <span style="background:#f59e0b;color:#000;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:600;">DUE</span>
+                    {% else %}
+                    <span style="background:#3498db;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">ELIGIBLE</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% if imm_gaps|length > 10 %}
+                <div style="padding:4px 0;font-size:12px;color:var(--text-secondary);">+{{ imm_gaps|length - 10 }} more</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if imm_seasonal|default([]) %}
+    <div class="card" style="border-left:4px solid #f39c12;">
+        <div class="card-header">&#127777; Seasonal Immunization Alerts</div>
+        <div class="card-body">
+            {% for s in imm_seasonal[:5] %}
+            <div style="padding:6px 10px;margin-bottom:4px;background:var(--bg-secondary,#2d2d2d);border-radius:6px;font-size:13px;">
+                <span style="font-weight:600;min-width:50px;color:var(--text-secondary);">{{ s.mrn_display }}</span>
+                <span style="color:var(--text-primary);">{{ s.alert }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Phase 32.5 — Risk Score Alerts (counts only, no PHI) #}
+    {% set rsa = risk_score_alerts|default({}) %}
+    {% if rsa.bmi_obese3 or rsa.prevent_high or rsa.ldl_190_plus %}
+    <div class="card" style="border-left:4px solid #e74c3c;">
+        <div class="card-header">&#128202; Risk Score Alerts (Tomorrow)</div>
+        <div class="card-body" style="display:flex;gap:16px;flex-wrap:wrap;">
+            {% if rsa.bmi_obese3 %}
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#e74c3c;">{{ rsa.bmi_obese3 }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">BMI ≥ 40<br>(Class III)</div>
+            </div>
+            {% endif %}
+            {% if rsa.prevent_high %}
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#e74c3c;">{{ rsa.prevent_high }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">PREVENT ≥ 10%<br>(High CVD)</div>
+            </div>
+            {% endif %}
+            {% if rsa.ldl_190_plus %}
+            <div style="text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#e74c3c;">{{ rsa.ldl_190_plus }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">LDL ≥ 190<br>(Possible FH)</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# Phase 35.5 — Significant Score Changes (since last visit) #}
+    {% if score_changes %}
+    <div class="card" style="border-left:4px solid #f59e0b;">
+        <div class="card-header">&#128200; Significant Score Changes (Tomorrow)</div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:6px;">
+            {% for ch in score_changes %}
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 0;border-bottom:1px solid var(--bg-tertiary,#2a2a2a);">
+                <span style="color:var(--text-secondary);">{{ ch.mrn_display }} &mdash; <strong style="color:var(--text-primary);">{{ ch.calc_name }}</strong></span>
+                <span>
+                    {{ ch.old_value }} {{ ch.unit }} &rarr; <strong>{{ ch.new_value }} {{ ch.unit }}</strong>
+                    {% if ch.direction == 'up' %}
+                    <span style="color:#e74c3c;">&#8593; {{ ch.change }}</span>
+                    {% else %}
+                    <span style="color:#27ae60;">&#8595; {{ ch.change }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# ---- Bonus Projection Card (Phase 17.8) ---- #}
+    {% if bonus_status %}
+    <div class="card">
+        <div class="card-header">&#128176; Bonus Status</div>
+        <div class="card-body">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+                <span style="font-size:24px;font-weight:700;color:var(--text-primary);">${{ "{:,.0f}".format(bonus_status.receipts_to_date) }}</span>
+                <span style="font-size:13px;color:var(--text-secondary);">of ${{ "{:,.0f}".format(bonus_status.threshold) }}</span>
+            </div>
+            {% set pct = bonus_status.pct_of_threshold if bonus_status.pct_of_threshold <= 100 else 100 %}
+            {% set bar_color = '#27ae60' if bonus_status.will_exceed else ('#f59e0b' if pct > 60 else '#e74c3c') %}
+            <div style="background:var(--bg-tertiary,#333);border-radius:6px;height:16px;overflow:hidden;margin-bottom:8px;">
+                <div style="background:{{ bar_color }};height:100%;width:{{ pct }}%;border-radius:6px;"></div>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);">
+                {{ bonus_status.days_remaining }} days left &bull; Daily rate: ${{ "{:,.0f}".format(bonus_status.daily_rate_needed) }}
+                {% if bonus_status.will_exceed %}
+                &bull; <span style="color:#27ae60;font-weight:600;">On track</span>
+                {% endif %}
+            </div>
+            {% if bonus_proj and bonus_proj.first_bonus_quarter %}
+            <div style="font-size:12px;margin-top:6px;color:var(--text-secondary);">
+                First bonus: <strong style="color:var(--text-primary);">{{ bonus_proj.first_bonus_quarter }}</strong>
+            </div>
+            {% endif %}
+            <a href="/bonus" style="font-size:12px;color:var(--color-primary,#3498db);margin-top:4px;display:inline-block;">View full tracker &rarr;</a>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+{# ---- TCM Discharge Quick-Add (Phase 19.7) ---- #}
+<div class="card" style="border-left:4px solid var(--color-primary,#3498db);margin-bottom:24px;">
+    <div class="card-header">&#127973; Weekend/Overnight Discharge Quick-Add</div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">
+            Got notified of a discharge over the weekend? Add it here so the 2-business-day
+            contact &amp; 14-day visit deadlines start tracking immediately.
+        </p>
+        <form id="tcm-quick-add-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+            <div>
+                <label style="font-size:12px;font-weight:600;">Patient MRN</label>
+                <input type="text" id="tcm-qa-mrn" placeholder="MRN" required
+                       style="display:block;padding:6px 10px;border:1px solid var(--border);border-radius:4px;width:120px;">
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:600;">Discharge Date</label>
+                <input type="date" id="tcm-qa-date" required
+                       style="display:block;padding:6px 10px;border:1px solid var(--border);border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:600;">Facility</label>
+                <input type="text" id="tcm-qa-facility" placeholder="Hospital/SNF name"
+                       style="display:block;padding:6px 10px;border:1px solid var(--border);border-radius:4px;width:180px;">
+            </div>
+            <button type="submit" class="btn btn-primary" style="padding:6px 16px;height:36px;">Add to Watch</button>
+        </form>
+        <div id="tcm-qa-msg" style="margin-top:8px;font-size:13px;display:none;"></div>
+    </div>
+</div>
+<script>
+document.getElementById('tcm-quick-add-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var msg = document.getElementById('tcm-qa-msg');
+    fetch('/tcm/add-discharge', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            patient_mrn: document.getElementById('tcm-qa-mrn').value.trim(),
+            discharge_date: document.getElementById('tcm-qa-date').value,
+            facility: document.getElementById('tcm-qa-facility').value.trim()
+        })
+    }).then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.status === 'ok') {
+            msg.style.display = 'block';
+            msg.style.color = 'var(--color-green,#27ae60)';
+            msg.textContent = 'Added to TCM Watch! 2-day contact deadline: ' + (d.two_day_deadline || 'N/A');
+            e.target.reset();
+        } else {
+            msg.style.display = 'block';
+            msg.style.color = 'var(--color-danger,#e74c3c)';
+            msg.textContent = d.error || 'Failed to add';
+        }
+    }).catch(function() {
+        msg.style.display = 'block';
+        msg.style.color = 'var(--color-danger,#e74c3c)';
+        msg.textContent = 'Network error';
+    });
+});
+</script>
 
 {# ---- Drug Recall Alerts ---- #}
 {% if recall_alerts %}
@@ -123,6 +405,30 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-body" style="text-align:center;padding:20px;color:var(--color-green,#27ae60);">
         &#10003; No active FDA drug recalls affecting your patients' medications.
+    </div>
+</div>
+{% endif %}
+
+{# ---- 7-Day Forecast ---- #}
+{% if forecast and forecast.days %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">&#128197; 7-Day Forecast</div>
+    <div class="card-body">
+        <div style="display:flex;gap:8px;overflow-x:auto;">
+            {% for day in forecast.days %}
+            <div style="flex:1;min-width:80px;text-align:center;padding:8px;background:var(--bg-muted,#f8fafc);border-radius:6px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">{{ day.date[5:] }}</div>
+                <div style="font-size:13px;margin-bottom:2px;">{{ day.description or '' }}</div>
+                <div style="font-size:14px;font-weight:700;">{{ day.high_f }}°</div>
+                <div style="font-size:12px;color:var(--text-secondary);">{{ day.low_f }}°</div>
+                {% if day.uv_index_max is not none and day.uv_index_max >= 8 %}
+                <div style="font-size:11px;color:var(--color-red,#e74c3c);font-weight:600;margin-top:2px;">UV {{ day.uv_index_max }}</div>
+                {% elif day.uv_index_max is not none and day.uv_index_max >= 6 %}
+                <div style="font-size:11px;color:var(--color-warning,#f59e0b);margin-top:2px;">UV {{ day.uv_index_max }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 {% endif %}

@@ -1,9 +1,10 @@
 """
-NP Companion — Agent API & Admin Routes
+CareCompanion — Agent API & Admin Routes
 
-File location: np-companion/routes/agent_api.py
+File location: carecompanion/routes/agent_api.py
 
 Provides:
+  GET  /api/health            — public health-check (no auth)
   GET  /api/agent-status     — JSON status for the header health dot
   GET  /admin/agent          — detailed agent dashboard (admin only)
   POST /admin/agent/restart  — restart the agent process (admin only)
@@ -23,6 +24,35 @@ from models import db
 from models.agent import AgentLog, AgentError
 
 agent_api_bp = Blueprint('agent_api', __name__)
+
+_server_started_at = datetime.now(timezone.utc)
+
+
+# ======================================================================
+# GET /api/health — public health-check (no auth required)
+# ======================================================================
+@agent_api_bp.route('/api/health')
+def api_health():
+    """Lightweight health-check for load-balancers and monitoring tools."""
+    now = datetime.now(timezone.utc)
+    uptime = (now - _server_started_at).total_seconds()
+
+    # Quick DB connectivity test
+    db_status = 'connected'
+    try:
+        db.session.execute(db.text('SELECT 1'))
+    except Exception:
+        db_status = 'error'
+
+    version = current_app.config.get('APP_VERSION', 'unknown')
+
+    status_code = 200 if db_status == 'connected' else 503
+    return jsonify({
+        'status': 'ok' if db_status == 'connected' else 'degraded',
+        'version': version,
+        'db': db_status,
+        'uptime_seconds': int(uptime),
+    }), status_code
 
 
 # ======================================================================
@@ -306,55 +336,3 @@ def admin_clear_np_session():
         'success': True,
         'message': 'NetPractice session cleared — manual re-auth required',
     })
-
-
-# ======================================================================
-# POST /admin/server/restart — restart the Flask server (admin only)
-# ======================================================================
-@agent_api_bp.route('/admin/server/restart', methods=['POST'])
-@login_required
-@_require_admin
-def admin_restart_server():
-    """
-    Restart the Flask server by spawning a new process and letting
-    the current one shut down.  The browser will auto-reconnect.
-    """
-    try:
-        python_exe = sys.executable
-        app_path = os.path.join(current_app.root_path, 'app.py')
-
-        if not os.path.exists(app_path):
-            return jsonify({
-                'success': False,
-                'error': 'app.py not found in project root',
-            }), 404
-
-        # Spawn new server process
-        subprocess.Popen(
-            [python_exe, app_path],
-            cwd=current_app.root_path,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-        # Schedule old process shutdown after the response is sent
-        import threading
-
-        def _delayed_exit():
-            """Wait a moment then exit so the response reaches the browser."""
-            import time
-            time.sleep(2)
-            os._exit(0)
-
-        threading.Thread(target=_delayed_exit, daemon=True).start()
-
-        return jsonify({
-            'success': True,
-            'message': 'Server restart initiated — page will reload automatically',
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-        }), 500

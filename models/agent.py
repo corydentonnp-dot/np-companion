@@ -1,7 +1,7 @@
 """
-NP Companion — Agent Log & Error Models
+CareCompanion — Agent Log & Error Models
 
-File location: np-companion/models/agent.py
+File location: carecompanion/models/agent.py
 
 Two tables for tracking the background agent's health:
   - AgentLog: startup/shutdown/heartbeat events and crash recovery info.

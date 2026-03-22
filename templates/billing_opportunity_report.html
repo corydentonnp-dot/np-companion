@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Billing Opportunity Report — CareCompanion{% endblock %}
+{% block page_id %}billing-opportunity-report{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Billing Opportunity Report</h1>
+    <div style="display:flex;gap:8px;margin-left:auto;align-items:center;">
+        <form method="GET" action="/billing/opportunity-report" style="display:flex;gap:8px;align-items:center;">
+            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}"
+                   style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+            <button type="submit" class="btn btn-sm btn-primary" style="min-height:44px;">Go</button>
+        </form>
+        <button onclick="window.print()" class="btn btn-sm btn-outline">Print</button>
+        <a href="/billing/monthly-report" style="font-size:13px;">Monthly Billing</a>
+    </div>
+</div>
+
+{# Summary Cards #}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:24px;">
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ totals.detected }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Detected</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:#059669;">{{ totals.captured }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Captured</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:#dc2626;">{{ totals.dismissed }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Dismissed</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:#059669;">${{ totals.rev_captured|round|int }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Revenue Captured</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:#dc2626;">${{ totals.rev_missed|round|int }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Revenue Missed</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:var(--color-navy);">${{ (totals.rev_captured * 12)|round|int }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Annualized Projection</div>
+        </div>
+    </div>
+</div>
+
+{# Charts Row #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;">
+    <div class="card">
+        <div class="card-header">Detected vs Captured vs Dismissed by Category</div>
+        <div class="card-body" style="height:320px;">
+            <canvas id="categoryChart"></canvas>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">6-Month Trend</div>
+        <div class="card-body" style="height:320px;">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+</div>
+
+{# Top 5 #}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">Top 5 Categories by Revenue Opportunity</div>
+    <div class="card-body" style="padding:0;">
+        <table class="table" style="width:100%;font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:10px 14px;">Category</th>
+                    <th style="padding:10px 14px;text-align:right;">Detected</th>
+                    <th style="padding:10px 14px;text-align:right;">Captured</th>
+                    <th style="padding:10px 14px;text-align:right;">Dismissed</th>
+                    <th style="padding:10px 14px;text-align:right;">Revenue Captured</th>
+                    <th style="padding:10px 14px;text-align:right;">Revenue Missed</th>
+                    <th style="padding:10px 14px;text-align:right;">Capture Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat, data in top5 %}
+                <tr>
+                    <td style="padding:10px 14px;font-weight:600;">{{ cat.replace('_', ' ')|title }}</td>
+                    <td style="padding:10px 14px;text-align:right;">{{ data.detected }}</td>
+                    <td style="padding:10px 14px;text-align:right;color:#059669;">{{ data.captured }}</td>
+                    <td style="padding:10px 14px;text-align:right;color:#dc2626;">{{ data.dismissed }}</td>
+                    <td style="padding:10px 14px;text-align:right;color:#059669;">${{ data.rev_captured|round|int }}</td>
+                    <td style="padding:10px 14px;text-align:right;color:#dc2626;">${{ data.rev_missed|round|int }}</td>
+                    <td style="padding:10px 14px;text-align:right;">
+                        {% if data.detected > 0 %}{{ ((data.captured / data.detected) * 100)|round|int }}%{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Full Category Breakdown #}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">All Categories</div>
+    <div class="card-body" style="padding:0;">
+        <table class="table" style="width:100%;font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:10px 14px;">Category</th>
+                    <th style="padding:10px 14px;text-align:right;">Detected</th>
+                    <th style="padding:10px 14px;text-align:right;">Captured</th>
+                    <th style="padding:10px 14px;text-align:right;">Dismissed</th>
+                    <th style="padding:10px 14px;text-align:right;">Rev Captured</th>
+                    <th style="padding:10px 14px;text-align:right;">Rev Missed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat, data in categories|dictsort %}
+                <tr>
+                    <td style="padding:10px 14px;">{{ cat.replace('_', ' ')|title }}</td>
+                    <td style="padding:10px 14px;text-align:right;">{{ data.detected }}</td>
+                    <td style="padding:10px 14px;text-align:right;">{{ data.captured }}</td>
+                    <td style="padding:10px 14px;text-align:right;">{{ data.dismissed }}</td>
+                    <td style="padding:10px 14px;text-align:right;">${{ data.rev_captured|round|int }}</td>
+                    <td style="padding:10px 14px;text-align:right;">${{ data.rev_missed|round|int }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    var cats = {{ categories|tojson }};
+    var trend = {{ trend|tojson }};
+
+    /* Category stacked bar chart */
+    var catLabels = Object.keys(cats).map(function(c) { return c.replace(/_/g, ' '); });
+    var catDetected = Object.values(cats).map(function(d) { return d.detected; });
+    var catCaptured = Object.values(cats).map(function(d) { return d.captured; });
+    var catDismissed = Object.values(cats).map(function(d) { return d.dismissed; });
+
+    new Chart(document.getElementById('categoryChart'), {
+        type: 'bar',
+        data: {
+            labels: catLabels,
+            datasets: [
+                { label: 'Captured', data: catCaptured, backgroundColor: '#059669' },
+                { label: 'Dismissed', data: catDismissed, backgroundColor: '#dc2626' },
+                { label: 'Pending', data: catDetected.map(function(d, i) { return d - catCaptured[i] - catDismissed[i]; }), backgroundColor: '#94a3b8' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                x: { stacked: true, ticks: { font: { size: 10 } } },
+                y: { stacked: true, beginAtZero: true }
+            }
+        }
+    });
+
+    /* Trend line chart */
+    new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: trend.map(function(t) { return t.label; }),
+            datasets: [
+                {
+                    label: 'Detected',
+                    data: trend.map(function(t) { return t.detected; }),
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99,102,241,0.1)',
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Captured',
+                    data: trend.map(function(t) { return t.captured; }),
+                    borderColor: '#059669',
+                    backgroundColor: 'rgba(5,150,105,0.1)',
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Revenue ($)',
+                    data: trend.map(function(t) { return t.revenue; }),
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245,158,11,0.1)',
+                    tension: 0.3,
+                    fill: false,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Count' } },
+                y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Revenue ($)' } }
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}

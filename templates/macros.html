@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+{% block title %}Macro Library — CareCompanion{% endblock %}
+{% block page_id %}macros{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Macro Library</h1>
+    <span class="badge badge--info">F23</span>
+    <button class="btn btn-sm btn-primary" onclick="showAddModal()">+ Add Macro</button>
+    <a href="/tools/macros/export" class="btn btn-sm btn-outline">Export All (.ahk)</a>
+    <a href="/tools/macros/export-json" class="btn btn-sm btn-outline">Backup (JSON)</a>
+    <button class="btn btn-sm btn-outline" onclick="showImportModal()">Import</button>
+</div>
+
+{# ---- Sync Status ---- #}
+<div id="sync-status" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:12px;color:var(--text-secondary,#666);">
+    {% if sync_enabled %}
+    <span style="display:inline-block;width:8px;height:8px;border-radius:50;background:{{ '#e74c3c' if last_sync.error else '#27ae60' }};"></span>
+    <span>Auto-sync: <strong>Enabled</strong></span>
+    {% if last_sync.synced_at %}
+    <span>| Last synced: {{ last_sync.synced_at[:19] }} ({{ last_sync.macro_count }} items)</span>
+    {% endif %}
+    {% if last_sync.error %}
+    <span style="color:var(--color-orange,#e67e22);">⚠ {{ last_sync.error[:80] }}</span>
+    {% endif %}
+    <button class="btn btn-sm btn-outline" onclick="manualSync()" style="font-size:11px;padding:2px 8px;">Sync Now</button>
+    {% else %}
+    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#999;"></span>
+    <span>Auto-sync: <strong>Not configured</strong></span>
+    {% endif %}
+</div>
+
+{# ---- Stats Bar ---- #}
+<div style="display:flex;gap:20px;margin-bottom:20px;font-size:13px;color:var(--text-secondary,#666);">
+    <span>Total: <strong>{{ macros|length }}</strong></span>
+    {% set active_count = macros|selectattr('is_active')|list|length %}
+    <span>Active: <strong>{{ active_count }}</strong></span>
+    {% for cat in categories %}
+    {% set cat_count = macros|selectattr('category','equalto',cat)|list|length %}
+    {% if cat_count > 0 %}
+    <span>{{ cat|title }}: <strong>{{ cat_count }}</strong></span>
+    {% endif %}
+    {% endfor %}
+</div>
+
+{# ---- Category Tabs ---- #}
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+    <a href="/tools/macros" class="btn btn-sm {{ 'btn-primary' if not active_category else 'btn-outline' }}">All</a>
+    {% for cat in categories %}
+    <a href="/tools/macros?category={{ cat }}" class="btn btn-sm {{ 'btn-primary' if active_category == cat else 'btn-outline' }}">{{ cat|replace('_',' ')|title }}</a>
+    {% endfor %}
+</div>
+
+{# ---- Search Bar ---- #}
+<div style="margin-bottom:16px;">
+    <input type="text" id="search-input" class="form-input" placeholder="Search macros by name, description, or hotkey..." style="max-width:400px;" oninput="filterMacros()">
+</div>
+
+{# ---- Macro Cards ---- #}
+{% if macros %}
+<div id="macro-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;">
+    {% for m in macros %}
+    <div class="card macro-card" data-id="{{ m.id }}" data-name="{{ m.name }}" data-hotkey="{{ m.hotkey }}" style="padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div>
+                <strong style="font-size:15px;">{{ m.name }}</strong>
+                {% if m.hotkey %}
+                <span style="display:inline-block;background:var(--bg-secondary,#f0f0f0);padding:2px 8px;border-radius:6px;font-family:monospace;font-size:11px;margin-left:6px;">{{ m.hotkey }}</span>
+                {% endif %}
+                {% if m.hotkey and m.hotkey in conflicts %}
+                <span style="color:var(--warning,#f39c12);font-size:11px;margin-left:4px;" title="Hotkey conflict — another macro uses the same hotkey">⚠️ conflict</span>
+                {% endif %}
+            </div>
+            <span style="display:inline-block;background:var(--primary,#4a90d9);color:#fff;padding:2px 8px;border-radius:8px;font-size:10px;">{{ m.category|replace('_',' ')|title }}</span>
+        </div>
+
+        <div style="font-size:13px;color:var(--text-secondary,#666);margin-bottom:8px;max-height:36px;overflow:hidden;">{{ m.description or 'No description' }}</div>
+
+        <div style="display:flex;gap:6px;margin-bottom:10px;font-size:11px;color:var(--text-muted,#999);">
+            {% if m.steps|length > 0 %}
+            <span>{{ m.steps|length }} step{{ 's' if m.steps|length != 1 else '' }}</span>
+            {% elif m.script_content %}
+            <span>Hand-written</span>
+            {% else %}
+            <span>Empty</span>
+            {% endif %}
+        </div>
+
+        {# Quick Actions #}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="editMacro({{ m.id }}, '{{ m.name|e }}', `{{ (m.description or '')|e }}`, '{{ m.hotkey }}', '{{ m.category }}', `{{ (m.script_content or '')|replace('`','\\`')|replace('\n','\\n') }}`)" title="Edit">✏️ Edit</button>
+            <button class="btn btn-sm btn-outline" onclick="duplicateMacro({{ m.id }})" title="Duplicate">📋 Clone</button>
+            <button class="btn btn-sm btn-outline" onclick="previewMacro({{ m.id }})" title="Preview AHK">👁 Preview</button>
+            <a href="/tools/macros/export/{{ m.id }}" class="btn btn-sm btn-outline" title="Export">⬇ .ahk</a>
+            <button class="btn btn-sm btn-outline" onclick="deleteMacro({{ m.id }}, '{{ m.name|e }}')" title="Delete" style="color:var(--danger,#e74c3c);">🗑️</button>
+        </div>
+
+        {# Expandable code view #}
+        <div id="code-{{ m.id }}" style="display:none;margin-top:12px;">
+            <pre style="background:var(--bg-secondary,#1e1e1e);color:var(--text-primary,#d4d4d4);padding:12px;border-radius:8px;font-size:12px;max-height:250px;overflow-y:auto;white-space:pre-wrap;font-family:Consolas,monospace;margin:0;"></pre>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="padding:32px;text-align:center;color:var(--text-secondary,#999);">
+    No macros found{% if active_category %} in "{{ active_category|replace('_',' ')|title }}"{% endif %}. Click "Add Macro" to create one.
+</div>
+{% endif %}
+
+{# ---- Undo Banner ---- #}
+<div id="undo-banner" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg-primary,#333);color:var(--text-primary,#fff);padding:12px 24px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:1000;font-size:14px;">
+    Macro deleted. <button class="btn btn-sm btn-outline" onclick="undoDelete()" style="margin-left:12px;">Undo</button>
+</div>
+
+{# ---- Add/Edit Modal ---- #}
+<div id="macro-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:620px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <h2 id="macro-modal-title" style="margin:0 0 16px;">Add Macro</h2>
+        <input type="hidden" id="macro-edit-id" value="">
+
+        <div id="add-path-choice" style="display:flex;gap:12px;margin-bottom:16px;">
+            <button class="btn btn-primary" onclick="chooseWriteScript()">✍ Write Script</button>
+            <a href="/tools/macros/recorder" class="btn btn-outline">🎬 Use Recorder</a>
+        </div>
+
+        <div id="macro-form" style="display:none;">
+            <label class="form-label">Name</label>
+            <input type="text" id="mm-name" class="form-input" style="margin-bottom:10px;">
+
+            <label class="form-label">Description</label>
+            <input type="text" id="mm-desc" class="form-input" style="margin-bottom:10px;">
+
+            <label class="form-label">Hotkey</label>
+            <input type="text" id="mm-hotkey" class="form-input" placeholder="e.g. ^!n" style="margin-bottom:10px;font-family:monospace;">
+
+            <label class="form-label">Category</label>
+            <select id="mm-category" class="form-input" style="margin-bottom:10px;">
+                <option value="navigation">Navigation</option>
+                <option value="template">Template</option>
+                <option value="order_entry">Order Entry</option>
+                <option value="data_entry">Data Entry</option>
+                <option value="custom" selected>Custom</option>
+            </select>
+
+            <label class="form-label">AHK Script</label>
+            <textarea id="mm-script" class="form-input" rows="12" style="margin-bottom:16px;font-family:Consolas,monospace;font-size:13px;white-space:pre;"></textarea>
+
+            <div style="display:flex;gap:12px;justify-content:flex-end;">
+                <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveMacroModal()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Preview Modal ---- #}
+<div id="preview-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:600px;max-width:90vw;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 id="preview-title" style="margin:0;">AHK Preview</h2>
+            <button class="btn btn-sm btn-outline" onclick="closePreview()">✕</button>
+        </div>
+        <pre id="preview-code" style="background:var(--bg-secondary,#1e1e1e);color:var(--text-primary,#d4d4d4);padding:16px;border-radius:8px;font-size:13px;max-height:500px;overflow-y:auto;white-space:pre-wrap;font-family:Consolas,monospace;margin:0;"></pre>
+    </div>
+</div>
+
+{# ---- Import Modal ---- #}
+<div id="import-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:520px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <h2 style="margin:0 0 16px;">Import Macros</h2>
+
+        <div style="margin-bottom:16px;">
+            <label class="form-label">Upload .ahk file (parses hotstrings):</label>
+            <input type="file" id="import-ahk-file" accept=".ahk,.txt" class="form-input" style="margin-bottom:8px;">
+            <button class="btn btn-sm btn-outline" onclick="importAhkFile()">Import AHK</button>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label class="form-label">Upload JSON backup:</label>
+            <input type="file" id="import-json-file" accept=".json" class="form-input" style="margin-bottom:8px;">
+            <button class="btn btn-sm btn-outline" onclick="importJsonFile()">Import JSON</button>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <label class="form-label">Or paste raw AHK code:</label>
+            <textarea id="import-paste" class="form-input" rows="6" placeholder="::.hpi::Patient presents with..." style="font-family:monospace;margin-bottom:8px;"></textarea>
+            <button class="btn btn-sm btn-outline" onclick="importPaste()">Import Pasted</button>
+        </div>
+
+        <div style="text-align:right;">
+            <button class="btn btn-outline" onclick="closeImportModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── Search ── */
+function filterMacros() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    document.querySelectorAll('.macro-card').forEach(card => {
+        const name = (card.dataset.name || '').toLowerCase();
+        const hotkey = (card.dataset.hotkey || '').toLowerCase();
+        const text = card.textContent.toLowerCase();
+        card.style.display = (name.includes(q) || hotkey.includes(q) || text.includes(q)) ? '' : 'none';
+    });
+}
+
+/* ── Manual Sync ── */
+function manualSync() {
+    fetch('/tools/macros/sync', {method:'POST'})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if (d.success) {
+                alert('Sync complete: ' + d.macro_count + ' items written.');
+                location.reload();
+            } else {
+                alert('Sync failed: ' + (d.error || 'unknown'));
+            }
+        })
+        .catch(function(){ alert('Sync request failed.'); });
+}
+
+/* ── Add/Edit Modal ── */
+let lastDeletedId = null;
+
+function showAddModal() {
+    document.getElementById('macro-modal-title').textContent = 'Add Macro';
+    document.getElementById('macro-edit-id').value = '';
+    document.getElementById('add-path-choice').style.display = 'flex';
+    document.getElementById('macro-form').style.display = 'none';
+    document.getElementById('macro-modal').style.display = 'flex';
+}
+
+function chooseWriteScript() {
+    document.getElementById('add-path-choice').style.display = 'none';
+    document.getElementById('macro-form').style.display = '';
+    document.getElementById('mm-name').value = '';
+    document.getElementById('mm-desc').value = '';
+    document.getElementById('mm-hotkey').value = '';
+    document.getElementById('mm-category').value = 'custom';
+    document.getElementById('mm-script').value = '';
+}
+
+function editMacro(id, name, desc, hotkey, category, script) {
+    document.getElementById('macro-modal-title').textContent = 'Edit Macro';
+    document.getElementById('macro-edit-id').value = id;
+    document.getElementById('add-path-choice').style.display = 'none';
+    document.getElementById('macro-form').style.display = '';
+    document.getElementById('mm-name').value = name;
+    document.getElementById('mm-desc').value = desc;
+    document.getElementById('mm-hotkey').value = hotkey;
+    document.getElementById('mm-category').value = category;
+    document.getElementById('mm-script').value = script.replace(/\\n/g, '\n');
+    document.getElementById('macro-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('macro-modal').style.display = 'none';
+}
+
+function saveMacroModal() {
+    const editId = document.getElementById('macro-edit-id').value;
+    const name = document.getElementById('mm-name').value.trim();
+    if (!name) { alert('Name is required.'); return; }
+
+    const data = {
+        name: name,
+        description: document.getElementById('mm-desc').value.trim(),
+        hotkey: document.getElementById('mm-hotkey').value.trim(),
+        category: document.getElementById('mm-category').value,
+        script_content: document.getElementById('mm-script').value,
+    };
+
+    const url = editId ? '/tools/macros/' + editId : '/tools/macros';
+    const method = editId ? 'PUT' : 'POST';
+
+    fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) location.reload();
+        else alert(d.error || 'Failed to save.');
+    });
+}
+
+/* ── Delete / Undo ── */
+function deleteMacro(id, name) {
+    if (!confirm('Delete "' + name + '"?')) return;
+    fetch('/tools/macros/' + id, {method:'DELETE'})
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            lastDeletedId = id;
+            document.querySelector('.macro-card[data-id="'+id+'"]').style.display = 'none';
+            const banner = document.getElementById('undo-banner');
+            banner.style.display = '';
+            setTimeout(() => { banner.style.display = 'none'; lastDeletedId = null; }, 8000);
+        }
+    });
+}
+
+function undoDelete() {
+    if (!lastDeletedId) return;
+    fetch('/tools/macros/' + lastDeletedId + '/restore', {method:'POST'})
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) location.reload();
+    });
+}
+
+/* ── Duplicate ── */
+function duplicateMacro(id) {
+    fetch('/tools/macros/' + id + '/duplicate', {method:'POST'})
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) location.reload();
+        else alert(d.error || 'Failed to duplicate.');
+    });
+}
+
+/* ── Preview ── */
+function previewMacro(id) {
+    fetch('/tools/macros/' + id + '/preview')
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            document.getElementById('preview-title').textContent = d.name + ' — AHK Preview';
+            document.getElementById('preview-code').textContent = d.script;
+            document.getElementById('preview-modal').style.display = 'flex';
+        }
+    });
+}
+
+function closePreview() {
+    document.getElementById('preview-modal').style.display = 'none';
+}
+
+/* ── Import ── */
+function showImportModal() {
+    document.getElementById('import-modal').style.display = 'flex';
+}
+function closeImportModal() {
+    document.getElementById('import-modal').style.display = 'none';
+}
+
+function importAhkFile() {
+    const fileInput = document.getElementById('import-ahk-file');
+    if (!fileInput.files.length) { alert('Select an .ahk file.'); return; }
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    fetch('/tools/macros/import', {method:'POST', body:formData})
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) { alert('Imported ' + d.imported_phrases + ' phrase(s), ' + d.imported_macros + ' macro(s).'); location.reload(); }
+        else alert(d.error || 'Import failed.');
+    });
+}
+
+function importJsonFile() {
+    const fileInput = document.getElementById('import-json-file');
+    if (!fileInput.files.length) { alert('Select a JSON file.'); return; }
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    fetch('/tools/macros/import-json', {method:'POST', body:formData})
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) { alert('Imported ' + d.imported_macros + ' macro(s), ' + d.imported_phrases + ' phrase(s).'); location.reload(); }
+        else alert(d.error || 'Import failed.');
+    });
+}
+
+function importPaste() {
+    const content = document.getElementById('import-paste').value.trim();
+    if (!content) { alert('Paste AHK code to import.'); return; }
+    fetch('/tools/macros/import', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({content})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) { alert('Imported ' + d.imported_phrases + ' phrase(s).'); location.reload(); }
+        else alert(d.error || 'Import failed.');
+    });
+}
+</script>
+{% endblock %}

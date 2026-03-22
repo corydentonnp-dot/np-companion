@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Provider Summary — {{ view_date }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            font-size: 9pt;
+            color: #111;
+            padding: 0.5in;
+            line-height: 1.35;
+        }
+        @media print {
+            @page { margin: 0.4in; size: letter; }
+            body { padding: 0; font-size: 8.5pt; }
+            .no-print { display: none !important; }
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            border-bottom: 2px solid #222;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+        }
+        .header h1 { font-size: 14pt; font-weight: 700; }
+        .header-meta { font-size: 9pt; color: #444; text-align: right; }
+
+        .patient-card {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px 8px;
+            margin-bottom: 5px;
+            page-break-inside: avoid;
+        }
+        .patient-card.has-flags { border-left: 3px solid #dc3545; }
+        .patient-card.has-rems { border-left: 3px solid #9b59b6; }
+        .patient-card.new-patient { border-left: 3px solid #0d6efd; }
+
+        .pt-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 2px;
+        }
+        .pt-time {
+            font-weight: 700;
+            font-size: 10pt;
+            min-width: 42px;
+            color: #333;
+        }
+        .pt-name {
+            font-weight: 700;
+            font-size: 10pt;
+            color: #111;
+        }
+        .pt-demo {
+            font-size: 8.5pt;
+            color: #555;
+        }
+        .pt-visit-badge {
+            display: inline-block;
+            padding: 0 5px;
+            border-radius: 3px;
+            font-size: 7.5pt;
+            font-weight: 600;
+            background: #e9ecef;
+            color: #444;
+        }
+        .pt-visit-badge.new { background: #cfe2ff; color: #084298; }
+
+        .pt-details {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 8.5pt;
+        }
+        .detail-section {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .detail-items { margin-top: 1px; }
+        .detail-items span { margin-right: 6px; }
+
+        .flag-critical { color: #dc3545; font-weight: 700; }
+        .flag-abnormal { color: #e67e22; font-weight: 600; }
+        .flag-overdue { color: #dc3545; font-weight: 600; }
+        .rems-alert { color: #9b59b6; font-weight: 700; }
+
+        .gap-tag {
+            display: inline-block;
+            padding: 0 4px;
+            margin: 1px 2px;
+            border-radius: 3px;
+            font-size: 7.5pt;
+            background: #fff3cd;
+            color: #856404;
+        }
+        .lab-due-tag {
+            display: inline-block;
+            padding: 0 4px;
+            margin: 1px 2px;
+            border-radius: 3px;
+            font-size: 7.5pt;
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .lab-due-tag.overdue { background: #f8d7da; color: #721c24; }
+
+        .summary-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 8px;
+            font-size: 9pt;
+            color: #444;
+        }
+        .summary-bar strong { color: #111; }
+
+        .print-btn {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .print-btn button {
+            padding: 6px 20px;
+            font-size: 11pt;
+            cursor: pointer;
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+        }
+        .print-btn button:hover { background: #0b5ed7; }
+        .empty-msg {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+            font-size: 12pt;
+        }
+    </style>
+</head>
+<body {% if auto_print %}onload="window.print()"{% endif %}>
+    <div class="print-btn no-print">
+        <button onclick="window.print()">&#128424; Print Daily Summary</button>
+        &nbsp;
+        <a href="/daily-summary/rooming?date={{ view_date_raw }}" style="font-size:10pt;">View Rooming Sheet &rarr;</a>
+    </div>
+
+    <div class="header">
+        <h1>Daily Provider Summary</h1>
+        <div class="header-meta">
+            <strong>{{ provider_name }}</strong><br>
+            {{ view_date }} &bull; {{ patient_count }} patient{{ 's' if patient_count != 1 else '' }}
+        </div>
+    </div>
+
+    <div class="summary-bar">
+        <span><strong>{{ patient_count }}</strong> patients</span>
+        {% set total_gaps = patients | sum(attribute='gap_count') %}
+        {% set total_flags = patients | map(attribute='flagged_labs') | map('length') | sum %}
+        {% set total_rems = patients | map(attribute='rems_alerts') | map('length') | sum %}
+        <span><strong>{{ total_gaps }}</strong> care gaps</span>
+        {% if total_flags %}<span class="flag-abnormal"><strong>{{ total_flags }}</strong> flagged results</span>{% endif %}
+        {% if total_rems %}<span class="rems-alert"><strong>{{ total_rems }}</strong> REMS alerts</span>{% endif %}
+    </div>
+
+    {% if not patients %}
+    <div class="empty-msg">No patients scheduled for {{ view_date }}.</div>
+    {% endif %}
+
+    {% for pt in patients %}
+    <div class="patient-card
+        {%- if pt.rems_alerts %} has-rems
+        {%- elif pt.flagged_labs %} has-flags
+        {%- elif pt.is_new_patient %} new-patient
+        {%- endif %}">
+
+        <div class="pt-header">
+            <span class="pt-time">{{ pt.time }}</span>
+            <span class="pt-name">{{ pt.last_name }}, {{ pt.first_name }}</span>
+            <span class="pt-demo">DOB {{ pt.dob }} &bull; MRN {{ pt.mrn }}{% if pt.age is not none %} &bull; {{ pt.age }}y{% endif %}</span>
+            <span class="pt-visit-badge{% if pt.is_new_patient %} new{% endif %}">{{ pt.visit_type or 'GV' }}{% if pt.is_new_patient %} — NEW{% endif %}</span>
+        </div>
+
+        <div class="pt-details">
+            {% if pt.gap_names %}
+            <div class="detail-section">
+                <div class="detail-label">Care Gaps ({{ pt.gap_count }})</div>
+                <div class="detail-items">
+                    {% for name in pt.gap_names %}<span class="gap-tag">{{ name }}</span>{% endfor %}
+                    {% if pt.gap_overflow %}<span class="gap-tag">+{{ pt.gap_overflow }} more</span>{% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pt.labs_due %}
+            <div class="detail-section">
+                <div class="detail-label">Labs Due</div>
+                <div class="detail-items">
+                    {% for lab in pt.labs_due %}<span class="lab-due-tag{% if lab.overdue %} overdue{% endif %}">{{ lab.name }}{% if lab.overdue %} ⚠{% endif %}</span>{% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pt.flagged_labs %}
+            <div class="detail-section">
+                <div class="detail-label">Flagged Results</div>
+                <div class="detail-items">
+                    {% for lab in pt.flagged_labs %}
+                    <span class="{% if lab.flag == 'critical' %}flag-critical{% else %}flag-abnormal{% endif %}">
+                        {{ lab.name }}: {{ lab.value }}{{ lab.units }} ({{ lab.date }})
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if pt.rems_alerts %}
+            <div class="detail-section">
+                <div class="detail-label">REMS</div>
+                <div class="detail-items">
+                    {% for r in pt.rems_alerts %}
+                    <span class="rems-alert">{{ r.program }}: {{ r.drug }}
+                        {% if r.escalation >= 2 %}⚠ OVERDUE{% elif r.escalation == 1 %}DUE SOON{% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not pt.gap_names and not pt.labs_due and not pt.flagged_labs and not pt.rems_alerts %}
+            <div class="detail-section" style="color:#999;font-style:italic;">No outstanding items</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div style="margin-top:10px;font-size:7.5pt;color:#999;text-align:center;border-top:1px solid #ddd;padding-top:4px;">
+        CareCompanion &bull; Daily Provider Summary &bull; Printed {{ view_date }} &bull; CONFIDENTIAL — For provider use only
+    </div>
+</body>
+</html>

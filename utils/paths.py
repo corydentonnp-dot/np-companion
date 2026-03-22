@@ -1,5 +1,5 @@
 """
-NP Companion — Path Resolution for Frozen (PyInstaller) and Dev Modes
+CareCompanion — Path Resolution for Frozen (PyInstaller) and Dev Modes
 
 Usage:
     from utils.paths import get_base_dir, get_resource_dir, get_data_dir, ...
@@ -77,14 +77,14 @@ def get_config_path() -> str:
 
 def get_db_path() -> str:
     """Full path to the SQLite database file."""
-    return os.path.join(get_data_dir(), 'npcompanion.db')
+    return os.path.join(get_data_dir(), 'carecompanion.db')
 
 
 def get_icon_path() -> str:
     """Path to the app icon file."""
     # Check next to exe first, then in resources
     for base in [get_base_dir(), get_resource_dir()]:
-        p = os.path.join(base, 'NP_Companion.ico')
+        p = os.path.join(base, 'CareCompanion.ico')
         if os.path.isfile(p):
             return p
     return ''

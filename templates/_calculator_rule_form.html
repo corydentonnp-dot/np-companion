@@ -1,0 +1,65 @@
+{#
+  Phase 36.2 — Rule-based / point-rule form partial
+  Parent context provides: calc, key, mrn, prefilled
+  Handles: boolean/checkbox items with point values, running total.
+#}
+
+{# Running point total #}
+<div style="display:flex;justify-content:space-between;align-items:center;
+            background:var(--bg-secondary,#1e1e1e);border-radius:8px;
+            padding:10px 14px;margin-bottom:14px;">
+    <span style="font-size:12px;color:var(--text-secondary,#94a3b8);">Running Point Total</span>
+    <div>
+        <span id="rule-running-total"
+              style="font-size:22px;font-weight:700;color:var(--color-teal,#0d9488);">0</span>
+    </div>
+</div>
+
+<form id="calculator-form" onsubmit="computeCalc(event)">
+    {% if mrn %}<input type="hidden" name="mrn" value="{{ mrn }}">{% endif %}
+
+    <div style="display:flex;flex-direction:column;gap:6px;">
+    {% for inp in calc.inputs %}
+    {% set pts = inp.points if inp.points is defined else 1 %}
+    {% set pf_val = prefilled.get(inp.key, '') if prefilled else '' %}
+    {% set is_checked = pf_val|string|lower in ('true', '1', 'yes') %}
+    <div class="calc-input-row"
+         style="display:flex;align-items:center;gap:10px;
+                padding:8px 12px;background:var(--bg-secondary,#1e1e1e);
+                border-radius:6px;border:1px solid var(--bg-tertiary,#2a2a2a);">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;font-size:13px;">
+            <input type="checkbox" name="{{ inp.key }}" value="true"
+                   id="inp-{{ inp.key }}"
+                   data-points="{{ pts }}"
+                   {% if is_checked %}checked{% endif %}
+                   onchange="updateRuleTotal()"
+                   style="width:16px;height:16px;flex-shrink:0;">
+            <span>{{ inp.label }}</span>
+        </label>
+        <span style="font-size:12px;font-weight:700;
+                     color:{% if pts < 0 %}#f87171{% else %}#4ade80{% endif %};
+                     min-width:32px;text-align:right;flex-shrink:0;">
+            {% if pts > 0 %}+{{ pts }}{% else %}{{ pts }}{% endif %}
+        </span>
+    </div>
+    {% endfor %}
+    </div>
+
+    <button type="submit" id="calc-submit-btn" class="btn-primary"
+            style="margin-top:20px;width:100%;padding:10px;">
+        Calculate Score
+    </button>
+</form>
+
+<script>
+/* Phase 36 — Rule-based running point total */
+function updateRuleTotal() {
+    var total = 0;
+    document.querySelectorAll('#calculator-form input[type="checkbox"]:checked').forEach(function(c) {
+        total += parseInt(c.dataset.points || '1');
+    });
+    var el = document.getElementById('rule-running-total');
+    if (el) el.textContent = total;
+}
+document.addEventListener('DOMContentLoaded', updateRuleTotal);
+</script>

@@ -1,6 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Patient {{ mrn_display }} — NP Companion{% endblock %}
+{% from '_empty_state.html' import empty_state %}
+{% from '_why_link.html' import why_link %}
+{% block title %}Patient {{ mrn_display }} — CareCompanion{% endblock %}
 {% block page_id %}patient-chart{% endblock %}
+{% block breadcrumb_badge %}{{ record.patient_name if record and record.patient_name else mrn_display }}{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>{{ record.patient_name.split(' ')[0] if record and record.patient_name else 'Patient' }}</h3></div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Patient</div>
+    {% if record %}
+    <div class="cp-stat"><span>MRN</span><span class="cp-stat-value">{{ mrn_display }}</span></div>
+    {% if age_str %}<div class="cp-stat"><span>Age</span><span class="cp-stat-value">{{ age_str }}</span></div>{% endif %}
+    {% if record.patient_sex %}<div class="cp-stat"><span>Sex</span><span class="cp-stat-value">{{ record.patient_sex }}</span></div>{% endif %}
+    {% endif %}
+</div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Chart Sections</div>
+    <a href="#section-diagnoses" class="cp-link">Diagnoses</a>
+    <a href="#section-medications" class="cp-link">Medications</a>
+    <a href="#section-labs" class="cp-link">Labs</a>
+    <a href="#section-vitals" class="cp-link">Vitals</a>
+    <a href="#section-allergies" class="cp-link">Allergies</a>
+    <a href="#section-immunizations" class="cp-link">Immunizations</a>
+    <a href="#section-notes" class="cp-link">Notes</a>
+</div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Actions</div>
+    <button class="cp-action" onclick="document.getElementById('xml-upload').click()">Upload XML</button>
+</div>
+{% if care_gaps %}
+<div class="context-panel-section">
+    <div class="cp-section-label">Care Gaps</div>
+    {% set open = care_gaps|selectattr('status', 'equalto', 'open')|list %}
+    <div class="cp-stat"><span>Open</span><span class="cp-stat-value" style="{{ 'color:var(--color-amber)' if open|length > 0 }}">{{ open|length }}</span></div>
+    <a href="/caregap/{{ mrn_display }}" class="cp-link">View Gaps →</a>
+</div>
+{% endif %}
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/patients" class="cp-link">My Patients</a>
+    <a href="/caregap" class="cp-link">Care Gaps</a>
+    <a href="/labtrack/{{ mrn_display }}" class="cp-link">Lab Track</a>
+</div>
+{% endblock %}
 
 {% block content %}
 {# ---- PATIENT HEADER BAR ---- #}
@@ -62,9 +105,16 @@
             <input type="file" id="xml-upload" accept=".xml" style="display:none;">
         </label>
         <button class="btn btn-sm btn-outline" onclick="toggleEditMode()">&#9881; Edit Layout</button>
+        <div class="chart-view-toggle" style="display:inline-flex;gap:2px;align-items:center;margin-left:4px;">
+            <span style="font-size:12px;color:var(--text-secondary);">View:</span>
+            <button id="view-tabs-btn" class="btn btn-sm" style="padding:2px 10px;font-size:12px;" onclick="setChartView('tabs')">Tabs</button>
+            <button id="view-grid-btn" class="btn btn-sm" style="padding:2px 10px;font-size:12px;" onclick="setChartView('grid')">Grid</button>
+        </div>
         {% include '_free_widgets.html' %}
     </div>
 </div>
+
+{% include '_billing_alert_bar.html' %}
 
 {% if not has_data %}
 <div class="pt-no-data-banner">
@@ -72,17 +122,37 @@
     <div>
         <strong>No clinical summary loaded</strong>
         <p style="margin:4px 0 0;font-size:13px;opacity:0.7;">Export a Clinical Summary XML from Amazing Charts (Alt+P &rarr; Export Clinical Summary) and upload it above.</p>
+        {% if schedule_context and (schedule_context.appointment_time or schedule_context.visit_type or schedule_context.reason) %}
+        <p style="margin:8px 0 0;font-size:13px;opacity:0.85;">
+            Schedule context:
+            {% if schedule_context.appointment_time %}<span><strong>{{ schedule_context.appointment_time }}</strong></span>{% endif %}
+            {% if schedule_context.visit_type %}<span> | {{ schedule_context.visit_type }}</span>{% endif %}
+            {% if schedule_context.reason %}<span> | {{ schedule_context.reason }}</span>{% endif %}
+        </p>
+        {% endif %}
     </div>
 </div>
 {% endif %}
 
 <div id="upload-status" style="display:none;" class="pt-status-bar"></div>
 
+{# ---- TAB NAVIGATION BAR ---- #}
+<nav id="chart-tabs" class="chart-tabs" style="display:none;">
+    <button class="chart-tab active" data-tab="overview" onclick="switchTab('overview',this)">&#128200; Overview</button>
+    <button class="chart-tab" data-tab="medications" onclick="switchTab('medications',this)">&#128138; Medications</button>
+    <button class="chart-tab" data-tab="labs" onclick="switchTab('labs',this)">&#128300; Labs</button>
+    <button class="chart-tab" data-tab="problems" onclick="switchTab('problems',this)">&#129658; Problems</button>
+    <button class="chart-tab" data-tab="notes" onclick="switchTab('notes',this)">&#128221; Notes</button>
+    <button class="chart-tab" data-tab="billing" onclick="switchTab('billing',this)">&#128176; Billing</button>
+    <button class="chart-tab" data-tab="calculators" onclick="switchTab('calculators',this)">&#129520; Calculators</button>
+</nav>
+
 {# ---- WIDGET GRID (Drag + Resize) ---- #}
-<div id="widget-grid" class="widget-grid fw-container">
+<script>window._fwServerPositions = {{ chart_free_positions|safe }};</script>
+<div id="widget-grid" class="widget-grid fw-container" data-server-mode="{{ chart_layout_mode }}">
 
     {# ---- MEDICATIONS WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="medications" data-widget-id="medications" data-col="0" data-row="0" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="medications" data-widget-id="medications" data-tab-group="medications" data-col="0" data-row="0" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128138; Medications</span>
             <div class="widget-controls">
@@ -98,7 +168,7 @@
             {% if medications %}
             <table class="widget-table" id="med-table">
                 <thead>
-                    <tr><th>Drug Name</th><th>Generic</th><th>Dose / Form</th><th>Frequency</th><th>Status</th></tr>
+                    <tr><th>Drug Name</th><th>Generic</th><th>Dose / Form</th><th>Frequency</th><th>Status</th><th title="Estimated monthly cost">$</th></tr>
                 </thead>
                 <tbody>
                     {% for m in medications %}
@@ -109,12 +179,13 @@
                         <td>{{ (rx.dose_strength ~ ' ' ~ rx.dose_form) | trim if rx and rx.dose_strength else m.dosage }}</td>
                         <td>{{ m.frequency }}</td>
                         <td><span class="badge badge-{{ 'success' if m.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'medication', {{ m.id }})" style="cursor:pointer;" title="Click to toggle">{{ m.status }}</span></td>
+                        <td class="price-cell" data-med-id="{{ m.id }}"><span class="price-badge price-loading" title="Loading..."></span></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             {% else %}
-            <p class="widget-empty">No medications loaded</p>
+            {{ empty_state('💊', 'No medications found', 'Medications appear after importing a clinical summary.') }}
             {% endif %}
             <div class="widget-footer-count">{{ medications|selectattr('status','equalto','active')|list|length }} active / {{ medications|length }} total</div>
         </div>
@@ -122,7 +193,7 @@
     </div>
 
     {# ---- DIAGNOSES WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="diagnoses" data-widget-id="diagnoses" data-col="1" data-row="0" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="diagnoses" data-widget-id="diagnoses" data-tab-group="problems" data-col="1" data-row="0" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#129658; Diagnoses</span>
             <div class="widget-controls">
@@ -171,7 +242,7 @@
     </div>
 
     {# ---- LABS SIMPLE VIEW WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="labs-simple" data-widget-id="labs-simple" data-col="2" data-row="0" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="labs-simple" data-widget-id="labs-simple" data-tab-group="labs" data-col="2" data-row="0" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128300; Labs</span>
             <div class="widget-controls">
@@ -211,7 +282,7 @@
     </div>
 
     {# ---- VITALS WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="vitals" data-widget-id="vitals" data-col="0" data-row="1" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="vitals" data-widget-id="vitals" data-tab-group="overview" data-col="0" data-row="1" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128200; Vitals</span>
             <div class="widget-controls">
@@ -245,7 +316,7 @@
     </div>
 
     {# ---- ALLERGIES WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="allergies" data-widget-id="allergies" data-col="1" data-row="1" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="allergies" data-widget-id="allergies" data-tab-group="overview" data-col="1" data-row="1" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#9888;&#65039; Allergies</span>
             <div class="widget-controls">
@@ -274,10 +345,11 @@
     </div>
 
     {# ---- IMMUNIZATIONS WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="immunizations" data-widget-id="immunizations" data-col="2" data-row="1" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="immunizations" data-widget-id="immunizations" data-tab-group="overview" data-col="2" data-row="1" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128137; Immunizations</span>
             <div class="widget-controls">
+                <button class="btn btn-sm btn-outline" id="viis-btn" onclick="checkVIIS()" title="Check Virginia Immunization Registry" style="font-size:10px;padding:1px 6px;">&#127973; Check VIIS</button>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
@@ -297,12 +369,49 @@
             {% else %}
             <p class="widget-empty">No immunizations loaded</p>
             {% endif %}
+
+            {# ---- Phase 24.4: Series Gap Flags ---- #}
+            {% if imm_series_gaps|default([]) %}
+            <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+                <div style="font-size:11px;font-weight:600;color:#8e44ad;margin-bottom:4px;">&#9888; Incomplete Series</div>
+                {% for g in imm_series_gaps %}
+                <div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;">
+                    <span style="font-weight:600;">{{ g.vaccine_group }}</span>
+                    <span style="color:var(--text-secondary);">{{ g.doses_received }}/{{ g.total_doses }}</span>
+                    {% if g.overdue %}
+                    <span style="background:#e74c3c;color:#fff;padding:0 4px;border-radius:3px;font-size:10px;">OVERDUE</span>
+                    {% elif g.status == 'in_progress' %}
+                    <span style="background:#f59e0b;color:#000;padding:0 4px;border-radius:3px;font-size:10px;">DUE</span>
+                    {% else %}
+                    <span style="background:#3498db;color:#fff;padding:0 4px;border-radius:3px;font-size:10px;">ELIGIBLE</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div id="viis-results" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"></div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- PDMP CONTROLLED SUBSTANCES WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="pdmp" data-widget-id="pdmp" data-tab-group="medications" data-col="0" data-row="2" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128274; Controlled Substances (PDMP)</span>
+            <div class="widget-controls">
+                <button class="btn btn-sm btn-outline" id="pdmp-btn" onclick="checkPDMP()" title="Check Virginia PDMP" style="font-size:10px;padding:1px 6px;">&#128270; Check PDMP</button>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" id="pdmp-body">
+            <p class="widget-empty">Click "Check PDMP" to query Virginia Prescription Drug Monitoring Program</p>
         </div>
         <div class="widget-resize-handle"></div>
     </div>
 
     {# ---- USPSTF RECOMMENDATIONS WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="uspstf" data-widget-id="uspstf" data-col="0" data-row="2" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="uspstf" data-widget-id="uspstf" data-tab-group="overview" data-col="0" data-row="2" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128203; USPSTF Recommendations</span>
             <div class="widget-controls">
@@ -347,6 +456,7 @@
                         <td>
                             <button class="widget-btn" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" title="Show explanation">&#9432;</button>
                             <div style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">{{ rec.explanation or 'No additional details.' }}</div>
+                            {{ why_link(rec.explanation or 'USPSTF screening recommendation for this demographic', 'USPSTF Grade ' + (rec.grade or 'B') + ' guideline') }}
                         </td>
                     </tr>
                     {% endfor %}
@@ -370,8 +480,112 @@
         <div class="widget-resize-handle"></div>
     </div>
 
+    {# ---- RISK SCORES WIDGET (Phase 32 — auto-computed from EHR) ---- #}
+    <div class="widget fw-widget" data-widget="risk-scores" data-widget-id="risk-scores"
+         data-tab-group="overview" data-col="1" data-row="2" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128202; Risk Scores</span>
+            <div class="widget-controls">
+                <button class="widget-btn" onclick="refreshAutoScores('{{ mrn }}')" title="Recalculate">&#8635;</button>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" id="risk-scores-body">
+        {% if auto_scores %}
+            {% set bmi = auto_scores.get('bmi') %}
+            {% set ldl = auto_scores.get('ldl') %}
+            {% set pack_years = auto_scores.get('pack_years') %}
+            {% set prevent = auto_scores.get('prevent') %}
+            <div class="risk-score-grid">
+                {% if bmi %}
+                {% set bmi_color = 'var(--success,#27ae60)' if bmi.score_label == 'normal' else ('var(--warning,#e67e22)' if bmi.score_label in ('overweight','obesity_class_1') else 'var(--danger,#e74c3c)') %}
+                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                    <div class="risk-card-header">
+                        <span class="risk-name">BMI</span>
+                        <span class="risk-badge" style="background:{{ bmi_color }}">{{ bmi.score_label|replace('_',' ')|title if bmi.score_label else '' }}</span>
+                    </div>
+                    <div class="risk-value" style="color:{{ bmi_color }}">{{ '%.1f'|format(bmi.score_value) }}</div>
+                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
+                        {% if bmi.score_detail %}{% for k,v in bmi.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
+                        <div style="margin-top:4px;color:var(--text-muted)">{{ bmi.computed_at[:10] if bmi.computed_at else '' }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if ldl %}
+                {% set ldl_color = 'var(--success,#27ae60)' if ldl.score_label in ('optimal','near_optimal') else ('var(--warning,#e67e22)' if ldl.score_label in ('borderline_high','high') else 'var(--danger,#e74c3c)') %}
+                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                    <div class="risk-card-header">
+                        <span class="risk-name">LDL</span>
+                        <span class="risk-badge" style="background:{{ ldl_color }}">{{ ldl.score_label|replace('_',' ')|title if ldl.score_label else '' }}</span>
+                    </div>
+                    <div class="risk-value" style="color:{{ ldl_color }}">{{ '%.0f'|format(ldl.score_value) }} <small>mg/dL</small></div>
+                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
+                        {% if ldl.score_detail %}{% for k,v in ldl.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
+                        <div style="margin-top:4px;color:var(--text-muted)">{{ ldl.computed_at[:10] if ldl.computed_at else '' }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if pack_years %}
+                {% set py_color = 'var(--success,#27ae60)' if pack_years.score_label == 'never_smoker' else ('var(--warning,#e67e22)' if 'light' in (pack_years.score_label or '') else 'var(--danger,#e74c3c)') %}
+                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                    <div class="risk-card-header">
+                        <span class="risk-name">Pack Years</span>
+                        <span class="risk-badge" style="background:{{ py_color }}">{{ pack_years.score_label|replace('_',' ')|title if pack_years.score_label else '' }}</span>
+                    </div>
+                    <div class="risk-value" style="color:{{ py_color }}">{{ '%.1f'|format(pack_years.score_value) }}</div>
+                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
+                        {% if pack_years.score_detail %}{% for k,v in pack_years.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
+                        <div style="margin-top:4px;color:var(--text-muted)">{{ pack_years.computed_at[:10] if pack_years.computed_at else '' }}</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if prevent %}
+                {% set prev_color = 'var(--success,#27ae60)' if prevent.score_label == 'low' else ('var(--warning,#e67e22)' if prevent.score_label in ('borderline','intermediate') else 'var(--danger,#e74c3c)') %}
+                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                    <div class="risk-card-header">
+                        <span class="risk-name">PREVENT</span>
+                        <span class="risk-badge" style="background:{{ prev_color }}">{{ prevent.score_label|replace('_',' ')|title if prevent.score_label else '' }}</span>
+                    </div>
+                    <div class="risk-value" style="color:{{ prev_color }}">{{ '%.1f'|format(prevent.score_value) }}<small>% 10yr</small></div>
+                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
+                        {% if prevent.score_detail %}{% for k,v in prevent.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
+                        <div style="margin-top:4px;color:var(--text-muted)">{{ prevent.computed_at[:10] if prevent.computed_at else '' }}</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% if not (bmi or ldl or pack_years or prevent) %}
+            <p class="widget-empty">No auto-scores computed (clinical data needed)</p>
+            {% endif %}
+        {% else %}
+            <p class="widget-empty">No risk scores yet — load chart with clinical data</p>
+        {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- RISK TOOLS WIDGET (Phase 33 — interactive calculator picker) ---- #}
+    <div class="widget fw-widget" data-widget="risk-tools" data-widget-id="risk-tools"
+         data-tab-group="calculators" data-col="0" data-row="0" data-w="2" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#129520; Risk Tool Picker</span>
+            <div class="widget-controls">
+                <a href="/patient/{{ mrn }}/risk-tools" class="widget-btn" title="Open full picker" style="text-decoration:none;">&#8599;</a>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" id="risk-tools-body" style="padding:0;">
+            <iframe src="/patient/{{ mrn }}/risk-tools"
+                    id="risk-tools-iframe"
+                    style="width:100%;min-height:420px;border:none;border-radius:0 0 6px 6px;"
+                    loading="lazy"
+                    title="Risk Tool Picker"></iframe>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
     {# ---- SPECIALISTS WIDGET ---- #}
-    <div class="widget fw-widget" data-widget="specialists" data-widget-id="specialists" data-col="1" data-row="2" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="specialists" data-widget-id="specialists" data-tab-group="problems" data-col="1" data-row="2" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#129464; Specialists</span>
             <div class="widget-controls">
@@ -413,7 +627,7 @@
     </div>
 
     {# ---- NOTE GENERATOR WIDGET ---- #}
-    <div class="widget widget-wide" data-widget="note-gen" data-col="2" data-row="2" data-w="1" data-h="1">
+    <div class="widget widget-wide fw-widget" data-widget="note-gen" data-widget-id="note-gen" data-tab-group="notes" data-col="2" data-row="2" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128221; Note Generator</span>
             <div class="widget-controls">
@@ -421,27 +635,57 @@
             </div>
         </div>
         <div class="widget-body">
-            <div class="note-gen-sections">
-                <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px;">Select sections to auto-generate from patient data:</p>
+            {# ---- PRIMARY ACTION BAR (Accept & Copy / Review & Edit) ---- #}
+            <div id="note-action-bar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
+                <button class="btn btn-sm" id="note-accept-btn" onclick="acceptAndCopy()" style="background:var(--color-green,#22c55e);color:#fff;font-weight:600;padding:6px 16px;">&#10003; Accept &amp; Copy</button>
+                <button class="btn btn-outline btn-sm" id="note-edit-btn" onclick="enterEditMode()">&#9998; Review &amp; Edit</button>
+                <button class="btn btn-outline btn-sm" onclick="saveDraft()">&#128190; Save Draft</button>
+                <button class="btn btn-outline btn-sm" onclick="runSpellCheck()" id="spell-check-btn" style="color:var(--color-teal);">&#128300; Check Terminology</button>
+                <span id="note-mode-label" style="font-size:11px;color:var(--text-secondary);margin-left:auto;">Preview</span>
+            </div>
+
+            {# ---- SECTION SELECTION (collapsed by default, shown in edit mode) ---- #}
+            <div class="note-gen-sections" id="note-gen-section-controls" style="display:none;">
+                <p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px;">Select sections to include:</p>
                 <div class="note-gen-checkboxes" id="note-gen-checks">
+                    {% set why_reasons = {
+                        'Allergies': 'Patient has ' ~ ((allergies|length) if allergies is defined and allergies else 0) ~ ' recorded allergies',
+                        'Medications': 'Patient has ' ~ ((medications|length) if medications is defined and medications else 0) ~ ' active medications',
+                        'Past Medical History': 'Patient has ' ~ ((diagnoses|length) if diagnoses is defined and diagnoses else 0) ~ ' active diagnoses',
+                        'Assessment': 'Required for E/M documentation — ' ~ ((diagnoses|length) if diagnoses is defined and diagnoses else 0) ~ ' active diagnoses',
+                        'Plan': 'Required for E/M documentation — addresses assessment findings',
+                        'Physical Exam': 'Standard component for face-to-face encounters',
+                        'Health Concerns': 'Preventive care tracking — ' ~ ((care_gaps|length) if care_gaps is defined and care_gaps else 0) ~ ' open care gaps',
+                    } %}
                     {% for section in note_sections %}
                     <label class="note-gen-check">
                         <input type="checkbox" value="{{ section }}"
                             {% if section in ['Allergies','Medications','Past Medical History','Assessment','Plan','Physical Exam','Health Concerns'] %}checked{% endif %}>
                         {{ section }}
+                        {% if section in why_reasons %}
+                        <span class="why-included" tabindex="0" title="Why included?">&#9432;<span class="why-included-tip">{{ why_reasons[section] }}</span></span>
+                        {% endif %}
                     </label>
                     {% endfor %}
                 </div>
                 <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-                    <button class="btn btn-primary btn-sm" onclick="generateNote()">&#9881; Generate Selected</button>
-                    <button class="btn btn-outline btn-sm" onclick="copyAllSections()">&#128203; Copy All</button>
-                    <button class="btn btn-outline btn-sm" onclick="saveDraft()">&#128190; Save Draft</button>
-                    <button class="btn btn-outline btn-sm" onclick="runSpellCheck()" id="spell-check-btn" style="color:var(--color-teal);">&#128300; Check Terminology</button>
+                    <button class="btn btn-primary btn-sm" onclick="generateNote()">&#9881; Re-generate Selected</button>
+                    <button class="btn btn-outline btn-sm" onclick="exitEditMode()">&#128065; Back to Preview</button>
                 </div>
-                <div id="spell-check-results" style="display:none;margin-top:10px;padding:10px;background:var(--bg-muted,#f8fafc);border-radius:6px;border:1px solid var(--border);font-size:12px;max-height:300px;overflow-y:auto;"></div>
             </div>
+
+            <div id="spell-check-results" style="display:none;margin-top:10px;padding:10px;background:var(--bg-muted,#f8fafc);border-radius:6px;border:1px solid var(--border);font-size:12px;max-height:300px;overflow-y:auto;"></div>
             <div id="note-gen-status" style="display:none;padding:6px 10px;border-radius:4px;margin-top:8px;font-size:12px;"></div>
-            <div id="note-sections" style="margin-top:12px;">
+
+            {# ---- PREVIEW MODE: read-only formatted note ---- #}
+            <div id="note-preview" style="margin-top:12px;">
+                <div id="note-preview-content" style="font-size:13px;line-height:1.6;color:var(--text-primary);">
+                    <p style="color:var(--text-secondary);font-style:italic;">Generating note preview...</p>
+                </div>
+            </div>
+
+            {# ---- EDIT MODE: textareas (hidden by default) ---- #}
+            <div id="note-sections" style="margin-top:12px;display:none;">
                 {% for section in note_sections %}
                 <div class="note-section" style="margin-bottom:10px;">
                     <label class="note-label">{{ section }}</label>
@@ -455,7 +699,7 @@
     </div>
 
     {# ---- BILLING OPPORTUNITIES WIDGET — async loaded ---- #}
-    <div class="widget fw-widget" data-widget="billing" data-widget-id="billing" data-col="0" data-row="3" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="billing" data-widget-id="billing" data-tab-group="billing" data-col="0" data-row="3" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128176; Billing Opportunities</span>
             <div class="widget-controls">
@@ -472,8 +716,67 @@
         <div class="widget-resize-handle"></div>
     </div>
 
+    {# ---- CCM ENROLLMENT WIDGET (Phase 19.13) — async loaded ---- #}
+    <div class="widget fw-widget" data-widget="ccm" data-widget-id="ccm" data-tab-group="billing" data-col="1" data-row="3" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128337; CCM Status</span>
+            <div class="widget-controls">
+                <span id="ccm-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-teal,#1abc9c);color:#fff;font-weight:600;"></span>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" id="ccm-body">
+            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
+                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+                Checking CCM enrollment...
+            </div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
+    {# ---- TELEHEALTH QUICK-LOG WIDGET (Phase 25.5) ---- #}
+    <div class="widget fw-widget" data-widget="telehealth-log" data-widget-id="telehealth-log" data-tab-group="billing" data-col="2" data-row="3" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128222; Log Phone Call</span>
+            <div class="widget-controls">
+                <span id="tele-timer-display" style="font-size:13px;font-weight:600;font-family:monospace;color:var(--text-secondary);">00:00</span>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" style="padding:10px;font-size:13px;">
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+                <select id="tele-type" style="flex:1;padding:4px;border-radius:4px;border:1px solid var(--border);font-size:12px;">
+                    <option value="phone_call">Phone Call</option>
+                    <option value="portal_message">Portal Message</option>
+                    <option value="secure_message">Secure Message</option>
+                    <option value="video_visit">Video Visit</option>
+                </select>
+                <select id="tele-initiated" style="width:80px;padding:4px;border-radius:4px;border:1px solid var(--border);font-size:12px;">
+                    <option value="provider">Provider</option>
+                    <option value="patient">Patient</option>
+                    <option value="staff">Staff</option>
+                </select>
+            </div>
+            <input id="tele-topic" type="text" placeholder="Topic (e.g. med refill, lab review)" style="width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <label style="font-size:11px;display:flex;align-items:center;gap:4px;">
+                    <input type="checkbox" id="tele-clinical-decision"> Clinical decision made
+                </label>
+                <label style="font-size:11px;display:flex;align-items:center;gap:4px;">
+                    <input type="checkbox" id="tele-resulted-visit"> Led to visit
+                </label>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button id="tele-start-btn" onclick="teleTimerToggle()" style="flex:1;padding:6px;border:none;border-radius:4px;background:#27ae60;color:#fff;font-weight:600;cursor:pointer;font-size:12px;">&#9654; Start</button>
+                <button id="tele-save-btn" onclick="teleSave()" style="flex:1;padding:6px;border:none;border-radius:4px;background:#2980b9;color:#fff;font-weight:600;cursor:pointer;font-size:12px;" disabled>&#128190; Save</button>
+            </div>
+            <div id="tele-status" style="margin-top:6px;font-size:11px;color:var(--text-secondary);"></div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
     {# ---- LAB INTERPRETATION WIDGET (NEW-B) — async loaded ---- #}
-    <div class="widget fw-widget" data-widget="lab-interp" data-widget-id="lab-interp" data-col="1" data-row="3" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="lab-interp" data-widget-id="lab-interp" data-tab-group="labs" data-col="1" data-row="3" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128300; Lab Interpretation</span>
             <div class="widget-controls">
@@ -492,7 +795,7 @@
 
     {# ---- DRUG SAFETY WIDGET (NEW-A + NEW-F) — async loaded ---- #}
     {% if current_user.get_pref('intel_drug_safety', True) %}
-    <div class="widget fw-widget" data-widget="drug-safety" data-widget-id="drug-safety" data-col="2" data-row="3" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="drug-safety" data-widget-id="drug-safety" data-tab-group="medications" data-col="2" data-row="3" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128165; Drug Safety</span>
             <div class="widget-controls">
@@ -512,7 +815,7 @@
 
     {# ---- PUBMED GUIDELINES WIDGET (NEW-C) — async loaded ---- #}
     {% if current_user.get_pref('intel_guidelines', True) %}
-    <div class="widget fw-widget" data-widget="guidelines" data-widget-id="guidelines" data-col="0" data-row="4" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="guidelines" data-widget-id="guidelines" data-tab-group="problems" data-col="0" data-row="4" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128218; Clinical Guidelines</span>
             <div class="widget-controls">
@@ -531,7 +834,7 @@
 
     {# ---- FORMULARY GAP DETECTION WIDGET (NEW-D) — async loaded ---- #}
     {% if current_user.get_pref('intel_formulary_gaps', True) %}
-    <div class="widget fw-widget" data-widget="formulary-gaps" data-widget-id="formulary-gaps" data-col="1" data-row="4" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="formulary-gaps" data-widget-id="formulary-gaps" data-tab-group="medications" data-col="1" data-row="4" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128137; Formulary Gaps</span>
             <div class="widget-controls">
@@ -550,7 +853,7 @@
 
     {# ---- PATIENT EDUCATION WIDGET (NEW-E) — async loaded ---- #}
     {% if current_user.get_pref('intel_education', True) %}
-    <div class="widget fw-widget" data-widget="education" data-widget-id="education" data-col="2" data-row="4" data-w="1" data-h="1">
+    <div class="widget fw-widget" data-widget="education" data-widget-id="education" data-tab-group="notes" data-col="2" data-row="4" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128214; Patient Education</span>
             <div class="widget-controls">
@@ -561,6 +864,26 @@
             <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
                 <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
                 Loading patient education content...
+            </div>
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+    {% endif %}
+
+    {# ---- CLINICAL TRIALS WIDGET (NEW-G) — async loaded, optional ---- #}
+    {% if current_user.get_pref('intel_clinical_trials', True) %}
+    <div class="widget fw-widget" data-widget="clinical-trials" data-widget-id="clinical-trials" data-tab-group="problems" data-col="1" data-row="5" data-w="1" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128300; Clinical Trials Near You</span>
+            <div class="widget-controls">
+                <span id="trials-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-teal,#0D7377);color:#fff;font-weight:600;"></span>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" id="clinical-trials-body">
+            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
+                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+                Searching recruiting trials...
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -640,6 +963,15 @@
 .widget.widget-wide{grid-column:span 2;}
 .widget.widget-full{grid-column:span 3;}
 
+/* Chart tabs */
+.chart-tabs{display:flex;gap:2px;padding:8px 0;border-bottom:2px solid var(--border,#e2e8f0);margin-bottom:12px;}
+.chart-tab{padding:8px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--text-secondary,#64748b);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;transition:color .15s,border-color .15s,background .15s;}
+.chart-tab:hover{color:var(--text-primary,#1e293b);background:var(--bg-muted,#f8fafc);}
+.chart-tab.active{color:var(--color-teal,#0D7377);border-bottom-color:var(--color-teal,#0D7377);font-weight:600;}
+.chart-tab:focus-visible{outline:2px solid var(--color-teal);outline-offset:-1px;}
+.widget-grid.tab-mode .widget[data-tab-group]{display:none;}
+.widget-grid.tab-mode .widget[data-tab-group].tab-visible{display:flex;}
+
 /* Edit mode */
 .widget-grid.edit-mode .widget{cursor:grab;border:2px dashed var(--color-teal,#0D7377);}
 .widget-grid.edit-mode .widget-resize-handle{display:block;}
@@ -699,6 +1031,15 @@
 .uspstf-code{font-size:10px;font-family:monospace;color:var(--color-teal);}
 .care-gap-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px;}
 
+/* Phase 32 — Risk Scores Widget */
+.risk-score-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.risk-card{background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:8px;cursor:pointer;transition:box-shadow 0.15s;}
+.risk-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.risk-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.risk-name{font-size:11px;font-weight:600;color:var(--text-secondary,#64748b);text-transform:uppercase;letter-spacing:0.5px;}
+.risk-badge{font-size:10px;font-weight:600;color:#fff;padding:1px 6px;border-radius:10px;white-space:nowrap;}
+.risk-value{font-size:20px;font-weight:700;line-height:1;}
+
 /* Specialists */
 .specialist-card{padding:6px 0;border-bottom:1px solid var(--border,#f1f5f9);}
 .spec-row{display:flex;justify-content:space-between;align-items:center;}
@@ -755,12 +1096,40 @@
 
 <script>
 /* ============================================================
-   NP Companion — Patient Chart Widget System
+   CareCompanion — Patient Chart Widget System
    ============================================================ */
 var MRN = {{ mrn|tojson }};
 var labData = null;
 var selectedLabs = new Set();
 var labColors = ['#0D7377','#E8A020','#C0392B','#1B3A6B','#8B5CF6','#059669','#DB2777','#D97706','#2563EB','#6366F1'];
+
+/* ---- Async Medication Pricing Badges (Phase 26) ---- */
+(function loadPriceBadges() {
+    fetch('/api/patient/' + encodeURIComponent(MRN) + '/pricing')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var meds = data.medications || [];
+            for (var i = 0; i < meds.length; i++) {
+                var m = meds[i];
+                var cell = document.querySelector('.price-cell[data-med-id="' + m.med_id + '"]');
+                if (!cell) continue;
+                var p = m.pricing || {};
+                if (p.badge_color) {
+                    var src = p.source === 'cost_plus' ? 'Cost Plus Drugs' : p.source === 'goodrx' ? 'GoodRx' : p.source;
+                    var tip = '$' + (p.price_monthly_estimate != null ? Number(p.price_monthly_estimate).toFixed(2) : '?') + '/month via ' + src;
+                    if (p.nadac_price && p.nadac_price.nadac_per_unit != null) {
+                        tip += ' (pharmacy cost: $' + Number(p.nadac_price.nadac_per_unit).toFixed(4) + '/' + (p.nadac_price.pricing_unit || 'unit') + ')';
+                    }
+                    cell.innerHTML = '<span class="price-badge price-' + p.badge_color + '" title="' + tip + '"></span>';
+                } else {
+                    cell.innerHTML = '';
+                }
+            }
+        })
+        .catch(function() {
+            document.querySelectorAll('.price-cell').forEach(function(c) { c.innerHTML = ''; });
+        });
+})();
 
 /* ---- XML Upload ---- */
 document.getElementById('xml-upload').addEventListener('change', function(e) {
@@ -799,6 +1168,31 @@ function toggleWidgetCollapse(btn) {
         body.style.display = 'none';
         btn.innerHTML = '&#9654;';
     }
+}
+
+/* Phase 32 — Auto-score refresh + risk card detail toggle */
+function toggleRiskDetail(card) {
+    var detail = card.querySelector('.risk-detail');
+    if (detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+}
+
+function refreshAutoScores(mrn) {
+    var btn = document.querySelector('[onclick="refreshAutoScores(\'' + mrn + '\')"]');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    fetch('/patient/' + mrn + '/auto-scores', {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            // Reload the widget body with fresh data via page reload (simplest approach)
+            location.reload();
+        } else {
+            alert('Risk score refresh failed: ' + (data.error || 'Unknown error'));
+            if (btn) { btn.disabled = false; btn.innerHTML = '&#8635;'; }
+        }
+    })
+    .catch(function() {
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#8635;'; }
+    });
 }
 
 /* ---- Toggle Diagnosis Category (acute ↔ chronic) ---- */
@@ -1169,7 +1563,142 @@ function deleteSpecialist(id) {
     });
 }
 
-/* ---- Note Generator ---- */
+/* ---- Note Generator (Phase 18 — Preview-first workflow) ---- */
+var _noteMode = 'preview';  /* 'preview' or 'edit' */
+var _noteGenerated = false;
+var _noteAccepted = false;
+var _visitType = '{{ schedule_context.visit_type|default("", true)|e }}';
+
+/* Visit-type-to-section preselection mapping (18.2) */
+var VISIT_TYPE_SECTIONS = {
+    'new patient':      ['Chief Complaint','History of Present Illness','Review of Systems','Past Medical History','Social History','Family History','Allergies','Medications','Physical Exam','Assessment','Plan','Health Concerns'],
+    'follow up':        ['Assessment','Plan','Medications'],
+    'follow-up':        ['Assessment','Plan','Medications'],
+    'followup':         ['Assessment','Plan','Medications'],
+    'f/u':              ['Assessment','Plan','Medications'],
+    'awv':              ['Physical Exam','Allergies','Medications','Assessment','Plan','Health Concerns'],
+    'annual wellness':  ['Physical Exam','Allergies','Medications','Assessment','Plan','Health Concerns'],
+    'wellness':         ['Physical Exam','Allergies','Medications','Assessment','Plan','Health Concerns'],
+    'physical':         ['Chief Complaint','Past Medical History','Social History','Family History','Allergies','Medications','Physical Exam','Assessment','Plan','Health Concerns'],
+    'sick':             ['Chief Complaint','History of Present Illness','Review of Systems','Allergies','Medications','Physical Exam','Assessment','Plan'],
+    'urgent':           ['Chief Complaint','History of Present Illness','Review of Systems','Allergies','Medications','Physical Exam','Assessment','Plan'],
+    'telehealth':       ['Chief Complaint','History of Present Illness','Assessment','Plan','Medications'],
+    'phone':            ['Chief Complaint','History of Present Illness','Assessment','Plan','Medications'],
+};
+
+/* Apply visit-type preselection on load */
+function applyVisitTypePreselection() {
+    if (!_visitType) return;
+    var vt = _visitType.toLowerCase().trim();
+    var matched = null;
+    for (var key in VISIT_TYPE_SECTIONS) {
+        if (vt.indexOf(key) !== -1) { matched = VISIT_TYPE_SECTIONS[key]; break; }
+    }
+    if (!matched) return;
+    document.querySelectorAll('#note-gen-checks input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = matched.indexOf(cb.value) !== -1;
+    });
+}
+
+/* Auto-generate note (triggered on tab activation) */
+function autoGenerateNote() {
+    if (_noteGenerated) return;
+    _noteGenerated = true;
+    applyVisitTypePreselection();
+
+    var checks = document.querySelectorAll('#note-gen-checks input:checked');
+    var sections = [];
+    checks.forEach(function(c) { sections.push(c.value); });
+    if (sections.length === 0) {
+        document.getElementById('note-preview-content').innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">No sections selected. Click "Review & Edit" to configure.</p>';
+        return;
+    }
+
+    document.getElementById('note-preview-content').innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">Generating note preview...</p>';
+
+    fetch('/patient/' + MRN + '/generate-note', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sections: sections})
+    }).then(function(r){ return r.json(); }).then(function(data){
+        if (data.success) {
+            for (var key in data.sections) {
+                var ta = document.querySelector('textarea[data-section="' + key + '"]');
+                if (ta && data.sections[key]) ta.value = data.sections[key];
+            }
+            renderNotePreview();
+        } else {
+            document.getElementById('note-preview-content').innerHTML = '<p style="color:var(--color-red);">Generation failed. Click "Review &amp; Edit" to enter manually.</p>';
+        }
+    }).catch(function() {
+        document.getElementById('note-preview-content').innerHTML = '<p style="color:var(--color-red);">Generation failed. Click "Review &amp; Edit" to enter manually.</p>';
+    });
+}
+
+/* Render read-only preview from textarea values */
+function renderNotePreview() {
+    var html = '';
+    var hasContent = false;
+    document.querySelectorAll('#note-sections .note-section').forEach(function(s) {
+        var label = s.querySelector('label').textContent.trim();
+        var value = s.querySelector('textarea').value.trim();
+        if (value) {
+            hasContent = true;
+            html += '<div style="margin-bottom:12px;">';
+            html += '<div style="font-weight:600;font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">' + escHtml(label) + '</div>';
+            html += '<div style="white-space:pre-wrap;">' + escHtml(value) + '</div>';
+            html += '</div>';
+        }
+    });
+    if (!hasContent) {
+        html = '<p style="color:var(--text-secondary);font-style:italic;">No note content. Click "Review &amp; Edit" to enter manually.</p>';
+    }
+    document.getElementById('note-preview-content').innerHTML = html;
+}
+
+/* Accept & Copy — copies full note to clipboard, marks accepted, shows toast */
+function acceptAndCopy() {
+    var text = '';
+    document.querySelectorAll('#note-sections .note-section').forEach(function(s) {
+        var label = s.querySelector('label').textContent.trim();
+        var value = s.querySelector('textarea').value.trim();
+        if (value) text += label + ':\n' + value + '\n\n';
+    });
+    if (!text.trim()) { showNoteStatus('No note content to copy.', 'error'); return; }
+
+    navigator.clipboard.writeText(text).then(function() {
+        _noteAccepted = true;
+        showNoteStatus('✓ Note accepted & copied to clipboard!', 'success');
+        document.getElementById('note-accept-btn').style.background = 'var(--text-secondary)';
+        document.getElementById('note-accept-btn').innerHTML = '&#10003; Accepted';
+        /* Also server-save the draft as accepted */
+        saveDraft();
+        /* Clear localStorage draft since accepted */
+        try { localStorage.removeItem('np_note_draft_' + MRN); } catch(e) {}
+    }).catch(function() { showNoteStatus('Copy failed — check browser permissions.', 'error'); });
+}
+
+/* Switch to edit mode */
+function enterEditMode() {
+    _noteMode = 'edit';
+    document.getElementById('note-preview').style.display = 'none';
+    document.getElementById('note-sections').style.display = '';
+    document.getElementById('note-gen-section-controls').style.display = '';
+    document.getElementById('note-mode-label').textContent = 'Editing';
+    document.getElementById('note-edit-btn').style.display = 'none';
+}
+
+/* Switch back to preview mode */
+function exitEditMode() {
+    _noteMode = 'preview';
+    renderNotePreview();
+    document.getElementById('note-preview').style.display = '';
+    document.getElementById('note-sections').style.display = 'none';
+    document.getElementById('note-gen-section-controls').style.display = 'none';
+    document.getElementById('note-mode-label').textContent = 'Preview';
+    document.getElementById('note-edit-btn').style.display = '';
+}
+
+/* Generate note from checked sections (used in edit mode) */
 function generateNote() {
     var checks = document.querySelectorAll('#note-gen-checks input:checked');
     var sections = [];
@@ -1196,6 +1725,10 @@ function generateNote() {
             }
             status.style.background = 'var(--bg-success,#dcfce7)';
             status.textContent = 'Generated ' + filled + ' section(s)';
+            /* Reset acceptance since content changed */
+            _noteAccepted = false;
+            document.getElementById('note-accept-btn').style.background = 'var(--color-green,#22c55e)';
+            document.getElementById('note-accept-btn').innerHTML = '&#10003; Accept &amp; Copy';
         } else {
             status.style.background = 'var(--bg-danger,#fee2e2)';
             status.textContent = 'Generation failed';
@@ -1205,15 +1738,7 @@ function generateNote() {
 }
 
 function copyAllSections() {
-    var text = '';
-    document.querySelectorAll('#note-sections .note-section').forEach(function(s) {
-        var label = s.querySelector('label').textContent;
-        var value = s.querySelector('textarea').value;
-        if (value.trim()) text += label + ':\n' + value.trim() + '\n\n';
-    });
-    navigator.clipboard.writeText(text).then(function() {
-        showNoteStatus('Copied to clipboard!', 'success');
-    }).catch(function() { showNoteStatus('Copy failed', 'error'); });
+    acceptAndCopy();  /* Redirect to new accept-and-copy workflow */
 }
 
 function saveDraft() {
@@ -1315,14 +1840,93 @@ function showNoteStatus(msg, type) {
     setTimeout(function(){ el.style.display = 'none'; }, 3000);
 }
 
-/* ---- Auto-save note draft to localStorage every 30s ---- */
-setInterval(function() {
+/* ---- Auto-save note draft to localStorage every 30s (18.3) ---- */
+function _saveNoteDraft() {
     var sections = {};
+    var hasContent = false;
     document.querySelectorAll('#note-sections textarea').forEach(function(ta) {
-        sections[ta.getAttribute('data-section')] = ta.value;
+        var val = ta.value;
+        sections[ta.getAttribute('data-section')] = val;
+        if (val.trim()) hasContent = true;
     });
-    try { localStorage.setItem('np_note_draft_' + MRN, JSON.stringify(sections)); } catch(e) {}
-}, 30000);
+    if (!hasContent || _noteAccepted) return;
+    try {
+        localStorage.setItem('np_note_draft_' + MRN, JSON.stringify(sections));
+        /* Show subtle indicator */
+        var label = document.getElementById('note-mode-label');
+        if (label) {
+            var prev = label.textContent;
+            label.textContent = 'Draft saved';
+            setTimeout(function() { label.textContent = prev; }, 1500);
+        }
+    } catch(e) {}
+    /* Also save to server */
+    fetch('/patient/' + MRN + '/note/save', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sections: sections})
+    }).catch(function() {});
+}
+var _draftSaveInterval = setInterval(_saveNoteDraft, 30000);
+
+/* Save draft when clicking out of a note textarea */
+document.querySelectorAll('#note-sections textarea.note-textarea').forEach(function(ta) {
+    ta.addEventListener('blur', _saveNoteDraft);
+});
+
+/* Restore draft from localStorage on load */
+(function restoreDraft() {
+    try {
+        var saved = localStorage.getItem('np_note_draft_' + MRN);
+        if (saved) {
+            var sections = JSON.parse(saved);
+            var restored = 0;
+            for (var key in sections) {
+                var ta = document.querySelector('textarea[data-section="' + key + '"]');
+                if (ta && sections[key] && !ta.value.trim()) {
+                    ta.value = sections[key];
+                    restored++;
+                }
+            }
+            if (restored > 0) {
+                showNoteStatus('Restored ' + restored + ' section(s) from draft.', 'success');
+            }
+        }
+    } catch(e) {}
+})();
+
+/* ---- Keyboard Navigation for Notes (18.4) ---- */
+document.addEventListener('keydown', function(e) {
+    /* Only handle when note widget is visible */
+    var noteWidget = document.querySelector('[data-widget="note-gen"]');
+    if (!noteWidget || !noteWidget.classList.contains('tab-visible')) return;
+
+    /* Enter on Accept button triggers accept */
+    if (e.key === 'Enter' && !e.shiftKey && document.activeElement === document.getElementById('note-accept-btn')) {
+        e.preventDefault();
+        acceptAndCopy();
+        return;
+    }
+
+    /* Escape in edit mode → back to preview */
+    if (e.key === 'Escape' && _noteMode === 'edit') {
+        e.preventDefault();
+        exitEditMode();
+        return;
+    }
+
+    /* Tab through note textareas in edit mode */
+    if (e.key === 'Tab' && _noteMode === 'edit' && document.activeElement && document.activeElement.classList.contains('note-textarea')) {
+        var textareas = Array.from(document.querySelectorAll('#note-sections textarea.note-textarea'));
+        var idx = textareas.indexOf(document.activeElement);
+        if (idx !== -1) {
+            if (e.shiftKey) {
+                if (idx > 0) { e.preventDefault(); textareas[idx - 1].focus(); }
+            } else {
+                if (idx < textareas.length - 1) { e.preventDefault(); textareas[idx + 1].focus(); }
+            }
+        }
+    }
+});
 
 /* ============================================================
    EPIC-STYLE LAB DETAIL MODAL
@@ -1588,9 +2192,11 @@ document.addEventListener('keydown', function(e) {
                 html += '<div style="padding:8px;margin:4px 0;background:var(--bg-muted,#f8fafc);border-left:3px solid var(--color-green,#27ae60);border-radius:4px;font-size:12px;">' +
                     '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                     '<strong>' + escHtml(o.type) + '</strong>' +
-                    '<span style="font-weight:700;color:var(--color-green);">~$' + Math.round(o.revenue) + '</span></div>' +
+                    '<span style="font-weight:700;color:var(--color-green);">~$' + Math.round(o.revenue) + '</span>' +
+                    (o.net_value ? '<span style="font-size:10px;color:var(--color-teal,#0d9488);margin-left:6px;">Net $' + Math.round(o.net_value) + '</span>' : '') +
+                    '<span style="font-size:10px;color:var(--text-secondary);margin-left:6px;">Bonus +$' + Math.round((o.revenue||0)*0.85*0.25) + '</span></div>' +
                     '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">' + escHtml(o.codes) + '</div>' +
-                    '<div style="font-size:11px;margin-top:2px;">' + escHtml(o.basis) + '</div>' +
+                    '<div style="font-size:11px;margin-top:2px;">' + escHtml(o.basis) + ' ' + whyBadge(o.basis || 'Billing opportunity detected from patient data', 'CMS CY2025 Fee Schedule rules') + '</div>' +
                     (o.documentation ? '<div style="font-size:10px;color:var(--color-teal);margin-top:2px;">Doc: ' + escHtml(o.documentation).substring(0,120) + '</div>' : '') +
                     (o.insurer_caveat ? '<div style="font-size:10px;color:var(--color-warning);margin-top:2px;">' + escHtml(o.insurer_caveat) + '</div>' : '') +
                     '</div>';
@@ -1600,6 +2206,48 @@ document.addEventListener('keydown', function(e) {
         })
         .catch(function() {
             el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;">Billing data unavailable</p>';
+        });
+})();
+
+/* CCM Status Widget (Phase 19.13) */
+(function loadCCM() {
+    var el = document.getElementById('ccm-body');
+    if (!el) return;
+    fetch('/api/patient/' + MRN + '/ccm-status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var badge = document.getElementById('ccm-badge');
+            if (!data.enrolled) {
+                el.innerHTML = '<div style="padding:12px;font-size:12px;">' +
+                    '<div style="color:var(--text-secondary);margin-bottom:8px;">Not enrolled in CCM</div>' +
+                    '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">CPT 99490 &bull; $62/month recurring revenue<br>Requires: verbal consent + care plan + 2+ chronic conditions + 20 min/month</div>' +
+                    '<a href="/ccm/registry" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:var(--color-teal,#1abc9c);color:#fff;border-radius:4px;text-decoration:none;">Enroll Patient</a></div>';
+                return;
+            }
+            if (badge) {
+                badge.textContent = data.billing_ready ? '$62' : data.minutes + '/' + data.goal + ' min';
+                badge.style.display = '';
+                badge.style.background = data.billing_ready ? 'var(--color-green,#27ae60)' : 'var(--color-teal,#1abc9c)';
+            }
+            var pct = data.pct || 0;
+            var barColor = pct >= 100 ? 'var(--color-green,#27ae60)' : pct >= 50 ? 'var(--color-teal,#1abc9c)' : 'var(--color-warning,#f39c12)';
+            var checks = '';
+            checks += '<div style="font-size:11px;">' + (data.consent ? '&#10003;' : '&#10007;') + ' Consent</div>';
+            checks += '<div style="font-size:11px;">' + (data.care_plan ? '&#10003;' : '&#10007;') + ' Care Plan</div>';
+            checks += '<div style="font-size:11px;">' + ((data.conditions||[]).length >= 2 ? '&#10003;' : '&#10007;') + ' 2+ Conditions (' + (data.conditions||[]).length + ')</div>';
+            el.innerHTML = '<div style="padding:10px;font-size:12px;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                '<strong>Enrolled</strong>' +
+                '<span class="badge ' + (data.billing_ready ? 'badge--success' : 'badge--warning') + '" style="font-size:10px;">' +
+                (data.billing_ready ? 'Ready to Bill $62' : 'Not Ready') + '</span></div>' +
+                '<div style="margin-bottom:8px;">' + checks + '</div>' +
+                '<div style="font-size:11px;margin-bottom:4px;">Time: ' + data.minutes + '/' + data.goal + ' min (' + pct + '%)</div>' +
+                '<div style="height:6px;background:var(--bg-muted,#eee);border-radius:3px;overflow:hidden;">' +
+                '<div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:3px;"></div></div>' +
+                '<a href="/ccm/registry" style="font-size:11px;color:var(--color-primary);margin-top:8px;display:inline-block;">View Registry &rarr;</a></div>';
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;">CCM data unavailable</p>';
         });
 })();
 
@@ -1630,7 +2278,7 @@ document.addEventListener('keydown', function(e) {
                     html += '<div style="font-size:10px;color:var(--text-secondary);">Range: ' + escHtml(i.reference_range) + ' | ' + escHtml(i.date) + '</div>';
                 }
                 if (i.context) {
-                    html += '<div style="font-size:11px;margin-top:2px;font-weight:500;">' + escHtml(i.context) + '</div>';
+                    html += '<div style="font-size:11px;margin-top:2px;font-weight:500;">' + escHtml(i.context) + ' ' + whyBadge(i.context, 'Lab reference range: ' + (i.reference_range || 'standard clinical range')) + '</div>';
                 }
                 if (i.drug_context && i.drug_context.length > 0) {
                     i.drug_context.forEach(function(dc) {
@@ -1667,6 +2315,7 @@ document.addEventListener('keydown', function(e) {
                     html += '<div style="padding:6px 8px;margin:4px 0;background:rgba(220,38,38,0.06);border-radius:4px;font-size:12px;">' +
                         '<strong>' + escHtml(r.drug_name) + '</strong> — ' +
                         '<span class="badge badge--danger" style="font-size:10px;">' + escHtml(r.classification || r.priority) + '</span>' +
+                        ' ' + whyBadge(r.reason || 'FDA recall reported for this drug', 'FDA openFDA Enforcement') +
                         '<div style="color:var(--text-secondary);margin-top:2px;">' + escHtml(r.reason).substring(0, 150) + '</div></div>';
                 });
                 html += '</div>';
@@ -1677,6 +2326,7 @@ document.addEventListener('keydown', function(e) {
                 data.interactions.forEach(function(i) {
                     html += '<div style="padding:6px 8px;margin:4px 0;background:rgba(245,158,11,0.06);border-radius:4px;font-size:12px;">' +
                         '<strong>' + escHtml(i.drug_a) + '</strong> ↔ <strong>' + escHtml(i.drug_b) + '</strong>' +
+                        ' ' + whyBadge(i.detail || 'Drug interaction detected', 'NIH NLM Drug Interactions API') +
                         '<div style="color:var(--text-secondary);margin-top:2px;">' + escHtml(i.detail).substring(0, 150) + '</div></div>';
                 });
                 html += '</div>';
@@ -1685,8 +2335,27 @@ document.addEventListener('keydown', function(e) {
             if (data.monitoring && data.monitoring.length > 0) {
                 html += '<div><strong style="color:var(--color-teal,#0D7377);font-size:12px;">&#128300; MONITORING</strong>';
                 data.monitoring.forEach(function(m) {
-                    html += '<div style="padding:4px 8px;margin:3px 0;font-size:12px;">' +
-                        '<strong>' + escHtml(m.drug) + '</strong>: ' + escHtml(m.requirement).substring(0, 120) + '</div>';
+                    var isRems = (m.source || '').indexOf('REMS') >= 0;
+                    var style = isRems ? 'padding:6px 8px;margin:3px 0;font-size:12px;background:rgba(220,38,38,0.06);border-left:3px solid var(--color-red,#e74c3c);border-radius:4px;' : 'padding:4px 8px;margin:3px 0;font-size:12px;';
+                    var label = isRems ? '<span style="font-size:9px;padding:1px 5px;border-radius:6px;background:var(--color-red,#e74c3c);color:#fff;margin-left:4px;">REMS</span>' : '';
+                    html += '<div style="' + style + '">' +
+                        '<strong>' + escHtml(m.drug) + '</strong>' + label + ': ' + escHtml(m.requirement).substring(0, 120) + '</div>';
+                });
+                html += '</div>';
+            }
+            // FAERS serious event stats
+            if (data.faers_stats && data.faers_stats.length > 0) {
+                html += '<div style="margin-top:8px;"><strong style="color:var(--text-secondary);font-size:12px;">&#128202; FAERS Real-World Data</strong>';
+                data.faers_stats.forEach(function(f) {
+                    var pctColor = f.serious_percentage > 60 ? 'var(--color-red,#e74c3c)' : f.serious_percentage > 30 ? 'var(--color-warning,#f59e0b)' : 'var(--text-secondary)';
+                    html += '<div style="padding:4px 8px;margin:3px 0;font-size:11px;color:var(--text-secondary);">' +
+                        '<strong>' + escHtml(f.drug) + '</strong>: ' +
+                        '<span style="color:' + pctColor + ';">' + f.serious_percentage + '% serious</span>' +
+                        ' (' + (f.total_reports || 0).toLocaleString() + ' reports)';
+                    if (f.top_age_group) {
+                        html += ' — most reported in ages ' + escHtml(f.top_age_group);
+                    }
+                    html += '</div>';
                 });
                 html += '</div>';
             }
@@ -1720,8 +2389,11 @@ document.addEventListener('keydown', function(e) {
                 var pmid = g.pmid ? '<a href="https://pubmed.ncbi.nlm.nih.gov/' + encodeURIComponent(g.pmid) + '/" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);" style="font-size:10px;color:var(--color-teal);margin-left:4px;">PubMed</a>' : '';
                 html += '<div style="padding:6px 0;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;">' +
                     '<div style="font-weight:600;line-height:1.3;">' + escHtml(g.title) + badge + '</div>' +
-                    '<div style="color:var(--text-secondary);margin-top:2px;">' + escHtml(g.journal) + ' (' + g.year + ') — ' + escHtml(g.authors) + '</div>' +
-                    '<div style="margin-top:2px;">' + doi + pmid + '</div></div>';
+                    '<div style="color:var(--text-secondary);margin-top:2px;">' + escHtml(g.journal) + ' (' + g.year + ') — ' + escHtml(g.authors) + '</div>';
+                if (g.abstract) {
+                    html += '<div style="margin-top:3px;font-size:11px;color:var(--text-secondary);line-height:1.4;max-height:60px;overflow:hidden;cursor:pointer;" onclick="this.style.maxHeight=this.style.maxHeight===\'none\'?\'60px\':\'none\'">' + escHtml(g.abstract).substring(0, 400) + '…</div>';
+                }
+                html += '<div style="margin-top:2px;">' + doi + pmid + '</div></div>';
             });
             el.innerHTML = html;
         })
@@ -1745,7 +2417,8 @@ document.addEventListener('keydown', function(e) {
             var html = '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">Chronic conditions without expected medication class:</div>';
             gaps.forEach(function(g) {
                 html += '<div style="padding:8px;margin:4px 0;background:rgba(245,158,11,0.06);border-left:3px solid var(--color-warning,#f59e0b);border-radius:4px;font-size:12px;">' +
-                    '<div style="font-weight:600;">' + escHtml(g.condition) + ' <span style="font-weight:400;color:var(--text-secondary);">(' + escHtml(g.icd10) + ')</span></div>' +
+                    '<div style="font-weight:600;">' + escHtml(g.condition) + ' <span style="font-weight:400;color:var(--text-secondary);">(' + escHtml(g.icd10) + ')</span>' +
+                    ' ' + whyBadge(g.message || 'Expected medication class not found in active medications', 'Formulary gap analysis — standard-of-care drug classes') + '</div>' +
                     '<div style="color:var(--text-secondary);margin-top:2px;">' + escHtml(g.message) + '</div>' +
                     '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Expected: ' + escHtml(g.expected_classes.join(', ')) + '</div></div>';
             });
@@ -1770,16 +2443,20 @@ document.addEventListener('keydown', function(e) {
             }
             var html = '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">Patient-facing content from NLM MedlinePlus:</div>';
             items.forEach(function(e) {
-                var icon = e.type === 'medication' ? '&#128138;' : '&#129658;';
+                var icon = e.type === 'medication' ? '&#128138;' : e.type === 'medication_guide' ? '&#128196;' : '&#129658;';
                 html += '<div style="padding:6px 0;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;">' +
                     '<div style="font-weight:600;">' + icon + ' ' + escHtml(e.title) + '</div>' +
-                    '<div style="color:var(--text-secondary);margin-top:2px;font-size:11px;">For: ' + escHtml(e.source_name) + ' (' + e.type + ')</div>';
+                    '<div style="color:var(--text-secondary);margin-top:2px;font-size:11px;">For: ' + escHtml(e.source_name) + ' (' + e.type + ')' +
+                    ' ' + whyBadge('Selected because patient has ' + e.type + ': ' + (e.source_name || 'matching condition'), e.type === 'medication_guide' ? 'NLM DailyMed Medication Guide' : 'NLM MedlinePlus Health Topics') + '</div>';
                 if (e.summary) {
                     html += '<div style="margin-top:4px;font-size:11px;line-height:1.4;max-height:60px;overflow:hidden;">' + escHtml(e.summary).substring(0, 200) + '…</div>';
                 }
                 if (e.url) {
                     html += '<a href="' + escHtml(e.url) + '" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);" style="font-size:10px;color:var(--color-teal);">Read more on MedlinePlus</a>';
                 }
+                html += ' <button class="btn btn-sm btn-outline" style="font-size:10px;padding:1px 6px;margin-left:4px;" ' +
+                    'onclick="sendEducationToPatient(this,' + JSON.stringify(JSON.stringify({title:e.title,summary:e.summary||'',url:e.url||'',source_name:e.source_name||''})) + ')">' +
+                    '&#9993; Send to Patient</button>';
                 html += '</div>';
             });
             el.innerHTML = html;
@@ -1787,6 +2464,355 @@ document.addEventListener('keydown', function(e) {
         .catch(function() {
             el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;">Education content unavailable</p>';
         });
+})();
+
+/* Send education content as delayed message draft */
+function sendEducationToPatient(btn, jsonStr) {
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    fetch('/api/patient/' + MRN + '/education/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: jsonStr
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            btn.textContent = '✓ Queued';
+            btn.style.color = 'var(--color-green, #22c55e)';
+        } else {
+            btn.textContent = 'Error';
+            btn.disabled = false;
+        }
+    })
+    .catch(function() {
+        btn.textContent = 'Error';
+        btn.disabled = false;
+    });
+}
+
+/* Clinical Trials Widget (NEW-G) */
+(function loadClinicalTrials() {
+    var el = document.getElementById('clinical-trials-body');
+    if (!el) return;
+    fetch('/api/patient/' + MRN + '/clinical-trials')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var trials = data.trials || [];
+            var badge = document.getElementById('trials-badge');
+            if (trials.length > 0 && badge) {
+                badge.textContent = trials.length + ' match' + (trials.length > 1 ? 'es' : '');
+                badge.style.display = '';
+            }
+            if (trials.length === 0) {
+                el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;padding:8px;">No recruiting trials found for this patient\'s conditions within 50 miles.</p>';
+                return;
+            }
+            var html = '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;">Recruiting studies near Chesterfield, VA for: ' +
+                escHtml((data.conditions_searched || []).join(', ')) + '</div>';
+            trials.forEach(function(t) {
+                var phaseBadge = t.phase && t.phase !== 'N/A' ? '<span style="font-size:9px;padding:1px 5px;border-radius:6px;background:var(--color-teal,#0D7377);color:#fff;margin-left:4px;">' + escHtml(t.phase) + '</span>' : '';
+                html += '<div style="padding:6px 0;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;">' +
+                    '<div style="font-weight:600;line-height:1.3;">' + escHtml(t.title) + phaseBadge + '</div>' +
+                    '<div style="color:var(--text-secondary);margin-top:2px;font-size:11px;">' +
+                        escHtml(t.nct_id) + ' — ' + escHtml(t.eligibility_summary) +
+                    '</div>';
+                if (t.enrollment_url) {
+                    html += '<a href="' + escHtml(t.enrollment_url) + '" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);" style="font-size:10px;color:var(--color-teal);">View on ClinicalTrials.gov</a>';
+                }
+                html += '</div>';
+            });
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;">Clinical trials data unavailable</p>';
+        });
+})();
+
+/* ---- Phase 7.1: VIIS Immunization Check ---- */
+function checkVIIS() {
+    var btn = document.getElementById('viis-btn');
+    var el = document.getElementById('viis-results');
+    if (!btn || !el) return;
+    btn.disabled = true;
+    btn.innerHTML = '&#9203; Checking...';
+    el.style.display = 'block';
+    el.innerHTML = '<div style="text-align:center;padding:8px;color:var(--text-secondary);font-size:12px;"><span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span> Querying VIIS...</div>';
+    fetch('/api/patient/' + MRN + '/immunizations/viis')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '&#127973; Check VIIS';
+            if (!data.success) {
+                el.innerHTML = '<p style="color:var(--color-red,#e74c3c);font-size:12px;">&#9888; ' + escHtml(data.error || 'VIIS lookup failed') + '</p>';
+                return;
+            }
+            var imms = data.immunizations || [];
+            if (imms.length === 0) {
+                el.innerHTML = '<p style="color:var(--text-secondary);font-size:12px;">No immunizations found in VIIS for this patient.</p>';
+                return;
+            }
+            var html = '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;font-weight:600;">VIIS Registry (' + imms.length + ' records):</div>';
+            html += '<table class="widget-table" style="font-size:11px;"><thead><tr><th>Vaccine</th><th>Date</th><th>Provider</th></tr></thead><tbody>';
+            imms.forEach(function(im) {
+                html += '<tr><td>' + escHtml(im.vaccine || '') + '</td><td>' + escHtml(im.date_given || '') + '</td><td>' + escHtml(im.provider || '') + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            if (data.checked_at) {
+                html += '<div style="font-size:10px;color:var(--text-secondary);margin-top:4px;">Checked: ' + new Date(data.checked_at).toLocaleString() + '</div>';
+            }
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '&#127973; Check VIIS';
+            el.innerHTML = '<p style="color:var(--color-red,#e74c3c);font-size:12px;">&#9888; VIIS service unavailable</p>';
+        });
+}
+
+/* ---- Phase 7.2: PDMP Controlled Substance Check ---- */
+function checkPDMP() {
+    var btn = document.getElementById('pdmp-btn');
+    var el = document.getElementById('pdmp-body');
+    if (!btn || !el) return;
+    btn.disabled = true;
+    btn.innerHTML = '&#9203; Checking...';
+    el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:12px;"><span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span> Querying Virginia PDMP...</div>';
+    fetch('/api/patient/' + MRN + '/pdmp')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '&#128270; Check PDMP';
+            if (!data.success) {
+                el.innerHTML = '<p style="color:var(--color-red,#e74c3c);font-size:12px;padding:8px;">&#9888; ' + escHtml(data.error || 'PDMP lookup failed') + '</p>';
+                return;
+            }
+            var rxs = data.prescriptions || [];
+            var flags = data.flags || [];
+            if (rxs.length === 0) {
+                el.innerHTML = '<p style="color:var(--text-secondary);font-size:12px;padding:8px;">No controlled substance prescriptions found in VA PDMP.</p>';
+                return;
+            }
+            var html = '';
+            if (flags.length > 0) {
+                html += '<div style="margin-bottom:8px;">';
+                flags.forEach(function(f) {
+                    var color = f.severity === 'warning' ? 'var(--color-red,#e74c3c)' : 'var(--color-teal,#14b8a6)';
+                    html += '<div style="font-size:11px;padding:3px 8px;margin-bottom:2px;border-left:3px solid ' + color + ';background:var(--bg-muted,#f8fafc);">&#9888; ' + escHtml(f.message) + '</div>';
+                });
+                html += '</div>';
+            }
+            html += '<table class="widget-table" style="font-size:11px;"><thead><tr><th>Drug</th><th>Date Filled</th><th>Qty</th><th>Days</th><th>Prescriber</th><th>Pharmacy</th></tr></thead><tbody>';
+            rxs.forEach(function(rx) {
+                html += '<tr><td class="fw-500">' + escHtml(rx.drug_name || '') + '</td>' +
+                    '<td>' + escHtml(rx.date_filled || '') + '</td>' +
+                    '<td>' + escHtml(rx.quantity || '') + '</td>' +
+                    '<td>' + escHtml(rx.days_supply || '') + '</td>' +
+                    '<td>' + escHtml(rx.prescriber || '') + '</td>' +
+                    '<td>' + escHtml(rx.pharmacy || '') + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            if (data.checked_at) {
+                html += '<div style="font-size:10px;color:var(--text-secondary);margin-top:4px;">Checked: ' + new Date(data.checked_at).toLocaleString() + '</div>';
+            }
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '&#128270; Check PDMP';
+            el.innerHTML = '<p style="color:var(--color-red,#e74c3c);font-size:12px;padding:8px;">&#9888; PDMP service unavailable</p>';
+        });
+}
+
+/* ============================================================
+   Chart Tabs + View Toggle (Phase 9)
+   ============================================================ */
+var _chartView = '{{ chart_view_mode }}';
+
+function setChartView(view) {
+    _chartView = view;
+    var tabsBtn = document.getElementById('view-tabs-btn');
+    var gridBtn = document.getElementById('view-grid-btn');
+    var tabBar = document.getElementById('chart-tabs');
+    var grid = document.getElementById('widget-grid');
+
+    if (tabsBtn) tabsBtn.className = 'btn btn-sm btn-' + (view === 'tabs' ? 'primary' : 'secondary');
+    if (gridBtn) gridBtn.className = 'btn btn-sm btn-' + (view === 'grid' ? 'primary' : 'secondary');
+
+    if (view === 'tabs') {
+        if (tabBar) tabBar.style.display = '';
+        if (grid) grid.classList.add('tab-mode');
+        var stored = sessionStorage.getItem('chartTab_' + MRN);
+        switchTab(stored || 'overview');
+    } else {
+        if (tabBar) tabBar.style.display = 'none';
+        if (grid) grid.classList.remove('tab-mode');
+        grid.querySelectorAll('.widget[data-tab-group]').forEach(function(w) {
+            w.classList.remove('tab-visible');
+        });
+    }
+    /* Persist to both localStorage and server */
+    localStorage.setItem('chart_view_mode', view);
+    fetch('/settings/account/preference', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key: 'chart_view_mode', value: view})
+    }).catch(function() {});
+}
+
+function switchTab(tabName, btn) {
+    var grid = document.getElementById('widget-grid');
+    if (!grid) return;
+    /* Update active tab button */
+    document.querySelectorAll('.chart-tab').forEach(function(t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === tabName);
+    });
+    /* Show/hide widgets */
+    grid.querySelectorAll('.widget[data-tab-group]').forEach(function(w) {
+        w.classList.toggle('tab-visible', w.getAttribute('data-tab-group') === tabName);
+    });
+    /* Remember per patient */
+    sessionStorage.setItem('chartTab_' + MRN, tabName);
+    /* Auto-generate note on Notes tab activation (18.1) */
+    if (tabName === 'notes' && typeof autoGenerateNote === 'function') {
+        autoGenerateNote();
+    }
+}
+
+/* Tab keyboard navigation */
+document.addEventListener('keydown', function(e) {
+    if (_chartView !== 'tabs') return;
+    var tabs = document.querySelectorAll('.chart-tab');
+    if (!tabs.length) return;
+    var activeIdx = -1;
+    tabs.forEach(function(t, i) { if (t.classList.contains('active')) activeIdx = i; });
+    if (e.target.closest('.chart-tabs') || document.activeElement.classList.contains('chart-tab')) {
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            var next = (activeIdx + 1) % tabs.length;
+            tabs[next].click();
+            tabs[next].focus();
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            var prev = (activeIdx - 1 + tabs.length) % tabs.length;
+            tabs[prev].click();
+            tabs[prev].focus();
+        }
+    }
+});
+
+/* Initialize view on load */
+(function() {
+    setChartView(_chartView);
+})();
+
+/* ---- Phase 25.5: Telehealth stopwatch + save ---- */
+var _teleStart = null, _teleInterval = null, _teleRunning = false;
+function teleTimerToggle() {
+    var btn = document.getElementById('tele-start-btn');
+    var display = document.getElementById('tele-timer-display');
+    var saveBtn = document.getElementById('tele-save-btn');
+    if (!_teleRunning) {
+        _teleStart = new Date();
+        _teleRunning = true;
+        btn.innerHTML = '&#9632; Stop';
+        btn.style.background = '#c0392b';
+        saveBtn.disabled = true;
+        _teleInterval = setInterval(function() {
+            var elapsed = Math.floor((new Date() - _teleStart) / 1000);
+            var m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            var s = String(elapsed % 60).padStart(2, '0');
+            display.textContent = m + ':' + s;
+        }, 1000);
+    } else {
+        _teleRunning = false;
+        clearInterval(_teleInterval);
+        btn.innerHTML = '&#9654; Start';
+        btn.style.background = '#27ae60';
+        saveBtn.disabled = false;
+    }
+}
+function teleSave() {
+    if (_teleRunning || !_teleStart) return;
+    var elapsed = (new Date() - _teleStart) / 60000;
+    var minutes = Math.max(Math.round(elapsed * 10) / 10, 0.1);
+    var status = document.getElementById('tele-status');
+    var saveBtn = document.getElementById('tele-save-btn');
+    saveBtn.disabled = true;
+    status.textContent = 'Saving...';
+
+    fetch('/api/patient/' + MRN + '/communication-log', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            communication_type: document.getElementById('tele-type').value,
+            initiated_by: document.getElementById('tele-initiated').value,
+            cumulative_minutes: minutes,
+            topic: document.getElementById('tele-topic').value,
+            clinical_decision_made: document.getElementById('tele-clinical-decision').checked,
+            resulted_in_visit: document.getElementById('tele-resulted-visit').checked
+        })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.status === 'ok') {
+            status.innerHTML = '<span style="color:#27ae60;">&#10003; Saved (' + minutes.toFixed(1) + ' min)</span>';
+            _teleStart = null;
+            document.getElementById('tele-timer-display').textContent = '00:00';
+            document.getElementById('tele-topic').value = '';
+            document.getElementById('tele-clinical-decision').checked = false;
+            document.getElementById('tele-resulted-visit').checked = false;
+        } else {
+            status.innerHTML = '<span style="color:#e74c3c;">Error: ' + (d.error || 'Unknown') + '</span>';
+            saveBtn.disabled = false;
+        }
+    }).catch(function(err) {
+        status.innerHTML = '<span style="color:#e74c3c;">Network error</span>';
+        saveBtn.disabled = false;
+    });
+}
+</script>
+
+{# ---- PH44-4: PiP widget markers (auto-injected) ---- #}
+<script>
+(function() {
+    var WIDGET_TITLES = {
+        'medications': 'Medications',
+        'diagnoses': 'Diagnoses',
+        'labs-simple': 'Labs',
+        'vitals': 'Vitals',
+        'allergies': 'Allergies',
+        'immunizations': 'Immunizations',
+        'pdmp': 'PDMP',
+        'uspstf': 'USPSTF Recommendations',
+        'risk-scores': 'Risk Scores',
+        'risk-tools': 'Risk Tools',
+        'specialists': 'Specialists',
+        'note-gen': 'Note Generator',
+        'billing': 'Billing',
+        'ccm': 'CCM',
+        'telehealth-log': 'Telehealth Log',
+        'lab-interp': 'Lab Interpretation',
+        'drug-safety': 'Drug Safety',
+        'guidelines': 'Guidelines',
+        'formulary-gaps': 'Formulary Gaps',
+        'education': 'Patient Education',
+        'clinical-trials': 'Clinical Trials'
+    };
+    document.querySelectorAll('.widget[data-widget]').forEach(function(w) {
+        var id = w.getAttribute('data-widget');
+        w.setAttribute('data-pip', 'true');
+        w.setAttribute('data-pip-title', WIDGET_TITLES[id] || id);
+        w.classList.add('pip-eligible');
+        /* Add pop-out button inside widget-controls */
+        var controls = w.querySelector('.widget-controls');
+        if (controls && !controls.querySelector('.pip-popout-btn')) {
+            var btn = document.createElement('button');
+            btn.className = 'widget-btn pip-popout-btn';
+            btn.title = 'Pop out widget';
+            btn.setAttribute('aria-label', 'Pop out ' + (WIDGET_TITLES[id] || id));
+            btn.innerHTML = '&#10697;'; /* ⧉ */
+            controls.insertBefore(btn, controls.firstChild);
+        }
+    });
 })();
 </script>
 {% endblock %}

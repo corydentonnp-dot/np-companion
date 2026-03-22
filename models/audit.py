@@ -1,7 +1,7 @@
 """
-NP Companion — Audit Log Model
+CareCompanion — Audit Log Model
 
-File location: np-companion/models/audit.py
+File location: carecompanion/models/audit.py
 
 Stores a record of every authenticated page view and API call.
 Used by the admin audit-log page for compliance review.
@@ -25,7 +25,7 @@ class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # Who performed the action
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
 
     # When it happened (UTC)
     timestamp = db.Column(

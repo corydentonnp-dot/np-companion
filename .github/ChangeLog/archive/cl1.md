@@ -34,7 +34,7 @@ Created 10 new SQLAlchemy model files and activated all imports so the database 
 1. Open a terminal in VS Code (press `` Ctrl+` `` to open it)
 2. Make sure you're in the project folder:
    ```powershell
-   cd C:\Users\coryd\Documents\NP_Companion
+   cd C:\Users\coryd\Documents\CareCompanion
    ```
 3. Run this command:
    ```powershell
@@ -47,7 +47,7 @@ Created 10 new SQLAlchemy model files and activated all imports so the database 
 
 ### Checkpoint 2 — Confirm the app still starts without errors
 
-1. Double-click **Start_NP_Companion.bat** (or run in terminal):
+1. Double-click **Start_CareCompanion.bat** (or run in terminal):
    ```powershell
    venv\Scripts\python.exe app.py
    ```
@@ -59,7 +59,7 @@ Created 10 new SQLAlchemy model files and activated all imports so the database 
 
 1. Run this command to list tables straight from the database file:
    ```powershell
-   venv\Scripts\python.exe -c "import sqlite3; c=sqlite3.connect('data/npcompanion.db'); [print(r[0]) for r in c.execute(chr(34)+'SELECT name FROM sqlite_master WHERE type='+chr(39)+'table'+chr(39)+' ORDER BY name'+chr(34)).fetchall()]; c.close()"
+   venv\Scripts\python.exe -c "import sqlite3; c=sqlite3.connect('data/carecompanion.db'); [print(r[0]) for r in c.execute(chr(34)+'SELECT name FROM sqlite_master WHERE type='+chr(39)+'table'+chr(39)+' ORDER BY name'+chr(34)).fetchall()]; c.close()"
    ```
    *(This is a long one-liner — copy the whole thing!)*
 

@@ -1,7 +1,7 @@
 """
-NP Companion — PyAutoGUI Order Executor (F8)
+CareCompanion — PyAutoGUI Order Executor (F8)
 
-File location: np-companion/agent/pyautogui_runner.py
+File location: carecompanion/agent/pyautogui_runner.py
 
 Executes order sets in Amazing Charts by automating mouse clicks
 and keyboard input. Safety-first design:
@@ -79,7 +79,7 @@ def execute_order_set(execution_id):
 
     Returns a result dict for the API response.
     """
-    execution = OrderExecution.query.get(execution_id)
+    execution = db.session.get(OrderExecution, execution_id)
     if not execution:
         return {'success': False, 'error': 'Execution record not found.'}
 

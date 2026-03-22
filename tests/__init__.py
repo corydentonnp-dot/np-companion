@@ -1,1 +1,1 @@
-"""NP Companion test package."""
+"""CareCompanion test package."""

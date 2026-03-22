@@ -1,7 +1,7 @@
 """
-NP Companion — NetPractice Admin Routes
+CareCompanion — NetPractice Admin Routes
 
-File location: np-companion/routes/netpractice_admin.py
+File location: carecompanion/routes/netpractice_admin.py
 
 Provides:
   GET  /admin/netpractice            — settings page (URL, client number)
@@ -294,3 +294,136 @@ def api_test_np_login():
             'success': False,
             'error': f'Login test failed: {str(e)}',
         })
+
+
+# ======================================================================
+# GET /api/netpractice/chrome-status — Chrome debug profile status
+# ======================================================================
+@np_admin_bp.route('/api/netpractice/chrome-status')
+@login_required
+def api_chrome_status():
+    """Return the current Chrome debug profile status."""
+    from utils.chrome_launcher import is_chrome_debug_running, get_chrome_launch_command
+
+    port = current_app.config.get('CHROME_CDP_PORT', 9222)
+    exe_path = current_app.config.get('CHROME_EXE_PATH', '')
+    profile_dir = current_app.config.get('CHROME_DEBUG_PROFILE_DIR', '')
+
+    return jsonify({
+        'running': is_chrome_debug_running(port),
+        'profile_exists': os.path.isdir(profile_dir) if profile_dir else False,
+        'port': port,
+        'profile_dir': profile_dir,
+        'launch_command': get_chrome_launch_command(exe_path, profile_dir, port),
+    })
+
+
+# ======================================================================
+# POST /api/netpractice/chrome-launch — launch Chrome debug profile
+# ======================================================================
+@np_admin_bp.route('/api/netpractice/chrome-launch', methods=['POST'])
+@login_required
+@_require_admin
+def api_chrome_launch():
+    """Attempt to launch Chrome with the debug profile."""
+    from utils.chrome_launcher import ensure_chrome_debug
+
+    exe_path = current_app.config.get('CHROME_EXE_PATH', '')
+    profile_dir = current_app.config.get('CHROME_DEBUG_PROFILE_DIR', '')
+    port = current_app.config.get('CHROME_CDP_PORT', 9222)
+
+    ok = ensure_chrome_debug(exe_path, profile_dir, port)
+    if ok:
+        return jsonify({'success': True, 'message': f'Chrome debug profile running on port {port}'})
+    return jsonify({'success': False, 'error': 'Failed to start Chrome — check that chrome.exe exists'})
+
+
+# ======================================================================
+# POST /api/netpractice/scrape-tomorrow — trigger manual scrape
+# ======================================================================
+@np_admin_bp.route('/api/netpractice/scrape-tomorrow', methods=['POST'])
+@login_required
+def api_scrape_tomorrow():
+    """
+    Trigger a scrape of tomorrow's schedule in a background thread.
+    Returns immediately; the UI polls /api/netpractice/scrape-status.
+    """
+    import threading
+    import asyncio
+    from datetime import date, timedelta
+
+    if not current_user.has_np_credentials():
+        return jsonify({
+            'success': False,
+            'error': 'No NetPractice credentials saved. Go to Settings > Account first.',
+        })
+
+    if not current_user.nav_steps:
+        return jsonify({
+            'success': False,
+            'error': 'No navigation steps configured. Complete the Setup Wizard first.',
+        })
+
+    settings = _read_np_settings()
+    if not settings.get('netpractice_url'):
+        return jsonify({
+            'success': False,
+            'error': 'NetPractice URL not configured. Ask your admin to set it.',
+        })
+
+    user_id = current_user.id
+    app = current_app._get_current_object()
+    tomorrow = date.today() + timedelta(days=1)
+
+    def _run_scrape():
+        with app.app_context():
+            from scrapers.netpractice import NetPracticeScraper
+            scraper = NetPracticeScraper(app)
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(scraper._scrape_date(user_id, tomorrow))
+            finally:
+                loop.close()
+
+    thread = threading.Thread(target=_run_scrape, daemon=True)
+    thread.start()
+
+    return jsonify({
+        'success': True,
+        'message': f'Scraping tomorrow ({tomorrow}) in background...',
+        'date': str(tomorrow),
+    })
+
+
+# ======================================================================
+# GET /api/netpractice/scrape-status — real-time progress for UI polling
+# ======================================================================
+@np_admin_bp.route('/api/netpractice/scrape-status')
+@login_required
+def api_scrape_status():
+    """Return current scrape progress from data/scrape_progress.json."""
+    path = os.path.join(current_app.root_path, 'data', 'scrape_progress.json')
+    if not os.path.exists(path):
+        return jsonify({'message': 'No scrape in progress', 'current': 0, 'total': 0})
+    try:
+        with open(path, 'r') as f:
+            return jsonify(json.load(f))
+    except (json.JSONDecodeError, OSError):
+        return jsonify({'message': 'No scrape in progress', 'current': 0, 'total': 0})
+
+
+# ======================================================================
+# GET /api/netpractice/scrape-result — last completed scrape result
+# ======================================================================
+@np_admin_bp.route('/api/netpractice/scrape-result')
+@login_required
+def api_scrape_result():
+    """Return the last scrape result from data/np_scrape_status.json."""
+    path = os.path.join(current_app.root_path, 'data', 'np_scrape_status.json')
+    if not os.path.exists(path):
+        return jsonify({'status': 'none', 'message': 'No scrape has been run yet'})
+    try:
+        with open(path, 'r') as f:
+            return jsonify(json.load(f))
+    except (json.JSONDecodeError, OSError):
+        return jsonify({'status': 'none', 'message': 'Could not read scrape status'})

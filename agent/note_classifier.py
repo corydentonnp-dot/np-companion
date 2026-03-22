@@ -1,5 +1,5 @@
 """
-NP Companion — Clinical Note Content Classifier
+CareCompanion — Clinical Note Content Classifier
 File: agent/note_classifier.py
 
 Step 3 of the Note Reformatter (F31). Takes parsed note sections from

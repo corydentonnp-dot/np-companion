@@ -1,7 +1,7 @@
 """
-NP Companion — scrapers package
+CareCompanion — scrapers package
 
-File location: np-companion/scrapers/__init__.py
+File location: carecompanion/scrapers/__init__.py
 
 This package contains Playwright-based web scrapers for
 NetPractice / WebPractice (schedule, messaging, etc.).

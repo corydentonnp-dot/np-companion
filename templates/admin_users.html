@@ -1,5 +1,5 @@
-﻿{% extends "base.html" %}
-{% block title %}User Management â€” NP Companion{% endblock %}
+{% extends "base.html" %}
+{% block title %}User Management â€” CareCompanion{% endblock %}
 {% block page_id %}admin-users{% endblock %}
 
 {% block content %}
@@ -42,6 +42,10 @@
                                 <option value="ma" {{ 'selected' if user.role == 'ma' }}>MA</option>
                                 <option value="admin" {{ 'selected' if user.role == 'admin' }}>Admin</option>
                             </select>
+                            <input type="password" name="admin_password" class="form-input"
+                                   placeholder="Your password" required
+                                   style="width:auto;max-width:140px;padding:4px 8px;font-size:13px;"
+                                   autocomplete="current-password">
                             <button type="submit" class="btn btn-secondary btn-sm">Set</button>
                         </form>
                     </td>
@@ -151,6 +155,15 @@
                                 required
                                 style="width:auto;max-width:200px;"
                                 autocomplete="off"
+                            >
+                            <input
+                                type="password"
+                                name="admin_password"
+                                class="form-input"
+                                placeholder="Your password"
+                                required
+                                style="width:auto;max-width:160px;"
+                                autocomplete="current-password"
                             >
                             <button type="submit" class="btn btn-primary btn-sm">Confirm</button>
                             <button type="button" class="btn btn-secondary btn-sm"
@@ -317,7 +330,7 @@ function loadNotifHistory() {
 </script>
 
 {# ---- Deactivation Modal ---- #}
-<div id="deact-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
+<div id="deact-modal" data-blocking="true" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
     <div style="background:var(--bg-card,#fff);border-radius:10px;padding:24px;width:380px;max-width:90vw;box-shadow:var(--shadow-lg);">
         <h3 style="margin:0 0 16px;">Deactivate <span id="deact-user-name"></span></h3>
         <div style="margin-bottom:12px;">

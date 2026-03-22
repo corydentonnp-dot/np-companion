@@ -1,7 +1,7 @@
 """
-NP Companion — Amazing Charts Mock Provider
+CareCompanion — Amazing Charts Mock Provider
 
-File location: np-companion/tests/ac_mock.py
+File location: carecompanion/tests/ac_mock.py
 
 Provides simulated Amazing Charts responses for testing on machines
 that don't have AC installed.  Activated by setting AC_MOCK_MODE = True
@@ -36,24 +36,26 @@ logger = logging.getLogger('tests.ac_mock')
 # ---------------------------------------------------------------------------
 _REF_DIR = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
-    'Documents', 'ac_interface_reference',
+    'Documents', 'ac_interface_reference', 'screenshots',
 )
 
 SCREENSHOTS = {
-    'home':             os.path.join(_REF_DIR, 'home screen pateitn chart highlighted.png'),
-    'inbox':            os.path.join(_REF_DIR, 'Inbox lab home page.png'),
-    'inbox_filters':    os.path.join(_REF_DIR, 'AC inbox drop down filter options .png'),
-    'patient_chart':    os.path.join(_REF_DIR, 'fresh open patient chart.png'),
-    'clinical_summary': os.path.join(_REF_DIR, 'navigate to clinical summary.png'),
-    'print_menu':       os.path.join(_REF_DIR, 'patient, print last note menu tab.png'),
-    'print_notes':      os.path.join(_REF_DIR, 'print notes_letters last note opening page .png'),
-    'print_notes_v2':   os.path.join(_REF_DIR, 'print notes_letters last note opening page variable 2 .png'),
-    'export_hie':       os.path.join(_REF_DIR, 'export to HIE & PHR.png'),
-    'reports':          os.path.join(_REF_DIR, 'reports tab.png'),
+    'home':             os.path.join(_REF_DIR, 'home_screen_pateitn_chart_highlighted.png'),
+    'inbox':            os.path.join(_REF_DIR, 'inbox_lab_home_page.png'),
+    'inbox_filters':    os.path.join(_REF_DIR, 'ac_inbox_drop_down_filter_options_.png'),
+    'patient_chart':    os.path.join(_REF_DIR, 'fresh_open_patient_chart.png'),
+    'clinical_summary': os.path.join(_REF_DIR, 'navigate_to_clinical_summary.png'),
+    'print_menu':       os.path.join(_REF_DIR, 'patient_print_last_note_menu_tab.png'),
+    'print_notes':      os.path.join(_REF_DIR, 'print_notes_letters_last_note_opening_page_.png'),
+    'print_notes_v2':   os.path.join(_REF_DIR, 'print_notes_letters_last_note_opening_page_variable_2_.png'),
+    'export_hie':       os.path.join(_REF_DIR, 'export_to_hie_&_phr.png'),
+    'reports':          os.path.join(_REF_DIR, 'reports_tab.png'),
 }
 
 SAMPLE_XML = os.path.join(
-    _REF_DIR, 'ClinicalSummary_PatientId_62815_20260316_130657.xml',
+    os.path.dirname(os.path.dirname(__file__)),
+    'Documents', 'xml_test_patients',
+    'ClinicalSummary_PatientId_62815_20260317_142457.xml',
 )
 
 # ---------------------------------------------------------------------------

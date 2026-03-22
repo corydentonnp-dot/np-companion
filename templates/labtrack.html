@@ -1,39 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Lab Tracker — NP Companion{% endblock %}
+{% block title %}Lab Tracker — CareCompanion{% endblock %}
 {% block page_id %}labtrack{% endblock %}
 
-{% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
-    <h1 style="margin:0;font-size:22px;">Lab Tracker</h1>
-    {% if overdue_count > 0 %}
-    <span class="badge badge--danger">{{ overdue_count }} Overdue</span>
-    {% endif %}
-    {% if critical_count > 0 %}
-    <span class="badge badge--danger" style="background:#ef4444;">{{ critical_count }} Critical</span>
-    {% endif %}
-    {% if due_soon_count > 0 %}
-    <span class="badge badge--warning">{{ due_soon_count }} Due Soon</span>
-    {% endif %}
+{% block subpanel %}
+<div class="context-panel-header"><h3>Lab Tracker</h3></div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Summary</div>
+    <div class="cp-stat"><span>Total Tracked</span><span class="cp-stat-value">{{ all_tracks|length }}</span></div>
+    <div class="cp-stat"><span>Patients</span><span class="cp-stat-value">{{ patients|length }}</span></div>
+    <div class="cp-stat"><span>Overdue</span><span class="cp-stat-value" style="{{ 'color:#ef4444;' if overdue_count > 0 else '' }}">{{ overdue_count }}</span></div>
+    <div class="cp-stat"><span>Critical</span><span class="cp-stat-value" style="{{ 'color:#ef4444;' if critical_count > 0 else '' }}">{{ critical_count }}</span></div>
+    <div class="cp-stat"><span>Due Soon</span><span class="cp-stat-value" style="{{ 'color:var(--color-warning,#f59e0b);' if due_soon_count > 0 else '' }}">{{ due_soon_count }}</span></div>
 </div>
 
-{# ── Stats cards ── #}
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-    <div class="card" style="text-align:center;padding:16px;">
-        <div style="font-size:28px;font-weight:700;">{{ all_tracks|length }}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">Total Tracked</div>
-    </div>
-    <div class="card" style="text-align:center;padding:16px;">
-        <div style="font-size:28px;font-weight:700;">{{ patients|length }}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">Patients</div>
-    </div>
-    <div class="card" style="text-align:center;padding:16px;">
-        <div style="font-size:28px;font-weight:700;color:{% if overdue_count %}#ef4444{% else %}var(--text-primary){% endif %};">{{ overdue_count }}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">Overdue</div>
-    </div>
-    <div class="card" style="text-align:center;padding:16px;">
-        <div style="font-size:28px;font-weight:700;color:{% if critical_count %}#ef4444{% else %}var(--text-primary){% endif %};">{{ critical_count }}</div>
-        <div style="font-size:12px;color:var(--text-secondary);">Critical</div>
-    </div>
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/caregap" class="cp-link">Care Gaps</a>
+    <a href="/monitoring/calendar" class="cp-link">Monitoring</a>
+    <a href="/patients" class="cp-link">My Patients</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px;">
+    <h1 style="margin:0;font-size:22px;">Lab Tracker</h1>
 </div>
 
 {# ── Add Tracking / Add Panel forms ── #}
@@ -122,7 +113,7 @@
 
 {# ── Patient Lab Table ── #}
 {% if patients %}
-<div class="card">
+<div class="card" data-pip="true" data-pip-title="Lab Tracking Table">
     <div class="card-body" style="padding:0;overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <thead>
@@ -140,7 +131,7 @@
             <tbody>
                 {% for mrn, pdata in patients.items() %}
                 {% for track in pdata.tracks %}
-                <tr style="border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;" onclick="window.location='/labtrack/{{ mrn }}'">
+                <tr data-filterable style="border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;" onclick="window.location='/labtrack/{{ mrn }}'">
                     {% if loop.first %}
                     <td style="padding:8px 12px;font-weight:600;" rowspan="{{ pdata.tracks|length }}">
                         …{{ pdata.display_mrn }}

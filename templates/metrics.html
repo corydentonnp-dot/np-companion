@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Metrics — NP Companion{% endblock %}
+{% block title %}Metrics — CareCompanion{% endblock %}
 {% block page_id %}metrics{% endblock %}
 
 {% block content %}
@@ -15,7 +15,7 @@
         </select>
         <button onclick="window.print()" style="padding:6px 14px;border-radius:6px;background:var(--color-navy);color:#fff;border:none;font-size:13px;cursor:pointer;">Export PDF</button>
         <a href="/metrics/weekly" style="padding:6px 14px;border-radius:6px;background:var(--color-lt-blue);color:var(--color-navy);border:none;font-size:13px;text-decoration:none;font-weight:600;">Weekly Summary</a>
-        {% include '_free_widgets.html' %>
+        {% include '_free_widgets.html' %}
     </div>
 </div>
 
@@ -42,15 +42,17 @@
     </div>
 </div>
 
-{# F13b Burnout Warnings #}
+{# F13b Wellness Card (burnout indicators) #}
 {% if burnout.warnings %}
-<div class="card" style="margin-bottom:20px;border-left:4px solid #e53e3e;">
-    <div class="card-header" style="color:#e53e3e;">Burnout Early Warnings</div>
+<div class="card" style="margin-bottom:20px;border-left:4px solid #e8a735;">
+    <div class="card-header" style="color:#b8860b;">&#128154; Wellness Check</div>
     <div class="card-body">
         {% for w in burnout.warnings %}
-        <p style="margin:4px 0;font-size:14px;">&#9888; {{ w }}</p>
+        <p style="margin:6px 0;font-size:14px;">&#9888;&#65039; {{ w }}</p>
         {% endfor %}
-        <p style="margin:8px 0 0;font-size:12px;color:var(--text-secondary);">These warnings trigger when a metric worsens for 3 consecutive weeks.</p>
+        <p style="margin:10px 0 0;font-size:12px;color:var(--text-secondary);">
+            Monitored over a 4-week sliding window. Thresholds: documentation&nbsp;+15%, inbox&nbsp;+20%, visit&nbsp;duration&nbsp;+10%.
+        </p>
     </div>
 </div>
 {% endif %}

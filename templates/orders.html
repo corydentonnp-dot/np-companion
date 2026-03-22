@@ -1,14 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Order Sets — NP Companion{% endblock %}
+{% block title %}Order Sets — CareCompanion{% endblock %}
 {% block page_id %}orders{% endblock %}
 
+{% block subpanel %}
+<div class="context-panel-header"><h3>Order Sets</h3></div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Views</div>
+    <a href="/orders?tab=mine" class="cp-link {{ 'active' if tab != 'community' else '' }}">My Sets</a>
+    <a href="/orders?tab=community" class="cp-link {{ 'active' if tab == 'community' else '' }}">Community</a>
+    <a href="/orders/master-list" class="cp-link">Master List</a>
+</div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Actions</div>
+    <button class="cp-action" onclick="openBuilder(null)">+ New Order Set</button>
+</div>
+
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/labtrack" class="cp-link">Lab Tracker</a>
+    <a href="/patients" class="cp-link">My Patients</a>
+    <a href="/monitoring/calendar" class="cp-link">Monitoring</a>
+</div>
+{% endblock %}
+
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+<div style="margin-bottom:16px;">
     <h1 style="margin:0;">Order Sets</h1>
-    <div style="display:flex;gap:8px;">
-        <a href="/orders/master-list" class="btn btn-outline btn-sm">Master List</a>
-        <button class="btn btn-primary btn-sm" onclick="openBuilder(null)">+ New Order Set</button>
-    </div>
 </div>
 
 {# F8e: Interrupted execution banner #}
@@ -33,18 +52,12 @@
 </div>
 {% endif %}
 
-{# ---- Tab bar: Mine / Community ---- #}
-<div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border,#e2e8f0);">
-    <a href="/orders?tab=mine" style="padding:10px 20px;font-size:14px;font-weight:{{ 600 if tab == 'mine' else 400 }};text-decoration:none;color:{{ 'var(--color-navy)' if tab == 'mine' else 'var(--text-secondary)' }};border-bottom:{{ '3px solid var(--color-navy)' if tab == 'mine' else 'none' }};margin-bottom:-2px;">My Sets</a>
-    <a href="/orders?tab=community" style="padding:10px 20px;font-size:14px;font-weight:{{ 600 if tab == 'community' else 400 }};text-decoration:none;color:{{ 'var(--color-navy)' if tab == 'community' else 'var(--text-secondary)' }};border-bottom:{{ '3px solid var(--color-navy)' if tab == 'community' else 'none' }};margin-bottom:-2px;">Community</a>
-</div>
-
 {% if tab == 'mine' %}
 {# ======== MY ORDER SETS GRID ======== #}
 {% if my_sets %}
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
     {% for s in my_sets %}
-    <div class="card" style="cursor:pointer;transition:box-shadow 0.15s;" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'" onmouseleave="this.style.boxShadow=''">
+    <div class="card" data-filterable style="cursor:pointer;transition:box-shadow 0.15s;" onmouseenter="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)'" onmouseleave="this.style.boxShadow=''">
         <div class="card-body" style="padding:16px;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
                 <div>
@@ -101,7 +114,7 @@
 {% if community_sets %}
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
     {% for s in community_sets %}
-    <div class="card">
+    <div class="card" data-filterable>
         <div class="card-body" style="padding:16px;">
             <div style="font-size:16px;font-weight:600;">{{ s.name }}</div>
             <div style="font-size:12px;color:var(--text-secondary);margin:4px 0 12px;">

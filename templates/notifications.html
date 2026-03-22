@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Notifications — CareCompanion{% endblock %}
+{% block page_id %}notifications{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>Notifications</h3></div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Filter</div>
+    <div class="cp-filter">
+        <select onchange="window.location='?type='+this.value">
+            <option value="">All Types</option>
+            {% for t in template_types %}
+            <option value="{{ t }}" {{ 'selected' if type_filter == t }}>{{ t }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Actions</div>
+    <button class="cp-action" onclick="markAllRead()">Mark All Read</button>
+</div>
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/inbox" class="cp-link">Inbox</a>
+    <a href="/oncall" class="cp-link">On-Call</a>
+    <a href="/patients" class="cp-link">My Patients</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Notifications</h1>
+    <span class="badge badge--info">F5</span>
+</div>
+
+{# ---- Notification Table ---- #}
+{% if notifications %}
+<div class="card" data-pip="true" data-pip-title="Notification Feed">
+    <table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr style="text-align:left;border-bottom:2px solid var(--border-color,#ddd);">
+                <th style="padding:10px 12px;width:40px;"></th>
+                <th style="padding:10px 12px;">Date</th>
+                <th style="padding:10px 12px;">Type</th>
+                <th style="padding:10px 12px;">Message</th>
+                <th style="padding:10px 12px;">From</th>
+                <th style="padding:10px 12px;text-align:center;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for n in notifications %}
+            <tr id="notif-row-{{ n.id }}" data-filterable style="border-bottom:1px solid var(--border-color,#eee);{{ 'font-weight:600;' if not n.is_read else '' }}">
+                <td style="padding:10px 12px;text-align:center;">
+                    {% if not n.is_read %}
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--color-primary,#0D7377);" title="Unread"></span>
+                    {% endif %}
+                </td>
+                <td style="padding:10px 12px;white-space:nowrap;font-size:13px;">
+                    {{ n.created_at.strftime('%Y-%m-%d %I:%M %p') if n.created_at else '—' }}
+                </td>
+                <td style="padding:10px 12px;">
+                    {% if n.template_name %}
+                    <span class="badge badge--secondary">{{ n.template_name|replace('_',' ')|title }}</span>
+                    {% else %}
+                    <span class="badge badge--secondary">System</span>
+                    {% endif %}
+                </td>
+                <td style="padding:10px 12px;">{{ n.message }}</td>
+                <td style="padding:10px 12px;font-size:13px;color:var(--text-secondary);">
+                    {{ n.sender.display_name or n.sender.username if n.sender else '—' }}
+                </td>
+                <td style="padding:10px 12px;text-align:center;">
+                    {% if not n.is_read %}
+                    <button class="btn btn-sm btn-outline" onclick="markRead({{ n.id }})">Mark Read</button>
+                    {% else %}
+                    <span style="color:var(--text-secondary);font-size:12px;">Read</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# ---- Pagination ---- #}
+{% if pagination.pages > 1 %}
+<div style="display:flex;justify-content:center;gap:8px;margin-top:16px;">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for('tools.notifications', page=pagination.prev_num, type=type_filter) }}" class="btn btn-sm btn-outline">&laquo; Prev</a>
+    {% endif %}
+    <span style="padding:6px 12px;color:var(--text-secondary);font-size:13px;">
+        Page {{ pagination.page }} of {{ pagination.pages }}
+    </span>
+    {% if pagination.has_next %}
+    <a href="{{ url_for('tools.notifications', page=pagination.next_num, type=type_filter) }}" class="btn btn-sm btn-outline">Next &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="card" style="text-align:center;padding:48px;color:var(--text-secondary);">
+    <div style="font-size:32px;margin-bottom:8px;">🔔</div>
+    <p>No notifications{{ ' matching this filter' if type_filter else '' }}.</p>
+</div>
+{% endif %}
+
+<script>
+function markRead(id) {
+    fetch('/api/notifications/' + id + '/read', { method: 'POST' })
+        .then(function() {
+            var row = document.getElementById('notif-row-' + id);
+            if (row) {
+                row.style.fontWeight = 'normal';
+                row.querySelector('td:first-child').innerHTML = '';
+                var btn = row.querySelector('button');
+                if (btn) btn.outerHTML = '<span style="color:var(--text-secondary);font-size:12px;">Read</span>';
+            }
+        });
+}
+
+function markAllRead() {
+    fetch('/api/notifications/read-all', { method: 'POST' })
+        .then(function() { location.reload(); });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Revenue Campaigns — CareCompanion{% endblock %}
+{% block page_id %}campaigns{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Revenue Campaigns</h1>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+        <a href="/admin/billing-roi" class="btn btn-sm btn-outline">Admin ROI</a>
+        <button onclick="document.getElementById('new-campaign-panel').style.display='block'" class="btn btn-sm btn-primary">+ New Campaign</button>
+    </div>
+</div>
+
+{# ---- New Campaign Panel (hidden by default) ---- #}
+<div id="new-campaign-panel" class="card" style="display:none;margin-bottom:24px;border-left:4px solid #7c3aed;">
+    <div class="card-body">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Create Campaign from Template</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">
+            {% for tpl in templates %}
+            <div style="padding:12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;"
+                 onclick="launchCampaign('{{ tpl.type }}', '{{ tpl.name }}', {{ tpl.time_to_cash_days }})">
+                <div style="font-weight:600;font-size:14px;">{{ tpl.name }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">{{ tpl.description }}</div>
+                <div style="font-size:11px;color:#7c3aed;margin-top:6px;">~{{ tpl.time_to_cash_days }}d to cash</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{# ---- Active Campaigns ---- #}
+{% set active = campaigns|selectattr('status', 'equalto', 'active')|list %}
+{% if active %}
+<h2 style="font-size:16px;margin-bottom:12px;">Active Campaigns</h2>
+<div style="display:grid;gap:12px;margin-bottom:24px;">
+    {% for c in active %}
+    <div class="card">
+        <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+            <div style="flex:1;">
+                <div style="font-weight:600;">{{ c.campaign_name }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">{{ c.campaign_type }} | {{ c.start_date }} — {{ c.end_date }}</div>
+            </div>
+            <div style="text-align:center;min-width:80px;">
+                <div style="font-size:20px;font-weight:700;">{{ c.completion_pct() }}%</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Complete</div>
+            </div>
+            <div style="text-align:center;min-width:80px;">
+                <div style="font-size:20px;font-weight:700;">{{ c.completed_count }}/{{ c.target_patient_count }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Patients</div>
+            </div>
+            <div style="text-align:center;min-width:100px;">
+                <div style="font-size:20px;font-weight:700;color:#059669;">${{ (c.actual_revenue or 0)|round|int }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">of ${{ (c.estimated_revenue or 0)|round|int }} est</div>
+            </div>
+            <div style="width:120px;">
+                <div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;">
+                    <div style="height:100%;width:{{ c.completion_pct() }}%;background:#059669;border-radius:4px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ---- Planned / Completed / Paused ---- #}
+{% set others = campaigns|rejectattr('status', 'equalto', 'active')|list %}
+{% if others %}
+<h2 style="font-size:16px;margin-bottom:12px;">Other Campaigns</h2>
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="padding:0;">
+        <table class="data-table" style="width:100%;font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:8px 12px;">Name</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th style="text-align:right;">Est Rev</th>
+                    <th style="text-align:right;">Actual Rev</th>
+                    <th style="text-align:center;">Progress</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in others %}
+                <tr>
+                    <td style="padding:6px 12px;font-weight:600;">{{ c.campaign_name }}</td>
+                    <td>{{ c.campaign_type }}</td>
+                    <td><span style="padding:2px 8px;border-radius:8px;background:{% if c.status == 'completed' %}#d1fae5{% elif c.status == 'paused' %}#fef3c7{% else %}#e5e7eb{% endif %};font-size:11px;font-weight:600;">{{ c.status }}</span></td>
+                    <td style="text-align:right;">${{ (c.estimated_revenue or 0)|round|int }}</td>
+                    <td style="text-align:right;color:#059669;">${{ (c.actual_revenue or 0)|round|int }}</td>
+                    <td style="text-align:center;">{{ c.completion_pct() }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if not campaigns %}
+<div class="card"><div class="card-body" style="text-align:center;color:var(--text-secondary);padding:40px;">
+    No campaigns yet. Click <strong>+ New Campaign</strong> to start a revenue push.
+</div></div>
+{% endif %}
+
+<script>
+function launchCampaign(type, name, ttc) {
+    if (!confirm('Launch campaign: ' + name + '?')) return;
+    fetch('/api/campaigns', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            campaign_name: name,
+            campaign_type: type,
+            time_to_cash_days: ttc,
+        })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.status === 'ok') window.location.reload();
+        else alert(d.error || 'Error');
+    });
+}
+</script>
+{% endblock %}

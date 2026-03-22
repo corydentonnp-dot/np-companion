@@ -2,7 +2,7 @@
 Seed the master_orders table from the AC orders spreadsheet.
 
 The spreadsheet is at:
-  Documents/ac_interface_reference/Amazing charts interface/Order Sets/AC orders.xlsx
+  Documents/ac_interface_reference/order_sets/AC orders.xlsx
 
 Usage:
     venv\Scripts\python.exe scripts/seed_master_orders.py
@@ -23,8 +23,8 @@ from models.orderset import MasterOrder, ORDER_TABS
 
 XLSX_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    'Documents', 'ac_interface_reference', 'Amazing charts interface',
-    'Order Sets', 'AC orders.xlsx',
+    'Documents', 'ac_interface_reference', 'order_sets',
+    'AC orders.xlsx',
 )
 
 
@@ -45,13 +45,24 @@ def seed():
         wb = openpyxl.load_workbook(XLSX_PATH, read_only=True, data_only=True)
         sheet = wb.active
 
-        # The spreadsheet has 8 columns matching ORDER_TABS
-        tab_names = ORDER_TABS
+        # Read actual column headers from row 1 so we don't depend on column order.
+        # Each header cell becomes the tab name for that column.
+        header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+        col_tab_map = {}  # col_idx (1-based) → tab_name
+        for col_idx, header in enumerate(header_row, start=1):
+            if header and str(header).strip():
+                col_tab_map[col_idx] = str(header).strip()
+
+        # Warn about any columns in ORDER_TABS not found in the spreadsheet
+        found_tabs = set(col_tab_map.values())
+        for t in ORDER_TABS:
+            if t not in found_tabs:
+                print(f'  WARNING: ORDER_TABS entry "{t}" not found in spreadsheet headers')
 
         added = 0
         skipped = 0
 
-        for col_idx, tab_name in enumerate(tab_names, start=1):
+        for col_idx, tab_name in col_tab_map.items():
             for row in sheet.iter_rows(min_row=2, min_col=col_idx,
                                         max_col=col_idx, values_only=False):
                 cell = row[0]

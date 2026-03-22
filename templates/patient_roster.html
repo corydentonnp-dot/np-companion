@@ -1,6 +1,29 @@
 {% extends "base.html" %}
-{% block title %}My Patients — NP Companion{% endblock %}
+{% block title %}My Patients — CareCompanion{% endblock %}
 {% block page_id %}patient-roster{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>My Patients</h3></div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Search</div>
+    <div class="cp-filter">
+        <input type="text" id="cp-roster-search" placeholder="Search patients…" autocomplete="off">
+    </div>
+</div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Stats</div>
+    <div class="cp-stat"><span>Total Patients</span><span class="cp-stat-value">{{ patients|length }}</span></div>
+</div>
+
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/caregap" class="cp-link">Care Gaps</a>
+    <a href="/labtrack" class="cp-link">Lab Track</a>
+    <a href="/timer" class="cp-link">Timer</a>
+</div>
+{% endblock %}
 
 {% block content %}
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:8px;">
@@ -28,7 +51,7 @@
             </thead>
             <tbody>
                 {% for p in patients %}
-                <tr>
+                <tr data-filterable>
                     <td>
                         <a href="/patient/{{ p.mrn }}" style="color:inherit;font-weight:600;text-decoration:none;border-bottom:1px dotted var(--text-secondary);">
                             {{ p.patient_name or 'Unknown' }}
@@ -61,15 +84,17 @@
 <script>
 (function(){
     var input = document.getElementById('roster-search');
-    if (!input) return;
-    input.addEventListener('input', function(){
-        var q = this.value.toLowerCase();
+    var cpInput = document.getElementById('cp-roster-search');
+    function filterRows(q) {
+        q = (q || '').toLowerCase();
         var rows = document.querySelectorAll('#roster-table tbody tr');
         for (var i = 0; i < rows.length; i++) {
             var text = rows[i].textContent.toLowerCase();
             rows[i].style.display = (!q || text.indexOf(q) !== -1) ? '' : 'none';
         }
-    });
+    }
+    if (input) input.addEventListener('input', function(){ if (cpInput) cpInput.value = this.value; filterRows(this.value); });
+    if (cpInput) cpInput.addEventListener('input', function(){ if (input) input.value = this.value; filterRows(this.value); });
 })();
 </script>
 {% else %}

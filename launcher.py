@@ -1,5 +1,5 @@
 """
-NP Companion — Unified Launcher
+CareCompanion — Unified Launcher
 
 Entry point for both dev and packaged (.exe) modes.
 
@@ -119,7 +119,24 @@ def _run_all():
     """
     _setup_env()
 
-    logger.info('Starting NP Companion (full stack)...')
+    logger.info('Starting CareCompanion (full stack)...')
+
+    # 0. Launch Chrome debug profile (non-blocking — scrapers fall back to headless)
+    if sys.platform == 'win32':
+        try:
+            from utils.chrome_launcher import ensure_chrome_debug
+            import config
+            chrome_ok = ensure_chrome_debug(
+                config.CHROME_EXE_PATH,
+                config.CHROME_DEBUG_PROFILE_DIR,
+                config.CHROME_CDP_PORT,
+            )
+            if chrome_ok:
+                logger.info('Chrome debug profile ready on port %d', config.CHROME_CDP_PORT)
+            else:
+                logger.warning('Chrome debug profile failed to start — scrapers will use headless')
+        except Exception as exc:
+            logger.warning('Chrome debug launch skipped: %s', exc)
 
     # 1. Start Flask in background thread
     flask_thread = _start_flask_thread()
@@ -174,7 +191,7 @@ def _run_with_webview(agent_service):
     from utils.paths import get_icon_path
 
     window = webview.create_window(
-        'NP Companion',
+        'CareCompanion',
         'http://127.0.0.1:5000',
         width=1280,
         height=900,
@@ -212,7 +229,7 @@ def _run_with_webview(agent_service):
         window.events.closing += _on_window_closing
 
         menu = pystray.Menu(
-            TrayItem('Open NP Companion', _show_window, default=True),
+            TrayItem('Open CareCompanion', _show_window, default=True),
             TrayItem('Pause Agent', lambda: agent_service.pause()),
             TrayItem('Resume Agent', lambda: agent_service.resume()),
             TrayItem('Check Inbox Now', lambda: agent_service.trigger_inbox_check()),
@@ -220,9 +237,9 @@ def _run_with_webview(agent_service):
         )
 
         tray_icon = pystray.Icon(
-            'NP Companion',
+            'CareCompanion',
             _make_icon_image(),
-            'NP Companion',
+            'CareCompanion',
             menu,
         )
 
@@ -270,19 +287,19 @@ def _run_with_tray_only(agent_service):
         icon.stop()
 
     menu = pystray.Menu(
-        TrayItem('Open NP Companion', _open_app, default=True),
+        TrayItem('Open CareCompanion', _open_app, default=True),
         TrayItem('Pause Agent', lambda: agent_service.pause()),
         TrayItem('Resume Agent', lambda: agent_service.resume()),
         TrayItem('Quit', _quit_all),
     )
 
-    icon = pystray.Icon('NP Companion', _make_icon_image(), 'NP Companion', menu)
+    icon = pystray.Icon('CareCompanion', _make_icon_image(), 'CareCompanion', menu)
     icon.run()  # Blocks on main thread
     agent_service.stop()
 
 
 def main():
-    parser = argparse.ArgumentParser(description='NP Companion Launcher')
+    parser = argparse.ArgumentParser(description='CareCompanion Launcher')
     parser.add_argument(
         '--mode',
         choices=['all', 'dev', 'server', 'agent'],

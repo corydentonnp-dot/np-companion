@@ -1,1 +1,1 @@
-"""NP Companion agent package helpers."""
+"""CareCompanion agent package helpers."""

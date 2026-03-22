@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Preventive Gaps — CareCompanion{% endblock %}
+{% block page_id %}preventive-gaps{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>Preventive Gaps</h3></div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Summary</div>
+    <div class="cp-stat"><span>Patients</span><span class="cp-stat-value">{{ total_patients }}</span></div>
+    <div class="cp-stat"><span>Services</span><span class="cp-stat-value">{{ service_count }}</span></div>
+    <div class="cp-stat"><span>Overdue</span><span class="cp-stat-value" style="color:var(--color-red)">{{ total_overdue }}</span></div>
+    <div class="cp-stat"><span>Revenue</span><span class="cp-stat-value" style="color:var(--color-green)">${{ total_revenue|int }}</span></div>
+</div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Actions</div>
+    <a href="/care-gaps/preventive/csv" class="cp-action">Export CSV</a>
+</div>
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/caregap" class="cp-link">Care Gaps</a>
+    <a href="/labtrack" class="cp-link">Lab Tracker</a>
+    <a href="/monitoring/calendar" class="cp-link">Monitoring</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <a href="/monitoring/calendar" style="color:var(--text-secondary);text-decoration:none;font-size:14px;">&larr; Monitoring</a>
+    <h1 style="margin:0;">&#127973; Preventive Gaps Dashboard</h1>
+</div>
+
+{# ---- Per-Service Breakdown ---- #}
+{% for svc in services %}
+<div class="card" data-filterable style="margin-bottom:16px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            {% if svc.priority == 'critical' %}
+            <span style="background:#c0392b;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">CRITICAL</span>
+            {% elif svc.priority == 'high' %}
+            <span style="background:#e67e22;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">HIGH</span>
+            {% endif %}
+            <strong>{{ svc.service_name }}</strong>
+            <span style="color:var(--text-secondary);font-size:12px;">CPT {{ svc.cpt_code }}</span>
+            {% if svc.icd10_trigger %}
+            <span style="color:var(--text-secondary);font-size:12px;">ICD-10 {{ svc.icd10_trigger }}</span>
+            {% endif %}
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+            {% if svc.revenue_opportunity > 0 %}
+            <span style="font-size:13px;color:#27ae60;font-weight:600;">${{ "{:,.0f}".format(svc.revenue_opportunity) }}</span>
+            {% endif %}
+            <a href="/care-gaps/preventive/csv?cpt={{ svc.cpt_code }}" style="font-size:12px;color:var(--color-primary,#3498db);">Export &darr;</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {# Compliance bar #}
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="flex:1;background:var(--bg-tertiary,#333);border-radius:6px;height:20px;overflow:hidden;">
+                {% set bar_color = '#27ae60' if svc.compliance_pct >= 80 else ('#f59e0b' if svc.compliance_pct >= 50 else '#e74c3c') %}
+                <div style="background:{{ bar_color }};height:100%;width:{{ svc.compliance_pct }}%;border-radius:6px;transition:width 0.3s;"></div>
+            </div>
+            <span style="font-size:14px;font-weight:600;min-width:50px;">{{ svc.compliance_pct }}%</span>
+        </div>
+        <div style="display:flex;gap:24px;font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
+            <span>Eligible: <strong style="color:var(--text-primary);">{{ svc.eligible_count }}</strong></span>
+            <span>Completed: <strong style="color:var(--text-primary);">{{ svc.completed_count }}</strong></span>
+            <span>Overdue: <strong style="color:#e74c3c;">{{ svc.overdue_count }}</strong></span>
+            {% if svc.interval_days > 0 %}
+            <span>Interval: {{ svc.interval_days }} days</span>
+            {% else %}
+            <span>One-time screening</span>
+            {% endif %}
+        </div>
+
+        {# Overdue patient drill-down (collapsed by default) #}
+        {% if svc.overdue_patients %}
+        <details style="margin-top:8px;">
+            <summary style="cursor:pointer;font-size:13px;color:var(--color-primary,#3498db);font-weight:500;">
+                {{ svc.overdue_count }} overdue patient{{ 's' if svc.overdue_count != 1 }}
+            </summary>
+            <div style="max-height:200px;overflow-y:auto;margin-top:8px;">
+                <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid var(--border,#e2e8f0);">
+                            <th style="padding:4px 8px;">Patient</th>
+                            <th style="padding:4px 8px;">MRN</th>
+                            <th style="padding:4px 8px;">Last Performed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pt in svc.overdue_patients %}
+                        <tr style="border-bottom:1px solid var(--border,#e2e8f0);">
+                            <td style="padding:4px 8px;">{{ pt.name }}</td>
+                            <td style="padding:4px 8px;color:var(--text-secondary);">{{ pt.mrn_display }}</td>
+                            <td style="padding:4px 8px;color:var(--text-secondary);">{{ pt.last_performed }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% if not services %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px;">
+        <div style="font-size:48px;margin-bottom:12px;">&#10003;</div>
+        <p style="color:var(--text-secondary);">No preventive screening rules configured. Run the monitoring seed script to populate VSAC rules.</p>
+    </div>
+</div>
+{% endif %}
+
+{# ---- Outreach Needed Tab (D5) ---- #}
+{% if outreach_patients|default([]) %}
+<div class="card" style="margin-top:24px;border-left:4px solid #e67e22;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <strong>&#128386; Outreach Needed</strong>
+        <span style="font-size:13px;color:var(--text-secondary);">Overdue + not seen 30+ days</span>
+    </div>
+    <div class="card-body">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+            <thead>
+                <tr style="text-align:left;border-bottom:2px solid var(--border,#e2e8f0);">
+                    <th style="padding:6px 8px;">Patient</th>
+                    <th style="padding:6px 8px;">MRN</th>
+                    <th style="padding:6px 8px;">Overdue Labs</th>
+                    <th style="padding:6px 8px;">Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pt in outreach_patients %}
+                <tr style="border-bottom:1px solid var(--border,#e2e8f0);{% if pt.has_critical %}background:rgba(231,76,60,0.08);{% endif %}">
+                    <td style="padding:6px 8px;">
+                        {% if pt.has_critical %}
+                        <span style="background:#c0392b;color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;margin-right:4px;">!</span>
+                        {% endif %}
+                        {{ pt.name }}
+                    </td>
+                    <td style="padding:6px 8px;color:var(--text-secondary);">{{ pt.mrn_display }}</td>
+                    <td style="padding:6px 8px;">{{ pt.labs }}</td>
+                    <td style="padding:6px 8px;font-weight:600;color:#e74c3c;">{{ pt.overdue_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

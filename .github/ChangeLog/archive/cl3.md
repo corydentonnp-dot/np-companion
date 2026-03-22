@@ -69,7 +69,7 @@
 
 ### Checkpoint 1 — Start the App
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
+cd C:\Users\coryd\Documents\CareCompanion
 venv\Scripts\python.exe app.py
 ```
 - The server should start on http://localhost:5000 with no errors.
@@ -114,15 +114,15 @@ venv\Scripts\python.exe app.py
 
 ### Checkpoint 7 — Database Migration (if first run after update)
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
+cd C:\Users\coryd\Documents\CareCompanion
 venv\Scripts\python.exe migrate_add_np_columns.py
 ```
 - Should report "+ Added" for each new column, or "= already exists" if already run
 
 ### Checkpoint 8 — Verify Database Columns
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
-venv\Scripts\python.exe -c "import sqlite3; conn=sqlite3.connect('data/npcompanion.db'); c=conn.cursor(); c.execute('PRAGMA table_info(users)'); print([r[1] for r in c.fetchall()]); c.execute('PRAGMA table_info(schedules)'); print([r[1] for r in c.fetchall()])"
+cd C:\Users\coryd\Documents\CareCompanion
+venv\Scripts\python.exe -c "import sqlite3; conn=sqlite3.connect('data/carecompanion.db'); c=conn.cursor(); c.execute('PRAGMA table_info(users)'); print([r[1] for r in c.fetchall()]); c.execute('PRAGMA table_info(schedules)'); print([r[1] for r in c.fetchall()])"
 ```
 - Users should include: `np_username_enc`, `np_password_enc`, `np_provider_name`, `nav_steps`
 - Schedules should include: `patient_mrn`, `patient_phone`, `reason`, `units`, `location`, `comment`, `entered_by`

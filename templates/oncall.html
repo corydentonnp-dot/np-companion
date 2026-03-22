@@ -1,25 +1,44 @@
 {% extends "base.html" %}
-{% block title %}On-Call Notes — NP Companion{% endblock %}
+{% block title %}On-Call Notes — CareCompanion{% endblock %}
 {% block page_id %}oncall{% endblock %}
 
-{% block content %}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px;">
-    <h1 style="margin:0;font-size:22px;">On-Call Notes</h1>
-    <div style="display:flex;gap:8px;">
-        <a href="/oncall/new" class="btn btn-primary" style="min-height:44px;display:flex;align-items:center;gap:6px;">&#128222; New Call</a>
-        <a href="/oncall/handoff" class="btn btn-outline" style="min-height:44px;display:flex;align-items:center;">Handoff</a>
-    </div>
+{% block subpanel %}
+<div class="context-panel-header"><h3>On-Call</h3></div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Actions</div>
+    <a href="/oncall/new" class="cp-action">&#128222; New Call</a>
+    <a href="/oncall/handoff" class="cp-action" style="margin-top:4px;">&#128203; Handoff</a>
 </div>
 
-{# ---- Filters ---- #}
-<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-    <a href="/oncall" class="btn btn-sm {{ 'btn-primary' if not status_filter else 'btn-outline' }}">All</a>
-    <a href="/oncall?status=pending" class="btn btn-sm {{ 'btn-primary' if status_filter == 'pending' else 'btn-outline' }}">Pending ({{ pending_count }})</a>
-    <a href="/oncall?status=entered" class="btn btn-sm {{ 'btn-primary' if status_filter == 'entered' else 'btn-outline' }}">Entered</a>
-    <a href="/oncall?status=not_needed" class="btn btn-sm {{ 'btn-primary' if status_filter == 'not_needed' else 'btn-outline' }}">No Doc Needed</a>
+<div class="context-panel-section">
+    <div class="cp-section-label">Filter by Status</div>
+    <a href="/oncall" class="cp-link {{ 'active' if not status_filter else '' }}">All Notes</a>
+    <a href="/oncall?status=pending" class="cp-link {{ 'active' if status_filter == 'pending' else '' }}">Pending</a>
+    <a href="/oncall?status=entered" class="cp-link {{ 'active' if status_filter == 'entered' else '' }}">Entered</a>
+    <a href="/oncall?status=not_needed" class="cp-link {{ 'active' if status_filter == 'not_needed' else '' }}">No Doc Needed</a>
     {% if is_monday %}
-    <a href="/oncall?monday=1" class="btn btn-sm btn-outline" style="border-color:var(--color-warning,#f59e0b);color:var(--color-warning,#f59e0b);">&#128197; Weekend Pending</a>
+    <a href="/oncall?monday=1" class="cp-link" style="color:var(--color-warning,#f59e0b);">&#128197; Weekend Pending</a>
     {% endif %}
+</div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Stats</div>
+    <div class="cp-stat"><span>Pending</span><span class="cp-stat-value">{{ pending_count }}</span></div>
+    <div class="cp-stat"><span>Callbacks Due</span><span class="cp-stat-value">{{ callbacks_due|length }}</span></div>
+</div>
+
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/inbox" class="cp-link">Inbox</a>
+    <a href="/notifications" class="cp-link">Notifications</a>
+    <a href="/patients" class="cp-link">My Patients</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:20px;flex-wrap:wrap;gap:8px;">
+    <h1 style="margin:0;font-size:22px;">On-Call Notes</h1>
 </div>
 
 {# ---- Callbacks Due Section (F7b) ---- #}
@@ -54,7 +73,7 @@
     {% for date_label, notes in grouped_notes.items() %}
     <h3 style="font-size:14px;color:var(--text-secondary);margin:20px 0 8px;font-weight:500;">{{ date_label }}</h3>
         {% for note in notes %}
-        <div class="card" style="margin-bottom:8px;border-left:4px solid {{ 'var(--color-danger,#ef4444)' if note.documentation_status == 'pending' else ('var(--color-warning,#f59e0b)' if note.callback_promised and not note.callback_completed else 'var(--color-success,#22c55e)') }};">
+        <div class="card" data-filterable style="margin-bottom:8px;border-left:4px solid {{ 'var(--color-danger,#ef4444)' if note.documentation_status == 'pending' else ('var(--color-warning,#f59e0b)' if note.callback_promised and not note.callback_completed else 'var(--color-success,#22c55e)') }};">
             <div class="card-body" style="padding:12px 16px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                     <div style="flex:1;min-width:200px;">

@@ -1,5 +1,5 @@
 """
-NP Companion — Clinical Terminology Spell Check & Fuzzy Matcher
+CareCompanion — Clinical Terminology Spell Check & Fuzzy Matcher
 File: app/services/clinical_spell_check.py
 
 Provides medical-aware spell checking and fuzzy matching for free text
@@ -299,7 +299,7 @@ COMMON_MISSPELLINGS = {
 }
 
 
-def analyze_text(text, use_api=True):
+def analyze_text(text, use_api=True, min_confidence=0.6):
     """
     Analyze free text for medical terminology issues.
 
@@ -318,6 +318,9 @@ def analyze_text(text, use_api=True):
     use_api : bool
         If True, queries RxNorm/ICD-10 APIs for unknown terms.
         If False, uses only local dictionaries (faster, offline-safe).
+    min_confidence : float
+        Minimum confidence threshold (0.0-1.0) to include a finding.
+        Default 0.6. Can be set per-user via spell_check_confidence pref.
     """
     if not text or len(text.strip()) < 3:
         return []
@@ -396,8 +399,8 @@ def analyze_text(text, use_api=True):
     if use_api:
         _enrich_with_api(text, findings)
 
-    # Filter: only return findings with confidence >= 0.6
-    findings = [f for f in findings if f['confidence'] >= 0.6]
+    # Filter: only return findings with confidence >= min_confidence
+    findings = [f for f in findings if f['confidence'] >= min_confidence]
 
     # Deduplicate by position
     seen_positions = set()
@@ -531,4 +534,12 @@ def _enrich_with_api(text, findings):
                 pass
 
     except Exception as e:
-        logger.debug('API enrichment failed: %s', e)
+        logger.warning('API enrichment failed: %s', e)
+        findings.append({
+            'original': '',
+            'suggested': 'API unavailable \u2014 check connection',
+            'category': 'api_error',
+            'confidence': 0,
+            'position': (0, 0),
+            'context': str(e),
+        })

@@ -1,5 +1,5 @@
 """
-NP Companion — Lab Value Tracker Routes
+CareCompanion — Lab Value Tracker Routes
 
 Feature 11:  Lab tracking with custom thresholds and trend charts.
 Feature 11a: Chart.js trend visualization.
@@ -16,6 +16,7 @@ from flask_login import login_required, current_user
 
 from models import db
 from models.labtrack import LabTrack, LabResult, LabPanel, STANDARD_PANELS
+from utils.feature_gates import require_feature
 
 labtrack_bp = Blueprint('labtrack', __name__)
 
@@ -25,6 +26,7 @@ labtrack_bp = Blueprint('labtrack', __name__)
 # ======================================================================
 @labtrack_bp.route('/labtrack')
 @login_required
+@require_feature('labtrack')
 def index():
     """Lab value tracker dashboard showing all tracked labs."""
     tracks = (

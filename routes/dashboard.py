@@ -1,7 +1,7 @@
 """
-NP Companion — Dashboard Route (Today View)
+CareCompanion — Dashboard Route (Today View)
 
-File location: np-companion/routes/dashboard.py
+File location: carecompanion/routes/dashboard.py
 
 The main Today View showing:
   - Today's appointment schedule (from NetPractice scraper)
@@ -15,8 +15,9 @@ Features: F4, F4a (new patient flag), F4b (duration estimator),
 """
 
 from datetime import date, datetime, timedelta, timezone
+from threading import Thread
 
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
@@ -26,6 +27,10 @@ from models.timelog import TimeLog
 from models.patient import PatientRecord
 
 dashboard_bp = Blueprint('dashboard', __name__)
+
+# ---- Data collection job tracker (Phase 4) ----
+# Module-level dict: schedule_id → {status, message, started_at}
+_collect_jobs = {}
 
 
 # ======================================================================
@@ -148,6 +153,7 @@ def analyze_schedule_anomalies(appointments):
     - short_appointment: Less than 15 minutes for a visit type that usually
       takes longer (new patient in 15 min, physical in 15 min, etc.)
     - schedule_gap: A gap of 30+ minutes between appointments
+    - schedule_overlap: Overlapping appointments (double-booking)
     - late_new_patient: A new patient scheduled in the last 2 slots of the day
 
     Returns a list of dicts:
@@ -243,6 +249,18 @@ def analyze_schedule_anomalies(appointments):
                     ),
                     'severity': 'info',
                 })
+            elif gap_minutes < 0:
+                overlap_min = abs(int(gap_minutes))
+                anomalies.append({
+                    'type': 'schedule_overlap',
+                    'message': (
+                        f'{appointments[i-1].appointment_time} and '
+                        f'{appointments[i].appointment_time} — '
+                        f'appointments overlap by {overlap_min} min'
+                    ),
+                    'severity': 'warning',
+                    'overlap_minutes': overlap_min,
+                })
         except (ValueError, AttributeError):
             continue
 
@@ -288,6 +306,7 @@ def index():
             appointment_time='07:00',
             patient_name='TEST, TEST',
             patient_mrn='62815',
+            patient_dob='10/01/1980',
             visit_type='TEST',
             reason='Test Patient',
             duration_minutes=15,
@@ -299,8 +318,20 @@ def index():
     # Duration estimator
     duration_info = estimate_schedule_duration(current_user.id, appointments)
 
-    # Anomaly analysis
+    # Anomaly analysis — pre-sort: warnings first, then info
     anomalies = analyze_schedule_anomalies(appointments)
+    anomalies.sort(key=lambda a: 0 if a.get('severity') == 'warning' else 1)
+
+    # Build set of appointment times involved in overlaps (for per-row badges)
+    overlap_times = set()
+    for a in anomalies:
+        if a.get('type') == 'schedule_overlap':
+            # Message format: "HH:MM and HH:MM — ..."
+            parts = a['message'].split(' and ')
+            if len(parts) >= 2:
+                overlap_times.add(parts[0].strip())
+                second = parts[1].split(' —')[0].strip() if ' —' in parts[1] else parts[1].strip()
+                overlap_times.add(second)
 
     # Count new patients for the summary line
     new_patient_count = sum(1 for a in appointments if a.is_new_patient)
@@ -332,18 +363,86 @@ def index():
     # Billing opportunities for today's scheduled patients
     billing_opportunities = []
     total_estimated_revenue = 0.0
+    billing_opp_counts = {}
     try:
         from models.billing import BillingOpportunity
         billing_opportunities = (
             BillingOpportunity.query
             .filter_by(user_id=current_user.id, visit_date=view_date)
             .filter(BillingOpportunity.status.in_(['pending', 'partial']))
-            .order_by(BillingOpportunity.estimated_revenue.desc())
+            .order_by(
+                BillingOpportunity.expected_net_dollars.desc().nullslast(),
+                BillingOpportunity.estimated_revenue.desc()
+            )
             .all()
         )
         total_estimated_revenue = sum(
             o.estimated_revenue or 0 for o in billing_opportunities
         )
+        # Per-patient billing opportunity counts for schedule badges
+        import hashlib
+        for appt in appointments:
+            if appt.patient_mrn:
+                mrn_hash = hashlib.sha256(str(appt.patient_mrn).encode()).hexdigest()
+                count = sum(1 for o in billing_opportunities if o.patient_mrn_hash == mrn_hash)
+                if count > 0:
+                    billing_opp_counts[appt.patient_mrn] = count
+    except Exception:
+        pass
+
+    # F25a: PDMP overdue check
+    pdmp_overdue = []
+    try:
+        from routes.tools import get_overdue_pdmp_patients
+        pdmp_overdue = get_overdue_pdmp_patients(current_user.id)
+    except Exception:
+        pass
+
+    # Phase 10: Education drafts pending review
+    education_draft_count = 0
+    try:
+        from models.message import DelayedMessage
+        education_draft_count = DelayedMessage.query.filter(
+            DelayedMessage.user_id == current_user.id,
+            DelayedMessage.status == 'pending',
+            DelayedMessage.message_content.contains('New Medication Education'),
+        ).count()
+    except Exception:
+        pass
+
+    # Phase 11: urgent_count for tier badge
+    warning_count = sum(1 for a in anomalies if a.get('severity') == 'warning')
+    high_billing_count = sum(
+        1 for o in billing_opportunities
+        if getattr(o, 'priority', 'medium') == 'high'
+    )
+    urgent_count = warning_count + high_billing_count + len(pdmp_overdue)
+
+    # Phase 19.5: TCM urgent entries (deadline ≤1 business day)
+    tcm_urgent = []
+    try:
+        from models.tcm import TCMWatchEntry
+        tcm_active = TCMWatchEntry.query.filter_by(
+            user_id=current_user.id, status='active'
+        ).all()
+        for te in tcm_active:
+            deadline = None
+            label = None
+            if not te.two_day_contact_completed and te.two_day_deadline:
+                deadline = te.two_day_deadline
+                label = '2-day contact'
+            elif not te.face_to_face_completed and te.seven_day_visit_deadline:
+                deadline = te.seven_day_visit_deadline
+                label = '7-day visit'
+            if deadline and (deadline - today).days <= 1:
+                tcm_urgent.append({
+                    'id': te.id,
+                    'patient': te.patient_mrn_hash[:8],
+                    'facility': te.discharge_facility or '',
+                    'deadline': deadline,
+                    'label': label,
+                    'days': (deadline - today).days,
+                })
     except Exception:
         pass
 
@@ -364,6 +463,12 @@ def index():
         my_patients=my_patients,
         billing_opportunities=billing_opportunities,
         total_estimated_revenue=total_estimated_revenue,
+        billing_opp_counts=billing_opp_counts,
+        urgent_count=urgent_count,
+        overlap_times=overlap_times,
+        pdmp_overdue=pdmp_overdue,
+        education_draft_count=education_draft_count,
+        tcm_urgent=tcm_urgent,
     )
 
 
@@ -482,3 +587,413 @@ def api_patient_search():
                 })
 
     return jsonify(results[:10])
+
+
+# ======================================================================
+# POST /api/schedule/add — manually add a patient to the schedule
+# ======================================================================
+@dashboard_bp.route('/api/schedule/add', methods=['POST'])
+@login_required
+def api_schedule_add():
+    """
+    Add a manual appointment to the schedule.
+    Accepts JSON body with patient_name, patient_mrn, appointment_time (required)
+    and optional fields: patient_dob, appointment_date, visit_type, duration_minutes,
+    reason, note_template.
+    """
+    import re
+
+    data = request.get_json(silent=True) or {}
+
+    patient_name = (data.get('patient_name') or '').strip()
+    patient_mrn = (data.get('patient_mrn') or '').strip()
+    appointment_time = (data.get('appointment_time') or '').strip()
+
+    # --- validation ---
+    errors = []
+    if not patient_name:
+        errors.append('patient_name is required')
+    if not patient_mrn:
+        errors.append('patient_mrn is required')
+    if not appointment_time:
+        errors.append('appointment_time is required')
+    elif not re.match(r'^\d{1,2}:\d{2}$', appointment_time):
+        errors.append('appointment_time must be HH:MM format')
+
+    if errors:
+        return jsonify({'success': False, 'errors': errors}), 400
+
+    # --- appointment date (default today) ---
+    appt_date_str = (data.get('appointment_date') or '').strip()
+    try:
+        appt_date = (
+            datetime.strptime(appt_date_str, '%Y-%m-%d').date()
+            if appt_date_str else date.today()
+        )
+    except ValueError:
+        return jsonify({'success': False, 'errors': ['Invalid appointment_date format (use YYYY-MM-DD)']}), 400
+
+    duration = data.get('duration_minutes', 15)
+    try:
+        duration = int(duration)
+        if duration < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        duration = 15
+
+    # --- duplicate detection (same MRN + time + date) ---
+    existing = Schedule.query.filter_by(
+        user_id=current_user.id,
+        appointment_date=appt_date,
+        appointment_time=appointment_time,
+        patient_mrn=patient_mrn,
+    ).first()
+    if existing:
+        return jsonify({
+            'success': False,
+            'errors': [f'Duplicate: {patient_mrn} already scheduled at {appointment_time} on {appt_date}']
+        }), 409
+
+    appt = Schedule(
+        user_id=current_user.id,
+        appointment_date=appt_date,
+        appointment_time=appointment_time,
+        patient_name=patient_name,
+        patient_mrn=patient_mrn,
+        patient_dob=(data.get('patient_dob') or '').strip(),
+        visit_type=(data.get('visit_type') or 'Office Visit').strip(),
+        duration_minutes=duration,
+        reason=(data.get('reason') or '').strip(),
+        comment=(data.get('note_template') or '').strip(),
+        entered_by='manual',
+        status='manual',
+    )
+    db.session.add(appt)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'id': appt.id,
+        'appointment': {
+            'time': appt.appointment_time,
+            'patient_name': appt.patient_name,
+            'patient_mrn': appt.patient_mrn,
+            'visit_type': appt.visit_type,
+            'duration_minutes': appt.duration_minutes,
+            'entered_by': appt.entered_by,
+        },
+    })
+
+
+# ======================================================================
+# DELETE /api/schedule/<id> — delete a manually-added appointment
+# ======================================================================
+@dashboard_bp.route('/api/schedule/<int:schedule_id>', methods=['DELETE'])
+@login_required
+def api_schedule_delete(schedule_id):
+    """
+    Delete a schedule entry. Only manual entries owned by the current user
+    can be deleted. Scraped entries cannot be removed via this endpoint.
+    """
+    appt = Schedule.query.filter_by(
+        id=schedule_id, user_id=current_user.id
+    ).first()
+    if not appt:
+        return jsonify({'success': False, 'error': 'Appointment not found'}), 404
+    if appt.entered_by != 'manual':
+        return jsonify({'success': False, 'error': 'Cannot delete scraped appointments'}), 403
+
+    db.session.delete(appt)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# POST /api/schedule/parse-text — parse pasted schedule text into rows
+# ======================================================================
+@dashboard_bp.route('/api/schedule/parse-text', methods=['POST'])
+@login_required
+def api_schedule_parse_text():
+    """
+    Parse unstructured schedule text (from OCR, Snipping Tool, or manual typing)
+    into structured appointment rows.  Returns a list of parsed entries with
+    confidence indicators so the user can review before committing.
+    """
+    import re
+
+    data = request.get_json(silent=True) or {}
+    raw_text = (data.get('text') or '').strip()
+    if not raw_text:
+        return jsonify({'success': False, 'error': 'No text provided'}), 400
+
+    # --- visit-type keyword map ---
+    _VISIT_TYPE_MAP = {
+        'NP': 'New Patient', 'NEW': 'New Patient', 'NEW PATIENT': 'New Patient',
+        'FU': 'Follow Up', 'FOLLOW UP': 'Follow Up', 'FOLLOW-UP': 'Follow Up',
+        'F/U': 'Follow Up',
+        'PE': 'Physical', 'PHYSICAL': 'Physical', 'AWV': 'Physical',
+        'ANNUAL': 'Physical', 'CPE': 'Physical',
+        'AV': 'Office Visit', 'OV': 'Office Visit', 'OFFICE VISIT': 'Office Visit',
+        'SV': 'Sick Visit', 'SICK': 'Sick Visit', 'SICK VISIT': 'Sick Visit',
+        'TH': 'Telehealth', 'TELE': 'Telehealth', 'TELEHEALTH': 'Telehealth',
+        'PROC': 'Procedure', 'PROCEDURE': 'Procedure',
+    }
+
+    # --- regex patterns ---
+    time_pat = re.compile(
+        r'(\d{1,2}:\d{2})\s*([AaPp][Mm])?'
+    )
+    mrn_pat = re.compile(
+        r'\((\d{3,8})\)'          # parenthesized digits (54321)
+        r'|(?<!\d)(\d{4,8})(?!\d)' # standalone 4-8 digit number
+    )
+    # Capitalized name pattern: "LAST, FIRST" or "FIRST LAST" or "Last, First M"
+    name_pat = re.compile(
+        r"([A-Z][A-Za-z'-]+),?\s+([A-Z][A-Za-z'-]+(?:\s+[A-Z]\.?)?)"
+    )
+    # Header lines to skip
+    header_pat = re.compile(
+        r'^\s*(?:time|patient|name|type|mrn|status|date|provider|reason)\s*$',
+        re.IGNORECASE,
+    )
+
+    def _convert_to_24h(time_str, ampm):
+        """Convert 12h time to HH:MM."""
+        h, m = time_str.split(':')
+        h = int(h)
+        if ampm:
+            ampm = ampm.upper()
+            if ampm == 'PM' and h != 12:
+                h += 12
+            elif ampm == 'AM' and h == 12:
+                h = 0
+        return f'{h}:{m}'
+
+    def _detect_visit_type(text):
+        """Try to extract a visit type keyword from text."""
+        upper = text.upper().strip()
+        # Try longest matches first
+        for kw in sorted(_VISIT_TYPE_MAP.keys(), key=len, reverse=True):
+            if kw in upper:
+                return _VISIT_TYPE_MAP[kw]
+        return ''
+
+    # --- normalise whitespace (tabs from spreadsheet paste, Windows line endings) ---
+    raw_text = raw_text.replace('\t', '  ')
+    lines = raw_text.replace('\r\n', '\n').replace('\r', '\n').split('\n')
+    parsed = []
+    pending_entry = None
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or header_pat.match(line):
+            continue
+
+        # Try to detect a time on this line
+        tm = time_pat.search(line)
+        if tm:
+            # Flush any pending entry
+            if pending_entry is not None:
+                parsed.append(pending_entry)
+
+            time_val = _convert_to_24h(tm.group(1), tm.group(2))
+            remainder = line[:tm.start()] + line[tm.end():]
+
+            # Extract MRN
+            mrn_match = mrn_pat.search(remainder)
+            mrn_val = ''
+            if mrn_match:
+                mrn_val = mrn_match.group(1) or mrn_match.group(2)
+                remainder = remainder[:mrn_match.start()] + remainder[mrn_match.end():]
+
+            # Extract patient name
+            name_match = name_pat.search(remainder)
+            name_val = ''
+            if name_match:
+                name_val = name_match.group(0).strip()
+                remainder = remainder[:name_match.start()] + remainder[name_match.end():]
+
+            # Extract visit type from remainder
+            visit_type = _detect_visit_type(remainder)
+            # Anything leftover is the reason / chief complaint
+            reason = remainder.strip(' \t-–—|/')
+            # Remove the matched visit type keyword from reason
+            if visit_type:
+                reason = re.sub(
+                    re.escape(visit_type), '', reason, count=1, flags=re.IGNORECASE
+                ).strip(' \t-–—|/')
+                # Also remove the abbreviation that matched
+                for kw, vt in _VISIT_TYPE_MAP.items():
+                    if vt == visit_type:
+                        reason = re.sub(
+                            r'\b' + re.escape(kw) + r'\b', '', reason,
+                            count=1, flags=re.IGNORECASE
+                        ).strip(' \t-–—|/')
+
+            # Confidence scoring
+            fields_found = sum([bool(time_val), bool(name_val), bool(mrn_val)])
+            confidence = 'high' if fields_found >= 3 else ('medium' if fields_found == 2 else 'low')
+
+            pending_entry = {
+                'time': time_val,
+                'patient_name': name_val,
+                'patient_mrn': mrn_val,
+                'visit_type': visit_type or 'Office Visit',
+                'reason': reason,
+                'confidence': confidence,
+            }
+        elif pending_entry is not None:
+            # Continuation line — append to previous entry's reason
+            pending_entry['reason'] = (pending_entry['reason'] + ' ' + line).strip()
+        else:
+            # Line with no time and no pending entry — try as standalone
+            mrn_match = mrn_pat.search(line)
+            mrn_val = ''
+            remainder = line
+            if mrn_match:
+                mrn_val = mrn_match.group(1) or mrn_match.group(2)
+                remainder = line[:mrn_match.start()] + line[mrn_match.end():]
+
+            name_match = name_pat.search(remainder)
+            name_val = ''
+            if name_match:
+                name_val = name_match.group(0).strip()
+                remainder = remainder[:name_match.start()] + remainder[name_match.end():]
+
+            visit_type = _detect_visit_type(remainder)
+            if name_val or mrn_val:
+                parsed.append({
+                    'time': '',
+                    'patient_name': name_val,
+                    'patient_mrn': mrn_val,
+                    'visit_type': visit_type or 'Office Visit',
+                    'reason': remainder.strip(' \t-–—|/'),
+                    'confidence': 'low',
+                })
+
+    if pending_entry is not None:
+        parsed.append(pending_entry)
+
+    return jsonify({'success': True, 'parsed': parsed})
+
+
+# ======================================================================
+# POST /api/schedule/<id>/collect — trigger AC data collection
+# ======================================================================
+@dashboard_bp.route('/api/schedule/<int:schedule_id>/collect', methods=['POST'])
+@login_required
+def api_schedule_collect(schedule_id):
+    """
+    Start background data collection for a scheduled patient.
+    Launches AC automation (open chart → export clinical summary XML →
+    parse → store) in a background thread and returns immediately.
+    """
+    appt = Schedule.query.filter_by(
+        id=schedule_id, user_id=current_user.id
+    ).first()
+    if not appt:
+        return jsonify({'success': False, 'error': 'Appointment not found'}), 404
+    if not appt.patient_mrn:
+        return jsonify({'success': False, 'error': 'Patient has no MRN'}), 400
+
+    # Check AC state before starting
+    try:
+        from agent.ac_window import get_ac_state
+        state = get_ac_state()
+    except Exception:
+        state = 'not_running'
+
+    if state == 'not_running':
+        return jsonify({'success': False, 'error': 'Amazing Charts is not running'}), 400
+    if state == 'login_screen':
+        return jsonify({'success': False, 'error': 'Amazing Charts is on the login screen — please log in first'}), 400
+
+    # Prevent duplicate jobs
+    existing = _collect_jobs.get(schedule_id)
+    if existing and existing.get('status') == 'running':
+        return jsonify({'success': False, 'error': 'Collection already in progress'}), 409
+
+    _collect_jobs[schedule_id] = {
+        'status': 'running',
+        'message': 'Starting data collection...',
+        'started_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Capture values needed by the background thread
+    user_id = current_user.id
+    mrn = appt.patient_mrn
+    patient_name = appt.patient_name or ''
+    app = current_app._get_current_object()
+
+    def _collect_worker():
+        try:
+            from agent.ac_window import get_ac_state, focus_ac_window, get_active_patient_mrn
+            from agent.clinical_summary_parser import (
+                open_patient_chart, export_clinical_summary,
+                parse_clinical_summary, store_parsed_summary,
+            )
+
+            # Bring AC to foreground
+            _collect_jobs[schedule_id]['message'] = 'Bringing Amazing Charts to foreground...'
+            focus_ac_window()
+            import time
+            time.sleep(0.5)
+
+            # Check if patient already open
+            current_mrn = get_active_patient_mrn()
+            if current_mrn and str(current_mrn).strip() == str(mrn).strip():
+                _collect_jobs[schedule_id]['message'] = 'Patient already open — skipping chart open...'
+            else:
+                _collect_jobs[schedule_id]['message'] = 'Opening patient chart...'
+                success = open_patient_chart(mrn, patient_name)
+                if not success:
+                    _collect_jobs[schedule_id]['status'] = 'error'
+                    _collect_jobs[schedule_id]['message'] = 'Failed to open patient chart in Amazing Charts'
+                    return
+                time.sleep(1)
+
+            _collect_jobs[schedule_id]['message'] = 'Exporting clinical summary...'
+            xml_path = export_clinical_summary(mrn)
+            if not xml_path:
+                _collect_jobs[schedule_id]['status'] = 'error'
+                _collect_jobs[schedule_id]['message'] = 'Failed to export clinical summary — check AC is on the correct screen'
+                return
+
+            _collect_jobs[schedule_id]['message'] = 'Parsing XML data...'
+            parsed = parse_clinical_summary(xml_path)
+            if not parsed:
+                _collect_jobs[schedule_id]['status'] = 'error'
+                _collect_jobs[schedule_id]['message'] = 'Failed to parse clinical summary XML'
+                return
+
+            _collect_jobs[schedule_id]['message'] = 'Storing patient data...'
+            with app.app_context():
+                store_parsed_summary(user_id, mrn, parsed)
+
+            _collect_jobs[schedule_id]['status'] = 'complete'
+            _collect_jobs[schedule_id]['message'] = 'Data collected successfully'
+
+        except Exception as e:
+            _collect_jobs[schedule_id]['status'] = 'error'
+            _collect_jobs[schedule_id]['message'] = f'Collection failed: {e}'
+
+    thread = Thread(target=_collect_worker, daemon=True)
+    thread.start()
+
+    return jsonify({'success': True, 'status': 'started', 'schedule_id': schedule_id})
+
+
+# ======================================================================
+# GET /api/schedule/<id>/collect-status — poll collection progress
+# ======================================================================
+@dashboard_bp.route('/api/schedule/<int:schedule_id>/collect-status')
+@login_required
+def api_schedule_collect_status(schedule_id):
+    """Return the current data collection status for a schedule entry."""
+    job = _collect_jobs.get(schedule_id)
+    if not job:
+        return jsonify({'status': 'not_started', 'message': ''})
+    return jsonify({
+        'status': job.get('status', 'not_started'),
+        'message': job.get('message', ''),
+    })

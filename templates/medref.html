@@ -1,11 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Medication Reference — NP Companion{% endblock %}
+{% from "_cache_badge.html" import cache_badge %}
+{% block title %}Medication Reference — CareCompanion{% endblock %}
 {% block page_id %}medref{% endblock %}
 
 {% block content %}
 <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
     <h1 style="margin:0;">Medication Reference</h1>
     <span class="badge badge--success">API-Powered</span>
+    <span id="medref-cache-badge"></span>
 </div>
 
 <div style="display:grid;grid-template-columns:360px 1fr;gap:20px;min-height:600px;">
@@ -20,19 +22,12 @@
                     <button class="btn btn-outline btn-sm" onclick="clearResults()">Clear</button>
                 </div>
                 <div style="margin-bottom:12px;padding:8px;background:var(--bg-muted,#f8fafc);border-radius:6px;">
-                    <div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--text-secondary);text-transform:uppercase;">Patient Context Filters (F10c)</div>
-                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;">
-                        <input type="checkbox" id="filter-pregnancy" onchange="refilterCard()">
-                        Pregnancy — highlight pregnancy/lactation warnings
-                    </label>
-                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;">
-                        <input type="checkbox" id="filter-renal" onchange="refilterCard()">
-                        Renal impairment — highlight renal dosing adjustments
-                    </label>
-                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
-                        <input type="checkbox" id="filter-hepatic" onchange="refilterCard()">
-                        Hepatic impairment — highlight hepatic adjustments
-                    </label>
+                    <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--text-secondary);text-transform:uppercase;">Quick Filters (F10c)</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                        <button type="button" id="filter-pregnancy" onclick="toggleQuickFilter(this,'pregnancy')" class="medref-toggle-btn" data-active="false">🤰 Pregnancy Safe</button>
+                        <button type="button" id="filter-renal" onclick="toggleQuickFilter(this,'renal')" class="medref-toggle-btn" data-active="false">🫘 Renal Dose Adjust</button>
+                        <button type="button" id="filter-hepatic" onclick="toggleQuickFilter(this,'hepatic')" class="medref-toggle-btn" data-active="false">🫁 Hepatic Adjust</button>
+                    </div>
                 </div>
                 <div id="search-suggestions" style="font-size:12px;"></div>
                 <div id="search-history" style="margin-top:12px;font-size:12px;color:var(--text-secondary);">
@@ -83,6 +78,15 @@ function searchDrug() {
             }
             addToHistory(q);
             renderDrugCard(data, container);
+            // Update cache staleness badge
+            var badgeEl = document.getElementById('medref-cache-badge');
+            if (badgeEl && data.cached_at) {
+                var age = (Date.now() / 1000) - new Date(data.cached_at).getTime() / 1000;
+                var ttl = 7 * 86400;
+                if (age < ttl) badgeEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;">🟢 Fresh</span>';
+                else if (age < ttl * 2) badgeEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;">🟡 Aging</span>';
+                else badgeEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">🔴 Stale</span>';
+            }
         })
         .catch(function() {
             btn.disabled = false; btn.textContent = 'Search';
@@ -122,6 +126,74 @@ function renderDrugCard(d, container) {
         if (d.drug_class) html += '<span class="badge badge--muted">' + escapeHtml(d.drug_class) + '</span>';
         html += '</div>';
     }
+
+    // ────────────────────────────────────────────────────────────────
+    // Pricing card — async fetch via /api/medref/pricing
+    // ToS COMPLIANCE: GoodRx and Cost Plus content NEVER appear in the same card.
+    // The waterfall architecture guarantees mutual exclusivity. Do not modify
+    // this logic to display both sources simultaneously.
+    // ────────────────────────────────────────────────────────────────
+    (function() {
+        var priceId = 'medref-price-card-' + Date.now();
+        html += '<div id="' + priceId + '" style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);">';
+        html += '<span style="font-size:12px;color:var(--text-secondary);">&#128260; Checking prices...</span>';
+        html += '</div>';
+
+        // After the card renders, kick off async pricing fetch
+        setTimeout(function() {
+            var el = document.getElementById(priceId);
+            if (!el) return;
+            var params = [];
+            if (d.generic_name) params.push('drug_name=' + encodeURIComponent(d.generic_name));
+            if (d.rxcui) params.push('rxcui=' + encodeURIComponent(d.rxcui));
+            if (d.dose_strength) params.push('strength=' + encodeURIComponent(d.dose_strength));
+            if (params.length === 0) { el.innerHTML = ''; return; }
+            fetch('/api/medref/pricing?' + params.join('&'))
+                .then(function(r) { return r.json(); })
+                .then(function(p) {
+                    var ph = '';
+                    if (p.source === 'cost_plus' && p.price_monthly_estimate != null) {
+                        var badgeCls = p.badge_color === 'green' ? '--success' : p.badge_color === 'yellow' ? '--warning' : p.badge_color === 'red' ? '--danger' : '--muted';
+                        ph += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">';
+                        ph += '<span class="badge badge' + badgeCls + '">&#128138; Cost Plus Drugs (generic) &mdash; ' + escapeHtml(p.price_display_string || ('$' + p.price_monthly_estimate.toFixed(2) + '/month')) + '</span>';
+                        if (p.direct_url) ph += ' <a href="' + escapeHtml(p.direct_url) + '" target="_blank" rel="noopener" style="font-size:11px;">View on Cost Plus &rarr;</a>';
+                        ph += '</div>';
+                    } else if (p.source === 'goodrx' && p.price_monthly_estimate != null) {
+                        var badgeCls = p.badge_color === 'green' ? '--success' : p.badge_color === 'yellow' ? '--warning' : p.badge_color === 'red' ? '--danger' : '--muted';
+                        ph += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">';
+                        ph += '<span class="badge badge' + badgeCls + '">&#128176; GoodRx cash price &mdash; ' + escapeHtml(p.price_display_string || ('$' + p.price_monthly_estimate.toFixed(2) + '/month')) + '</span>';
+                        if (p.direct_url) ph += ' <a href="' + escapeHtml(p.direct_url) + '" target="_blank" rel="noopener" style="font-size:11px;">View on GoodRx &mdash; click to get coupon &rarr;</a>';
+                        ph += '<div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">' + escapeHtml(p.attribution_text || 'Powered by GoodRx') + '</div>';
+                        ph += '</div>';
+                    } else {
+                        ph += '<div style="font-size:12px;color:var(--text-secondary);">Price data unavailable &mdash; check <a href="https://www.goodrx.com" target="_blank" rel="noopener">GoodRx.com</a> or <a href="https://costplusdrugs.com" target="_blank" rel="noopener">CostPlusDrugs.com</a></div>';
+                    }
+                    // NADAC reference price (Tier 1b — pharmacy acquisition cost)
+                    if (p.nadac_price && p.nadac_price.nadac_per_unit != null) {
+                        ph += '<div class="nadac-ref" style="font-size:11px;color:var(--text-secondary,#6b7280);margin-top:4px;">Pharmacy cost: $' + Number(p.nadac_price.nadac_per_unit).toFixed(4) + '/' + escapeHtml(p.nadac_price.pricing_unit || 'unit') + ' (NADAC)';
+                        if (p.nadac_price.nadac_effective_date) ph += ' &mdash; eff. ' + escapeHtml(p.nadac_price.nadac_effective_date.substring(0, 10));
+                        ph += '</div>';
+                    }
+                    // Assistance programs
+                    if (p.assistance_programs && p.assistance_programs.length > 0) {
+                        ph += '<details style="margin-top:8px;"><summary style="font-size:12px;cursor:pointer;color:var(--color-teal);">Financial Assistance Programs (' + p.assistance_programs.length + ' available)</summary>';
+                        ph += '<div style="margin-top:6px;">';
+                        p.assistance_programs.forEach(function(prog) {
+                            ph += '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--border,#f0f0f0);">';
+                            ph += '<strong>' + escapeHtml(prog.program_name || '') + '</strong>';
+                            if (prog.eligibility_summary) ph += ' &mdash; ' + escapeHtml(prog.eligibility_summary).substring(0, 200);
+                            if (prog.application_url) ph += ' <a href="' + escapeHtml(prog.application_url) + '" target="_blank" rel="noopener" style="font-size:11px;">Apply &rarr;</a>';
+                            ph += '</div>';
+                        });
+                        ph += '</div></details>';
+                    }
+                    el.innerHTML = ph;
+                })
+                .catch(function() {
+                    el.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);">Price data unavailable &mdash; check <a href="https://www.goodrx.com" target="_blank" rel="noopener">GoodRx.com</a> or <a href="https://costplusdrugs.com" target="_blank" rel="noopener">CostPlusDrugs.com</a></div>';
+                });
+        }, 100);
+    })();
 
     // FDA Label sections
     var sections = [
@@ -197,11 +269,18 @@ function renderHistory() {
     el.innerHTML = html;
 }
 
+function toggleQuickFilter(btn, key) {
+    var active = btn.getAttribute('data-active') === 'true';
+    btn.setAttribute('data-active', active ? 'false' : 'true');
+    btn.classList.toggle('medref-toggle-active', !active);
+    refilterCard();
+}
+
 function refilterCard() {
     // When pregnancy/renal/hepatic filters change, re-highlight relevant sections
-    var pregnancy = document.getElementById('filter-pregnancy').checked;
-    var renal = document.getElementById('filter-renal').checked;
-    var hepatic = document.getElementById('filter-hepatic').checked;
+    var pregnancy = document.getElementById('filter-pregnancy').getAttribute('data-active') === 'true';
+    var renal = document.getElementById('filter-renal').getAttribute('data-active') === 'true';
+    var hepatic = document.getElementById('filter-hepatic').getAttribute('data-active') === 'true';
 
     // Find all label sections in the drug card and auto-expand filtered ones
     var container = document.getElementById('drug-card-container');
@@ -244,5 +323,9 @@ function escapeHtml(s) {
 
 <style>
 @keyframes spin{to{transform:rotate(360deg);}}
+.medref-toggle-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:16px;border:1px solid var(--border,#e2e8f0);background:var(--bg-card,#fff);color:var(--text-secondary);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s ease;}
+.medref-toggle-btn:hover{border-color:var(--color-teal,#0D7377);color:var(--text-primary);}
+.medref-toggle-active{background:var(--color-teal,#0D7377);color:#fff;border-color:var(--color-teal,#0D7377);}
+.medref-toggle-active:hover{opacity:.9;color:#fff;}
 </style>
 {% endblock %}

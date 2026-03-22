@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Commute Mode — CareCompanion{% endblock %}
+{% block page_id %}commute-briefing{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:16px;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+        <div>
+            <h1 style="margin:0;font-size:28px;">&#128663; Commute Mode</h1>
+            <span style="font-size:14px;color:var(--text-secondary);">{{ today.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button id="btn-speak" class="btn btn-primary" onclick="toggleSpeech()" style="font-size:16px;padding:10px 20px;">
+                &#128264; Start Reading
+            </button>
+            <a href="/briefing" class="btn" style="font-size:14px;padding:10px 16px;">Full Briefing</a>
+        </div>
+    </div>
+
+    {# ---- Weather Card ---- #}
+    <div class="card" style="margin-bottom:16px;" data-speech="weather">
+        <div class="card-header" style="font-size:18px;">&#127780; Commute Weather</div>
+        <div class="card-body" style="font-size:18px;line-height:1.6;">
+            {% if weather and weather.temperature_f is not none %}
+            <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+                <div style="font-size:48px;font-weight:700;color:var(--text-primary);">
+                    {{ weather.temperature_f }}°F
+                </div>
+                <div>
+                    <div style="font-weight:600;font-size:20px;">{{ weather.description or 'Unknown' }}</div>
+                    <div style="color:var(--text-secondary);">Wind: {{ weather.wind_speed_mph }} mph</div>
+                </div>
+            </div>
+            {% if weather.rain_likely_commute %}
+            <div style="margin-top:12px;padding:12px;background:var(--bg-warning,#fffbeb);border-radius:8px;border-left:4px solid var(--color-warning,#f59e0b);font-weight:600;font-size:20px;">
+                &#9730; {{ weather.precipitation_probability_commute }}% chance of rain during commute (7–9 AM) — bring an umbrella!
+            </div>
+            {% else %}
+            <div style="margin-top:12px;color:var(--color-green,#27ae60);font-weight:500;">
+                &#10003; No rain expected during commute
+            </div>
+            {% endif %}
+            {% if weather.is_extreme_heat %}
+            <div style="margin-top:8px;color:var(--color-red,#e74c3c);font-weight:600;">&#9888; Extreme heat alert — temperature above 95°F</div>
+            {% elif weather.is_extreme_cold %}
+            <div style="margin-top:8px;color:var(--color-blue,#3498db);font-weight:600;">&#9888; Extreme cold alert — temperature below 20°F</div>
+            {% endif %}
+            {% else %}
+            <p style="color:var(--text-secondary);font-style:italic;">Weather data unavailable</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- Schedule Card ---- #}
+    <div class="card" style="margin-bottom:16px;" data-speech="schedule">
+        <div class="card-header" style="font-size:18px;">&#128197; Today's Schedule — {{ appointment_count }} appointment{{ 's' if appointment_count != 1 else '' }}</div>
+        <div class="card-body" style="font-size:16px;line-height:1.8;">
+            {% if appointments %}
+            {% for appt in appointments %}
+            <div style="padding:8px 0;border-bottom:1px solid var(--border,#f1f5f9);display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-weight:600;font-size:18px;">{{ appt.patient_name or 'Unknown' }}</span>
+                <span style="color:var(--text-secondary);font-size:16px;">{{ appt.appointment_time or '' }}</span>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p style="color:var(--text-secondary);font-style:italic;font-size:18px;">No appointments scheduled today</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- Quick Stats Card ---- #}
+    <div class="card" style="margin-bottom:16px;" data-speech="stats">
+        <div class="card-header" style="font-size:18px;">&#128203; Quick Stats</div>
+        <div class="card-body">
+            <div style="display:flex;gap:32px;flex-wrap:wrap;">
+                <div style="text-align:center;">
+                    <div style="font-size:40px;font-weight:700;color:{{ 'var(--color-red,#e74c3c)' if gap_count > 0 else 'var(--color-green,#27ae60)' }};">{{ gap_count }}</div>
+                    <div style="font-size:14px;color:var(--text-secondary);text-transform:uppercase;">Open Care Gaps</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:40px;font-weight:700;color:{{ 'var(--color-warning,#f59e0b)' if inbox_unread > 0 else 'var(--color-green,#27ae60)' }};">{{ inbox_unread }}</div>
+                    <div style="font-size:14px;color:var(--text-secondary);text-transform:uppercase;">Unread Inbox</div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:40px;font-weight:700;color:var(--color-teal,#0D7377);">{{ appointment_count }}</div>
+                    <div style="font-size:14px;color:var(--text-secondary);text-transform:uppercase;">Appointments</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- TTS Controls ---- #}
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap;">
+        <button class="btn" onclick="pauseSpeech()" style="font-size:16px;padding:10px 20px;">&#9208; Pause</button>
+        <button class="btn" onclick="resumeSpeech()" style="font-size:16px;padding:10px 20px;">&#9654; Resume</button>
+        <button class="btn" onclick="stopSpeech()" style="font-size:16px;padding:10px 20px;">&#9632; Stop</button>
+    </div>
+
+</div>
+
+<script>
+(function(){
+    var synth = window.speechSynthesis;
+    var speaking = false;
+    var btnSpeak = document.getElementById('btn-speak');
+
+    function buildScript(){
+        var lines = [];
+        // Weather
+        {% if weather and weather.temperature_f is not none %}
+        lines.push("Good morning. Current weather: {{ weather.temperature_f }} degrees Fahrenheit, {{ weather.description | default('unknown conditions', true) }}. Wind at {{ weather.wind_speed_mph }} miles per hour.");
+        {% if weather.rain_likely_commute %}
+        lines.push("Heads up: {{ weather.precipitation_probability_commute }} percent chance of rain during your commute. Bring an umbrella.");
+        {% else %}
+        lines.push("No rain expected during your commute.");
+        {% endif %}
+        {% if weather.is_extreme_heat %}
+        lines.push("Warning: extreme heat alert. Temperature above 95 degrees.");
+        {% elif weather.is_extreme_cold %}
+        lines.push("Warning: extreme cold alert. Temperature below 20 degrees.");
+        {% endif %}
+        {% else %}
+        lines.push("Weather data is unavailable.");
+        {% endif %}
+
+        // Schedule
+        lines.push("You have {{ appointment_count }} appointment{{ 's' if appointment_count != 1 else '' }} today.");
+        {% for appt in appointments[:5] %}
+        lines.push("{{ appt.patient_name | default('Unknown', true) }} at {{ appt.appointment_time | default('unspecified time', true) }}.");
+        {% endfor %}
+        {% if appointments|length > 5 %}
+        lines.push("Plus {{ appointments|length - 5 }} more.");
+        {% endif %}
+
+        // Stats
+        {% if gap_count > 0 %}
+        lines.push("You have {{ gap_count }} open care gap{{ 's' if gap_count != 1 else '' }}.");
+        {% else %}
+        lines.push("All care gaps are addressed.");
+        {% endif %}
+        {% if inbox_unread > 0 %}
+        lines.push("{{ inbox_unread }} unread inbox item{{ 's' if inbox_unread != 1 else '' }}.");
+        {% endif %}
+
+        lines.push("That's your commute briefing. Have a great day.");
+        return lines.join(' ');
+    }
+
+    window.toggleSpeech = function(){
+        if(!synth){ alert('Speech synthesis not supported in this browser.'); return; }
+        if(speaking){
+            stopSpeech();
+            return;
+        }
+        synth.cancel();
+        var utter = new SpeechSynthesisUtterance(buildScript());
+        utter.rate = 0.95;
+        utter.pitch = 1;
+        utter.onend = function(){ speaking = false; btnSpeak.innerHTML = '&#128264; Start Reading'; };
+        utter.onerror = function(){ speaking = false; btnSpeak.innerHTML = '&#128264; Start Reading'; };
+        synth.speak(utter);
+        speaking = true;
+        btnSpeak.innerHTML = '&#128263; Stop Reading';
+    };
+
+    window.pauseSpeech = function(){ if(synth) synth.pause(); };
+    window.resumeSpeech = function(){ if(synth) synth.resume(); };
+    window.stopSpeech = function(){
+        if(synth) synth.cancel();
+        speaking = false;
+        btnSpeak.innerHTML = '&#128264; Start Reading';
+    };
+})();
+</script>
+{% endblock %}

@@ -1,7 +1,7 @@
 """
-NP Companion — Inbox Digest Report Generator
+CareCompanion — Inbox Digest Report Generator
 
-File location: np-companion/agent/inbox_digest.py
+File location: carecompanion/agent/inbox_digest.py
 
 Generates a periodic summary of inbox activity over a configurable
 time window (default: 24 hours). Can be sent as a Pushover

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Patient {{ mrn_display }} — NP Companion{% endblock %}
+{% from "_cache_badge.html" import cache_badge %}
+{% block title %}Patient {{ mrn_display }} — CareCompanion{% endblock %}
 {% block page_id %}patient{% endblock %}
 
 {% block content %}
@@ -31,7 +32,7 @@
             </tr>
             <tr>
                 <td style="font-weight:500;">Last XML Parsed</td>
-                <td>{{ record.last_xml_parsed.strftime('%m/%d/%Y %I:%M %p') if record.last_xml_parsed else 'Never' }}</td>
+                <td>{{ record.last_xml_parsed.strftime('%m/%d/%Y %I:%M %p') if record.last_xml_parsed else 'Never' }} {{ cache_badge(record.last_xml_parsed, ttl_days=7) }}</td>
             </tr>
         </table>
         {% else %}

@@ -1,5 +1,5 @@
 """
-NP Companion — Agent Scheduler
+CareCompanion — Agent Scheduler
 
 Centralized APScheduler setup for the background agent.
 """
@@ -15,7 +15,17 @@ def build_scheduler(*, timezone, heartbeat_fn, mrn_fn, inbox_fn, inbox_minutes=1
                     xml_poll_fn=None,
                     weekly_summary_fn=None,
                     monthly_billing_fn=None,
-                    deactivation_fn=None):
+                    deactivation_fn=None,
+                    delayed_message_fn=None,
+                    eod_check_fn=None,
+                    drug_recall_fn=None,
+                    previsit_billing_fn=None,
+                    daily_backup_fn=None,
+                    escalation_fn=None,
+                    auto_scrape_fn=None,
+                    auto_scrape_hour=18,
+                    auto_scrape_minute=0,
+                    **kwargs):
     """
     Build and configure a BackgroundScheduler with standard NP jobs.
 
@@ -49,6 +59,16 @@ def build_scheduler(*, timezone, heartbeat_fn, mrn_fn, inbox_fn, inbox_minutes=1
         Function called every Friday at 5 PM to generate and email weekly summary (F13c).
     monthly_billing_fn : callable or None
         Function called on the 1st of each month at 7 AM to generate and email monthly billing report (F14c).
+    delayed_message_fn : callable or None
+        Function called every 60 seconds to check for pending delayed messages ready to send (F18).
+    eod_check_fn : callable or None
+        Function called daily at 5:00 PM to run end-of-day checks and send notifications (F20).
+    drug_recall_fn : callable or None
+        Function called daily at 3:00 AM to scan active patient medications for FDA recalls (NEW-A).
+    previsit_billing_fn : callable or None
+        Function called daily at 8:00 PM to pre-compute billing opportunities for tomorrow's schedule.
+    daily_backup_fn : callable or None
+        Function called daily at 1:00 AM to back up the database with integrity verification.
     """
     scheduler = BackgroundScheduler(timezone=timezone)
 
@@ -182,5 +202,137 @@ def build_scheduler(*, timezone, heartbeat_fn, mrn_fn, inbox_fn, inbox_minutes=1
             max_instances=1,
             coalesce=True,
         )
+
+    # F18: delayed message sender — every 60 seconds
+    if delayed_message_fn is not None:
+        scheduler.add_job(
+            delayed_message_fn,
+            trigger='interval',
+            seconds=60,
+            id='delayed_message_sender',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # F20: end-of-day checker — daily at 5:00 PM
+    if eod_check_fn is not None:
+        scheduler.add_job(
+            eod_check_fn,
+            trigger='cron',
+            hour=17,
+            minute=0,
+            id='eod_check',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # NEW-A: drug recall background scan — daily at 3:00 AM
+    if drug_recall_fn is not None:
+        scheduler.add_job(
+            drug_recall_fn,
+            trigger='cron',
+            hour=3,
+            minute=0,
+            id='drug_recall_scan',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # Scraper overhaul: nightly auto-scrape tomorrow's schedule
+    if auto_scrape_fn is not None:
+        scheduler.add_job(
+            auto_scrape_fn,
+            trigger='cron',
+            hour=int(auto_scrape_hour),
+            minute=int(auto_scrape_minute),
+            id='auto_scrape',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # Phase 13C: pre-visit billing opportunity computation — daily at 8:00 PM
+    if previsit_billing_fn is not None:
+        scheduler.add_job(
+            previsit_billing_fn,
+            trigger='cron',
+            hour=20,
+            minute=0,
+            id='previsit_billing',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # Phase 18: daily database backup with integrity check — 1:00 AM
+    if daily_backup_fn is not None:
+        scheduler.add_job(
+            daily_backup_fn,
+            trigger='cron',
+            hour=1,
+            minute=0,
+            id='daily_backup',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # F21b: escalating alerts — check every 2 minutes for unacknowledged critical values
+    if escalation_fn is not None:
+        scheduler.add_job(
+            escalation_fn,
+            trigger='interval',
+            minutes=2,
+            id='escalation_check',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # Phase 19.14: TCM deadline checker — run nightly at 6 AM
+    if kwargs.get('tcm_deadline_fn') is not None:
+        scheduler.add_job(
+            kwargs['tcm_deadline_fn'],
+            trigger='cron',
+            hour=6,
+            minute=0,
+            id='tcm_deadline_check',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # Phase 19.14: CCM month-end processing — run on 1st of each month at 2 AM
+    if kwargs.get('ccm_month_end_fn') is not None:
+        scheduler.add_job(
+            kwargs['ccm_month_end_fn'],
+            trigger='cron',
+            day=1,
+            hour=2,
+            minute=0,
+            id='ccm_month_end',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # XML cleanup — delete expired clinical summary files daily at 2 AM
+    try:
+        from agent.clinical_summary_parser import run_scheduled_deletions
+        scheduler.add_job(
+            run_scheduled_deletions,
+            trigger='cron',
+            hour=2,
+            minute=0,
+            id='xml_cleanup',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+    except ImportError:
+        pass
 
     return scheduler

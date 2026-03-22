@@ -1,5 +1,5 @@
 """
-NP Companion — Tools Routes
+CareCompanion — Tools Routes
 File: routes/tools.py
 
 Routes for the Tools module:
@@ -28,6 +28,9 @@ from models.tools import (
 )
 from models.tickler import Tickler
 from models.user import User
+from models.notification import Notification, NOTIFICATION_TEMPLATES
+from models.macro import AhkMacro, DotPhrase, MacroStep, MacroVariable
+from models.result_template import ResultTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,37 @@ def index():
 # ======================================================================
 # F25: Controlled Substance Tracker
 # ======================================================================
+
+def get_overdue_pdmp_patients(user_id):
+    """Return list of active CS patients overdue for PDMP check.
+
+    Each dict: {mrn, drug_name, last_checked, days_overdue}.
+    A patient is overdue when last_pdmp_check is null or older than
+    the entry's pdmp_check_interval_days.
+    """
+    from datetime import date, timedelta
+    entries = (
+        ControlledSubstanceEntry.query
+        .filter_by(user_id=user_id, is_active=True)
+        .all()
+    )
+    overdue = []
+    for e in entries:
+        if e.last_pdmp_check is None:
+            days_overdue = e.pdmp_check_interval_days
+        else:
+            due_date = e.last_pdmp_check + timedelta(days=e.pdmp_check_interval_days)
+            if date.today() < due_date:
+                continue
+            days_overdue = (date.today() - due_date).days
+        overdue.append({
+            'mrn': e.mrn,
+            'drug_name': e.drug_name,
+            'last_checked': e.last_pdmp_check.isoformat() if e.last_pdmp_check else None,
+            'days_overdue': days_overdue,
+        })
+    return overdue
+
 
 @tools_bp.route('/cs-tracker')
 @login_required
@@ -72,6 +106,11 @@ def cs_add():
         if request.is_json:
             return jsonify({'success': False, 'error': 'Drug name required'}), 400
         flash('Drug name is required.', 'error')
+        return redirect(url_for('tools.cs_tracker'))
+    if len(drug_name) > 200:
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'Drug name too long'}), 400
+        flash('Drug name is too long.', 'error')
         return redirect(url_for('tools.cs_tracker'))
 
     entry = ControlledSubstanceEntry(
@@ -544,6 +583,7 @@ def pa_generate():
     ndc = ''
     generic_available = False
     drug_class = ''
+    cui_result = None
     try:
         from app.services.api.rxnorm import RxNormService
         svc = RxNormService(db)
@@ -583,7 +623,7 @@ def pa_generate():
         mrn=mrn,
         patient_name=patient_name,
         drug_name=drug_name,
-        rxnorm_cui=cui_result['rxcui'] if 'cui_result' in dir() and cui_result else '',
+        rxnorm_cui=cui_result['rxcui'] if cui_result else '',
         ndc_code=ndc,
         diagnosis=diagnosis,
         icd10_code=icd10,
@@ -666,6 +706,78 @@ def pa_generate_appeal(pa_id):
     db.session.commit()
 
     return jsonify({'success': True, 'appeal': appeal})
+
+
+# ======================================================================
+# F26a: Shared PA Library (Phase 22.8)
+# ======================================================================
+
+@tools_bp.route('/pa/library')
+@login_required
+def pa_library():
+    """Practice-wide shared PA template library with approval rates."""
+    shared_pas = (
+        PriorAuthorization.query
+        .filter_by(is_shared=True)
+        .order_by(PriorAuthorization.drug_name)
+        .all()
+    )
+    return render_template('pa_library.html', shared_pas=shared_pas)
+
+
+@tools_bp.route('/pa/<int:pa_id>/share', methods=['POST'])
+@login_required
+def pa_share(pa_id):
+    """Share a PA template with the practice library."""
+    pa = PriorAuthorization.query.filter_by(
+        id=pa_id, user_id=current_user.id
+    ).first_or_404()
+    pa.is_shared = True
+    pa.shared_by_user_id = current_user.id
+    db.session.commit()
+    flash('PA template shared with practice library.', 'success')
+    return redirect(url_for('tools.pa_index'))
+
+
+@tools_bp.route('/pa/<int:pa_id>/unshare', methods=['POST'])
+@login_required
+def pa_unshare(pa_id):
+    """Remove a PA template from the shared library."""
+    pa = PriorAuthorization.query.filter_by(
+        id=pa_id, user_id=current_user.id
+    ).first_or_404()
+    pa.is_shared = False
+    db.session.commit()
+    flash('PA template removed from shared library.', 'success')
+    return redirect(url_for('tools.pa_index'))
+
+
+@tools_bp.route('/pa/<int:pa_id>/import', methods=['POST'])
+@login_required
+def pa_import(pa_id):
+    """Fork a shared PA template into the current user's PA list."""
+    source = PriorAuthorization.query.filter_by(
+        id=pa_id, is_shared=True
+    ).first_or_404()
+
+    forked = PriorAuthorization(
+        user_id=current_user.id,
+        drug_name=source.drug_name,
+        rxnorm_cui=source.rxnorm_cui,
+        ndc_code=source.ndc_code,
+        diagnosis=source.diagnosis,
+        icd10_code=source.icd10_code,
+        payer_name=source.payer_name,
+        failed_alternatives=source.failed_alternatives,
+        clinical_justification=source.clinical_justification,
+        generated_narrative=source.generated_narrative,
+        status='draft',
+        forked_from_id=source.id,
+    )
+    db.session.add(forked)
+    db.session.commit()
+    flash(f'Imported PA template for {source.drug_name}.', 'success')
+    return redirect(url_for('tools.pa_index'))
 
 
 # ======================================================================
@@ -813,6 +925,110 @@ SPECIALTIES = [
     'Physical Medicine', 'Podiatry', 'Other',
 ]
 
+SPECIALTY_FIELDS = {
+    'Cardiology': [
+        {'name': 'ekg_findings', 'label': 'EKG Findings', 'type': 'text', 'placeholder': 'e.g., NSR, LBBB, ST changes'},
+        {'name': 'echo_results', 'label': 'Echocardiogram Results', 'type': 'textarea', 'placeholder': 'EF, wall motion, valve findings...'},
+        {'name': 'chest_pain_characteristics', 'label': 'Chest Pain Characteristics', 'type': 'text', 'placeholder': 'e.g., exertional, substernal, duration'},
+    ],
+    'Orthopedics': [
+        {'name': 'imaging_results', 'label': 'Imaging Results', 'type': 'textarea', 'placeholder': 'X-ray, MRI, CT findings...'},
+        {'name': 'affected_area', 'label': 'Affected Joint/Extremity', 'type': 'text', 'placeholder': 'e.g., right knee, lumbar spine'},
+        {'name': 'injury_mechanism', 'label': 'Injury Mechanism', 'type': 'text', 'placeholder': 'e.g., fall, overuse, trauma'},
+    ],
+    'Gastroenterology': [
+        {'name': 'lab_results', 'label': 'Recent Labs (LFTs, CBC)', 'type': 'textarea', 'placeholder': 'AST, ALT, bilirubin, CBC values...'},
+        {'name': 'prior_endoscopy', 'label': 'Prior Endoscopy Results', 'type': 'textarea', 'placeholder': 'EGD/colonoscopy findings...'},
+        {'name': 'gi_symptoms', 'label': 'GI Symptom Details', 'type': 'text', 'placeholder': 'e.g., duration, frequency, triggers'},
+    ],
+    'Dermatology': [
+        {'name': 'lesion_location', 'label': 'Lesion Location', 'type': 'text', 'placeholder': 'e.g., left forearm, scalp'},
+        {'name': 'lesion_duration', 'label': 'Duration', 'type': 'text', 'placeholder': 'e.g., 3 months, worsening'},
+        {'name': 'prior_treatments', 'label': 'Prior Treatments', 'type': 'text', 'placeholder': 'e.g., topical steroids, antifungals'},
+    ],
+    'Endocrinology': [
+        {'name': 'recent_labs', 'label': 'Recent Labs (A1c, TSH, etc.)', 'type': 'textarea', 'placeholder': 'A1c, TSH, free T4, glucose values...'},
+        {'name': 'current_regimen', 'label': 'Current Endocrine Regimen', 'type': 'text', 'placeholder': 'e.g., metformin 1000mg BID, levothyroxine 75mcg'},
+        {'name': 'target_concerns', 'label': 'Target Concerns', 'type': 'text', 'placeholder': 'e.g., uncontrolled DM, thyroid nodule'},
+    ],
+    'Neurology': [
+        {'name': 'neuro_exam', 'label': 'Neurological Exam Findings', 'type': 'textarea', 'placeholder': 'Cranial nerves, reflexes, strength, sensation...'},
+        {'name': 'imaging_results', 'label': 'Brain/Spine Imaging', 'type': 'textarea', 'placeholder': 'MRI/CT findings...'},
+        {'name': 'symptom_timeline', 'label': 'Symptom Timeline', 'type': 'text', 'placeholder': 'e.g., onset 2 weeks ago, progressive'},
+    ],
+    'Urology': [
+        {'name': 'psa_results', 'label': 'PSA / Labs', 'type': 'text', 'placeholder': 'e.g., PSA 5.2, UA with micro hematuria'},
+        {'name': 'imaging_results', 'label': 'Imaging Results', 'type': 'textarea', 'placeholder': 'Renal US, CT findings...'},
+        {'name': 'urinary_symptoms', 'label': 'Urinary Symptoms', 'type': 'text', 'placeholder': 'e.g., frequency, hesitancy, nocturia'},
+    ],
+    'Pulmonology': [
+        {'name': 'pft_results', 'label': 'PFT / Spirometry Results', 'type': 'textarea', 'placeholder': 'FEV1, FVC, DLCO values...'},
+        {'name': 'chest_imaging', 'label': 'Chest Imaging', 'type': 'textarea', 'placeholder': 'CXR or CT chest findings...'},
+        {'name': 'respiratory_symptoms', 'label': 'Respiratory Symptoms', 'type': 'text', 'placeholder': 'e.g., dyspnea on exertion, chronic cough'},
+    ],
+    'Nephrology': [
+        {'name': 'renal_labs', 'label': 'Renal Labs (BMP, UA)', 'type': 'textarea', 'placeholder': 'Cr, BUN, GFR, UA with protein...'},
+        {'name': 'renal_imaging', 'label': 'Renal Imaging', 'type': 'textarea', 'placeholder': 'Renal US findings...'},
+        {'name': 'ckd_stage', 'label': 'CKD Stage / Concerns', 'type': 'text', 'placeholder': 'e.g., Stage 3b, declining GFR'},
+    ],
+    'Rheumatology': [
+        {'name': 'inflammatory_labs', 'label': 'Inflammatory Labs', 'type': 'textarea', 'placeholder': 'ESR, CRP, RF, ANA, anti-CCP...'},
+        {'name': 'joint_involvement', 'label': 'Joint Involvement', 'type': 'text', 'placeholder': 'e.g., bilateral MCP, PIPs, symmetric'},
+        {'name': 'symptom_pattern', 'label': 'Symptom Pattern', 'type': 'text', 'placeholder': 'e.g., morning stiffness >1hr, flares'},
+    ],
+    'Psychiatry': [
+        {'name': 'psych_meds', 'label': 'Current Psychiatric Medications', 'type': 'textarea', 'placeholder': 'Drug, dose, duration...'},
+        {'name': 'screening_scores', 'label': 'PHQ-9 / GAD-7 Scores', 'type': 'text', 'placeholder': 'e.g., PHQ-9: 18, GAD-7: 14'},
+        {'name': 'safety_concerns', 'label': 'Safety Concerns', 'type': 'text', 'placeholder': 'e.g., SI/HI assessment, substance use'},
+    ],
+    'General Surgery': [
+        {'name': 'imaging_results', 'label': 'Imaging Results', 'type': 'textarea', 'placeholder': 'CT, US, MRI findings...'},
+        {'name': 'surgical_history', 'label': 'Prior Surgical History', 'type': 'text', 'placeholder': 'e.g., appendectomy 2010, cholecystectomy 2015'},
+        {'name': 'anticoagulation', 'label': 'Anticoagulation Status', 'type': 'text', 'placeholder': 'e.g., on warfarin, last INR 2.3'},
+    ],
+    'Ophthalmology': [
+        {'name': 'visual_acuity', 'label': 'Visual Acuity', 'type': 'text', 'placeholder': 'e.g., OD 20/40, OS 20/25'},
+        {'name': 'ocular_symptoms', 'label': 'Ocular Symptoms', 'type': 'text', 'placeholder': 'e.g., blurred vision, floaters, eye pain'},
+        {'name': 'dm_htn_status', 'label': 'DM/HTN Status', 'type': 'text', 'placeholder': 'e.g., DM2 x10yr, A1c 7.8, HTN controlled'},
+    ],
+    'ENT/Otolaryngology': [
+        {'name': 'symptom_duration', 'label': 'Symptom Duration', 'type': 'text', 'placeholder': 'e.g., chronic sinusitis x6 months'},
+        {'name': 'prior_treatments', 'label': 'Prior Treatments', 'type': 'text', 'placeholder': 'e.g., nasal steroids, antibiotics x3 courses'},
+        {'name': 'imaging_results', 'label': 'Imaging Results', 'type': 'text', 'placeholder': 'e.g., sinus CT findings'},
+    ],
+    'Allergy/Immunology': [
+        {'name': 'allergen_history', 'label': 'Known Allergies / Triggers', 'type': 'textarea', 'placeholder': 'Environmental, food, drug allergies...'},
+        {'name': 'prior_testing', 'label': 'Prior Allergy Testing', 'type': 'text', 'placeholder': 'e.g., skin prick, IgE levels'},
+        {'name': 'current_antihistamines', 'label': 'Current Allergy Medications', 'type': 'text', 'placeholder': 'e.g., cetirizine, montelukast, fluticasone'},
+    ],
+    'Hematology/Oncology': [
+        {'name': 'cbc_results', 'label': 'CBC / Blood Smear', 'type': 'textarea', 'placeholder': 'WBC, Hgb, Plt, differential...'},
+        {'name': 'concerning_findings', 'label': 'Concerning Findings', 'type': 'textarea', 'placeholder': 'e.g., unexplained lymphadenopathy, mass on imaging'},
+        {'name': 'family_cancer_hx', 'label': 'Family Cancer History', 'type': 'text', 'placeholder': 'e.g., mother breast ca age 45, father colon ca age 60'},
+    ],
+    'Infectious Disease': [
+        {'name': 'culture_results', 'label': 'Culture / Sensitivity Results', 'type': 'textarea', 'placeholder': 'Blood Cx, wound Cx, susceptibilities...'},
+        {'name': 'antibiotic_history', 'label': 'Antibiotic History', 'type': 'textarea', 'placeholder': 'Prior antibiotics tried, duration, response...'},
+        {'name': 'travel_exposure', 'label': 'Travel / Exposure History', 'type': 'text', 'placeholder': 'e.g., recent travel, animal exposure, IV drug use'},
+    ],
+    'Pain Management': [
+        {'name': 'pain_location', 'label': 'Pain Location / Characteristics', 'type': 'text', 'placeholder': 'e.g., chronic low back, radicular, neuropathic'},
+        {'name': 'prior_interventions', 'label': 'Prior Interventions', 'type': 'textarea', 'placeholder': 'PT, injections, nerve blocks, medications tried...'},
+        {'name': 'current_pain_meds', 'label': 'Current Pain Medications', 'type': 'text', 'placeholder': 'e.g., gabapentin 300mg TID, meloxicam 15mg'},
+    ],
+    'Physical Medicine': [
+        {'name': 'functional_status', 'label': 'Functional Limitations', 'type': 'textarea', 'placeholder': 'ADL limitations, mobility status, work restrictions...'},
+        {'name': 'prior_therapy', 'label': 'Prior PT/OT', 'type': 'text', 'placeholder': 'e.g., 6 weeks PT, completed home program'},
+        {'name': 'rehab_goals', 'label': 'Rehabilitation Goals', 'type': 'text', 'placeholder': 'e.g., return to work, independent ambulation'},
+    ],
+    'Podiatry': [
+        {'name': 'foot_exam', 'label': 'Foot Exam Findings', 'type': 'textarea', 'placeholder': 'Pulses, sensation, deformity, wound...'},
+        {'name': 'dm_status', 'label': 'Diabetes Status', 'type': 'text', 'placeholder': 'e.g., DM2 x15yr, A1c 8.1, neuropathy'},
+        {'name': 'footwear_orthotics', 'label': 'Footwear / Orthotics', 'type': 'text', 'placeholder': 'e.g., diabetic shoes, custom orthotics'},
+    ],
+    'Other': [],
+}
+
 
 @tools_bp.route('/referral')
 @login_required
@@ -825,7 +1041,8 @@ def referral():
         .limit(50)
         .all()
     )
-    return render_template('referral.html', log=log, specialties=SPECIALTIES)
+    return render_template('referral.html', log=log, specialties=SPECIALTIES,
+                               specialty_fields_json=json.dumps(SPECIALTY_FIELDS))
 
 
 @tools_bp.route('/referral/generate', methods=['POST'])
@@ -870,6 +1087,19 @@ I am referring {patient} for evaluation of {reason}.
     if meds:
         letter += f"CURRENT MEDICATIONS:\n{meds}\n\n"
 
+    # Specialty-specific clinical details
+    spec_fields = SPECIALTY_FIELDS.get(specialty, [])
+    specialty_details = {}
+    clinical_lines = []
+    for fld in spec_fields:
+        val = (data.get(fld['name']) or '').strip()
+        if val:
+            specialty_details[fld['name']] = val
+            clinical_lines.append(f"{fld['label']}: {val}")
+    if clinical_lines:
+        letter += "SPECIALTY-SPECIFIC CLINICAL DETAILS:\n"
+        letter += '\n'.join(clinical_lines) + '\n\n'
+
     letter += f"""I would appreciate your evaluation and recommendations regarding the management of this patient. Please send a consultation note to our office at your earliest convenience.
 
 Thank you for your expertise and timely attention.
@@ -890,6 +1120,7 @@ Family Practice Associates of Chesterfield"""
         urgency=urgency,
         generated_letter=letter,
         referral_date=date.today(),
+        specialty_fields=json.dumps(specialty_details) if specialty_details else None,
     )
     db.session.add(ref)
     db.session.commit()
@@ -906,5 +1137,929 @@ def referral_received(ref_id):
         return jsonify({'success': False}), 404
     ref.consultation_received = True
     ref.follow_up_date = date.today()
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# F20: End-of-Day Checker
+# ======================================================================
+
+@tools_bp.route('/tools/eod')
+@login_required
+def eod():
+    """End-of-Day dashboard — live status check."""
+    from agent.eod_checker import run_eod_check
+    result = run_eod_check(current_user.id)
+    return render_template('eod.html', result=result)
+
+
+# ======================================================================
+# F5: Notification History
+# ======================================================================
+
+@tools_bp.route('/notifications')
+@login_required
+def notifications():
+    """Full notification history page with pagination."""
+    page = request.args.get('page', 1, type=int)
+    per_page = 30
+    type_filter = request.args.get('type', '')
+
+    query = Notification.query.filter_by(user_id=current_user.id)
+    if type_filter:
+        query = query.filter_by(template_name=type_filter)
+
+    pagination = (
+        query
+        .order_by(Notification.created_at.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    template_types = list(NOTIFICATION_TEMPLATES.keys())
+    return render_template(
+        'notifications.html',
+        notifications=pagination.items,
+        pagination=pagination,
+        type_filter=type_filter,
+        template_types=template_types,
+    )
+
+
+# ======================================================================
+# F23: Dot Phrase Engine
+# ======================================================================
+
+@tools_bp.route('/tools/dot-phrases')
+@login_required
+def dot_phrases():
+    """Dot phrase management page — browse, add, edit, delete."""
+    category = request.args.get('category', '')
+    query = DotPhrase.query.filter_by(user_id=current_user.id, is_active=True)
+    if category:
+        query = query.filter_by(category=category)
+    phrases = query.order_by(DotPhrase.abbreviation).all()
+    categories = ['hpi', 'exam', 'plan', 'instructions', 'letters', 'custom']
+    return render_template('dot_phrases.html', phrases=phrases, categories=categories,
+                           active_category=category)
+
+
+@tools_bp.route('/tools/dot-phrases', methods=['POST'])
+@login_required
+def dot_phrase_create():
+    """Create a new dot phrase."""
+    data = request.get_json(silent=True) or {}
+    abbreviation = (data.get('abbreviation') or '').strip().lower()
+    expansion = (data.get('expansion') or '').strip()
+    category = (data.get('category') or 'custom').strip()
+
+    if not abbreviation:
+        return jsonify({'success': False, 'error': 'Abbreviation is required'}), 400
+    if not abbreviation.startswith('.'):
+        abbreviation = '.' + abbreviation
+    if not expansion:
+        return jsonify({'success': False, 'error': 'Expansion text is required'}), 400
+
+    existing = DotPhrase.query.filter_by(user_id=current_user.id, abbreviation=abbreviation).first()
+    if existing:
+        return jsonify({'success': False, 'error': f'"{abbreviation}" already exists'}), 409
+
+    import re as _re
+    placeholders = json.dumps(sorted(set(_re.findall(r'\{(\w+)\}', expansion))))
+
+    phrase = DotPhrase(
+        user_id=current_user.id,
+        abbreviation=abbreviation,
+        expansion=expansion,
+        category=category,
+        placeholders=placeholders,
+    )
+    db.session.add(phrase)
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({'success': True, 'id': phrase.id, 'abbreviation': phrase.abbreviation})
+
+
+@tools_bp.route('/tools/dot-phrases/<int:phrase_id>', methods=['PUT'])
+@login_required
+def dot_phrase_update(phrase_id):
+    """Edit an existing dot phrase."""
+    phrase = DotPhrase.query.filter_by(id=phrase_id, user_id=current_user.id).first_or_404()
+    data = request.get_json(silent=True) or {}
+
+    if 'abbreviation' in data:
+        abbrev = data['abbreviation'].strip().lower()
+        if not abbrev.startswith('.'):
+            abbrev = '.' + abbrev
+        dup = DotPhrase.query.filter_by(user_id=current_user.id, abbreviation=abbrev).first()
+        if dup and dup.id != phrase.id:
+            return jsonify({'success': False, 'error': f'"{abbrev}" already exists'}), 409
+        phrase.abbreviation = abbrev
+
+    if 'expansion' in data:
+        phrase.expansion = data['expansion'].strip()
+        import re as _re
+        phrase.placeholders = json.dumps(sorted(set(_re.findall(r'\{(\w+)\}', phrase.expansion))))
+
+    if 'category' in data:
+        phrase.category = data['category'].strip()
+
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/tools/dot-phrases/<int:phrase_id>', methods=['DELETE'])
+@login_required
+def dot_phrase_delete(phrase_id):
+    """Delete a dot phrase."""
+    phrase = DotPhrase.query.filter_by(id=phrase_id, user_id=current_user.id).first_or_404()
+    db.session.delete(phrase)
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/api/dot-phrases')
+@login_required
+def dot_phrases_api():
+    """JSON list of active dot phrases for autocomplete / live expansion."""
+    phrases = (DotPhrase.query
+               .filter_by(user_id=current_user.id, is_active=True)
+               .order_by(DotPhrase.abbreviation)
+               .all())
+    return jsonify([{
+        'id': p.id,
+        'abbreviation': p.abbreviation,
+        'expansion': p.expansion,
+        'category': p.category,
+        'use_count': p.use_count,
+    } for p in phrases])
+
+
+@tools_bp.route('/api/dot-phrases/<int:phrase_id>/increment', methods=['POST'])
+@login_required
+def dot_phrase_increment(phrase_id):
+    """Bump the use_count for a dot phrase."""
+    phrase = DotPhrase.query.filter_by(id=phrase_id, user_id=current_user.id).first_or_404()
+    phrase.use_count = (phrase.use_count or 0) + 1
+    db.session.commit()
+    return jsonify({'success': True, 'use_count': phrase.use_count})
+
+
+@tools_bp.route('/tools/dot-phrases/export')
+@login_required
+def dot_phrases_export():
+    """Export all active dot phrases as an AHK hotstring file."""
+    from utils.ahk_generator import generate_dot_phrase_script
+
+    phrases = (DotPhrase.query
+               .filter_by(user_id=current_user.id, is_active=True)
+               .order_by(DotPhrase.category, DotPhrase.abbreviation)
+               .all())
+    script = generate_dot_phrase_script(phrases)
+    from flask import Response
+    return Response(
+        script,
+        mimetype='text/plain',
+        headers={'Content-Disposition': 'attachment; filename=dot_phrases.ahk'},
+    )
+
+
+# ======================================================================
+# F23: Macro Recorder
+# ======================================================================
+
+@tools_bp.route('/tools/macros/recorder')
+@login_required
+def macro_recorder():
+    """Macro recorder page — step builder UI."""
+    return render_template('macro_recorder.html')
+
+
+@tools_bp.route('/api/macros/record/save', methods=['POST'])
+@login_required
+def macro_record_save():
+    """Save recorded steps as a new macro."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Macro name is required'}), 400
+
+    macro = AhkMacro(
+        user_id=current_user.id,
+        name=name,
+        description=(data.get('description') or '').strip(),
+        hotkey=(data.get('hotkey') or '').strip(),
+        category=(data.get('category') or 'custom').strip(),
+    )
+    db.session.add(macro)
+    db.session.flush()  # get macro.id
+
+    steps_data = data.get('steps') or []
+    for i, s in enumerate(steps_data):
+        step = MacroStep(
+            macro_id=macro.id,
+            step_order=i + 1,
+            action_type=s.get('action_type', 'sleep'),
+            target_x=s.get('target_x'),
+            target_y=s.get('target_y'),
+            key_sequence=s.get('key_sequence'),
+            delay_ms=s.get('delay_ms', 100),
+            window_title=s.get('window_title'),
+            comment=s.get('comment'),
+        )
+        db.session.add(step)
+
+    variables_data = data.get('variables') or []
+    for v in variables_data:
+        var = MacroVariable(
+            macro_id=macro.id,
+            var_name=v.get('var_name', ''),
+            var_label=v.get('var_label', ''),
+            default_value=v.get('default_value', ''),
+            var_type=v.get('var_type', 'text'),
+            choices=v.get('choices'),
+        )
+        db.session.add(var)
+
+    db.session.commit()
+    return jsonify({'success': True, 'id': macro.id, 'name': macro.name})
+
+
+@tools_bp.route('/api/macros/<int:macro_id>/steps')
+@login_required
+def macro_get_steps(macro_id):
+    """Get steps for a macro (for preview / editing)."""
+    macro = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+    steps = MacroStep.query.filter_by(macro_id=macro.id).order_by(MacroStep.step_order).all()
+    return jsonify([s.to_dict() for s in steps])
+
+
+@tools_bp.route('/api/macros/<int:macro_id>/steps', methods=['PUT'])
+@login_required
+def macro_update_steps(macro_id):
+    """Replace all steps for a macro (bulk update after reorder/edit)."""
+    macro = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+
+    # Delete existing steps
+    MacroStep.query.filter_by(macro_id=macro.id).delete()
+
+    steps_data = (request.get_json(silent=True) or {}).get('steps', [])
+    for i, s in enumerate(steps_data):
+        step = MacroStep(
+            macro_id=macro.id,
+            step_order=i + 1,
+            action_type=s.get('action_type', 'sleep'),
+            target_x=s.get('target_x'),
+            target_y=s.get('target_y'),
+            key_sequence=s.get('key_sequence'),
+            delay_ms=s.get('delay_ms', 100),
+            window_title=s.get('window_title'),
+            comment=s.get('comment'),
+        )
+        db.session.add(step)
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# F23: Macro Library (Main Management Page)
+# ======================================================================
+
+@tools_bp.route('/tools/macros')
+@login_required
+def macro_library():
+    """Macro library — card grid with all macros grouped by category."""
+    category = request.args.get('category', '')
+    query = AhkMacro.query.filter_by(user_id=current_user.id, is_active=True)
+    if category:
+        query = query.filter_by(category=category)
+    macros = query.order_by(AhkMacro.display_order, AhkMacro.name).all()
+
+    # Detect hotkey conflicts
+    hotkey_counts = {}
+    for m in macros:
+        if m.hotkey:
+            hotkey_counts.setdefault(m.hotkey, []).append(m.id)
+    conflicts = {hk: ids for hk, ids in hotkey_counts.items() if len(ids) > 1}
+
+    import config as _cfg
+    sync_enabled = bool(getattr(_cfg, 'AHK_AUTO_SYNC_PATH', None))
+    categories = ['navigation', 'template', 'order_entry', 'dot_phrase', 'data_entry', 'custom']
+    return render_template('macros.html', macros=macros, categories=categories,
+                           active_category=category, conflicts=conflicts,
+                           sync_enabled=sync_enabled,
+                           last_sync=_last_sync_result)
+
+
+@tools_bp.route('/tools/macros', methods=['POST'])
+@login_required
+def macro_create():
+    """Create a new macro from form or code editor."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Name is required'}), 400
+
+    macro = AhkMacro(
+        user_id=current_user.id,
+        name=name,
+        description=(data.get('description') or '').strip(),
+        hotkey=(data.get('hotkey') or '').strip(),
+        script_content=(data.get('script_content') or '').strip(),
+        category=(data.get('category') or 'custom').strip(),
+    )
+    db.session.add(macro)
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({'success': True, 'id': macro.id})
+
+
+@tools_bp.route('/tools/macros/<int:macro_id>', methods=['PUT'])
+@login_required
+def macro_update(macro_id):
+    """Edit macro metadata and/or script content."""
+    macro = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+    data = request.get_json(silent=True) or {}
+
+    for field in ('name', 'description', 'hotkey', 'script_content', 'category'):
+        if field in data:
+            setattr(macro, field, (data[field] or '').strip())
+
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/tools/macros/<int:macro_id>', methods=['DELETE'])
+@login_required
+def macro_delete(macro_id):
+    """Soft-delete a macro (set is_active=False)."""
+    macro = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+    macro.is_active = False
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({'success': True, 'undo': True})
+
+
+@tools_bp.route('/tools/macros/<int:macro_id>/restore', methods=['POST'])
+@login_required
+def macro_restore(macro_id):
+    """Undo a soft-delete — restore macro."""
+    macro = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+    macro.is_active = True
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/tools/macros/<int:macro_id>/duplicate', methods=['POST'])
+@login_required
+def macro_duplicate(macro_id):
+    """Clone a macro with ' (Copy)' suffix."""
+    original = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+
+    clone = AhkMacro(
+        user_id=current_user.id,
+        name=original.name + ' (Copy)',
+        description=original.description,
+        hotkey='',  # clear hotkey to avoid conflicts
+        script_content=original.script_content,
+        category=original.category,
+    )
+    db.session.add(clone)
+    db.session.flush()
+
+    # Clone steps
+    for step in original.steps:
+        new_step = MacroStep(
+            macro_id=clone.id,
+            step_order=step.step_order,
+            action_type=step.action_type,
+            target_x=step.target_x,
+            target_y=step.target_y,
+            key_sequence=step.key_sequence,
+            delay_ms=step.delay_ms,
+            window_title=step.window_title,
+            comment=step.comment,
+        )
+        db.session.add(new_step)
+
+    # Clone variables
+    for var in original.variables:
+        new_var = MacroVariable(
+            macro_id=clone.id,
+            var_name=var.var_name,
+            var_label=var.var_label,
+            default_value=var.default_value,
+            var_type=var.var_type,
+            choices=var.choices,
+        )
+        db.session.add(new_var)
+
+    db.session.commit()
+    return jsonify({'success': True, 'id': clone.id, 'name': clone.name})
+
+
+@tools_bp.route('/tools/macros/reorder', methods=['PUT'])
+@login_required
+def macro_reorder():
+    """Update display_order for multiple macros."""
+    data = request.get_json(silent=True) or {}
+    order_map = data.get('order', {})  # {macro_id: new_order}
+    for mid_str, new_order in order_map.items():
+        macro = AhkMacro.query.filter_by(id=int(mid_str), user_id=current_user.id).first()
+        if macro:
+            macro.display_order = int(new_order)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/tools/macros/<int:macro_id>/preview')
+@login_required
+def macro_preview(macro_id):
+    """Preview generated AHK code for a single macro."""
+    from utils.ahk_generator import generate_macro_script
+    macro = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+    steps = MacroStep.query.filter_by(macro_id=macro.id).order_by(MacroStep.step_order).all()
+    variables = MacroVariable.query.filter_by(macro_id=macro.id).all()
+    script = generate_macro_script(macro, steps, variables)
+    return jsonify({'success': True, 'script': script, 'name': macro.name})
+
+
+# ======================================================================
+# F23: AHK Auto-Sync Helper
+# ======================================================================
+
+_last_sync_result = {'synced_at': None, 'error': None, 'macro_count': 0}
+
+
+def _sync_ahk_to_disk(user_id):
+    """Write the full AHK library to disk if AHK_AUTO_SYNC_PATH is configured.
+
+    Never raises — sync failure is logged but never blocks the save operation.
+    Returns dict with sync result.
+    """
+    import config
+    sync_path = getattr(config, 'AHK_AUTO_SYNC_PATH', None)
+    if not sync_path:
+        return {'synced': False, 'reason': 'not_configured'}
+
+    try:
+        from utils.ahk_generator import generate_full_library
+
+        macros_raw = (
+            AhkMacro.query
+            .filter_by(user_id=user_id, is_active=True)
+            .order_by(AhkMacro.display_order, AhkMacro.name)
+            .all()
+        )
+        macros = []
+        for m in macros_raw:
+            steps = MacroStep.query.filter_by(macro_id=m.id).order_by(MacroStep.step_order).all()
+            variables = MacroVariable.query.filter_by(macro_id=m.id).all()
+            macros.append((m, steps, variables))
+
+        phrases = (
+            DotPhrase.query
+            .filter_by(user_id=user_id, is_active=True)
+            .order_by(DotPhrase.category, DotPhrase.abbreviation)
+            .all()
+        )
+
+        script = generate_full_library(macros, phrases)
+
+        import os
+        sync_dir = os.path.dirname(sync_path)
+        if sync_dir:
+            os.makedirs(sync_dir, exist_ok=True)
+        with open(sync_path, 'w', encoding='utf-8') as f:
+            f.write(script)
+
+        now_str = datetime.now(timezone.utc).isoformat()
+        _last_sync_result['synced_at'] = now_str
+        _last_sync_result['error'] = None
+        _last_sync_result['macro_count'] = len(macros) + len(phrases)
+        logger.info('AHK auto-sync: wrote %d items to %s', len(macros) + len(phrases), sync_path)
+        return {'synced': True, 'synced_at': now_str, 'macro_count': len(macros) + len(phrases)}
+    except Exception as exc:
+        _last_sync_result['error'] = str(exc)
+        logger.warning('AHK auto-sync failed: %s', exc)
+        return {'synced': False, 'error': str(exc)}
+
+
+# ======================================================================
+# F23: Import / Export
+# ======================================================================
+
+@tools_bp.route('/tools/macros/export')
+@login_required
+def macro_export_all():
+    """Export all active macros + dot phrases as a single .ahk file."""
+    from utils.ahk_generator import generate_full_library
+    from flask import Response
+
+    macros_raw = (AhkMacro.query
+                  .filter_by(user_id=current_user.id, is_active=True)
+                  .order_by(AhkMacro.display_order, AhkMacro.name)
+                  .all())
+    macros = []
+    for m in macros_raw:
+        steps = MacroStep.query.filter_by(macro_id=m.id).order_by(MacroStep.step_order).all()
+        variables = MacroVariable.query.filter_by(macro_id=m.id).all()
+        macros.append((m, steps, variables))
+
+    phrases = (DotPhrase.query
+               .filter_by(user_id=current_user.id, is_active=True)
+               .order_by(DotPhrase.category, DotPhrase.abbreviation)
+               .all())
+
+    script = generate_full_library(macros, phrases)
+    return Response(
+        script,
+        mimetype='text/plain',
+        headers={'Content-Disposition': 'attachment; filename=carecompanion_macros.ahk'},
+    )
+
+
+@tools_bp.route('/tools/macros/export/<int:macro_id>')
+@login_required
+def macro_export_single(macro_id):
+    """Export a single macro as an .ahk file."""
+    from utils.ahk_generator import generate_macro_script
+    from flask import Response
+
+    macro = AhkMacro.query.filter_by(id=macro_id, user_id=current_user.id).first_or_404()
+    steps = MacroStep.query.filter_by(macro_id=macro.id).order_by(MacroStep.step_order).all()
+    variables = MacroVariable.query.filter_by(macro_id=macro.id).all()
+    script = generate_macro_script(macro, steps, variables)
+
+    safe_name = macro.name.replace(' ', '_').lower()[:40]
+    return Response(
+        script,
+        mimetype='text/plain',
+        headers={'Content-Disposition': f'attachment; filename={safe_name}.ahk'},
+    )
+
+
+@tools_bp.route('/tools/macros/import', methods=['POST'])
+@login_required
+def macro_import_ahk():
+    """Import .ahk file — parse hotkeys and hotstrings into macros/dot phrases."""
+    from utils.ahk_generator import parse_ahk_hotstring
+
+    content = None
+    if request.is_json:
+        content = (request.get_json(silent=True) or {}).get('content', '')
+    elif request.files.get('file'):
+        content = request.files['file'].read().decode('utf-8', errors='replace')
+
+    if not content:
+        return jsonify({'success': False, 'error': 'No content provided'}), 400
+
+    imported_phrases = 0
+    imported_macros = 0
+
+    for line in content.split('\n'):
+        line = line.strip()
+        parsed = parse_ahk_hotstring(line)
+        if parsed:
+            abbrev, expansion = parsed
+            existing = DotPhrase.query.filter_by(
+                user_id=current_user.id, abbreviation=abbrev
+            ).first()
+            if not existing:
+                import re as _re
+                placeholders = json.dumps(sorted(set(_re.findall(r'\{(\w+)\}', expansion))))
+                dp = DotPhrase(
+                    user_id=current_user.id,
+                    abbreviation=abbrev,
+                    expansion=expansion,
+                    category='custom',
+                    placeholders=placeholders,
+                )
+                db.session.add(dp)
+                imported_phrases += 1
+
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({
+        'success': True,
+        'imported_phrases': imported_phrases,
+        'imported_macros': imported_macros,
+    })
+
+
+@tools_bp.route('/tools/macros/export-json')
+@login_required
+def macro_export_json():
+    """Export full library as JSON backup."""
+    macros_raw = (AhkMacro.query
+                  .filter_by(user_id=current_user.id)
+                  .order_by(AhkMacro.display_order)
+                  .all())
+    macros_list = []
+    for m in macros_raw:
+        steps = MacroStep.query.filter_by(macro_id=m.id).order_by(MacroStep.step_order).all()
+        variables = MacroVariable.query.filter_by(macro_id=m.id).all()
+        macros_list.append({
+            'name': m.name,
+            'description': m.description,
+            'hotkey': m.hotkey,
+            'script_content': m.script_content,
+            'category': m.category,
+            'is_active': m.is_active,
+            'display_order': m.display_order,
+            'steps': [s.to_dict() for s in steps],
+            'variables': [v.to_dict() for v in variables],
+        })
+
+    phrases = DotPhrase.query.filter_by(user_id=current_user.id).order_by(DotPhrase.abbreviation).all()
+    phrases_list = [{
+        'abbreviation': p.abbreviation,
+        'expansion': p.expansion,
+        'category': p.category,
+        'placeholders': p.placeholders,
+        'use_count': p.use_count,
+        'is_active': p.is_active,
+    } for p in phrases]
+
+    from flask import Response
+    backup = json.dumps({
+        'version': 1,
+        'exported_at': datetime.now(timezone.utc).isoformat(),
+        'macros': macros_list,
+        'dot_phrases': phrases_list,
+    }, indent=2)
+    return Response(
+        backup,
+        mimetype='application/json',
+        headers={'Content-Disposition': 'attachment; filename=carecompanion_macros_backup.json'},
+    )
+
+
+@tools_bp.route('/tools/macros/import-json', methods=['POST'])
+@login_required
+def macro_import_json():
+    """Import JSON backup to restore library."""
+    content = None
+    if request.is_json:
+        content = request.get_json(silent=True)
+    elif request.files.get('file'):
+        raw = request.files['file'].read().decode('utf-8', errors='replace')
+        try:
+            content = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({'success': False, 'error': 'Invalid JSON file'}), 400
+
+    if not content or not isinstance(content, dict):
+        return jsonify({'success': False, 'error': 'No valid JSON data provided'}), 400
+
+    imported_macros = 0
+    imported_phrases = 0
+
+    for m_data in content.get('macros', []):
+        name = (m_data.get('name') or '').strip()
+        if not name:
+            continue
+        macro = AhkMacro(
+            user_id=current_user.id,
+            name=name,
+            description=m_data.get('description', ''),
+            hotkey=m_data.get('hotkey', ''),
+            script_content=m_data.get('script_content', ''),
+            category=m_data.get('category', 'custom'),
+            is_active=m_data.get('is_active', True),
+            display_order=m_data.get('display_order', 0),
+        )
+        db.session.add(macro)
+        db.session.flush()
+
+        for s_data in m_data.get('steps', []):
+            step = MacroStep(
+                macro_id=macro.id,
+                step_order=s_data.get('step_order', 0),
+                action_type=s_data.get('action_type', 'sleep'),
+                target_x=s_data.get('target_x'),
+                target_y=s_data.get('target_y'),
+                key_sequence=s_data.get('key_sequence'),
+                delay_ms=s_data.get('delay_ms', 100),
+                window_title=s_data.get('window_title'),
+                comment=s_data.get('comment'),
+            )
+            db.session.add(step)
+
+        for v_data in m_data.get('variables', []):
+            var = MacroVariable(
+                macro_id=macro.id,
+                var_name=v_data.get('var_name', ''),
+                var_label=v_data.get('var_label', ''),
+                default_value=v_data.get('default_value', ''),
+                var_type=v_data.get('var_type', 'text'),
+                choices=v_data.get('choices'),
+            )
+            db.session.add(var)
+        imported_macros += 1
+
+    for p_data in content.get('dot_phrases', []):
+        abbrev = (p_data.get('abbreviation') or '').strip()
+        if not abbrev:
+            continue
+        existing = DotPhrase.query.filter_by(user_id=current_user.id, abbreviation=abbrev).first()
+        if existing:
+            continue
+        dp = DotPhrase(
+            user_id=current_user.id,
+            abbreviation=abbrev,
+            expansion=p_data.get('expansion', ''),
+            category=p_data.get('category', 'custom'),
+            placeholders=p_data.get('placeholders', '[]'),
+            use_count=p_data.get('use_count', 0),
+            is_active=p_data.get('is_active', True),
+        )
+        db.session.add(dp)
+        imported_phrases += 1
+
+    db.session.commit()
+    _sync_ahk_to_disk(current_user.id)
+    return jsonify({
+        'success': True,
+        'imported_macros': imported_macros,
+        'imported_phrases': imported_phrases,
+    })
+
+
+@tools_bp.route('/tools/macros/sync', methods=['POST'])
+@login_required
+def macro_sync():
+    """Manual sync — write AHK library to disk on demand."""
+    result = _sync_ahk_to_disk(current_user.id)
+    if result.get('synced'):
+        return jsonify({
+            'success': True,
+            'synced_at': result['synced_at'],
+            'macro_count': result['macro_count'],
+        })
+    return jsonify({
+        'success': False,
+        'error': result.get('error') or result.get('reason', 'unknown'),
+    })
+
+
+# ======================================================================
+# F19a: Result Template Library
+# ======================================================================
+
+TEMPLATE_CATEGORIES = ['normal', 'abnormal', 'critical', 'follow_up', 'referral']
+
+
+@tools_bp.route('/tools/templates')
+@login_required
+def template_library():
+    """Result template library — My / Shared / System tabs."""
+    uid = current_user.id
+
+    my_templates = (
+        ResultTemplate.query
+        .filter_by(user_id=uid, is_active=True)
+        .order_by(ResultTemplate.category, ResultTemplate.display_order)
+        .all()
+    )
+    shared_templates = (
+        ResultTemplate.query
+        .filter(ResultTemplate.user_id != uid, ResultTemplate.user_id != None,
+                ResultTemplate.is_shared == True, ResultTemplate.is_active == True)
+        .order_by(ResultTemplate.category, ResultTemplate.display_order)
+        .all()
+    )
+    system_templates = (
+        ResultTemplate.query
+        .filter_by(user_id=None, is_active=True)
+        .order_by(ResultTemplate.category, ResultTemplate.display_order)
+        .all()
+    )
+
+    return render_template(
+        'result_template_library.html',
+        my_templates=my_templates,
+        shared_templates=shared_templates,
+        system_templates=system_templates,
+        categories=TEMPLATE_CATEGORIES,
+    )
+
+
+@tools_bp.route('/tools/templates/create', methods=['POST'])
+@login_required
+def template_create():
+    """Create a new result template owned by the current user."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    category = (data.get('category') or '').strip()
+    body = (data.get('body_template') or '').strip()
+
+    if not name or not category or not body:
+        return jsonify({'success': False, 'error': 'Name, category, and body are required'}), 400
+    if category not in TEMPLATE_CATEGORIES:
+        return jsonify({'success': False, 'error': 'Invalid category'}), 400
+
+    t = ResultTemplate(
+        name=name,
+        category=category,
+        body_template=body,
+        user_id=current_user.id,
+    )
+    db.session.add(t)
+    db.session.commit()
+    return jsonify({'success': True, 'id': t.id})
+
+
+@tools_bp.route('/tools/templates/<int:tid>/update', methods=['POST'])
+@login_required
+def template_update(tid):
+    """Update a result template (owner or admin only)."""
+    t = ResultTemplate.query.get(tid)
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if t.user_id != current_user.id and current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    data = request.get_json(silent=True) or {}
+    if 'name' in data:
+        t.name = (data['name'] or '').strip()
+    if 'category' in data:
+        cat = (data['category'] or '').strip()
+        if cat and cat in TEMPLATE_CATEGORIES:
+            t.category = cat
+    if 'body_template' in data:
+        t.body_template = (data['body_template'] or '').strip()
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/tools/templates/<int:tid>/delete', methods=['POST'])
+@login_required
+def template_delete(tid):
+    """Soft-delete a template (set is_active=False). Owner or admin."""
+    t = ResultTemplate.query.get(tid)
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if t.user_id != current_user.id and current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    t.is_active = False
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@tools_bp.route('/tools/templates/<int:tid>/share', methods=['POST'])
+@login_required
+def template_share(tid):
+    """Toggle is_shared on a user-owned template."""
+    t = ResultTemplate.query.get(tid)
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+    if t.user_id != current_user.id and current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    t.is_shared = not t.is_shared
+    db.session.commit()
+    return jsonify({'success': True, 'is_shared': t.is_shared})
+
+
+@tools_bp.route('/tools/templates/<int:tid>/fork', methods=['POST'])
+@login_required
+def template_fork(tid):
+    """Fork a shared or system template into user's collection."""
+    t = ResultTemplate.query.get(tid)
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    copy = ResultTemplate(
+        name=t.name + ' (My Copy)',
+        category=t.category,
+        body_template=t.body_template,
+        user_id=current_user.id,
+        copied_from_id=t.id,
+    )
+    db.session.add(copy)
+    db.session.commit()
+    return jsonify({'success': True, 'id': copy.id})
+
+
+@tools_bp.route('/tools/templates/<int:tid>/flag-reviewed', methods=['POST'])
+@login_required
+def template_flag_reviewed(tid):
+    """Mark a template as legally reviewed (provider/admin)."""
+    if current_user.role not in ('admin', 'provider'):
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+    t = ResultTemplate.query.get(tid)
+    if not t:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    t.legal_reviewed = True
+    t.legal_reviewed_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify({'success': True})

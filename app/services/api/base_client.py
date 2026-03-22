@@ -1,5 +1,5 @@
 """
-NP Companion — Base API Client
+CareCompanion — Base API Client
 File: app/services/api/base_client.py
 
 All external API service modules inherit from BaseAPIClient.
@@ -28,7 +28,7 @@ Dependencies:
   HTTP_RETRY_BACKOFF_SECONDS)
 - app/services/api/cache_manager.py (CacheManager)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Every API service in app/services/api/ (all 14 service modules)
 - Offline mode (F30) — stale cache path is defined here
 """
@@ -59,7 +59,7 @@ class APIUnavailableError(Exception):
 
 class BaseAPIClient:
     """
-    Base class for all NP Companion API service modules.
+    Base class for all CareCompanion API service modules.
 
     Provides retry logic, rate limiting, and offline fallback via the
     cache manager. Subclasses only need to implement endpoint-specific

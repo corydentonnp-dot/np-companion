@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Billing Benchmarks — CareCompanion{% endblock %}
+{% block page_id %}timer{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Billing Benchmarks</h1>
+    <div style="display:flex;gap:8px;margin-left:auto;align-items:center;">
+        <form method="GET" action="/billing/benchmarks" style="display:flex;gap:8px;align-items:center;">
+            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}"
+                   style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+            <button type="submit" style="padding:6px 14px;border-radius:6px;background:var(--color-navy);color:#fff;border:none;font-size:13px;cursor:pointer;min-height:44px;">Go</button>
+        </form>
+        <a href="/billing/monthly-report" style="font-size:13px;color:var(--color-navy);">Monthly Report</a>
+        <a href="/billing/log" style="font-size:13px;color:var(--color-navy);">Billing Log</a>
+    </div>
+</div>
+
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px;">
+    Compares your {{ '%04d-%02d'|format(year, month) }} E&amp;M code distribution against your own 6-month rolling average.
+    Codes deviating &gt;1.5&sigma; from your baseline are flagged as outliers.
+</p>
+
+{# Summary Cards #}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:24px;">
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ current_total }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Sessions This Month</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ current_rvu }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">wRVU This Month</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ avg_monthly_rvu }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Avg Monthly wRVU (6mo)</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body" style="text-align:center;">
+            <div style="font-size:32px;font-weight:700;color:{% if outlier_count > 0 %}#dc2626{% else %}#059669{% endif %};">{{ outlier_count }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Outlier Codes</div>
+        </div>
+    </div>
+</div>
+
+{# Code Distribution Table #}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:var(--bg-secondary,#f8fafc);border-bottom:2px solid var(--border,#e2e8f0);">
+                    <th style="padding:10px 12px;text-align:left;">Code</th>
+                    <th style="padding:10px 12px;text-align:right;">wRVU</th>
+                    <th style="padding:10px 12px;text-align:right;">This Month</th>
+                    <th style="padding:10px 12px;text-align:right;">This Month %</th>
+                    <th style="padding:10px 12px;text-align:right;">6mo Avg</th>
+                    <th style="padding:10px 12px;text-align:right;">6mo Avg %</th>
+                    <th style="padding:10px 12px;text-align:right;">Diff</th>
+                    <th style="padding:10px 12px;text-align:center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in comparison %}
+                <tr style="border-bottom:1px solid var(--border,#e2e8f0);{% if row.is_outlier %}background:{% if row.outlier_direction == 'high' %}#fef2f2{% else %}#eff6ff{% endif %};{% endif %}">
+                    <td style="padding:8px 12px;font-weight:600;">{{ row.code }}</td>
+                    <td style="padding:8px 12px;text-align:right;">{{ row.rvu }}</td>
+                    <td style="padding:8px 12px;text-align:right;">{{ row.current_count }}</td>
+                    <td style="padding:8px 12px;text-align:right;">{{ row.current_pct }}%</td>
+                    <td style="padding:8px 12px;text-align:right;">{{ row.avg_count }}</td>
+                    <td style="padding:8px 12px;text-align:right;">{{ row.avg_pct }}%</td>
+                    <td style="padding:8px 12px;text-align:right;color:{% if row.diff_pct > 0 %}#059669{% elif row.diff_pct < 0 %}#dc2626{% else %}var(--text-secondary){% endif %};">
+                        {% if row.diff_pct > 0 %}+{% endif %}{{ row.diff_pct }}pp
+                    </td>
+                    <td style="padding:8px 12px;text-align:center;">
+                        {% if row.is_outlier %}
+                            <span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;
+                                {% if row.outlier_direction == 'high' %}background:#fee2e2;color:#dc2626;{% else %}background:#dbeafe;color:#2563eb;{% endif %}">
+                                &#9888; {{ row.outlier_direction|upper }}
+                            </span>
+                        {% else %}
+                            <span style="color:#059669;font-size:11px;">&#10003; Normal</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Code Trend Chart #}
+{% if trend_series %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body">
+        <h3 style="margin:0 0 16px 0;font-size:15px;">E&amp;M Code Trend (7 Months)</h3>
+        <canvas id="chart-benchmark-trend" height="260"></canvas>
+    </div>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+(function(){
+    var labels = {{ trend_labels|tojson }};
+    var series = {{ trend_series|tojson }};
+
+    var colors = ['#1e3a5f','#2563eb','#059669','#d97706','#dc2626','#7c3aed','#db2777','#0891b2','#65a30d','#ea580c'];
+    var datasets = [];
+    var i = 0;
+    for (var code in series) {
+        datasets.push({
+            label: code,
+            data: series[code],
+            borderColor: colors[i % colors.length],
+            backgroundColor: 'transparent',
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 3,
+        });
+        i++;
+    }
+
+    var ctx = document.getElementById('chart-benchmark-trend');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Sessions' } }
+                }
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

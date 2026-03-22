@@ -1,5 +1,5 @@
 """
-NP Companion — CDC Immunization Schedule Service
+CareCompanion — CDC Immunization Schedule Service
 File: app/services/api/cdc_immunizations.py
 
 CDC CVX (Clinical Vaccine administered) codes are part of the RxNorm dataset.
@@ -13,7 +13,7 @@ Dependencies:
 - app/services/api/rxnorm.py (RxNormService for CVX lookup)
 - app/api_config.py (CDC_IMMUNIZATION_CACHE_TTL_DAYS)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Care Gap Tracker (F15) — immunization gap detection alongside USPSTF gaps
 - Patient Chart View — immunization status per CDC adult schedule
 - Morning Briefing (F22) — immunization gaps for scheduled patients
@@ -22,6 +22,7 @@ NP Companion features that rely on this module:
 import logging
 from datetime import datetime, timezone
 from app.api_config import CDC_IMMUNIZATION_CACHE_TTL_DAYS
+from models.api_cache import CdcImmunizationCache
 
 logger = logging.getLogger(__name__)
 
@@ -118,10 +119,39 @@ class CDCImmunizationsService:
     """
     Evaluates immunization gaps from patient history against the CDC adult schedule.
 
-    Unlike other services, this does not make live API calls — it uses the
-    locally maintained CDC schedule data above and cross-references against
-    the patient's immunization history from the Clinical Summary XML.
+    Phase 17.2: Supplemented with VSAC value sets when available. The hardcoded
+    CDC_ADULT_SCHEDULE is the offline fallback (Pattern C architecture).
+    When VSAC is reachable, additional vaccine recommendations beyond the
+    hardcoded 10 are included in gap evaluation.
     """
+
+    def __init__(self, db=None):
+        self._db = db
+        self._vsac_vaccines = None  # Lazy-loaded from VSAC
+
+    def _load_vsac_vaccines(self) -> list:
+        """
+        Attempt to load additional vaccines from VSAC value sets.
+        Returns a list of CVX codes from VSAC, or empty list if unavailable.
+        """
+        if self._vsac_vaccines is not None:
+            return self._vsac_vaccines
+        self._vsac_vaccines = []
+        if not self._db:
+            return self._vsac_vaccines
+        try:
+            from app.services.api.umls import UMLSService
+            from app.api_config import UMLS_API_KEY
+            if not UMLS_API_KEY:
+                return self._vsac_vaccines
+            svc = UMLSService(self._db, api_key=UMLS_API_KEY)
+            vsac_results = svc.get_immunization_value_set()
+            if vsac_results:
+                self._vsac_vaccines = vsac_results
+                logger.info("VSAC immunization supplement: %d vaccines loaded", len(vsac_results))
+        except Exception as e:
+            logger.debug("VSAC immunization load failed: %s", e)
+        return self._vsac_vaccines
 
     def evaluate_gaps(self, patient_age: int, patient_sex: str,
                       patient_diagnoses: list, immunization_history: list) -> list:
@@ -202,7 +232,48 @@ class CDCImmunizationsService:
                 "notes": vaccine.get("notes", ""),
             })
 
+        # --- Phase 17.2: Supplement with VSAC vaccines ---
+        # VSAC may include vaccines not in the hardcoded schedule
+        hardcoded_cvx = {v.get("cvx") for v in CDC_ADULT_SCHEDULE}
+        vsac_vaccines = self._load_vsac_vaccines()
+        for vac in vsac_vaccines:
+            cvx = vac.get("cvx_code", "")
+            name = vac.get("vaccine_name", "")
+            if not cvx or cvx in hardcoded_cvx:
+                continue  # Already covered by hardcoded schedule
+            if cvx in received_cvx:
+                continue  # Already received
+            # VSAC vaccines without detailed age/risk data — flag as low priority
+            gaps.append({
+                "vaccine": name,
+                "cvx": cvx,
+                "reason": f"VSAC-recommended vaccine — verify applicability for age {patient_age}",
+                "priority": "low",
+                "notes": "Source: VSAC value set. Review clinical applicability.",
+                "source": "vsac",
+            })
+
         return gaps
+
+    @staticmethod
+    def populate_structured_cache(db):
+        """Seed CdcImmunizationCache from the hardcoded CDC schedule."""
+        try:
+            for v in CDC_ADULT_SCHEDULE:
+                cvx = v.get('cvx', '')
+                existing = CdcImmunizationCache.query.filter_by(vaccine_code=cvx).first()
+                if not existing:
+                    db.session.add(CdcImmunizationCache(
+                        vaccine_code=cvx,
+                        vaccine_name=v.get('vaccine', ''),
+                        schedule_description=v.get('notes', ''),
+                        min_age=str(v.get('min_age', '')),
+                        max_age=str(v.get('max_age', '')),
+                    ))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.debug(f'CdcImmunizationCache populate error: {e}')
 
 
 def _extract_risk_flags(diagnoses: list) -> set:

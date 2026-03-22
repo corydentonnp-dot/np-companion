@@ -1,7 +1,7 @@
 """
-NP Companion — Admin Dashboard & Site Map Routes
+CareCompanion — Admin Dashboard & Site Map Routes
 
-File location: np-companion/routes/admin.py
+File location: carecompanion/routes/admin.py
 
 Provides:
   GET  /admin                — admin dashboard hub (links to all admin tools)
@@ -11,6 +11,7 @@ Provides:
 
 import os
 import sys
+from datetime import date
 from flask import (
     Blueprint, render_template, request, jsonify,
     redirect, url_for, flash, current_app,
@@ -82,9 +83,10 @@ def practice_overview():
     total_gaps = len(all_gaps)
     gap_compliance_pct = round(total_addressed / total_gaps * 100) if total_gaps > 0 else 100
 
-    overdue_labs = LabTrack.query.filter(
-        LabTrack.status.in_(['overdue', 'critical'])
-    ).count()
+    overdue_labs = sum(
+        1 for lt in LabTrack.query.all()
+        if lt.status in ('overdue', 'critical')
+    )
 
     overdue_referrals = ReferralLetter.query.filter_by(
         consultation_received=False
@@ -107,10 +109,10 @@ def practice_overview():
         p_total = len(p_gaps)
         p_compliance = round((p_total - p_open) / p_total * 100) if p_total > 0 else 100
 
-        p_overdue_labs = LabTrack.query.filter(
-            LabTrack.user_id == prov.id,
-            LabTrack.status.in_(['overdue', 'critical'])
-        ).count()
+        p_overdue_labs = sum(
+            1 for lt in LabTrack.query.filter_by(user_id=prov.id).all()
+            if lt.status in ('overdue', 'critical')
+        )
 
         p_overdue_refs = ReferralLetter.query.filter(
             ReferralLetter.user_id == prov.id,
@@ -323,7 +325,9 @@ def admin_config():
                 flash('No changes detected.', 'info')
 
         except Exception as e:
-            flash(f'Error saving config: {e}', 'error')
+            import logging
+            logging.getLogger(__name__).error('Config save error: %s', e)
+            flash('Could not save configuration. Check server logs for details.', 'error')
 
         return redirect(url_for('admin_hub.admin_config'))
 
@@ -427,7 +431,9 @@ def admin_seed_test_data():
         result = seed_all_test_data(current_user.id)
         flash(f'Test data seeded successfully. {result}', 'success')
     except Exception as e:
-        flash(f'Error seeding test data: {e}', 'error')
+        import logging
+        logging.getLogger(__name__).error('Seed test data error: %s', e)
+        flash('Could not seed test data. Check server logs for details.', 'error')
     return redirect(url_for('admin_hub.admin_tools'))
 
 
@@ -444,7 +450,9 @@ def admin_clear_test_data():
         result = clear_test_data(current_user.id)
         flash(f'Test data cleared. {result}', 'success')
     except Exception as e:
-        flash(f'Error clearing test data: {e}', 'error')
+        import logging
+        logging.getLogger(__name__).error('Clear test data error: %s', e)
+        flash('Could not clear test data. Check server logs for details.', 'error')
     return redirect(url_for('admin_hub.admin_tools'))
 
 
@@ -536,7 +544,7 @@ def admin_updates():
 @login_required
 @_require_admin
 def admin_updates_scan():
-    """Scan the specified folder for NP_Companion_v*.zip files."""
+    """Scan the specified folder for CareCompanion_v*.zip files."""
     import config as cfg
     from utils.updater import check_for_update
 
@@ -581,3 +589,123 @@ def admin_updates_restart():
     from utils.updater import restart_after_update
     restart_after_update()
     return jsonify({'success': True})
+
+
+# ======================================================================
+# Phase 13 — Per-Provider Feature Tier Defaults
+# ======================================================================
+@admin_bp.route('/admin/provider-defaults', methods=['GET', 'POST'])
+@login_required
+@_require_admin
+def admin_provider_defaults():
+    """Set org-wide default feature tiers per role (NP, PA, MD)."""
+    from utils.feature_gates import FEATURE_TIERS, TIER_DESCRIPTIONS
+
+    if request.method == 'POST':
+        for role in ('provider', 'ma'):
+            tier = request.form.get(f'default_tier_{role}', 'essential')
+            if tier in ('essential', 'standard', 'advanced'):
+                # Store as org-level config preference on the admin user
+                current_user.set_pref(f'org_default_tier_{role}', tier)
+        db.session.commit()
+        flash('Provider defaults saved.', 'success')
+        return redirect(url_for('admin_hub.admin_provider_defaults'))
+
+    # GET — load current defaults
+    defaults = {}
+    for role in ('provider', 'ma'):
+        defaults[role] = current_user.get_pref(f'org_default_tier_{role}', 'essential')
+
+    users = User.query.filter_by(is_active_account=True).order_by(User.display_name).all()
+    user_tiers = []
+    for u in users:
+        user_tiers.append({
+            'id': u.id,
+            'name': u.display_name or u.username,
+            'role': u.role,
+            'tier': u.get_pref('feature_tier', 'essential'),
+        })
+
+    return render_template(
+        'admin_provider_defaults.html',
+        defaults=defaults,
+        user_tiers=user_tiers,
+        tier_descriptions=TIER_DESCRIPTIONS,
+    )
+
+
+# ======================================================================
+# Phase 14 — Dismissal Audit Report
+# ======================================================================
+@admin_bp.route('/admin/dismissal-audit')
+@login_required
+@_require_admin
+def admin_dismissal_audit():
+    """View all dismissed billing opportunities and care gaps with reasons."""
+    from models.billing import BillingOpportunity
+    from models.caregap import CareGap
+
+    # Filters from query string
+    reason_filter = request.args.get('reason', '').strip()
+    suggestion_type = request.args.get('type', '').strip()
+    date_from = request.args.get('date_from', '').strip()
+    date_to = request.args.get('date_to', '').strip()
+
+    dismissals = []
+
+    # Billing opportunity dismissals
+    if suggestion_type in ('', 'billing'):
+        q = BillingOpportunity.query.filter_by(status='dismissed')
+        if reason_filter:
+            q = q.filter(BillingOpportunity.dismissal_reason.ilike(f'%{reason_filter}%'))
+        if date_from:
+            q = q.filter(BillingOpportunity.reviewed_at >= date_from)
+        if date_to:
+            q = q.filter(BillingOpportunity.reviewed_at <= date_to + ' 23:59:59')
+        for opp in q.order_by(BillingOpportunity.reviewed_at.desc()).limit(200).all():
+            dismissals.append({
+                'type': 'Billing: ' + (opp.opportunity_type or ''),
+                'reason': opp.dismissal_reason or '',
+                'user_id': opp.user_id,
+                'timestamp': opp.reviewed_at,
+                'detail': opp.eligibility_basis or '',
+            })
+
+    # Care gap dismissals
+    if suggestion_type in ('', 'caregap'):
+        q = CareGap.query.filter_by(status='declined')
+        if reason_filter:
+            q = q.filter(CareGap.dismissal_reason.ilike(f'%{reason_filter}%'))
+        if date_from:
+            q = q.filter(CareGap.updated_at >= date_from)
+        if date_to:
+            q = q.filter(CareGap.updated_at <= date_to + ' 23:59:59')
+        for gap in q.order_by(CareGap.updated_at.desc()).limit(200).all():
+            dismissals.append({
+                'type': 'Care Gap: ' + (gap.gap_type or ''),
+                'reason': gap.dismissal_reason or '',
+                'user_id': gap.user_id,
+                'timestamp': gap.updated_at,
+                'detail': gap.description or '',
+            })
+
+    # Sort combined by timestamp descending
+    dismissals.sort(key=lambda d: d['timestamp'] or '', reverse=True)
+
+    # Map user_ids to names
+    user_ids = set(d['user_id'] for d in dismissals if d['user_id'])
+    user_map = {}
+    if user_ids:
+        for u in User.query.filter(User.id.in_(user_ids)).all():
+            user_map[u.id] = u.display_name or u.username
+    for d in dismissals:
+        d['user_name'] = user_map.get(d['user_id'], 'Unknown')
+
+    return render_template(
+        'admin_dismissal_audit.html',
+        dismissals=dismissals,
+        reason_filter=reason_filter,
+        suggestion_type=suggestion_type,
+        date_from=date_from,
+        date_to=date_to,
+    )

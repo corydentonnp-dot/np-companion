@@ -1,5 +1,5 @@
 """
-NP Companion — ICD-10-CM Clinical Tables Search Service
+CareCompanion — ICD-10-CM Clinical Tables Search Service
 File: app/services/api/icd10.py
 
 Live search of the complete ICD-10-CM dataset from NLM Clinical Tables.
@@ -13,7 +13,7 @@ Dependencies:
 - app/services/api/base_client.py (BaseAPIClient)
 - app/api_config.py (ICD10_BASE_URL, ICD10_CACHE_TTL_DAYS)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Coding Suggester (F17) — primary autocomplete search engine
 - Specificity reminder (F17b) — parent/child code hierarchy
 - Code pairing suggestions (F17c)

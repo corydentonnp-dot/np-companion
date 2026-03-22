@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Delayed Messages — CareCompanion{% endblock %}
+{% block page_id %}messages{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Delayed Messages</h1>
+    <span class="badge badge--info">F18</span>
+    <a href="{{ url_for('messages.new') }}" class="btn btn-primary btn-sm">+ New Message</a>
+</div>
+
+{# ---- Tab bar ---- #}
+<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border-color,#ddd);">
+    <button class="btn btn-sm" id="tab-pending" onclick="showTab('pending')" style="border-radius:6px 6px 0 0;border-bottom:2px solid var(--color-primary,#0D7377);font-weight:600;">
+        Pending Queue <span class="badge badge--warning" style="margin-left:6px;">{{ pending|length }}</span>
+    </button>
+    <button class="btn btn-sm btn-outline" id="tab-history" onclick="showTab('history')" style="border-radius:6px 6px 0 0;">
+        Sent / History <span class="badge badge--secondary" style="margin-left:6px;">{{ history|length }}</span>
+    </button>
+</div>
+
+{# ---- Pending Queue Tab ---- #}
+<div id="panel-pending">
+    {% if pending %}
+    <div class="card">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="text-align:left;border-bottom:2px solid var(--border-color,#ddd);">
+                    <th style="padding:10px 12px;">Recipient</th>
+                    <th style="padding:10px 12px;">Message</th>
+                    <th style="padding:10px 12px;">Scheduled For</th>
+                    <th style="padding:10px 12px;">Created</th>
+                    <th style="padding:10px 12px;text-align:center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in pending %}
+                <tr style="border-bottom:1px solid var(--border-color,#eee);">
+                    <td style="padding:10px 12px;font-weight:600;">{{ m.recipient_identifier }}</td>
+                    <td style="padding:10px 12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ m.message_content[:120] }}</td>
+                    <td style="padding:10px 12px;">{{ m.scheduled_send_at.strftime('%Y-%m-%d %H:%M') if m.scheduled_send_at else '—' }}</td>
+                    <td style="padding:10px 12px;font-size:13px;color:var(--text-secondary);">{{ m.created_at.strftime('%Y-%m-%d %H:%M') if m.created_at else '' }}</td>
+                    <td style="padding:10px 12px;text-align:center;white-space:nowrap;">
+                        {% if m.is_recurring %}<span class="badge badge--info" title="Every {{ m.recurrence_interval_days }}d">🔁 {{ m.recurrence_interval_days }}d</span>{% endif %}
+                        <form method="POST" action="{{ url_for('messages.cancel', msg_id=m.id) }}" style="display:inline;" onsubmit="return confirm('Cancel this message?');">
+                            <button type="submit" class="btn btn-sm btn-outline" style="color:var(--color-red,#e74c3c);border-color:var(--color-red,#e74c3c);">Cancel</button>
+                        </form>
+                        {% if m.is_recurring %}
+                        <form method="POST" action="{{ url_for('messages.cancel_series', msg_id=m.id) }}" style="display:inline;" onsubmit="return confirm('Cancel ALL future messages in this series?');">
+                            <button type="submit" class="btn btn-sm btn-outline" style="color:var(--color-red,#e74c3c);border-color:var(--color-red,#e74c3c);">Cancel Series</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:48px;color:var(--text-secondary);">
+        <div style="font-size:32px;margin-bottom:8px;">📭</div>
+        <p>No pending messages. <a href="{{ url_for('messages.new') }}">Schedule one now.</a></p>
+    </div>
+    {% endif %}
+</div>
+
+{# ---- History Tab ---- #}
+<div id="panel-history" style="display:none;">
+    {% if history %}
+    <div class="card">
+        <table style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr style="text-align:left;border-bottom:2px solid var(--border-color,#ddd);">
+                    <th style="padding:10px 12px;">Recipient</th>
+                    <th style="padding:10px 12px;">Message</th>
+                    <th style="padding:10px 12px;">Status</th>
+                    <th style="padding:10px 12px;">Sent At</th>
+                    <th style="padding:10px 12px;">Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in history %}
+                <tr style="border-bottom:1px solid var(--border-color,#eee);">
+                    <td style="padding:10px 12px;font-weight:600;">{{ m.recipient_identifier }}</td>
+                    <td style="padding:10px 12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ m.message_content[:120] }}</td>
+                    <td style="padding:10px 12px;">
+                        {% if m.status == 'sent' %}
+                        <span class="badge badge--success">Sent</span>
+                        {% elif m.status == 'failed' %}
+                        <span class="badge badge--danger">Failed</span>
+                        {% elif m.status == 'cancelled' %}
+                        <span class="badge badge--secondary">Cancelled</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:10px 12px;">{{ m.sent_at.strftime('%Y-%m-%d %H:%M') if m.sent_at else '—' }}</td>
+                    <td style="padding:10px 12px;font-size:13px;color:var(--text-secondary);">{{ m.created_at.strftime('%Y-%m-%d %H:%M') if m.created_at else '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card" style="text-align:center;padding:48px;color:var(--text-secondary);">
+        <div style="font-size:32px;margin-bottom:8px;">📨</div>
+        <p>No sent or cancelled messages yet.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function showTab(tab) {
+    document.getElementById('panel-pending').style.display = tab === 'pending' ? '' : 'none';
+    document.getElementById('panel-history').style.display = tab === 'history' ? '' : 'none';
+    var btnPending = document.getElementById('tab-pending');
+    var btnHistory = document.getElementById('tab-history');
+    if (tab === 'pending') {
+        btnPending.style.borderBottom = '2px solid var(--color-primary,#0D7377)';
+        btnPending.style.fontWeight = '600';
+        btnPending.className = 'btn btn-sm';
+        btnHistory.style.borderBottom = 'none';
+        btnHistory.style.fontWeight = 'normal';
+        btnHistory.className = 'btn btn-sm btn-outline';
+    } else {
+        btnHistory.style.borderBottom = '2px solid var(--color-primary,#0D7377)';
+        btnHistory.style.fontWeight = '600';
+        btnHistory.className = 'btn btn-sm';
+        btnPending.style.borderBottom = 'none';
+        btnPending.style.fontWeight = 'normal';
+        btnPending.className = 'btn btn-sm btn-outline';
+    }
+}
+</script>
+{% endblock %}

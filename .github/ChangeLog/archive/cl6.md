@@ -252,6 +252,6 @@ All set to `(0, 0)` — must be calibrated on the work PC via `/admin/config`:
 | `/tools` | 7 | Tools Hub |
 
 ### Tracking System Added (This CL)
-- **ACTION ITEMS table** added to top of `NP_Companion_Development_Guide.md` (within first 40 lines)
+- **ACTION ITEMS table** added to top of `CareCompanion_Development_Guide.md` (within first 40 lines)
 - **Master Build Checklist** in Section 9 converted from bullet list to full status table with AI Tested / User Verified columns
 - **Mandatory update instruction** added to `copilot-instructions.md` — both tables must be updated after every prompt

@@ -1,7 +1,7 @@
 """
-NP Companion — AI Assistant API Routes
+CareCompanion — AI Assistant API Routes
 
-File location: np-companion/routes/ai_api.py
+File location: carecompanion/routes/ai_api.py
 
 Provides:
   POST /api/ai/chat              — Proxy user message to their configured AI provider

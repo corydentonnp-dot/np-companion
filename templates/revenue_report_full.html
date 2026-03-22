@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Revenue Report {{ '%02d/%d'|format(month, year) }} — CareCompanion{% endblock %}
+{% block page_id %}revenue-report{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Revenue Report — {{ '%02d/%d'|format(month, year) }}</h1>
+    <div style="display:flex;gap:8px;margin-left:auto;align-items:center;">
+        <form method="GET" style="display:flex;gap:8px;align-items:center;">
+            <input type="month" name="m" id="rev-month-picker" value="{{ '%04d-%02d'|format(year, month) }}"
+                   style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;"
+                   onchange="var p=this.value.split('-');window.location='/reports/revenue/'+p[0]+'/'+parseInt(p[1])">
+        </form>
+        <button onclick="window.print()" class="btn btn-sm btn-outline">Print</button>
+        <a href="/reports/dx-families" class="btn btn-sm btn-outline">Dx Families</a>
+    </div>
+</div>
+
+{# ======== 26.1: Summary Cards ======== #}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:24px;">
+    <div class="card"><div class="card-body" style="text-align:center;">
+        <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ total.detected }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Detected</div>
+    </div></div>
+    <div class="card"><div class="card-body" style="text-align:center;">
+        <div style="font-size:32px;font-weight:700;color:#059669;">{{ total.captured }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Captured</div>
+    </div></div>
+    <div class="card"><div class="card-body" style="text-align:center;">
+        <div style="font-size:32px;font-weight:700;color:#059669;">${{ total.rev_captured|round|int }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Revenue Captured</div>
+    </div></div>
+    <div class="card"><div class="card-body" style="text-align:center;">
+        <div style="font-size:32px;font-weight:700;color:#dc2626;">${{ total.rev_missed|round|int }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Revenue Gap</div>
+    </div></div>
+    <div class="card"><div class="card-body" style="text-align:center;">
+        <div style="font-size:32px;font-weight:700;color:var(--color-navy);">{{ capture_rate }}%</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Capture Rate</div>
+    </div></div>
+    <div class="card"><div class="card-body" style="text-align:center;">
+        <div style="font-size:32px;font-weight:700;color:#7c3aed;">${{ total.bonus_impact|round|int }}</div>
+        <div style="font-size:12px;color:var(--text-secondary);">Bonus Impact</div>
+    </div></div>
+</div>
+
+{# ======== Category Breakdown Table ======== #}
+{% if categories %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="padding:0;">
+        <table class="data-table" style="width:100%;font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:10px 12px;">Category</th>
+                    <th style="text-align:center;">Detected</th>
+                    <th style="text-align:center;">Captured</th>
+                    <th style="text-align:center;">Dismissed</th>
+                    <th style="text-align:right;">Rev Detected</th>
+                    <th style="text-align:right;">Rev Captured</th>
+                    <th style="text-align:right;">Rev Gap</th>
+                    <th style="text-align:center;">Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat_name, c in categories %}
+                <tr>
+                    <td style="padding:8px 12px;font-weight:600;">{{ cat_name }}</td>
+                    <td style="text-align:center;">{{ c.detected }}</td>
+                    <td style="text-align:center;color:#059669;">{{ c.captured }}</td>
+                    <td style="text-align:center;color:#dc2626;">{{ c.dismissed }}</td>
+                    <td style="text-align:right;">${{ c.rev_detected|round|int }}</td>
+                    <td style="text-align:right;color:#059669;">${{ c.rev_captured|round|int }}</td>
+                    <td style="text-align:right;color:#dc2626;">${{ c.rev_missed|round|int }}</td>
+                    <td style="text-align:center;">
+                        {% set r = (c.captured / c.detected * 100)|round|int if c.detected else 0 %}
+                        <span style="padding:2px 8px;border-radius:10px;background:{% if r >= 70 %}#d1fae5{% elif r >= 40 %}#fef3c7{% else %}#fee2e2{% endif %};font-size:11px;font-weight:600;">{{ r }}%</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{# ======== 26.2: Reconciliation Funnel ======== #}
+{% if funnel %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body">
+        <h3 style="margin:0 0 16px 0;font-size:15px;">Reconciliation Funnel</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-end;">
+            {% for stage in funnel %}
+            <div style="flex:1;min-width:80px;text-align:center;">
+                <div style="height:{{ [stage.pct * 1.2, 10]|max }}px;background:{% if stage.stage in ['paid'] %}#059669{% elif stage.stage in ['denied','adjusted'] %}#dc2626{% else %}var(--color-navy){% endif %};border-radius:4px 4px 0 0;margin:0 4px;min-height:10px;"></div>
+                <div style="font-size:18px;font-weight:700;margin-top:4px;">{{ stage.count }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);text-transform:capitalize;">{{ stage.stage }}</div>
+                {% if stage.leakage_pct is defined and stage.leakage_pct > 0 %}
+                <div style="font-size:10px;color:#dc2626;margin-top:2px;">-{{ stage.leakage_pct }}%</div>
+                {% endif %}
+            </div>
+            {% if not loop.last %}
+            <div style="font-size:16px;color:var(--text-secondary);padding-bottom:20px;">→</div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ======== 26.3: Leakage Cause Attribution ======== #}
+{% if leakage %}
+{% set total_leakage = leakage.values()|sum %}
+{% if total_leakage > 0 %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body">
+        <h3 style="margin:0 0 16px 0;font-size:15px;">Leakage Causes</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+            {% for cause, count in leakage.items() if count > 0 %}
+            <div style="padding:12px;border-radius:8px;background:var(--bg-secondary,#f8f9fa);text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#dc2626;">{{ count }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);text-transform:capitalize;">{{ cause|replace('_', ' ') }}</div>
+                <div style="font-size:10px;color:var(--text-secondary);">{{ (count / total_leakage * 100)|round|int }}%</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+
+{# ======== 26.5: Annual Opportunity Estimate ======== #}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Annual Billing Opportunity Value</h3>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;text-align:center;">
+            <div>
+                <div style="font-size:28px;font-weight:700;color:var(--color-navy);">${{ annual_estimate|round|int }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Annualized Detected</div>
+            </div>
+            <div>
+                <div style="font-size:28px;font-weight:700;color:#059669;">${{ annual_captured|round|int }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Annualized Captured</div>
+            </div>
+            <div>
+                <div style="font-size:28px;font-weight:700;color:#dc2626;">${{ annual_gap|round|int }}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">Annual Gap</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ======== 26.6: First-Bonus Projection ======== #}
+{% if bonus_projection %}
+<div class="card" style="margin-bottom:24px;border-left:4px solid #7c3aed;">
+    <div class="card-body">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Bonus Projection</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:16px;text-align:center;">
+            <div>
+                <div style="font-size:22px;font-weight:700;">${{ bonus_projection.quarter_receipts|round|int }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Quarter Receipts</div>
+            </div>
+            <div>
+                <div style="font-size:22px;font-weight:700;">${{ bonus_projection.threshold|round|int }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Threshold</div>
+            </div>
+            <div>
+                <div style="font-size:22px;font-weight:700;color:{% if bonus_projection.deficit > 0 %}#dc2626{% else %}#059669{% endif %};">${{ bonus_projection.deficit|round|int }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Deficit</div>
+            </div>
+            <div>
+                <div style="font-size:22px;font-weight:700;">{{ bonus_projection.multiplier * 100 }}%</div>
+                <div style="font-size:11px;color:var(--text-secondary);">Bonus Rate</div>
+            </div>
+            {% if bonus_projection.projected_first_bonus_quarter %}
+            <div>
+                <div style="font-size:22px;font-weight:700;color:#7c3aed;">{{ bonus_projection.projected_first_bonus_quarter }}</div>
+                <div style="font-size:11px;color:var(--text-secondary);">First Bonus Quarter</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# ======== Top Missed Opportunities ======== #}
+{% if top_missed %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="padding:0;">
+        <h3 style="margin:0;padding:12px;font-size:15px;">Top Missed Opportunities</h3>
+        <table class="data-table" style="width:100%;font-size:13px;">
+            <thead>
+                <tr>
+                    <th style="padding:8px 12px;">Type</th>
+                    <th>Patient (hash)</th>
+                    <th>Visit Date</th>
+                    <th style="text-align:right;">Est. Revenue</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for opp in top_missed %}
+                <tr>
+                    <td style="padding:6px 12px;font-weight:600;">{{ opp.opportunity_type }}</td>
+                    <td style="font-family:monospace;font-size:11px;">{{ opp.patient_mrn_hash[:8] }}…</td>
+                    <td>{{ opp.visit_date.strftime('%Y-%m-%d') if opp.visit_date else '—' }}</td>
+                    <td style="text-align:right;color:#dc2626;">${{ (opp.expected_net_dollars or opp.estimated_revenue or 0)|round|int }}</td>
+                    <td><span style="padding:2px 6px;border-radius:8px;background:#fee2e2;font-size:11px;">{{ opp.status }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Account Settings — NP Companion{% endblock %}
+{% block title %}Account Settings — CareCompanion{% endblock %}
 {% block page_id %}settings-account{% endblock %}
 
 {% block content %}
@@ -180,11 +180,30 @@
                     name="np_provider_name"
                     class="form-input"
                     value="{{ current_user.np_provider_name or '' }}"
-                    placeholder='e.g. "ASHLEY MORSBERGER FNP (45)"'
+                    placeholder="e.g., DENTON CORY (12)"
                 >
                 <p class="form-help">
-                    Exactly as it appears on the schedule page header.
-                    Used to verify we're on the right provider's schedule.
+                    Enter your name exactly as it appears in the NetPractice provider list. Include the provider number in parentheses.
+                </p>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="np_totp_secret">TOTP Secret (MFA Auto-Login)</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input
+                        type="password"
+                        id="np_totp_secret"
+                        name="np_totp_secret"
+                        class="form-input"
+                        style="flex:1;"
+                        placeholder="{% if current_user.has_np_totp_secret() %}••••••• (saved){% else %}Base32 secret from authenticator app{% endif %}"
+                        autocomplete="off"
+                    >
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="var f=document.getElementById('np_totp_secret');f.type=f.type==='password'?'text':'password';" title="Show / hide">👁</button>
+                </div>
+                <p class="form-help">
+                    Paste your base32 TOTP secret to allow automatic MFA login.
+                    Find this in your authenticator app's account details or export.
+                    Leave blank to keep the current saved secret.
                 </p>
             </div>
             <button type="submit" class="btn btn-primary">Save Credentials</button>

@@ -1,7 +1,7 @@
 """
-NP Companion — OCR Element Finding Helpers
+CareCompanion — OCR Element Finding Helpers
 
-File location: np-companion/agent/ocr_helpers.py
+File location: carecompanion/agent/ocr_helpers.py
 
 Provides OCR-first element detection for Amazing Charts automation.
 Instead of hardcoded screen coordinates (which break across different

@@ -1,7 +1,7 @@
 """
-NP Companion — Self-Update Mechanism
+CareCompanion — Self-Update Mechanism
 
-Scans a folder for update zips (NP_Companion_v*.zip), compares versions,
+Scans a folder for update zips (CareCompanion_v*.zip), compares versions,
 and applies updates by replacing _internal/ + exe while preserving data/.
 """
 
@@ -29,14 +29,14 @@ def _parse_version(v: str) -> tuple:
 
 def check_for_update(folder_path: str, current_version: str) -> dict | None:
     """
-    Scan *folder_path* for NP_Companion_v*.zip files.
+    Scan *folder_path* for CareCompanion_v*.zip files.
     Returns info about the newest version if it is newer than *current_version*,
     otherwise returns None.
     """
     if not folder_path or not os.path.isdir(folder_path):
         return None
 
-    pattern = os.path.join(folder_path, 'NP_Companion_v*.zip')
+    pattern = os.path.join(folder_path, 'CareCompanion_v*.zip')
     zips = glob.glob(pattern)
     if not zips:
         return None
@@ -96,9 +96,14 @@ def apply_update(zip_path: str) -> dict:
         # 1. Extract to a temp directory next to the base
         tmp_dir = tempfile.mkdtemp(dir=base, prefix='_update_')
         with zipfile.ZipFile(zip_path, 'r') as zf:
+            # Validate no path traversal (zip-slip protection)
+            for member in zf.namelist():
+                member_path = os.path.realpath(os.path.join(tmp_dir, member))
+                if not member_path.startswith(os.path.realpath(tmp_dir) + os.sep) and member_path != os.path.realpath(tmp_dir):
+                    raise ValueError(f'Blocked path traversal in zip: {member}')
             zf.extractall(tmp_dir)
 
-        # The zip may contain a top-level folder (NP_Companion/) — detect it
+        # The zip may contain a top-level folder (CareCompanion/) — detect it
         contents = os.listdir(tmp_dir)
         source = tmp_dir
         if len(contents) == 1 and os.path.isdir(os.path.join(tmp_dir, contents[0])):

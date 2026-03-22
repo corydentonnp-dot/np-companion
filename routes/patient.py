@@ -1,7 +1,7 @@
 """
-NP Companion — Patient Chart View (F10e) — Widget-Based Layout
+CareCompanion — Patient Chart View (F10e) — Widget-Based Layout
 
-File location: np-companion/routes/patient.py
+File location: carecompanion/routes/patient.py
 
 Draggable/resizable widget-based patient chart with:
   - XML upload (manual CDA import)
@@ -19,7 +19,7 @@ import os
 from collections import defaultdict
 from datetime import datetime, timezone
 
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app
 from flask_login import login_required, current_user
 
 import config
@@ -32,6 +32,7 @@ from models.patient import (
 )
 from models.labtrack import LabTrack
 from models.caregap import CareGap, CareGapRule
+from models.schedule import Schedule
 
 patient_bp = Blueprint('patient', __name__)
 
@@ -121,6 +122,94 @@ def _calc_age_years(dob_str):
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
     except ValueError:
         return None
+
+
+def _normalize_name(name):
+    """Normalize patient names from schedule/query data for display."""
+    name = (name or '').strip()
+    if not name:
+        return ''
+    if ',' in name:
+        parts = [part.strip() for part in name.split(',', 1)]
+        if len(parts) == 2 and parts[0] and parts[1]:
+            return f'{parts[1]} {parts[0]}'
+    return ' '.join(name.split())
+
+
+def _normalize_dob(dob_str):
+    """Normalize DOB strings to YYYYMMDD for PatientRecord storage."""
+    dob_str = (dob_str or '').strip()
+    if not dob_str:
+        return ''
+    for fmt in ('%Y%m%d', '%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'):
+        try:
+            return datetime.strptime(dob_str, fmt).strftime('%Y%m%d')
+        except ValueError:
+            continue
+    digits = ''.join(ch for ch in dob_str if ch.isdigit())
+    if len(digits) == 8:
+        if digits.startswith(('19', '20')):
+            return digits
+        try:
+            return datetime.strptime(digits, '%m%d%Y').strftime('%Y%m%d')
+        except ValueError:
+            return ''
+    return ''
+
+
+def _schedule_context_for_patient(user_id, mrn):
+    """Return the most relevant schedule metadata for this user/MRN."""
+    latest = (
+        Schedule.query
+        .filter_by(user_id=user_id, patient_mrn=mrn)
+        .order_by(Schedule.appointment_date.desc(), Schedule.appointment_time.desc())
+        .first()
+    )
+
+    context = {
+        'patient_name': _normalize_name(request.args.get('name', '')),
+        'patient_dob': _normalize_dob(request.args.get('dob', '')),
+        'appointment_time': (request.args.get('appt', '') or '').strip(),
+        'visit_type': (request.args.get('visit', '') or '').strip(),
+        'reason': (request.args.get('reason', '') or '').strip(),
+        'appointment_date': None,
+        'status': '',
+    }
+
+    if latest:
+        context['patient_name'] = context['patient_name'] or _normalize_name(latest.patient_name)
+        context['patient_dob'] = context['patient_dob'] or _normalize_dob(latest.patient_dob)
+        context['appointment_time'] = context['appointment_time'] or (latest.appointment_time or '')
+        context['visit_type'] = context['visit_type'] or (latest.visit_type or '')
+        context['reason'] = context['reason'] or (latest.reason or '')
+        context['appointment_date'] = latest.appointment_date
+        context['status'] = latest.status or ''
+
+    return context
+
+
+def _ensure_patient_record_for_view(user_id, mrn, schedule_context):
+    """Create or backfill a per-user patient record from schedule context."""
+    record = PatientRecord.query.filter_by(user_id=user_id, mrn=mrn).first()
+    changed = False
+
+    if not record:
+        record = PatientRecord(user_id=user_id, mrn=mrn)
+        db.session.add(record)
+        changed = True
+
+    if schedule_context['patient_name'] and not (record.patient_name or '').strip():
+        record.patient_name = schedule_context['patient_name']
+        changed = True
+
+    if schedule_context['patient_dob'] and not (record.patient_dob or '').strip():
+        record.patient_dob = schedule_context['patient_dob']
+        changed = True
+
+    if changed:
+        db.session.commit()
+
+    return record
 
 
 def _classify_diagnosis(name, icd10):
@@ -311,6 +400,14 @@ def _enrich_rxnorm_single(rxcui):
     elif tty == 'IN':
         generic_name = generic_name or name
 
+    # 5. Get first NDC code for pricing lookups
+    ndc = ''
+    ndc_data = _fetch_rxnorm_api(f'/rxcui/{rxcui}/ndcs.json')
+    if ndc_data:
+        ndc_list = (ndc_data.get('ndcGroup') or {}).get('ndcList', {}).get('ndc', [])
+        if ndc_list:
+            ndc = ndc_list[0]
+
     return {
         'brand_name': brand_name,
         'generic_name': generic_name or name,
@@ -318,6 +415,7 @@ def _enrich_rxnorm_single(rxcui):
         'dose_form': dose_form,
         'route': route,
         'tty': tty,
+        'ndc': ndc,
     }
 
 
@@ -381,6 +479,7 @@ def _enrich_rxnorm(rxcui, drug_name_fallback=''):
         dose_form=info['dose_form'],
         route=info['route'],
         tty=info['tty'],
+        ndc=info.get('ndc', ''),
     )
     try:
         db.session.add(entry)
@@ -571,9 +670,8 @@ def _auto_evaluate_care_gaps(user_id, mrn):
 @login_required
 def chart(mrn):
     """Patient chart view — widget-based drag/resize layout."""
-    record = PatientRecord.query.filter_by(
-        user_id=current_user.id, mrn=mrn
-    ).first()
+    schedule_context = _schedule_context_for_patient(current_user.id, mrn)
+    record = _ensure_patient_record_for_view(current_user.id, mrn, schedule_context)
 
     medications = PatientMedication.query.filter_by(
         user_id=current_user.id, mrn=mrn
@@ -655,6 +753,30 @@ def chart(mrn):
 
     # Widget layout preferences (default ordering)
     widget_layout = current_user.get_pref('chart_widget_layout', None)
+    chart_layout_mode = current_user.get_pref('chart_layout_mode', 'grid')
+    chart_free_positions = current_user.get_pref('chart_free_widget_positions', None)
+    chart_view_mode = current_user.get_pref('chart_view_mode', 'tabs')
+
+    # Phase 24.4 — Immunization series gaps for patient chart
+    imm_series_gaps = []
+    try:
+        from app.services.immunization_engine import get_series_gaps, populate_patient_series
+        from billing_engine.shared import hash_mrn
+        mrn_hash = hash_mrn(mrn)
+        populate_patient_series(mrn_hash, current_user.id)
+        imm_series_gaps = get_series_gaps(mrn_hash, current_user.id, age)
+    except Exception:
+        pass
+
+    # Phase 32.1 — Auto-compute risk scores from available EHR data
+    auto_scores = {}
+    try:
+        from app.services.calculator_engine import CalculatorEngine
+        _calc_engine = CalculatorEngine()
+        _score_list = _calc_engine.run_auto_scores(mrn, current_user.id)
+        auto_scores = {s['calculator_key']: s for s in _score_list if s.get('score_value') is not None}
+    except Exception:
+        pass
 
     return render_template(
         'patient_chart.html',
@@ -677,9 +799,55 @@ def chart(mrn):
         lab_spreadsheet=dict(lab_spreadsheet),
         lab_dates=sorted_dates,
         overdue_labs=overdue_labs,
+        schedule_context=schedule_context,
         widget_layout=json.dumps(widget_layout) if widget_layout else 'null',
+        chart_layout_mode=chart_layout_mode,
+        chart_free_positions=json.dumps(chart_free_positions) if chart_free_positions else 'null',
+        chart_view_mode=chart_view_mode,
         has_data=record is not None and record.last_xml_parsed is not None,
+        imm_series_gaps=imm_series_gaps,
+        auto_scores=auto_scores,
     )
+
+
+# ======================================================================
+# GET /api/patient/<mrn>/pricing — Bulk medication pricing
+# ======================================================================
+@patient_bp.route('/api/patient/<mrn>/pricing')
+@login_required
+def medication_pricing(mrn):
+    """Return pricing data for all active medications of a patient (max 20)."""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from app.services.pricing_service import PricingService
+        medications = PatientMedication.query.filter_by(
+            user_id=current_user.id, mrn=mrn, status='active'
+        ).order_by(PatientMedication.drug_name).limit(20).all()
+
+        record = PatientRecord.query.filter_by(
+            user_id=current_user.id, mrn=mrn
+        ).first()
+
+        svc = PricingService(db)
+        results = []
+        for med in medications:
+            try:
+                pricing = svc.get_pricing_for_medication(med, record)
+            except Exception as e:
+                logger.debug('Pricing failed for %s: %s', med.drug_name, e)
+                pricing = {'source': 'none', 'price_monthly_estimate': None,
+                           'badge_color': None, 'assistance_programs': []}
+            results.append({
+                'drug_name': med.drug_name,
+                'rxcui': med.rxnorm_cui,
+                'med_id': med.id,
+                'pricing': pricing,
+            })
+        return jsonify({'medications': results})
+    except Exception as e:
+        logger.error('Bulk pricing error for MRN %s: %s', mrn, e)
+        return jsonify({'medications': []}), 200
 
 
 # ======================================================================
@@ -846,9 +1014,7 @@ def save_widget_layout(mrn):
     """Save widget positions/sizes to user preferences."""
     data = request.get_json(silent=True) or {}
     layout = data.get('layout', {})
-    prefs = current_user.preferences_dict()
-    prefs['chart_widget_layout'] = layout
-    current_user.preferences = json.dumps(prefs)
+    current_user.set_pref('chart_widget_layout', layout)
     db.session.commit()
     return jsonify({'success': True})
 
@@ -946,6 +1112,19 @@ def refresh_patient(mrn):
         ),
         'source': 'pending',
     })
+
+
+@patient_bp.route('/patient/<mrn>/auto-scores', methods=['POST'])
+@login_required
+def refresh_auto_scores(mrn):
+    """Phase 32.3 — Re-run all auto_ehr calculators and return updated results as JSON."""
+    try:
+        from app.services.calculator_engine import CalculatorEngine
+        calc_engine = CalculatorEngine()
+        results = calc_engine.run_auto_scores(mrn, current_user.id)
+        return jsonify({'success': True, 'data': results})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ======================================================================
@@ -1232,7 +1411,7 @@ def roster():
 @login_required
 def toggle_dx_category(mrn, dx_id):
     """Toggle a diagnosis between acute and chronic."""
-    dx = PatientDiagnosis.query.get(dx_id)
+    dx = db.session.get(PatientDiagnosis, dx_id)
     if not dx:
         return jsonify({'success': False, 'error': 'Not found'}), 404
     new_cat = 'acute' if (dx.diagnosis_category or 'chronic') == 'chronic' else 'chronic'
@@ -1249,9 +1428,9 @@ def toggle_dx_category(mrn, dx_id):
 def toggle_item_status(mrn, item_type, item_id):
     """Toggle active/inactive status for a medication or diagnosis."""
     if item_type == 'medication':
-        item = PatientMedication.query.get(item_id)
+        item = db.session.get(PatientMedication, item_id)
     elif item_type == 'diagnosis':
-        item = PatientDiagnosis.query.get(item_id)
+        item = db.session.get(PatientDiagnosis, item_id)
     else:
         return jsonify({'success': False, 'error': 'Invalid type'}), 400
 

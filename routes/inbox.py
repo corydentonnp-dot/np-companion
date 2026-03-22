@@ -1,7 +1,7 @@
 """
-NP Companion — Inbox Monitor Routes
+CareCompanion — Inbox Monitor Routes
 
-File location: np-companion/routes/inbox.py
+File location: carecompanion/routes/inbox.py
 
 Provides:
   GET  /inbox            — Main inbox page with unresolved items
@@ -113,7 +113,10 @@ def index():
         pass
 
     for item in items:
-        age = (now - item.first_seen_at).total_seconds() / 3600
+        if item.first_seen_at:
+            age = (now - item.first_seen_at).total_seconds() / 3600
+        else:
+            age = 0
         if age >= critical_hours:
             item._age_class = 'critical'
         elif age >= warning_hours:

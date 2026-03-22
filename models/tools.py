@@ -1,5 +1,5 @@
 """
-NP Companion — Tools Models
+CareCompanion — Tools Models
 File: models/tools.py
 
 ORM models for the Tools module features:
@@ -117,6 +117,9 @@ class CodeFavorite(db.Model):
         db.UniqueConstraint('user_id', 'icd10_code', name='uq_user_code_fav'),
     )
 
+    def __repr__(self):
+        return f'<CodeFavorite id={self.id} code={self.icd10_code!r}>'
+
 
 class CodePairing(db.Model):
     """F17c: Tracks ICD-10 code pairs used together for pairing suggestions."""
@@ -132,6 +135,9 @@ class CodePairing(db.Model):
     __table_args__ = (
         db.UniqueConstraint('user_id', 'code_a', 'code_b', name='uq_user_code_pair'),
     )
+
+    def __repr__(self):
+        return f'<CodePairing id={self.id} {self.code_a}-{self.code_b}>'
 
 
 class PriorAuthorization(db.Model):
@@ -169,6 +175,12 @@ class PriorAuthorization(db.Model):
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
 
+    # F26a: Shared PA library
+    is_shared = db.Column(db.Boolean, default=False)
+    shared_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    forked_from_id = db.Column(db.Integer, nullable=True)
+    approval_rate = db.Column(db.Float, nullable=True)  # 0.0-1.0 success rate for this drug/payer combo
+
     def __repr__(self):
         return f'<PA {self.drug_name} status={self.status}>'
 
@@ -190,6 +202,7 @@ class ReferralLetter(db.Model):
     urgency = db.Column(db.String(20), default='routine')  # routine, urgent, emergent
 
     generated_letter = db.Column(db.Text, default='')
+    specialty_fields = db.Column(db.Text, nullable=True)  # JSON: specialty-specific field values
 
     # Tracking
     referral_date = db.Column(db.Date, nullable=True)

@@ -1,7 +1,7 @@
 """
-NP Companion — Inbox Monitor Wrapper
+CareCompanion — Inbox Monitor Wrapper
 
-File location: np-companion/agent/inbox_monitor.py
+File location: carecompanion/agent/inbox_monitor.py
 
 Thin wrapper that the agent scheduler calls. Coordinates the
 inbox reader and notifier.

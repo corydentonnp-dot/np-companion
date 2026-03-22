@@ -1,5 +1,5 @@
-# NP Companion ignore rules
-# File location in project: np-companion/.gitignore (project root, alongside app.py and config.py)
+# CareCompanion ignore rules
+# File location in project: carecompanion/.gitignore (project root, alongside app.py and config.py)
 # config.py is excluded because it contains sensitive machine-specific credentials and secrets
 
 # Sensitive config
@@ -25,6 +25,9 @@ venv/
 
 # Log files
 *.log
+
+# Generated output
+deploy_check_output.txt
 
 # Build output
 dist/

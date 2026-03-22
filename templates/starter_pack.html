@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Import Starter Resources — CareCompanion{% endblock %}
+{% block page_id %}starter-pack{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;margin:0 auto;">
+
+{# ---- Header ---- #}
+<div style="margin-bottom:24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h1 style="margin:0;font-size:22px;">📦 Import Starter Resources</h1>
+        {% if onboarding_mode %}
+        <span style="color:var(--text-secondary);font-size:13px;">Step 4b of 5</span>
+        {% endif %}
+    </div>
+    {% if onboarding_mode %}
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+        <div style="flex:1;height:6px;border-radius:3px;background:var(--color-green);"></div>
+        <div style="flex:1;height:6px;border-radius:3px;background:var(--color-green);"></div>
+        <div style="flex:1;height:6px;border-radius:3px;background:var(--color-green);"></div>
+        <div style="flex:1;height:6px;border-radius:3px;background:var(--color-primary);"></div>
+        <div style="flex:1;height:6px;border-radius:3px;background:var(--color-lt-gray);"></div>
+    </div>
+    {% endif %}
+    <p style="color:var(--text-secondary);margin:0;font-size:14px;">
+        Import shared resources from your colleagues to get started quickly.
+        Selected items will be copied into your personal library — you can edit them freely.
+    </p>
+</div>
+
+{# ---- Resource Sections ---- #}
+{% set total_available = resources.order_sets|length + resources.medications|length + resources.pa_templates|length + resources.dot_phrases|length %}
+
+{% if total_available == 0 %}
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="padding:32px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:12px;">📭</div>
+        <h3 style="margin:0 0 8px;">No Shared Resources Yet</h3>
+        <p style="color:var(--text-secondary);margin:0;font-size:14px;">
+            No colleagues have shared resources yet. You can come back here later from Settings.
+        </p>
+    </div>
+</div>
+{% else %}
+
+{% for cat in categories %}
+{% set items = resources[cat.key] %}
+{% if items|length > 0 %}
+<div class="card starter-pack-section" data-category="{{ cat.key }}" style="margin-bottom:16px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>{{ cat.icon }} {{ cat.label }} <span class="badge" style="margin-left:6px;">{{ items|length }}</span></span>
+        <div style="display:flex;gap:8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAll('{{ cat.key }}', true)">Select All</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleAll('{{ cat.key }}', false)">Select None</button>
+        </div>
+    </div>
+    <div class="card-body" style="padding:12px 16px;max-height:300px;overflow-y:auto;">
+        {% for item in items %}
+        <label style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-color);cursor:pointer;font-size:14px;">
+            <input type="checkbox" class="sp-checkbox" data-category="{{ cat.key }}" data-id="{{ item.id }}"
+                   style="width:16px;height:16px;flex-shrink:0;" checked>
+            <div style="flex:1;min-width:0;">
+                {% if cat.key == 'order_sets' %}
+                    <strong>{{ item.name }}</strong>
+                    {% if item.visit_type %}<span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">{{ item.visit_type }}</span>{% endif %}
+                    <span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">({{ item.items|length }} orders)</span>
+                {% elif cat.key == 'medications' %}
+                    <strong>{{ item.drug_name }}</strong>
+                    <span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">for {{ item.condition }} — {{ item.line }} line</span>
+                {% elif cat.key == 'pa_templates' %}
+                    <strong>{{ item.drug_name }}</strong>
+                    <span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">{{ item.diagnosis }} ({{ item.payer_name or 'Any payer' }})</span>
+                {% elif cat.key == 'dot_phrases' %}
+                    <strong>{{ item.abbreviation }}</strong>
+                    <span style="color:var(--text-secondary);font-size:12px;margin-left:6px;">{{ item.expansion[:60] }}{% if item.expansion|length > 60 %}…{% endif %}</span>
+                {% endif %}
+            </div>
+        </label>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endif %}
+
+{# ---- Action Buttons ---- #}
+<div style="display:flex;gap:12px;justify-content:space-between;margin-top:24px;margin-bottom:32px;">
+    {% if onboarding_mode %}
+    <a href="{{ url_for('auth.onboarding', step=4) }}" class="btn btn-secondary">← Back</a>
+    {% else %}
+    <a href="{{ url_for('auth.settings_account') }}" class="btn btn-secondary">← Back to Settings</a>
+    {% endif %}
+    <div style="display:flex;gap:12px;">
+        {% if onboarding_mode %}
+        <a href="{{ url_for('auth.onboarding', step=5) }}" class="btn btn-secondary" id="skip-btn">Skip</a>
+        {% endif %}
+        {% if total_available > 0 %}
+        <button type="button" class="btn btn-primary" id="import-btn" onclick="importSelected()">
+            Import Selected
+        </button>
+        {% else %}
+        <a href="{{ url_for('auth.onboarding', step=5) if onboarding_mode else url_for('auth.settings_account') }}" class="btn btn-primary">Continue →</a>
+        {% endif %}
+    </div>
+</div>
+
+{# ---- Import Result Banner ---- #}
+<div id="import-result" style="display:none;margin-bottom:24px;"></div>
+
+</div>
+
+<script>
+function toggleAll(category, checked) {
+    document.querySelectorAll('.sp-checkbox[data-category="' + category + '"]').forEach(function(cb) {
+        cb.checked = checked;
+    });
+}
+
+function importSelected() {
+    var payload = {};
+    var categories = ['order_sets', 'medications', 'pa_templates', 'dot_phrases'];
+    categories.forEach(function(cat) {
+        var ids = [];
+        document.querySelectorAll('.sp-checkbox[data-category="' + cat + '"]:checked').forEach(function(cb) {
+            ids.push(parseInt(cb.dataset.id, 10));
+        });
+        if (ids.length > 0) payload[cat] = ids;
+    });
+
+    if (Object.keys(payload).length === 0) {
+        {% if onboarding_mode %}
+        window.location.href = '{{ url_for("auth.onboarding", step=5) }}';
+        {% else %}
+        window.location.href = '{{ url_for("auth.settings_account") }}';
+        {% endif %}
+        return;
+    }
+
+    var btn = document.getElementById('import-btn');
+    btn.disabled = true;
+    btn.textContent = 'Importing…';
+
+    fetch('{{ url_for("auth.import_starter_pack") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            var parts = [];
+            var imp = data.imported || {};
+            if (imp.order_sets)   parts.push(imp.order_sets + ' order set' + (imp.order_sets > 1 ? 's' : ''));
+            if (imp.medications)  parts.push(imp.medications + ' medication' + (imp.medications > 1 ? 's' : ''));
+            if (imp.pa_templates) parts.push(imp.pa_templates + ' PA template' + (imp.pa_templates > 1 ? 's' : ''));
+            if (imp.dot_phrases)  parts.push(imp.dot_phrases + ' dot phrase' + (imp.dot_phrases > 1 ? 's' : ''));
+
+            var resultDiv = document.getElementById('import-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'card';
+            resultDiv.innerHTML = '<div class="card-body" style="padding:16px;background:var(--color-green-bg,#f0fdf4);border-left:4px solid var(--color-green,#22c55e);">' +
+                '<strong>✅ Imported:</strong> ' + (parts.length ? parts.join(', ') : 'Nothing new to import') +
+                '</div>';
+
+            btn.textContent = 'Done!';
+            setTimeout(function() {
+                {% if onboarding_mode %}
+                window.location.href = '{{ url_for("auth.onboarding", step=5) }}';
+                {% else %}
+                window.location.href = '{{ url_for("auth.settings_account") }}';
+                {% endif %}
+            }, 1500);
+        }
+    })
+    .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Import Selected';
+    });
+}
+</script>
+{% endblock %}

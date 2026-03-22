@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Setup — NP Companion{% endblock %}
+{% block title %}Setup — CareCompanion{% endblock %}
 {% block page_id %}setup{% endblock %}
 
 {% block content %}
@@ -13,7 +13,7 @@
 </div>
 
 <p style="color:var(--text-secondary);font-size:14px;margin-bottom:24px;">
-    Complete these setup tasks so NP Companion can work properly with your accounts.
+    Complete these setup tasks so CareCompanion can work properly with your accounts.
     You can return to this page anytime from Settings.
 </p>
 
@@ -84,11 +84,8 @@
                     <label class="form-label" for="np_provider_name">Provider Name in webPRACTICE</label>
                     <input type="text" id="np_provider_name" name="np_provider_name" class="form-input"
                            value="{{ current_user.np_provider_name or '' }}"
-                           placeholder='e.g. "ASHLEY MORSBERGER FNP (45)"'>
-                    <p class="form-help">
-                        Exactly as it appears on the schedule page header.
-                        Used to verify we're pulling the right provider's schedule.
-                    </p>
+                           placeholder="e.g., DENTON CORY (12)">
+                    <small class="form-help">Enter your name exactly as it appears in the NetPractice provider list. Include the provider number in parentheses.</small>
                 </div>
                 <button type="submit" class="btn btn-primary">Save NetPractice Credentials</button>
             </form>
@@ -145,7 +142,7 @@
         <div class="card-header">Work Computer Password <span class="badge badge--info" style="margin-left:8px;">Optional</span></div>
         <div class="card-body">
             <p style="margin:0 0 16px;font-size:13px;color:var(--text-secondary);">
-                If you want NP Companion to be able to unlock your work PC automatically,
+                If you want CareCompanion to be able to unlock your work PC automatically,
                 enter the password here. This is optional and encrypted at rest.
             </p>
             <form method="POST" action="{{ url_for('auth.setup_page') }}">

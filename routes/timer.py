@@ -1,7 +1,7 @@
 """
-NP Companion — Visit Timer Routes
+CareCompanion — Visit Timer Routes
 
-File location: np-companion/routes/timer.py
+File location: carecompanion/routes/timer.py
 
 Provides:
   GET  /timer                     — Timer dashboard (F12)
@@ -64,6 +64,117 @@ VISIT_TYPES = [
     ('awv', 'AWV'),
     ('other', 'Other'),
 ]
+
+# F16a — AWV Interactive Checklist (8 items from AWV detector)
+AWV_CHECKLIST_ITEMS = [
+    {'key': 'hra',             'label': 'Complete HRA',                                'code': None},
+    {'key': 'meds',            'label': 'Review medications',                          'code': None},
+    {'key': 'history',         'label': 'Update family/social history',                'code': None},
+    {'key': 'functional',      'label': 'Review functional status',                    'code': None},
+    {'key': 'cognitive',       'label': 'Document cognitive assessment',               'code': None},
+    {'key': 'prevention_plan', 'label': 'Create personalized prevention plan (G0468)', 'code': 'G0468'},
+    {'key': 'acp',             'label': 'Discuss advance care planning (99497)',       'code': '99497'},
+    {'key': 'sdoh',            'label': 'Complete SDOH screening (G0136)',             'code': 'G0136'},
+]
+
+# RVU lookup table (2024 Medicare RBRVS, approximate)
+RVU_TABLE = {
+    '99211': 0.18, '99212': 0.70, '99213': 1.30, '99214': 1.92, '99215': 2.80,
+    '99201': 0.48, '99202': 0.93, '99203': 1.60, '99204': 2.60, '99205': 3.50,
+    'AWV-Initial': 2.43, 'AWV-Subsequent': 1.50,
+}
+
+# F14b — Expected time ranges per E&M level (min chart time)
+EM_TIME_RANGES = {
+    '99211': (1, 10),
+    '99212': (5, 20),
+    '99213': (10, 30),
+    '99214': (20, 45),
+    '99215': (30, 70),
+    '99201': (5, 15),
+    '99202': (10, 25),
+    '99203': (15, 40),
+    '99204': (25, 55),
+    '99205': (35, 75),
+    'AWV-Initial': (30, 75),
+    'AWV-Subsequent': (20, 50),
+}
+
+
+# --------------------------------------------------------------------------
+#  F16a — AWV Interactive Checklist routes
+# --------------------------------------------------------------------------
+
+@timer_bp.route('/timer/awv-checklist/<int:timelog_id>', methods=['GET'])
+@login_required
+def awv_checklist_get(timelog_id):
+    """Return AWV checklist state for a given session."""
+    tl = TimeLog.query.filter_by(id=timelog_id, user_id=current_user.id).first()
+    if not tl:
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
+
+    progress = {}
+    if tl.awv_checklist:
+        try:
+            progress = json.loads(tl.awv_checklist)
+        except (json.JSONDecodeError, TypeError):
+            progress = {}
+
+    items = []
+    for item in AWV_CHECKLIST_ITEMS:
+        items.append({
+            'key': item['key'],
+            'label': item['label'],
+            'code': item['code'],
+            'checked': progress.get(item['key'], False),
+        })
+
+    checked_count = sum(1 for i in items if i['checked'])
+    eligible_codes = []
+    for item in items:
+        if item['checked'] and item['code']:
+            rvu = RVU_TABLE.get(item['code'], 0)
+            eligible_codes.append({'code': item['code'], 'rvu': rvu})
+
+    return jsonify({
+        'success': True,
+        'items': items,
+        'checked_count': checked_count,
+        'total_count': len(AWV_CHECKLIST_ITEMS),
+        'eligible_addon_codes': eligible_codes,
+        'is_awv': (tl.visit_type == 'awv'),
+    })
+
+
+@timer_bp.route('/timer/awv-checklist/<int:timelog_id>', methods=['POST'])
+@login_required
+def awv_checklist_toggle(timelog_id):
+    """Toggle a single AWV checklist item."""
+    tl = TimeLog.query.filter_by(id=timelog_id, user_id=current_user.id).first()
+    if not tl:
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    item_key = (data.get('item_key') or '').strip()
+    checked = bool(data.get('checked', False))
+
+    valid_keys = {i['key'] for i in AWV_CHECKLIST_ITEMS}
+    if item_key not in valid_keys:
+        return jsonify({'success': False, 'error': 'Invalid checklist item'}), 400
+
+    progress = {}
+    if tl.awv_checklist:
+        try:
+            progress = json.loads(tl.awv_checklist)
+        except (json.JSONDecodeError, TypeError):
+            progress = {}
+
+    progress[item_key] = checked
+    tl.awv_checklist = json.dumps(progress)
+    db.session.commit()
+
+    # Return updated state
+    return awv_checklist_get(timelog_id)
 
 
 # --------------------------------------------------------------------------
@@ -397,7 +508,8 @@ def face_stop():
     active.face_to_face_seconds = (active.face_to_face_seconds or 0) + elapsed
     db.session.commit()
     flash('Face-to-face timer stopped.', 'success')
-    return redirect(url_for('timer.index'))
+    # 19E.2 — redirect with billing prompt so the post-visit modal can fire
+    return redirect(url_for('timer.index', show_billing='1', billing_mrn=active.mrn))
 
 
 # --------------------------------------------------------------------------
@@ -570,29 +682,6 @@ def day_report(report_date):
 # ==========================================================================
 #  F14 — Billing Audit Log
 # ==========================================================================
-
-# RVU lookup table (2024 Medicare RBRVS, approximate)
-RVU_TABLE = {
-    '99211': 0.18, '99212': 0.70, '99213': 1.30, '99214': 1.92, '99215': 2.80,
-    '99201': 0.48, '99202': 0.93, '99203': 1.60, '99204': 2.60, '99205': 3.50,
-    'AWV-Initial': 2.43, 'AWV-Subsequent': 1.50,
-}
-
-# F14b — Expected time ranges per E&M level (min chart time)
-EM_TIME_RANGES = {
-    '99211': (1, 10),
-    '99212': (5, 20),
-    '99213': (10, 30),
-    '99214': (20, 45),
-    '99215': (30, 70),
-    '99201': (5, 15),
-    '99202': (10, 25),
-    '99203': (15, 40),
-    '99204': (25, 55),
-    '99205': (35, 75),
-    'AWV-Initial': (30, 75),
-    'AWV-Subsequent': (20, 50),
-}
 
 
 @timer_bp.route('/billing/log')
@@ -983,12 +1072,218 @@ def monthly_report():
     stats = _monthly_stats(sessions)
     prev_stats = _monthly_stats(prev_sessions) if prev_sessions else None
 
+    # 6-month RVU trend (21.3)
+    rvu_trend = []
+    for offset in range(5, -1, -1):
+        m = month - offset
+        y = year
+        while m <= 0:
+            m += 12
+            y -= 1
+        t_start = datetime(y, m, 1, tzinfo=timezone.utc)
+        t_end = datetime(y, m + 1, 1, tzinfo=timezone.utc) if m < 12 else datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+        t_sessions = (
+            TimeLog.query
+            .filter_by(user_id=current_user.id)
+            .filter(TimeLog.session_start >= t_start, TimeLog.session_start < t_end,
+                    TimeLog.session_end.isnot(None))
+            .all()
+        )
+        t_rvu = round(sum(RVU_TABLE.get(s.billed_level or '', 0) for s in t_sessions), 2)
+        t_pts = len(t_sessions)
+        rvu_trend.append({'label': f'{y}-{m:02d}', 'rvu': t_rvu, 'patients': t_pts})
+
+    # YTD cumulative RVU
+    ytd_start = datetime(year, 1, 1, tzinfo=timezone.utc)
+    ytd_sessions = (
+        TimeLog.query
+        .filter_by(user_id=current_user.id)
+        .filter(TimeLog.session_start >= ytd_start, TimeLog.session_start < end,
+                TimeLog.session_end.isnot(None))
+        .all()
+    )
+    ytd_rvu = round(sum(RVU_TABLE.get(s.billed_level or '', 0) for s in ytd_sessions), 2)
+
     return render_template(
         'billing_monthly.html',
         year=year,
         month=month,
         prev_year=prev_year,
         prev_month=prev_month,
+        rvu_trend=rvu_trend,
+        ytd_rvu=ytd_rvu,
         **stats,
         prev=prev_stats,
+    )
+
+
+# ======================================================================
+# 21.2 — Local Billing Benchmarking (Practice Self-Comparison)
+# ======================================================================
+
+@timer_bp.route('/billing/benchmarks')
+@login_required
+def billing_benchmarks():
+    """Practice billing benchmarking: compare current code distribution
+    against own 6-month rolling average, flag outliers."""
+    from collections import Counter
+    import math
+
+    month_str = request.args.get('month', '')
+    try:
+        rpt_year, rpt_month = int(month_str[:4]), int(month_str[5:7])
+    except (ValueError, IndexError):
+        rpt_year, rpt_month = datetime.now().year, datetime.now().month
+
+    # Current month sessions
+    start = datetime(rpt_year, rpt_month, 1, tzinfo=timezone.utc)
+    if rpt_month == 12:
+        end = datetime(rpt_year + 1, 1, 1, tzinfo=timezone.utc)
+    else:
+        end = datetime(rpt_year, rpt_month + 1, 1, tzinfo=timezone.utc)
+
+    current_sessions = (
+        TimeLog.query
+        .filter(TimeLog.user_id == current_user.id,
+                TimeLog.session_start >= start,
+                TimeLog.session_start < end,
+                TimeLog.session_end.isnot(None))
+        .all()
+    )
+
+    # Build 6-month history (excluding current month)
+    history_months = []
+    for offset in range(1, 7):
+        m = rpt_month - offset
+        y = rpt_year
+        while m <= 0:
+            m += 12
+            y -= 1
+        h_start = datetime(y, m, 1, tzinfo=timezone.utc)
+        if m == 12:
+            h_end = datetime(y + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            h_end = datetime(y, m + 1, 1, tzinfo=timezone.utc)
+
+        h_sessions = (
+            TimeLog.query
+            .filter(TimeLog.user_id == current_user.id,
+                    TimeLog.session_start >= h_start,
+                    TimeLog.session_start < h_end,
+                    TimeLog.session_end.isnot(None))
+            .all()
+        )
+        history_months.append({
+            'label': f'{y}-{m:02d}',
+            'sessions': h_sessions,
+        })
+
+    # --- Code distribution for current month ---
+    current_dist = Counter()
+    current_total = 0
+    for s in current_sessions:
+        lvl = s.billed_level or 'Unbilled'
+        current_dist[lvl] += 1
+        current_total += 1
+
+    # --- Historical average distribution across 6 months ---
+    all_codes = set(current_dist.keys())
+    hist_counts_by_code = {}   # code → list of monthly counts
+    hist_totals = []
+
+    for hm in history_months:
+        month_dist = Counter()
+        month_total = 0
+        for s in hm['sessions']:
+            lvl = s.billed_level or 'Unbilled'
+            month_dist[lvl] += 1
+            month_total += 1
+            all_codes.add(lvl)
+        hist_totals.append(month_total)
+        for code in all_codes:
+            hist_counts_by_code.setdefault(code, []).append(month_dist.get(code, 0))
+
+    # Pad lists to 6 months
+    for code in all_codes:
+        while len(hist_counts_by_code.get(code, [])) < 6:
+            hist_counts_by_code.setdefault(code, []).append(0)
+
+    # --- Build comparison table ---
+    comparison = []
+    sorted_codes = sorted(all_codes, key=lambda c: RVU_TABLE.get(c, 0), reverse=True)
+
+    for code in sorted_codes:
+        counts = hist_counts_by_code.get(code, [0] * 6)
+        avg_count = sum(counts) / max(len(counts), 1)
+        # Standard deviation
+        variance = sum((c - avg_count) ** 2 for c in counts) / max(len(counts), 1)
+        std_dev = math.sqrt(variance) if variance > 0 else 0
+
+        cur_count = current_dist.get(code, 0)
+        cur_pct = round(cur_count / current_total * 100, 1) if current_total > 0 else 0
+        avg_pct = round(avg_count / (sum(hist_totals) / max(len(hist_totals), 1)) * 100, 1) if sum(hist_totals) > 0 else 0
+        diff_pct = round(cur_pct - avg_pct, 1)
+
+        # Outlier flag: deviation > 1.5 std devs from mean
+        is_outlier = False
+        outlier_direction = ''
+        if std_dev > 0 and abs(cur_count - avg_count) > 1.5 * std_dev:
+            is_outlier = True
+            outlier_direction = 'high' if cur_count > avg_count else 'low'
+        elif std_dev == 0 and avg_count > 0 and abs(cur_count - avg_count) > 1:
+            is_outlier = True
+            outlier_direction = 'high' if cur_count > avg_count else 'low'
+
+        rvu = RVU_TABLE.get(code, 0)
+
+        comparison.append({
+            'code': code,
+            'current_count': cur_count,
+            'current_pct': cur_pct,
+            'avg_count': round(avg_count, 1),
+            'avg_pct': avg_pct,
+            'diff_pct': diff_pct,
+            'std_dev': round(std_dev, 1),
+            'is_outlier': is_outlier,
+            'outlier_direction': outlier_direction,
+            'rvu': rvu,
+        })
+
+    # --- Monthly trend by code (for chart) ---
+    trend_labels = [hm['label'] for hm in reversed(history_months)]
+    trend_labels.append(f'{rpt_year}-{rpt_month:02d}')
+
+    trend_series = {}
+    for code in sorted_codes:
+        if code == 'Unbilled':
+            continue
+        series = []
+        for hm in reversed(history_months):
+            cnt = Counter(s.billed_level or 'Unbilled' for s in hm['sessions'])
+            series.append(cnt.get(code, 0))
+        series.append(current_dist.get(code, 0))
+        trend_series[code] = series
+
+    # --- Summary stats ---
+    current_rvu = round(sum(RVU_TABLE.get(s.billed_level or '', 0) for s in current_sessions), 2)
+    avg_monthly_rvu = round(
+        sum(
+            sum(RVU_TABLE.get(s.billed_level or '', 0) for s in hm['sessions'])
+            for hm in history_months
+        ) / max(len([hm for hm in history_months if hm['sessions']]), 1),
+        2
+    )
+    outlier_count = sum(1 for c in comparison if c['is_outlier'])
+
+    return render_template(
+        'billing_benchmarks.html',
+        year=rpt_year,
+        month=rpt_month,
+        comparison=comparison,
+        trend_labels=trend_labels,
+        trend_series=trend_series,
+        current_total=current_total,
+        current_rvu=current_rvu,
+        avg_monthly_rvu=avg_monthly_rvu,
+        outlier_count=outlier_count,
     )

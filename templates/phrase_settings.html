@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Documentation Phrase Library — CareCompanion{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:960px;margin:24px auto;padding:0 16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+            <h2 style="margin:0;font-size:20px;">&#128221; Documentation Phrase Library</h2>
+            <p style="margin:4px 0 0;font-size:13px;color:var(--text-secondary);">
+                Pre-written clinical documentation snippets for compliant billing. Click to copy to clipboard.
+            </p>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <input type="text" id="phrase-search" placeholder="Search phrases..." 
+                   style="padding:6px 12px;border:1px solid var(--border-color,#e2e8f0);border-radius:6px;font-size:13px;width:200px;"
+                   oninput="filterPhrases()">
+        </div>
+    </div>
+
+    {# Category filter tabs #}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="phrase-cat-btn active" onclick="filterCategory('all')" data-cat="all"
+                style="padding:4px 12px;border-radius:12px;border:1px solid var(--border-color,#e2e8f0);font-size:11px;cursor:pointer;background:var(--color-green,#27ae60);color:#fff;">
+            All ({{ phrases|length }})
+        </button>
+        {% for cat in categories %}
+        <button class="phrase-cat-btn" onclick="filterCategory('{{ cat }}')" data-cat="{{ cat }}"
+                style="padding:4px 12px;border-radius:12px;border:1px solid var(--border-color,#e2e8f0);font-size:11px;cursor:pointer;background:var(--bg-card,#fff);color:var(--text-primary);">
+            {{ cat|replace('_',' ')|title }}
+            <span style="opacity:0.6;">({{ category_counts[cat] }})</span>
+        </button>
+        {% endfor %}
+    </div>
+
+    {# Phrase cards grouped by opportunity code #}
+    {% for opp_code, group in grouped.items() %}
+    <div class="phrase-group" data-opp="{{ opp_code }}">
+        <div style="display:flex;align-items:center;gap:8px;margin:16px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--color-green,#27ae60);">
+            <span style="font-weight:700;font-size:14px;">{{ opp_code }}</span>
+            <span style="font-size:12px;color:var(--text-secondary);">{{ group|length }} phrase{{ 's' if group|length != 1 }}</span>
+        </div>
+        {% for phrase in group %}
+        <div class="phrase-card" data-category="{{ phrase.phrase_category }}" data-text="{{ phrase.phrase_text|e }}" data-title="{{ phrase.phrase_title|e }}"
+             style="background:var(--bg-card,#fff);border:1px solid var(--border-color,#e2e8f0);border-radius:8px;padding:12px 16px;margin-bottom:8px;transition:box-shadow 0.2s;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div style="flex:1;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                        <strong style="font-size:13px;">{{ phrase.phrase_title }}</strong>
+                        {% if phrase.cpt_code %}
+                        <span style="font-size:10px;padding:1px 6px;background:var(--bg-secondary,#f1f5f9);border-radius:4px;font-family:monospace;">{{ phrase.cpt_code }}</span>
+                        {% endif %}
+                        <span style="font-size:10px;padding:1px 6px;background:var(--bg-secondary,#f1f5f9);border-radius:4px;">{{ phrase.phrase_category|replace('_',' ')|title }}</span>
+                        {% if phrase.payer_specific %}
+                        <span style="font-size:10px;padding:1px 6px;background:#dbeafe;border-radius:4px;color:#1e40af;">{{ phrase.payer_specific|title }}</span>
+                        {% endif %}
+                        {% if phrase.is_customized %}
+                        <span style="font-size:10px;padding:1px 6px;background:#fef3c7;border-radius:4px;color:#92400e;">Customized</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size:12px;color:var(--text-primary);white-space:pre-wrap;line-height:1.5;max-height:100px;overflow-y:auto;">{{ phrase.phrase_text }}</div>
+                    {% if phrase.clinical_context %}
+                    <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;font-style:italic;">Context: {{ phrase.clinical_context }}</div>
+                    {% endif %}
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px;margin-left:12px;">
+                    <button class="btn btn-sm btn-primary" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+                            onclick="copyPhrase(this, {{ phrase.id }})" title="Copy to clipboard">
+                        &#128203; Copy
+                    </button>
+                    <button class="btn btn-sm btn-outline" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+                            onclick="editPhrase({{ phrase.id }})" title="Edit phrase">
+                        &#9998; Edit
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    {% if not phrases %}
+    <div style="text-align:center;padding:40px;color:var(--text-secondary);">
+        No documentation phrases found. Run the seeder to populate the library.
+    </div>
+    {% endif %}
+</div>
+
+{# Edit modal #}
+<div id="phrase-edit-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.55);padding:24px;overflow-y:auto;">
+    <div style="max-width:600px;margin:60px auto;background:var(--bg-card,#fff);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);overflow:hidden;">
+        <div style="background:linear-gradient(90deg,#27ae60 0%,#1a7a42 100%);padding:14px 20px;color:#fff;display:flex;justify-content:space-between;align-items:center;">
+            <strong>Edit Documentation Phrase</strong>
+            <button onclick="closeEditModal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">&#10005;</button>
+        </div>
+        <form id="phrase-edit-form" method="POST" style="padding:20px;">
+            <input type="hidden" id="edit-phrase-id" name="phrase_id">
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Title</label>
+                <input type="text" id="edit-phrase-title" name="phrase_title" style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;font-size:13px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Phrase Text</label>
+                <textarea id="edit-phrase-text" name="phrase_text" rows="6" style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;font-family:inherit;resize:vertical;"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.phrase-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.phrase-cat-btn:hover { opacity: 0.85; }
+.phrase-cat-btn.active { background: var(--color-green, #27ae60) !important; color: #fff !important; }
+.copy-flash { background: #d1fae5 !important; border-color: #10b981 !important; }
+</style>
+
+<script>
+var currentCat = 'all';
+
+function filterCategory(cat) {
+    currentCat = cat;
+    document.querySelectorAll('.phrase-cat-btn').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-cat') === cat);
+    });
+    filterPhrases();
+}
+
+function filterPhrases() {
+    var search = (document.getElementById('phrase-search').value || '').toLowerCase();
+    document.querySelectorAll('.phrase-card').forEach(function(card) {
+        var catMatch = currentCat === 'all' || card.getAttribute('data-category') === currentCat;
+        var textMatch = !search || 
+            (card.getAttribute('data-title') || '').toLowerCase().indexOf(search) >= 0 ||
+            (card.getAttribute('data-text') || '').toLowerCase().indexOf(search) >= 0;
+        card.style.display = (catMatch && textMatch) ? '' : 'none';
+    });
+    /* Show/hide group headers based on visible cards */
+    document.querySelectorAll('.phrase-group').forEach(function(g) {
+        var visible = g.querySelectorAll('.phrase-card:not([style*="display: none"])').length;
+        g.style.display = visible > 0 ? '' : 'none';
+    });
+}
+
+function copyPhrase(btn, id) {
+    var card = btn.closest('.phrase-card');
+    var text = card.getAttribute('data-text');
+    navigator.clipboard.writeText(text).then(function() {
+        btn.innerHTML = '&#10003; Copied!';
+        card.classList.add('copy-flash');
+        setTimeout(function() {
+            btn.innerHTML = '&#128203; Copy';
+            card.classList.remove('copy-flash');
+        }, 1500);
+    });
+}
+
+function editPhrase(id) {
+    fetch('/api/billing/phrase/' + id)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            document.getElementById('edit-phrase-id').value = d.id;
+            document.getElementById('edit-phrase-title').value = d.phrase_title;
+            document.getElementById('edit-phrase-text').value = d.phrase_text;
+            document.getElementById('phrase-edit-form').action = '/settings/phrases/' + d.id + '/edit';
+            document.getElementById('phrase-edit-modal').style.display = '';
+        });
+}
+
+function closeEditModal() {
+    document.getElementById('phrase-edit-modal').style.display = 'none';
+}
+</script>
+{% endblock %}

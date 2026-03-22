@@ -1,0 +1,167 @@
+{
+  "timestamp": "2026-03-22T00:04:50.796667+00:00",
+  "version": "v1.1.3",
+  "host": "Yoga",
+  "checks": {
+    "debug_false": {
+      "pass": true,
+      "detail": "DEBUG=False",
+      "warning": false
+    },
+    "mock_mode_false": {
+      "pass": true,
+      "detail": "AC_MOCK_MODE=False",
+      "warning": false
+    },
+    "secret_key_random": {
+      "pass": true,
+      "detail": "len=32, known_default=False",
+      "warning": false
+    },
+    "config_in_gitignore": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "tesseract_installed": {
+      "pass": true,
+      "detail": "C:\\Program Files\\Tesseract-OCR\\tesseract.EXE",
+      "warning": false
+    },
+    "ac_exe_reachable": {
+      "pass": false,
+      "detail": "C:\\Program Files (x86)\\Amazing Charts\\AmazingCharts.exe",
+      "warning": false
+    },
+    "data_dir_exists": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "logs_dir_exists": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "backups_dir_exists": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "db_file_exists": {
+      "pass": true,
+      "detail": "C:\\Users\\coryd\\Documents\\CareCompanion\\data\\carecompanion.db",
+      "warning": false
+    },
+    "db_integrity": {
+      "pass": true,
+      "detail": "ok",
+      "warning": false
+    },
+    "migrations_table": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "migration_count": {
+      "pass": true,
+      "detail": "36 migrations",
+      "warning": false
+    },
+    "critical_tables": {
+      "pass": false,
+      "detail": "20/21 present, missing: ['patient_record']",
+      "warning": false
+    },
+    "admin_exists": {
+      "pass": true,
+      "detail": "2 admin(s)",
+      "warning": false
+    },
+    "user_count": {
+      "pass": true,
+      "detail": "11 user(s)",
+      "warning": false
+    },
+    "pushover_user_key": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "pushover_api_token": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "smtp_server": {
+      "pass": false,
+      "detail": "",
+      "warning": true
+    },
+    "openfda_key": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "umls_key": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "loinc_creds": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "pubmed_key": {
+      "pass": false,
+      "detail": "",
+      "warning": true
+    },
+    "netpractice_url": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "ac_mock_false": {
+      "pass": true,
+      "detail": "AC_MOCK_MODE=False",
+      "warning": false
+    },
+    "ac_credentials": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "agent_job_count": {
+      "pass": true,
+      "detail": "16/16 jobs",
+      "warning": false
+    },
+    "health_endpoint": {
+      "pass": true,
+      "detail": "status=200",
+      "warning": false
+    },
+    "log_dir_writable": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "backup_job_in_src": {
+      "pass": true,
+      "detail": "",
+      "warning": false
+    },
+    "test_suite_pass": {
+      "pass": true,
+      "detail": "  PASS  PA shared columns present\n  PASS  /pa/library renders (200)\n  PASS  Insurer classifier: 8/8 cases correct\n  PASS  PatientRecord.insurer_type exists\n  PASS  /billing/benchmarks: comparison table + trend chart present\n\n==================================================\nResults: 127 passed, 0 failed, 0 errors out of 127 checks\n\n*** ALL CHECKS PASSED ***",
+      "warning": false
+    }
+  },
+  "summary": {
+    "passed": 27,
+    "failed": 2,
+    "warnings": 2
+  }
+}

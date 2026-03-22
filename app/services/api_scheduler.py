@@ -1,5 +1,5 @@
 """
-NP Companion — API Intelligence Layer Scheduler
+CareCompanion — API Intelligence Layer Scheduler
 File: app/services/api_scheduler.py
 
 Registers background jobs for the API intelligence layer into an
@@ -26,7 +26,7 @@ Dependencies:
 - models/billing.py (BillingOpportunity)
 - models (db)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Morning Briefing (F22) — weather, recalls, PubMed loaded before provider arrives
 - Billing Opportunity Engine — overnight pre-visit prep
 - Drug Safety Monitor — daily recall sweep
@@ -43,6 +43,8 @@ from app.api_config import (
     WEEKLY_CACHE_REFRESH_DAY,
     WEEKLY_CACHE_REFRESH_HOUR,
     CY2025_CONVERSION_FACTOR,
+    PRICING_CACHE_REFRESH_HOUR,
+    PRICING_CACHE_REFRESH_MINUTE,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ def run_morning_briefing_prep(app, db):
     """
     6:00 AM — Fetch weather conditions and check for drug recalls.
     Pre-loads PubMed guidelines for today's scheduled patients.
+    Phase 24.6: medication safety + staff prep tasks.
 
     Runs inside the Flask app context so models are available.
     """
@@ -64,6 +67,7 @@ def run_morning_briefing_prep(app, db):
         _run_weather_fetch(db)
         _run_recall_check(db)
         _run_pubmed_preload(db)
+        _run_medication_safety_prep(db)
         logger.info("[api_scheduler] Morning briefing prep complete")
 
 
@@ -71,6 +75,7 @@ def run_overnight_visit_prep(app, db):
     """
     8:00 PM — Run the billing rules engine for tomorrow's scheduled patients.
     Creates BillingOpportunity records for the Today View.
+    Phase 23: Also populates monitoring schedules and advances REMS phases.
 
     Runs inside the Flask app context so ORM writes succeed.
     """
@@ -80,6 +85,8 @@ def run_overnight_visit_prep(app, db):
             "[api_scheduler] Overnight visit prep for %s starting", tomorrow
         )
         _run_billing_rules(db, target_date=tomorrow)
+        _run_nightly_monitoring_update(db, target_date=tomorrow)
+        _run_nightly_outreach_check(db)
         logger.info("[api_scheduler] Overnight visit prep complete")
 
 
@@ -103,6 +110,32 @@ def run_weekly_cache_refresh(app, db):
         logger.info("[api_scheduler] Weekly cache refresh starting")
         _flush_stale_caches(db)
         logger.info("[api_scheduler] Weekly cache refresh complete")
+
+
+def run_weekly_rxclass_vsac_refresh(app, db):
+    """
+    Sunday 3:00 AM — Refresh RxClass and VSAC caches, log new entries
+    discovered via API that weren't in the hardcoded fallbacks.
+    Phase 17.3 auto-update verification.
+    Phase 23: Also refreshes monitoring rules for newly added medications.
+    """
+    with app.app_context():
+        logger.info("[api_scheduler] RxClass/VSAC refresh starting")
+        _run_rxclass_vsac_refresh(db)
+        _run_weekly_monitoring_refresh(db)
+        logger.info("[api_scheduler] RxClass/VSAC refresh complete")
+
+
+def run_pricing_cache_refresh(app, db):
+    """
+    5:30 AM — Refresh pricing cache for medications on today's scheduled patients.
+    Cost Plus runs first (free), GoodRx only for Cost Plus misses.
+    Runs before recall check (5:45) and morning briefing (6:00).
+    """
+    with app.app_context():
+        logger.info("[api_scheduler] Pricing cache refresh starting")
+        _run_pricing_cache_refresh(db)
+        logger.info("[api_scheduler] Pricing cache refresh complete")
 
 
 # ---------------------------------------------------------------------------
@@ -182,16 +215,48 @@ def register_api_jobs(scheduler, app, db):
         coalesce=True,
     )
 
+    # Sunday 3:00 AM — RxClass/VSAC auto-update verification (Phase 17.3)
+    scheduler.add_job(
+        func=run_weekly_rxclass_vsac_refresh,
+        kwargs={"app": app, "db": db},
+        trigger="cron",
+        day_of_week=WEEKLY_CACHE_REFRESH_DAY,
+        hour=WEEKLY_CACHE_REFRESH_HOUR + 1,
+        minute=0,
+        id="api_rxclass_vsac_refresh",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # 5:30 AM — Pricing cache refresh for today's scheduled patients (Phase 28)
+    scheduler.add_job(
+        func=run_pricing_cache_refresh,
+        kwargs={"app": app, "db": db},
+        trigger="cron",
+        hour=PRICING_CACHE_REFRESH_HOUR,
+        minute=PRICING_CACHE_REFRESH_MINUTE,
+        id="api_pricing_cache_refresh",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     logger.info(
-        "[api_scheduler] Registered 4 API intelligence jobs: "
+        "[api_scheduler] Registered 6 API intelligence jobs: "
         "morning_briefing=%d:00, overnight_prep=%d:00, "
-        "recall_check=%d:%02d, cache_refresh=%s %d:00",
+        "recall_check=%d:%02d, cache_refresh=%s %d:00, "
+        "rxclass_vsac_refresh=%s %d:00, pricing_cache=%d:%02d",
         MORNING_BRIEFING_HOUR,
         OVERNIGHT_PREP_HOUR,
         DAILY_RECALL_CHECK_HOUR,
         DAILY_RECALL_CHECK_MINUTE,
         WEEKLY_CACHE_REFRESH_DAY.upper(),
         WEEKLY_CACHE_REFRESH_HOUR,
+        WEEKLY_CACHE_REFRESH_DAY.upper(),
+        WEEKLY_CACHE_REFRESH_HOUR + 1,
+        PRICING_CACHE_REFRESH_HOUR,
+        PRICING_CACHE_REFRESH_MINUTE,
     )
 
 
@@ -260,6 +325,111 @@ def _run_recall_check(db):
             )
     except Exception as exc:
         logger.error("[api_scheduler] Recall check failed: %s", exc)
+
+
+def _run_medication_safety_prep(db):
+    """
+    Phase 24.6 — Medication safety expansion.
+    For today's scheduled patients:
+      1. Cross-ref active meds against cached FDA recall results
+      2. Gather monitoring bundles (labs due) for MA lab-draw prep
+      3. Create staff prep Notification records for MA workflow
+    """
+    try:
+        from models.schedule import Schedule
+        from models.patient import PatientMedication
+        from models.monitoring import MonitoringSchedule
+        from models.notification import Notification
+        from billing_engine.shared import hash_mrn
+
+        today = date.today()
+
+        # Get today's scheduled patients
+        appointments = Schedule.query.filter_by(appointment_date=today).all()
+        if not appointments:
+            return
+
+        unique_users = {}
+        for appt in appointments:
+            if not appt.patient_mrn:
+                continue
+            key = (appt.user_id, appt.patient_mrn)
+            unique_users[key] = appt
+
+        prep_count = 0
+        for (user_id, mrn), appt in unique_users.items():
+            mrn_hash = hash_mrn(mrn)
+
+            # ── 1. Monitoring labs due → MA lab-draw prep ──
+            due_labs = (
+                MonitoringSchedule.query
+                .filter_by(patient_mrn_hash=mrn_hash, status='active')
+                .filter(MonitoringSchedule.next_due_date <= today)
+                .all()
+            )
+            if due_labs:
+                lab_names = [e.lab_name for e in due_labs if e.lab_name]
+                if lab_names:
+                    msg = f'MA PREP ...{mrn[-4:]}: Draw labs — {", ".join(lab_names[:5])}'
+                    if len(lab_names) > 5:
+                        msg += f' (+{len(lab_names) - 5} more)'
+
+                    existing = Notification.query.filter_by(
+                        user_id=user_id,
+                        template_name='staff_lab_prep',
+                        is_read=False,
+                    ).filter(Notification.message.startswith(f'MA PREP ...{mrn[-4:]}')).first()
+
+                    if not existing:
+                        notif = Notification(
+                            user_id=user_id,
+                            message=msg,
+                            template_name='staff_lab_prep',
+                            priority=2,
+                        )
+                        db.session.add(notif)
+                        prep_count += 1
+
+            # ── 2. Active meds with recall flags ──
+            active_meds = (
+                PatientMedication.query
+                .filter_by(user_id=user_id, mrn=mrn, is_active=True)
+                .all()
+            )
+            for med in active_meds:
+                if getattr(med, 'recall_flag', None):
+                    recall_msg = (
+                        f'RECALL ALERT ...{mrn[-4:]}: {med.drug_name} — '
+                        f'FDA recall flagged. Review before visit.'
+                    )
+                    existing = Notification.query.filter_by(
+                        user_id=user_id,
+                        template_name='med_recall_prep',
+                        is_read=False,
+                    ).filter(Notification.message.startswith(f'RECALL ALERT ...{mrn[-4:]}')).first()
+
+                    if not existing:
+                        notif = Notification(
+                            user_id=user_id,
+                            message=recall_msg,
+                            template_name='med_recall_prep',
+                            priority=1,
+                        )
+                        db.session.add(notif)
+                        prep_count += 1
+
+        if prep_count > 0:
+            db.session.commit()
+            logger.info(
+                "[api_scheduler] Medication safety prep: %d staff tasks created",
+                prep_count,
+            )
+        else:
+            logger.info("[api_scheduler] Medication safety prep: no tasks needed")
+
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("[api_scheduler] Medication safety prep failed: %s", exc)
 
 
 def _run_pubmed_preload(db):
@@ -360,6 +530,30 @@ def _run_billing_rules(db, target_date):
             # Build patient_data dict expected by BillingRulesEngine
             patient_data = _build_patient_data(db, patient_record, user_id, target_date)
 
+            # Phase 23.C2: populate monitoring schedule before billing
+            try:
+                from app.services.monitoring_rule_engine import MonitoringRuleEngine
+                mon_engine = MonitoringRuleEngine(db)
+                mon_engine.populate_patient_schedule(
+                    mrn_hash, user_id,
+                    patient_data.get("medications", []),
+                    patient_data.get("diagnoses", []),
+                )
+                overdue = mon_engine.get_overdue_monitoring(mrn_hash)
+                patient_data["monitoring_schedule"] = [
+                    {
+                        "lab_name": e.lab_name,
+                        "lab_code": e.lab_code,
+                        "next_due_date": str(e.next_due_date) if e.next_due_date else "",
+                        "priority": e.priority,
+                        "source": e.source,
+                    }
+                    for e in overdue
+                ]
+            except Exception as mon_exc:
+                logger.debug("Monitoring schedule population skipped: %s", mon_exc)
+                patient_data["monitoring_schedule"] = []
+
             # Delete stale pending opportunities for this patient+date
             db.session.query(BillingOpportunity).filter(
                 BillingOpportunity.patient_mrn_hash == mrn_hash,
@@ -432,7 +626,7 @@ def _build_patient_data(db, patient_record, user_id, visit_date):
         .first()
     )
 
-    return {
+    result = {
         "mrn": getattr(patient_record, "mrn", ""),
         "patient_mrn_hash": mrn_hash,
         "user_id": user_id,
@@ -458,7 +652,18 @@ def _build_patient_data(db, patient_record, user_id, visit_date):
             "bmi": getattr(vitals, "bmi", None),
             "blood_pressure": getattr(vitals, "blood_pressure", None),
         } if vitals else {},
+        "monitoring_schedule": [],  # populated in C2 block after _build_patient_data
     }
+
+    # Phase 25.4: populate telehealth + BHI fields from CommunicationLog
+    try:
+        from app.services.telehealth_engine import get_telehealth_fields
+        tele_fields = get_telehealth_fields(mrn_hash, user_id, visit_date)
+        result.update(tele_fields)
+    except Exception:
+        pass
+
+    return result
 
 
 def _flush_stale_caches(db):
@@ -490,3 +695,470 @@ def _flush_stale_caches(db):
         )
     except Exception as exc:
         logger.error("[api_scheduler] Cache flush failed: %s", exc)
+
+
+def _run_rxclass_vsac_refresh(db):
+    """
+    Phase 17.3 — Weekly auto-update verification.
+    Refreshes RxClass therapeutic class cache for known medications and
+    VSAC immunization value sets. Logs when new entries are discovered
+    that aren't in the hardcoded fallbacks.
+    """
+    new_classes = 0
+    new_vaccines = 0
+
+    # --- RxClass refresh: re-query classes for all cached RxCUIs ---
+    try:
+        from models.api_cache import RxClassCache
+        from app.services.api.rxnorm import RxNormService
+
+        rxnorm_svc = RxNormService(db)
+        existing_rxcuis = [
+            row.rxcui for row in
+            db.session.query(RxClassCache.rxcui).distinct().limit(100).all()
+        ]
+
+        for rxcui in existing_rxcuis:
+            try:
+                classes = rxnorm_svc.get_therapeutic_classes_for_rxcui(rxcui)
+                for cls_name in classes:
+                    existing = RxClassCache.query.filter_by(
+                        rxcui=rxcui, class_name=cls_name
+                    ).first()
+                    if not existing:
+                        db.session.add(RxClassCache(
+                            rxcui=rxcui,
+                            class_id=cls_name.lower().replace(" ", "_"),
+                            class_name=cls_name,
+                            class_type="MEDRT",
+                            source="rxclass_api_refresh",
+                        ))
+                        new_classes += 1
+            except Exception:
+                continue
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error("[api_scheduler] RxClass refresh failed: %s", e)
+
+    # --- VSAC immunization refresh ---
+    try:
+        from app.services.api.umls import UMLSService
+        from app.api_config import UMLS_API_KEY
+        from models.api_cache import CdcImmunizationCache
+
+        if UMLS_API_KEY:
+            umls_svc = UMLSService(db, api_key=UMLS_API_KEY)
+            vsac_vaccines = umls_svc.get_immunization_value_set()
+            for vac in vsac_vaccines:
+                cvx = vac.get("cvx_code", "")
+                if not cvx:
+                    continue
+                existing = CdcImmunizationCache.query.filter_by(vaccine_code=cvx).first()
+                if not existing:
+                    db.session.add(CdcImmunizationCache(
+                        vaccine_code=cvx,
+                        vaccine_name=vac.get("vaccine_name", ""),
+                        schedule_description="VSAC-sourced — verify applicability",
+                        min_age="19",
+                        max_age="999",
+                    ))
+                    new_vaccines += 1
+            db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error("[api_scheduler] VSAC immunization refresh failed: %s", e)
+
+    if new_classes or new_vaccines:
+        logger.info(
+            "[api_scheduler] RxClass/VSAC refresh: %d new therapeutic classes, "
+            "%d new vaccines discovered via API",
+            new_classes, new_vaccines,
+        )
+        # Create admin notification for new entries
+        try:
+            from models.notification import Notification
+            from models.user import User
+            admin = User.query.filter_by(role='admin', is_active_account=True).first()
+            if admin:
+                msg_parts = []
+                if new_classes:
+                    msg_parts.append(f"{new_classes} new therapeutic class(es)")
+                if new_vaccines:
+                    msg_parts.append(f"{new_vaccines} new vaccine(s)")
+                db.session.add(Notification(
+                    user_id=admin.id,
+                    title="API Auto-Update: New entries discovered",
+                    message=f"Weekly refresh found {' and '.join(msg_parts)} via RxClass/VSAC — review in admin.",
+                    priority=2,
+                    category="system",
+                ))
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.debug("Notification creation failed: %s", e)
+    else:
+        logger.info("[api_scheduler] RxClass/VSAC refresh: no new entries found")
+
+
+def _run_pricing_cache_refresh(db):
+    """
+    Phase 28 — Refresh pricing cache for today's scheduled patients' medications.
+    Cost Plus queried first (free, fast), GoodRx only for Cost Plus misses.
+    Deduplicates medications across patients.
+    """
+    from models.schedule import Schedule
+    from models.patient import PatientMedication, PatientRecord
+
+    today = date.today()
+    cost_plus_hits = 0
+    goodrx_hits = 0
+
+    try:
+        # Get today's scheduled patient MRNs
+        scheduled_mrns = [
+            row[0] for row in
+            db.session.query(Schedule.patient_mrn_hash)
+            .filter(Schedule.visit_date == today)
+            .distinct()
+            .all()
+            if row[0]
+        ]
+
+        if not scheduled_mrns:
+            logger.info("[api_scheduler] No scheduled patients — pricing cache refresh skipped")
+            return
+
+        # Gather distinct active medications across scheduled patients
+        seen_drugs = set()
+        med_list = []
+        for mrn in scheduled_mrns:
+            meds = PatientMedication.query.filter_by(
+                mrn=mrn, status='active'
+            ).all()
+            for m in meds:
+                drug_key = (m.drug_name or '').lower().split()[0] if m.drug_name else ''
+                if drug_key and drug_key not in seen_drugs:
+                    seen_drugs.add(drug_key)
+                    med_list.append(m)
+
+        if not med_list:
+            logger.info("[api_scheduler] No active medications for scheduled patients")
+            return
+
+        # Tier 1: Cost Plus (free, no auth)
+        try:
+            from app.services.api.cost_plus_service import CostPlusService
+            cp_svc = CostPlusService(db)
+            cost_plus_misses = []
+            for m in med_list:
+                try:
+                    result = cp_svc.get_price(
+                        drug_name=m.drug_name.split()[0] if m.drug_name else '',
+                        ndc=getattr(m, 'ndc', None),
+                    )
+                    if result and result.get('price') is not None:
+                        cost_plus_hits += 1
+                    else:
+                        cost_plus_misses.append(m)
+                except Exception:
+                    cost_plus_misses.append(m)
+        except Exception as e:
+            logger.error("[api_scheduler] Cost Plus pricing refresh failed: %s", e)
+            cost_plus_misses = med_list  # All meds fall through to GoodRx
+
+        # Tier 2: GoodRx (only for Cost Plus misses)
+        try:
+            from app.services.api.goodrx_service import GoodRxService
+            grx_svc = GoodRxService(db)
+            for m in cost_plus_misses:
+                try:
+                    result = grx_svc.get_price(
+                        drug_name=m.drug_name.split()[0] if m.drug_name else '',
+                    )
+                    if result and result.get('price') is not None:
+                        goodrx_hits += 1
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.error("[api_scheduler] GoodRx pricing refresh failed: %s", e)
+
+        # Tier 1b: NADAC reference pricing (informational — failures non-blocking)
+        nadac_hits = 0
+        try:
+            from app.services.api.nadac_service import NADACService
+            nadac_svc = NADACService(db)
+            for m in med_list:
+                try:
+                    result = nadac_svc.get_price(
+                        ndc=getattr(m, 'ndc', None),
+                        drug_name=m.drug_name.split()[0] if m.drug_name else '',
+                    )
+                    if result and result.get('found'):
+                        nadac_hits += 1
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.error("[api_scheduler] NADAC pricing refresh failed: %s", e)
+
+        logger.info(
+            "[api_scheduler] Pricing cache: refreshed %d medications "
+            "(%d from Cost Plus, %d from GoodRx, %d NADAC refs)",
+            len(med_list), cost_plus_hits, goodrx_hits, nadac_hits,
+        )
+
+    except Exception as exc:
+        logger.error("[api_scheduler] Pricing cache refresh failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Phase 23 — Monitoring + REMS background jobs
+# ---------------------------------------------------------------------------
+
+def _run_nightly_monitoring_update(db, target_date):
+    """
+    Phase 23 (E1): Nightly monitoring schedule update.
+
+    For each patient on tomorrow's schedule:
+    - Populate monitoring schedules with latest lab results
+    - Advance REMS phases (clozapine weekly→biweekly→monthly)
+    - Update REMS escalation levels
+    """
+    try:
+        from app.services.monitoring_rule_engine import MonitoringRuleEngine
+        from app.services.api.dailymed import DailyMedService
+        from models.patient import PatientMedication, PatientDiagnosis, PatientLabResult, PatientRecord
+
+        engine = MonitoringRuleEngine(db)
+        dm = DailyMedService(db)
+
+        # Get patients on tomorrow's schedule
+        try:
+            from models.schedule import Schedule
+            scheduled = (
+                db.session.query(Schedule.patient_mrn_hash, Schedule.user_id)
+                .filter(Schedule.visit_date == target_date)
+                .distinct()
+                .all()
+            )
+        except Exception:
+            scheduled = []
+
+        updated = 0
+        for mrn_hash, user_id in scheduled:
+            if not mrn_hash:
+                continue
+            try:
+                # Get patient's medications, diagnoses, labs
+                record = PatientRecord.query.filter_by(
+                    user_id=user_id
+                ).filter(
+                    PatientRecord.mrn.isnot(None)
+                ).first()
+                if not record:
+                    continue
+
+                meds = PatientMedication.query.filter_by(
+                    user_id=user_id, mrn=record.mrn, status='active'
+                ).all()
+                diagnoses = PatientDiagnosis.query.filter_by(
+                    user_id=user_id, mrn=record.mrn, status='active'
+                ).all()
+                labs = PatientLabResult.query.filter_by(
+                    user_id=user_id, mrn=record.mrn
+                ).order_by(PatientLabResult.result_date.desc()).limit(100).all()
+
+                engine.populate_patient_schedule(
+                    mrn_hash, user_id,
+                    [{'drug_name': m.drug_name, 'rxnorm_cui': m.rxnorm_cui} for m in meds],
+                    [{'icd10_code': d.icd10_code, 'diagnosis_name': d.diagnosis_name} for d in diagnoses],
+                    labs,
+                )
+                updated += 1
+            except Exception as exc:
+                logger.debug(
+                    "[api_scheduler] Monitoring update failed for %s: %s",
+                    mrn_hash[:8], exc,
+                )
+
+        # Advance REMS phases and update escalation levels
+        try:
+            advanced = dm.advance_rems_phases()
+            escalation = dm.bulk_update_rems_escalation()
+            logger.info(
+                "[api_scheduler] REMS: %d phases advanced, escalation: %s",
+                advanced, escalation,
+            )
+        except Exception as exc:
+            logger.debug("[api_scheduler] REMS update failed: %s", exc)
+
+        logger.info(
+            "[api_scheduler] Nightly monitoring: updated %d patients", updated
+        )
+    except Exception as exc:
+        logger.error("[api_scheduler] Nightly monitoring update failed: %s", exc)
+
+
+def _run_nightly_outreach_check(db):
+    """
+    Phase 23 (D5): Proactive outreach flag.
+
+    Identifies patients with overdue monitoring who haven't been seen in 30+ days.
+    Creates Notification records for the dashboard. Sends Pushover for critical items.
+    """
+    try:
+        from models.monitoring import MonitoringSchedule
+        from models.patient import PatientRecord
+        from models.notification import Notification
+        from models.user import User
+
+        today = date.today()
+        thirty_days_ago = today - timedelta(days=30)
+
+        # Get all active, overdue monitoring entries
+        overdue = (
+            MonitoringSchedule.query
+            .filter(
+                MonitoringSchedule.status == 'active',
+                MonitoringSchedule.next_due_date < today,
+            )
+            .all()
+        )
+
+        if not overdue:
+            return
+
+        # Group by (patient_mrn_hash, user_id)
+        by_patient = {}
+        for entry in overdue:
+            key = (entry.patient_mrn_hash, entry.user_id)
+            by_patient.setdefault(key, []).append(entry)
+
+        flagged = 0
+        critical_alerts = []
+
+        for (mrn_hash, user_id), entries in by_patient.items():
+            # Check if patient was seen recently (last_xml_parsed as proxy)
+            record = PatientRecord.query.filter_by(
+                user_id=user_id,
+            ).filter(
+                PatientRecord.mrn.isnot(None),
+            ).first()
+
+            if not record:
+                continue
+
+            # Use last_xml_parsed as proxy for last visit
+            last_seen = record.last_xml_parsed
+            if last_seen and last_seen.date() > thirty_days_ago:
+                continue  # Seen recently — not flagged for outreach
+
+            # Check if patient is on any future schedule
+            try:
+                from models.schedule import Schedule
+                future_appt = Schedule.query.filter(
+                    Schedule.user_id == user_id,
+                    Schedule.appointment_date >= today,
+                ).first()
+                if future_appt:
+                    continue  # Has an upcoming visit — skip
+            except Exception:
+                pass
+
+            # Flag for outreach
+            flagged += 1
+            has_critical = any(e.priority in ('critical', 'high') for e in entries)
+
+            # Create notification (idempotent — check for existing by template_name + message prefix)
+            msg_prefix = f'Patient ...{mrn_hash[-4:]}'
+            existing = Notification.query.filter(
+                Notification.user_id == user_id,
+                Notification.template_name == 'monitoring_outreach',
+                Notification.message.like(f'{msg_prefix}%'),
+                Notification.is_read == False,
+            ).first()
+
+            if not existing:
+                lab_names = ', '.join(e.lab_name for e in entries[:3])
+                if len(entries) > 3:
+                    lab_names += f' +{len(entries) - 3} more'
+
+                notif = Notification(
+                    user_id=user_id,
+                    template_name='monitoring_outreach',
+                    message=f'{msg_prefix} has {len(entries)} overdue lab(s): {lab_names}',
+                    priority=1 if has_critical else 2,
+                )
+                db.session.add(notif)
+
+            # Collect critical alerts for Pushover
+            if has_critical:
+                critical_entries = [e for e in entries if e.priority in ('critical', 'high')]
+                critical_alerts.append({
+                    'mrn_display': f'...{mrn_hash[-4:]}',
+                    'user_id': user_id,
+                    'labs': [e.lab_name for e in critical_entries],
+                })
+
+        db.session.commit()
+
+        # Send Pushover for critical overdue monitoring
+        if critical_alerts:
+            try:
+                import config
+                user_key = getattr(config, 'PUSHOVER_USER_KEY', '')
+                api_token = getattr(config, 'PUSHOVER_API_TOKEN', '')
+                if user_key and api_token:
+                    from agent.notifier import _send_pushover
+                    msg_parts = []
+                    for alert in critical_alerts[:5]:
+                        labs = ', '.join(alert['labs'][:3])
+                        msg_parts.append(f"{alert['mrn_display']}: {labs}")
+                    msg = '\n'.join(msg_parts)
+                    if len(critical_alerts) > 5:
+                        msg += f'\n+{len(critical_alerts) - 5} more patients'
+                    _send_pushover(
+                        user_key, api_token,
+                        'Critical Lab Monitoring Overdue',
+                        msg,
+                        priority=1,
+                        sound='siren',
+                    )
+            except Exception as exc:
+                logger.debug("[api_scheduler] Pushover outreach alert failed: %s", exc)
+
+        logger.info(
+            "[api_scheduler] Outreach check: %d patients flagged, %d critical alerts",
+            flagged, len(critical_alerts),
+        )
+    except Exception as exc:
+        logger.error("[api_scheduler] Outreach check failed: %s", exc)
+
+
+def _run_weekly_monitoring_refresh(db):
+    """
+    Phase 23 (E1 + B4): Weekly monitoring rule refresh.
+
+    Queries medications added in the past 7 days that don't yet have
+    MonitoringRule entries and populates rules via the waterfall.
+    Also refreshes VSAC preventive service OIDs (B4).
+    """
+    try:
+        from app.services.monitoring_rule_engine import MonitoringRuleEngine
+        engine = MonitoringRuleEngine(db)
+        count = engine.bulk_refresh_new_medications(lookback_days=7)
+        logger.info(
+            "[api_scheduler] Weekly monitoring refresh: %d new rules created",
+            count,
+        )
+
+        # B4: Refresh VSAC preventive service OIDs
+        vsac_count = engine.refresh_preventive_vsac_oids()
+        logger.info(
+            "[api_scheduler] VSAC preventive OID refresh: %d OIDs updated",
+            vsac_count,
+        )
+    except Exception as exc:
+        logger.error(
+            "[api_scheduler] Weekly monitoring refresh failed: %s", exc
+        )

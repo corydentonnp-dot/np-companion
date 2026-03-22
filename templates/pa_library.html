@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Shared PA Library — CareCompanion{% endblock %}
+{% block page_id %}tools{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Shared PA Library</h1>
+    <a href="/pa" style="margin-left:auto;font-size:13px;color:var(--color-navy);">← Back to My PAs</a>
+</div>
+
+{% if shared_pas %}
+<div class="card">
+    <div class="card-body">
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border,#e2e8f0);">
+                    <th style="padding:8px;text-align:left;">Drug</th>
+                    <th style="padding:8px;text-align:left;">Diagnosis</th>
+                    <th style="padding:8px;text-align:left;">Payer</th>
+                    <th style="padding:8px;text-align:right;">Approval Rate</th>
+                    <th style="padding:8px;text-align:center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for pa in shared_pas %}
+            <tr style="border-bottom:1px solid var(--border,#f1f5f9);">
+                <td style="padding:8px;font-weight:600;">{{ pa.drug_name }}</td>
+                <td style="padding:8px;">{{ pa.diagnosis or '—' }}{% if pa.icd10_code %} <span style="color:var(--text-secondary);font-size:11px;">({{ pa.icd10_code }})</span>{% endif %}</td>
+                <td style="padding:8px;">{{ pa.payer_name or '—' }}</td>
+                <td style="padding:8px;text-align:right;">
+                    {% if pa.approval_rate is not none %}
+                    <span style="color:{% if pa.approval_rate >= 0.7 %}#059669{% elif pa.approval_rate >= 0.4 %}#d97706{% else %}#dc2626{% endif %};">
+                        {{ (pa.approval_rate * 100)|round|int }}%
+                    </span>
+                    {% else %}
+                    <span style="color:var(--text-secondary);">—</span>
+                    {% endif %}
+                </td>
+                <td style="padding:8px;text-align:center;">
+                    <form method="POST" action="/pa/{{ pa.id }}/import" style="display:inline;">
+                        <button type="submit" style="padding:4px 12px;border-radius:4px;background:var(--color-navy);color:#fff;border:none;font-size:12px;cursor:pointer;">Import</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
+        <p>No shared PA templates yet.</p>
+        <p style="font-size:13px;">Share a PA from your <a href="/pa">PA history</a> to add it to the practice library.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

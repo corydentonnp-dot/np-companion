@@ -1,7 +1,7 @@
 """
-NP Companion — On-Call Note Keeper (F7, F7a–e)
+CareCompanion — On-Call Note Keeper (F7, F7a–e)
 
-File location: np-companion/routes/oncall.py
+File location: carecompanion/routes/oncall.py
 
 Mobile-first on-call note system with voice input, callback tracking,
 colleague handoff, and kanban status flow.
@@ -391,7 +391,7 @@ def forward_note(note_id):
         flash('Please select a provider to forward to.', 'error')
         return redirect(url_for('oncall.index'))
 
-    target_user = User.query.get(int(provider_id))
+    target_user = db.session.get(User, int(provider_id))
     if not target_user or not target_user.is_active_account:
         flash('Invalid provider selected.', 'error')
         return redirect(url_for('oncall.index'))

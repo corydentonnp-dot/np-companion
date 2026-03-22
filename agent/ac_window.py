@@ -1,7 +1,7 @@
 """
-NP Companion — Amazing Charts Window Manager
+CareCompanion — Amazing Charts Window Manager
 
-File location: np-companion/agent/ac_window.py
+File location: carecompanion/agent/ac_window.py
 
 Provides pywin32-based utilities for detecting and interacting with
 the Amazing Charts desktop application windows.

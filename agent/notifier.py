@@ -1,7 +1,7 @@
 """
-NP Companion — Pushover Notification Service
+CareCompanion — Pushover Notification Service
 
-File location: np-companion/agent/notifier.py
+File location: carecompanion/agent/notifier.py
 
 Sends de-identified push notifications via the Pushover API.
 NEVER includes patient names, MRNs, or other PHI in messages.
@@ -12,7 +12,7 @@ Feature: F7b (Callback reminders)
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import config
 
@@ -86,6 +86,20 @@ def send_inbox_notification(user_id, summary):
             priority=1,
             sound='siren',
         )
+        # F21b: create in-app critical notification for escalation tracking
+        try:
+            from models.notification import Notification
+            from models import db
+            crit_notif = Notification(
+                user_id=user_id,
+                message='CRITICAL VALUE in inbox — Log in immediately to review',
+                is_critical=True,
+                priority=1,
+            )
+            db.session.add(crit_notif)
+            db.session.commit()
+        except Exception as e:
+            logger.warning(f'Could not create critical notification record: {e}')
         return
 
     # Respect quiet hours for non-critical notifications
@@ -93,7 +107,7 @@ def send_inbox_notification(user_id, summary):
         logger.info(f'Quiet hours — suppressing notification for user {user_id}')
         return
 
-    _send_pushover(user_key, api_token, title='NP Companion Inbox', message=message)
+    _send_pushover(user_key, api_token, title='CareCompanion Inbox', message=message)
 
 
 def _send_pushover(user_key, api_token, title, message, priority=0, sound='pushover'):
@@ -170,3 +184,54 @@ def check_callback_reminders(user_id):
             priority=0,
             sound='pushover',
         )
+
+
+# ======================================================================
+# F21b: Escalating alerts — re-send unacknowledged critical notifications
+# ======================================================================
+ESCALATION_INTERVAL_MINUTES = 5
+MAX_ESCALATIONS = 3
+
+
+def check_escalations():
+    """
+    Re-send Pushover notification for unacknowledged critical alerts.
+    Called every 2 minutes by the scheduler. Escalates up to MAX_ESCALATIONS
+    times with ESCALATION_INTERVAL_MINUTES between each.
+    """
+    from models.notification import Notification
+    from models import db
+
+    user_key = getattr(config, 'PUSHOVER_USER_KEY', '')
+    api_token = getattr(config, 'PUSHOVER_API_TOKEN', '')
+    if not user_key or not api_token:
+        return
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(minutes=ESCALATION_INTERVAL_MINUTES)
+
+    # Find critical notifications that are unacknowledged and due for escalation
+    unacked = Notification.query.filter(
+        Notification.is_critical.is_(True),
+        Notification.acknowledged_at.is_(None),
+        Notification.escalation_count < MAX_ESCALATIONS,
+    ).all()
+
+    for notif in unacked:
+        # Check if enough time has passed since last escalation (or creation)
+        last_time = notif.last_escalated_at or notif.created_at
+        if last_time and last_time > cutoff:
+            continue  # not yet time to re-send
+
+        notif.escalation_count = (notif.escalation_count or 0) + 1
+        notif.last_escalated_at = now
+        db.session.commit()
+
+        _send_pushover(
+            user_key, api_token,
+            title=f'⚠ CRITICAL VALUE (escalation {notif.escalation_count}/{MAX_ESCALATIONS})',
+            message='UNACKNOWLEDGED critical value — Please review immediately',
+            priority=1,
+            sound='siren',
+        )
+        logger.info(f'Escalated critical notification {notif.id} (count={notif.escalation_count})')

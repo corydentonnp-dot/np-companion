@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Dot Phrases — CareCompanion{% endblock %}
+{% block page_id %}dot-phrases{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Dot Phrases</h1>
+    <span class="badge badge--info">F23</span>
+    <button class="btn btn-sm btn-primary" onclick="showAddModal()">+ Add Dot Phrase</button>
+    <a href="/tools/dot-phrases/export" class="btn btn-sm btn-outline">Export as AHK</a>
+    <button class="btn btn-sm btn-outline" onclick="showImportModal()">Import</button>
+</div>
+
+{# ---- Category Tabs ---- #}
+<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+    <a href="/tools/dot-phrases" class="btn btn-sm {{ 'btn-primary' if not active_category else 'btn-outline' }}">All</a>
+    {% for cat in categories %}
+    <a href="/tools/dot-phrases?category={{ cat }}" class="btn btn-sm {{ 'btn-primary' if active_category == cat else 'btn-outline' }}">{{ cat|title }}</a>
+    {% endfor %}
+</div>
+
+{# ---- Search ---- #}
+<div style="margin-bottom:16px;">
+    <input type="text" id="search-input" class="form-input" placeholder="Search dot phrases..." style="max-width:400px;" oninput="filterPhrases()">
+</div>
+
+{# ---- Phrase Cards ---- #}
+{% if phrases %}
+<div id="phrase-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;">
+    {% for p in phrases %}
+    <div class="card phrase-card" data-id="{{ p.id }}" data-abbrev="{{ p.abbreviation }}" data-cat="{{ p.category }}" style="padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+            <div>
+                <span style="display:inline-block;background:var(--primary,#4a90d9);color:#fff;padding:2px 10px;border-radius:12px;font-family:monospace;font-size:14px;font-weight:600;">{{ p.abbreviation }}</span>
+                <span style="display:inline-block;background:var(--bg-secondary,#f0f0f0);padding:2px 8px;border-radius:8px;font-size:11px;margin-left:6px;">{{ p.category }}</span>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button class="btn btn-sm btn-outline" onclick="editPhrase({{ p.id }}, '{{ p.abbreviation }}', `{{ p.expansion|replace('`','\\`')|replace('\n','\\n') }}`, '{{ p.category }}')" title="Edit">✏️</button>
+                <button class="btn btn-sm btn-outline" onclick="deletePhrase({{ p.id }}, '{{ p.abbreviation }}')" title="Delete" style="color:var(--danger,#e74c3c);">🗑️</button>
+            </div>
+        </div>
+        <div style="font-size:13px;color:var(--text-secondary,#666);max-height:80px;overflow:hidden;white-space:pre-wrap;line-height:1.4;">{{ p.expansion[:200] }}{% if p.expansion|length > 200 %}…{% endif %}</div>
+        {% if p.placeholders and p.placeholders != '[]' %}
+        <div style="margin-top:8px;font-size:11px;color:var(--text-muted,#999);">Placeholders: {{ p.placeholders }}</div>
+        {% endif %}
+        <div style="margin-top:8px;font-size:11px;color:var(--text-muted,#999);">Used {{ p.use_count }} time{{ 's' if p.use_count != 1 else '' }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="padding:32px;text-align:center;color:var(--text-secondary,#999);">
+    No dot phrases found{% if active_category %} in "{{ active_category }}"{% endif %}. Click "Add Dot Phrase" to create one.
+</div>
+{% endif %}
+
+{# ---- Add/Edit Modal ---- #}
+<div id="phrase-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:560px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <h2 id="modal-title" style="margin:0 0 16px;">Add Dot Phrase</h2>
+        <input type="hidden" id="edit-id" value="">
+
+        <label class="form-label">Abbreviation</label>
+        <input type="text" id="modal-abbrev" class="form-input" placeholder=".hpi" style="margin-bottom:12px;font-family:monospace;">
+
+        <label class="form-label">Category</label>
+        <select id="modal-category" class="form-input" style="margin-bottom:12px;">
+            {% for cat in categories %}
+            <option value="{{ cat }}">{{ cat|title }}</option>
+            {% endfor %}
+        </select>
+
+        <label class="form-label">Expansion Text</label>
+        <div style="margin-bottom:6px;display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="insertPlaceholder('patient_name')" type="button">{patient_name}</button>
+            <button class="btn btn-sm btn-outline" onclick="insertPlaceholder('date')" type="button">{date}</button>
+            <button class="btn btn-sm btn-outline" onclick="insertPlaceholder('provider_name')" type="button">{provider_name}</button>
+        </div>
+        <textarea id="modal-expansion" class="form-input" rows="8" placeholder="Type the full expanded text here..." style="margin-bottom:12px;font-family:monospace;white-space:pre-wrap;"></textarea>
+
+        <label class="form-label">Preview</label>
+        <div id="modal-preview" style="background:var(--bg-secondary,#f5f5f5);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;white-space:pre-wrap;max-height:150px;overflow-y:auto;color:var(--text-primary,#333);"></div>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="savePhrase()">Save</button>
+        </div>
+    </div>
+</div>
+
+{# ---- Import Modal ---- #}
+<div id="import-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:500px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+        <h2 style="margin:0 0 16px;">Import Dot Phrases</h2>
+        <p style="font-size:13px;color:var(--text-secondary,#666);margin-bottom:12px;">Paste AHK hotstrings (::abbr::expansion format), one per line:</p>
+        <textarea id="import-text" class="form-input" rows="8" placeholder="::.hpi::Patient presents with..." style="margin-bottom:16px;font-family:monospace;"></textarea>
+        <div style="display:flex;gap:12px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="doImport()">Import</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── Search / Filter ── */
+function filterPhrases() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    document.querySelectorAll('.phrase-card').forEach(card => {
+        const abbr = card.dataset.abbrev.toLowerCase();
+        const text = card.textContent.toLowerCase();
+        card.style.display = (abbr.includes(q) || text.includes(q)) ? '' : 'none';
+    });
+}
+
+/* ── Add/Edit Modal ── */
+function showAddModal() {
+    document.getElementById('modal-title').textContent = 'Add Dot Phrase';
+    document.getElementById('edit-id').value = '';
+    document.getElementById('modal-abbrev').value = '.';
+    document.getElementById('modal-category').value = 'custom';
+    document.getElementById('modal-expansion').value = '';
+    document.getElementById('modal-preview').textContent = '';
+    document.getElementById('phrase-modal').style.display = 'flex';
+}
+
+function editPhrase(id, abbrev, expansion, category) {
+    document.getElementById('modal-title').textContent = 'Edit Dot Phrase';
+    document.getElementById('edit-id').value = id;
+    document.getElementById('modal-abbrev').value = abbrev;
+    document.getElementById('modal-category').value = category;
+    document.getElementById('modal-expansion').value = expansion.replace(/\\n/g, '\n');
+    updatePreview();
+    document.getElementById('phrase-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('phrase-modal').style.display = 'none';
+}
+
+function insertPlaceholder(name) {
+    const ta = document.getElementById('modal-expansion');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text = ta.value;
+    ta.value = text.substring(0, start) + '{' + name + '}' + text.substring(end);
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = start + name.length + 2;
+    updatePreview();
+}
+
+function updatePreview() {
+    const text = document.getElementById('modal-expansion').value;
+    document.getElementById('modal-preview').textContent = text;
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const ta = document.getElementById('modal-expansion');
+    if (ta) ta.addEventListener('input', updatePreview);
+});
+
+function savePhrase() {
+    const editId = document.getElementById('edit-id').value;
+    const abbreviation = document.getElementById('modal-abbrev').value.trim();
+    const expansion = document.getElementById('modal-expansion').value.trim();
+    const category = document.getElementById('modal-category').value;
+
+    if (!abbreviation || !expansion) {
+        showWarning('Abbreviation and expansion are required.');
+        return;
+    }
+
+    const url = editId ? '/tools/dot-phrases/' + editId : '/tools/dot-phrases';
+    const method = editId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({abbreviation, expansion, category})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            showError(data.error || 'Failed to save dot phrase.');
+        }
+    });
+}
+
+function deletePhrase(id, abbrev) {
+    if (!confirm('Delete "' + abbrev + '"?')) return;
+    fetch('/tools/dot-phrases/' + id, {method: 'DELETE'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else showError(data.error || 'Failed to delete.');
+    });
+}
+
+/* ── Import Modal ── */
+function showImportModal() {
+    document.getElementById('import-text').value = '';
+    document.getElementById('import-modal').style.display = 'flex';
+}
+function closeImportModal() {
+    document.getElementById('import-modal').style.display = 'none';
+}
+function doImport() {
+    const content = document.getElementById('import-text').value.trim();
+    if (!content) { showWarning('Paste AHK hotstrings to import.'); return; }
+    fetch('/tools/macros/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content: content})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess('Imported ' + data.imported_phrases + ' phrase(s).');
+            location.reload();
+        } else {
+            showError(data.error || 'Import failed.');
+        }
+    });
+}
+</script>
+{% endblock %}

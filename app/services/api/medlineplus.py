@@ -1,5 +1,5 @@
 """
-NP Companion — NLM MedlinePlus Connect Service
+CareCompanion — NLM MedlinePlus Connect Service
 File: app/services/api/medlineplus.py
 
 Returns curated, patient-facing health information for ICD-10, SNOMED,
@@ -13,7 +13,7 @@ Dependencies:
 - app/services/api/base_client.py (BaseAPIClient)
 - app/api_config.py (MEDLINEPLUS_BASE_URL, MEDLINEPLUS_CACHE_TTL_DAYS)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Patient Education Auto-Draft (Feature E) — care gap addressed trigger
 - New prescription patient education — drug info for new medications
 - Care Gap closure documentation — pre-populated patient message
@@ -22,6 +22,7 @@ NP Companion features that rely on this module:
 import logging
 from app.api_config import MEDLINEPLUS_BASE_URL, MEDLINEPLUS_CACHE_TTL_DAYS
 from app.services.api.base_client import BaseAPIClient, APIUnavailableError
+from models.api_cache import MedlinePlusCache
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class MedlinePlusService(BaseAPIClient):
                     "lang": self._language,
                 },
             )
-            return self._parse_response(data)
+            return self._parse_and_cache(icd10_code, data)
         except APIUnavailableError:
             logger.warning(f"MedlinePlus unavailable for ICD-10: {icd10_code}")
             return {}
@@ -99,7 +100,7 @@ class MedlinePlusService(BaseAPIClient):
                     "lang": self._language,
                 },
             )
-            return self._parse_response(data)
+            return self._parse_and_cache(rxcui, data)
         except APIUnavailableError:
             logger.warning(f"MedlinePlus unavailable for RxCUI: {rxcui}")
             return {}
@@ -155,3 +156,24 @@ class MedlinePlusService(BaseAPIClient):
         except (KeyError, TypeError, AttributeError) as e:
             logger.warning(f"MedlinePlus parse error: {e}")
             return {}
+
+    def _parse_and_cache(self, topic_id, data):
+        """Parse response and persist to structured MedlinePlusCache."""
+        result = self._parse_response(data)
+        if result and topic_id:
+            db = self.cache.db
+            try:
+                existing = MedlinePlusCache.query.filter_by(topic_id=topic_id[:30]).first()
+                if not existing:
+                    db.session.add(MedlinePlusCache(
+                        topic_id=topic_id[:30],
+                        title=result.get('title', ''),
+                        url=result.get('url', '')[:500],
+                        summary=result.get('summary', ''),
+                        language=result.get('language', 'en'),
+                    ))
+                    db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.debug(f'MedlinePlusCache save error: {e}')
+        return result

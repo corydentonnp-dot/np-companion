@@ -1,0 +1,1728 @@
+# Running Plan 3: NetPractice Schedule Scraper, Manual Schedule Entry & Data Collection
+
+> **Status**: NOT STARTED  
+> **Created**: 2026-03-20  
+> **Scope**: Chrome 136 debug profile infrastructure, NetPractice scraper hardening, manual patient schedule entry with paste-from-OCR, AC data collection with takeover warning  
+> **Prerequisite**: Running Plans 1–2 complete (123+ tests, 59 tables, 19 blueprints, billing engine live)
+
+---
+
+## Context
+
+The NetPractice scraper (`scrapers/netpractice.py`) currently connects to Chrome via CDP on port 9222, but Chrome 136+ (May 2025) broke the old `--remote-debugging-port` approach for default profiles. Chrome now requires a dedicated `--user-data-dir` to accept the debug flag. None of our launch scripts or scrapers handle this. Additionally, users need the ability to manually add patients to their schedule (walk-ins, add-ons, personal prep lists) and trigger Amazing Charts data collection from the dashboard with a clear mouse/keyboard takeover warning.
+
+### What Already Exists
+- `scrapers/netpractice.py` — 1,300+ line async Playwright scraper with DOM-first parsing, nav step replay, date navigation, cookie persistence to `data/np_session.pkl`
+- `scrapers/pdmp.py` / `scrapers/viis.py` — Same CDP-first + headless fallback pattern
+- `models/schedule.py` — `Schedule` model with `entered_by` field (already supports distinguishing manual entries)
+- `routes/dashboard.py` — Today View with schedule table, anomaly detection, billing opps, duration estimator
+- `templates/dashboard.html` — Full dashboard with widgets, date navigation, patient panel, XML drop zone
+- `routes/netpractice_admin.py` — Admin settings + setup wizard + nav step recorder
+- `agent/clinical_summary_parser.py` — `open_patient_chart(mrn)` + `export_clinical_summary()` for AC automation
+- `agent/ac_window.py` — `get_ac_state()`, `get_current_patient()` for AC detection
+- `agent/pyautogui_runner.py` — Safety-checked PyAutoGUI execution with pre/post screenshots
+- `config.py` — `CHROME_CDP_PORT = 9222`, NetPractice URL/client number, session cookie path
+
+### Key Chrome 136 Facts
+- `--remote-debugging-port` is **ignored** when Chrome uses the default user data directory (Chrome 136+, May 2025)
+- Must launch with BOTH `--remote-debugging-port=9222` AND `--user-data-dir=<custom-path>`
+- `--remote-allow-origins=*` required since Chrome 111 (WebSocket origin check)
+- Cookies persist in the custom profile directory — log in once, reuse indefinitely
+- `connect_over_cdp()` is the correct Playwright method (not `connect()`)
+
+---
+
+## Phase 1 — Chrome 136 Debug Profile Infrastructure
+
+> **Goal**: Automate Chrome launch with a dedicated debug profile so all 3 scrapers (NetPractice, PDMP, VIIS) work reliably on Chrome 136+.
+
+- [x] **1.1** Add Chrome debug profile settings to `config.py` ✅ Done 2026-03-20
+  - Added `CHROME_EXE_PATH` and `CHROME_DEBUG_PROFILE_DIR` with env var overrides to config.py Section 3
+  - Kept existing `CHROME_CDP_PORT = 9222`
+  - Test: `from config import CHROME_EXE_PATH, CHROME_DEBUG_PROFILE_DIR, CHROME_CDP_PORT` → all resolve correctly
+
+- [x] **1.2** Create `utils/chrome_launcher.py` — Chrome debug profile launcher utility ✅ Done 2026-03-20
+  - Created `utils/chrome_launcher.py` with `is_chrome_debug_running()`, `ensure_chrome_debug()`, `get_chrome_launch_command()`
+  - Uses `urllib.request` (stdlib), `subprocess.Popen` with `CREATE_NO_WINDOW`, 8s polling loop
+  - Test: `is_chrome_debug_running()` returns False with no Chrome → correct; `get_chrome_launch_command()` produces valid command string
+
+- [x] **1.3** Update `launcher.py` to call `ensure_chrome_debug()` on startup ✅ Done 2026-03-20
+  - Added Chrome debug auto-launch in `_run_all()` before Flask startup, gated by `sys.platform == 'win32'`
+  - Non-blocking: logs warning and continues if Chrome fails to start
+  - Test: `py_compile.compile('launcher.py')` passes; logs correct messages
+
+- [x] **1.4** Update `scrapers/netpractice.py` `_connect_browser()` to auto-launch Chrome ✅ Done 2026-03-20
+  - Extended `_connect_browser()`: try CDP → auto-launch via `ensure_chrome_debug()` → 3s wait → retry CDP → headless fallback
+  - Reads `CHROME_EXE_PATH` and `CHROME_DEBUG_PROFILE_DIR` from `self.app.config`
+  - Test: `py_compile.compile('scrapers/netpractice.py')` passes
+
+- [x] **1.5** Apply same `_connect_browser()` update to PDMP and VIIS scrapers ✅ Done 2026-03-20
+  - Both `scrapers/pdmp.py` and `scrapers/viis.py` updated with identical pattern: try CDP → auto-launch → 3s wait → retry CDP → headless
+  - Test: both files compile cleanly
+
+- [x] **1.6** Add Chrome debug profile status to NetPractice admin page ✅ Done 2026-03-20
+  - Added `GET /api/netpractice/chrome-status` endpoint returning `{running, profile_exists, port, profile_dir, launch_command}`
+  - Added `POST /api/netpractice/chrome-launch` endpoint (admin-only) calling `ensure_chrome_debug()`
+  - Added Chrome Debug Profile card to `templates/admin_netpractice.html` with green/red status dot, port, profile dir, copyable launch command, Launch Chrome button, Refresh Status button
+  - Auto-checks status on page load via `checkChromeStatus()`
+  - Test: all files compile cleanly
+
+**Phase 1 test gate**: All 3 scrapers connect to Chrome CDP when debug Chrome is running. Scrapers auto-launch Chrome if not running. Headless fallback still works when Chrome exe not found. Admin page shows accurate Chrome status. ✅ COMPLETE
+
+---
+
+## Phase 2 — Manual Patient Schedule Entry (Single Add)
+
+> **Goal**: Add a "+" button to the schedule widget on the dashboard that opens a modal for manually adding a patient to Today's Schedule.
+
+- [x] **2.1** Add `POST /api/schedule/add` endpoint to `routes/dashboard.py` ✅ Done 2026-03-20
+  - Validates patient_name, patient_mrn, appointment_time (HH:MM regex). Defaults: date=today, visit_type="Office Visit", duration=15
+  - Creates Schedule record with `entered_by='manual'`, `status='manual'`
+  - Returns JSON with success, id, appointment details
+  - Test: `py_compile.compile('routes/dashboard.py')` passes
+
+- [x] **2.2** Add `DELETE /api/schedule/<int:schedule_id>` endpoint to `routes/dashboard.py` ✅ Done 2026-03-20
+  - Checks `entered_by == 'manual'` + `user_id == current_user.id`; 403 for scraped, 404 for not found
+  - Test: compile passes
+
+- [x] **2.3** Add "+" button to schedule widget header in `templates/dashboard.html` ✅ Done 2026-03-20
+  - Added `+ Add` button inside date nav div, gated by `{% if is_today %}`
+  - Calls `openAddPatientModal()` on click
+
+- [x] **2.4** Create "Add Patient to Schedule" modal in `templates/dashboard.html` ✅ Done 2026-03-20
+  - Full modal overlay with form fields: name, MRN, DOB, time (defaults to next half-hour), visit type dropdown (8 options), duration, reason, note template dropdown (6 options)
+  - JS: `openAddPatientModal()`, `closeAddPatientModal()`, `submitAddPatient()` — POST → reload on success, inline error on failure
+  - Test: Jinja2 template syntax validates cleanly
+
+- [x] **2.5** Visually distinguish manually-added schedule rows ✅ Done 2026-03-20
+  - Added `schedule-row--manual` CSS class with teal left border (`border-left: 3px solid #0d9488`)
+  - Added "MANUAL" badge (teal) after status badge for manual entries
+  - Added × delete button column for manual rows → calls `deleteManualAppointment(id)` with confirm dialog
+  - Added empty `<th>` + `<td>` column to keep table aligned for scraped rows
+
+**Phase 2 test gate**: "+" button visible on today's dashboard. Modal opens, validates inputs, creates Schedule row. Manual rows visually distinct. Delete works for manual entries only. Scraped entries unaffected. ✅ COMPLETE
+
+---
+
+## Phase 3 — Paste-from-OCR Bulk Schedule Import
+
+> **Goal**: Allow users to paste unstructured schedule text (copied via Windows Snipping Tool text extractor, screen OCR, or manual typing) into a text area, have it parsed into structured appointment rows, allow editing each row before committing.
+
+- [x] **3.1** Add `POST /api/schedule/parse-text` endpoint to `routes/dashboard.py` ✅ Done 2026-03-20
+  - Regex + heuristic parser: splits lines, extracts time (12h→24h), patient name (LAST, FIRST / FIRST LAST), MRN (parenthesized or standalone digits), visit type keywords (18 abbreviation mappings)
+  - Groups continuation lines with preceding time entry; skips header lines
+  - Confidence scoring: high (3 fields), medium (2), low (1)
+  - Returns `{success, parsed: [{time, patient_name, patient_mrn, visit_type, reason, confidence}]}`
+  - Test: `py_compile.compile('routes/dashboard.py')` passes
+
+- [x] **3.2** Add "Paste Schedule" button + modal to `templates/dashboard.html` ✅ Done 2026-03-20
+  - Added 📋 Paste button next to "+ Add", gated by `{% if is_today %}`
+  - Full modal: textarea input → Parse button → editable results table with inline inputs/selects
+  - Each row: editable time, name, MRN, visit type dropdown, confidence badge (green/yellow/red HIGH/MEDIUM/LOW), remove × button
+  - JS: `openPasteScheduleModal()`, `closePasteScheduleModal()`, `backToPasteInput()`, `parseScheduleText()`, `renderParsedResults()`, `submitParsedSchedule()`
+  - Sequential batch add with progress indicator; reload on complete, error count on partial failure
+  - Test: Jinja2 template syntax validates cleanly
+
+- [x] **3.3** Add note template and chief complaint fields to parsed results ✅ Done 2026-03-20
+  - Each parsed row has "Chief Complaint" text input (pre-filled from parsed `reason`) and "Note Template" dropdown (same 6 options as single-add modal)
+  - Values passed through to `POST /api/schedule/add` — chief complaint stored in `reason`, note template stored in `comment`
+  - Existing `api_schedule_add()` already stores `note_template` in `comment` field — no endpoint change needed
+  - Test: parsed rows show both fields, values round-trip through add endpoint to Schedule record
+
+**Phase 3 test gate**: Paste button opens modal. Pasting unstructured text produces editable table of parsed appointments with confidence indicators. Users can edit all fields including visit type, complaint, and note template before committing. Batch add works. Parsed entries appear in schedule with "MANUAL" badge. ✅ COMPLETE
+
+---
+
+## Phase 4 — Data Collection with Takeover Warning
+
+> **Goal**: Add a "Collect Data" action button that triggers Amazing Charts automation (open chart → export clinical summary XML → parse) with a clear warning that the app will control mouse and keyboard.
+
+- [x] **4.1** Add `POST /api/schedule/<int:schedule_id>/collect` endpoint to `routes/dashboard.py` ✅ Done 2026-03-20
+  - Validates schedule ownership + MRN present; checks `get_ac_state()` — returns 400 if AC not running or on login screen
+  - Prevents duplicate jobs (409 if already running)
+  - Spawns daemon `Thread` for background AC automation; stores job state in module-level `_collect_jobs` dict
+  - Returns immediately: `{success, status: 'started', schedule_id}`
+  - Test: `py_compile.compile('routes/dashboard.py')` passes
+
+- [x] **4.2** Add `GET /api/schedule/<int:schedule_id>/collect-status` endpoint ✅ Done 2026-03-20
+  - Returns `{status, message}` from `_collect_jobs` dict; 'not_started' if no job found
+  - Test: compile passes
+
+- [x] **4.3** Create takeover warning confirmation modal in `templates/dashboard.html` ✅ Done 2026-03-20
+  - Full modal at z-index 5100 with two views: warning view (patient name, masked MRN, 3 bullet points, Yes Continue / Cancel) and progress view (spinning CSS animation, status text, View Patient Chart link on success, Try Again button on error)
+  - JS: `confirmCollectData()`, `closeCollectModal()`, `startCollection()`, `pollCollectStatus()` (2s interval), `showCollectError()`
+  - Test: Jinja2 template syntax validates cleanly
+
+- [x] **4.4** Add "Collect" action button to schedule table rows ✅ Done 2026-03-20
+  - Replaced old delete-only column with consolidated "Actions" column (60px)
+  - Each row: 📥 Collect button (only shown if MRN present) + × delete button (only shown if manual entry)
+  - Collect button calls `confirmCollectData(id, name, mrn)` → opens takeover warning
+  - Test: template validates; buttons render conditionally
+
+- [x] **4.5** Wire collection to existing AC automation pipeline ✅ Done 2026-03-20
+  - Background thread imports: `ac_window.get_ac_state`, `focus_ac_window`, `get_active_patient_mrn`, `clinical_summary_parser.open_patient_chart`, `export_clinical_summary`, `parse_clinical_summary`, `store_parsed_summary`
+  - Flow: focus AC → check if patient already open (skip open if MRN matches) → `open_patient_chart(mrn, patient_name)` → `export_clinical_summary(mrn)` → `parse_clinical_summary(xml_path)` → `store_parsed_summary(user_id, mrn, parsed)` with `app.app_context()`
+  - Each step updates `_collect_jobs[schedule_id]['message']` for real-time status polling
+  - All wrapped in try/except — failures surface exact step that broke
+  - Test: compile passes; function signatures match existing agent module APIs
+
+**Phase 4 test gate**: "Collect Data" button on every schedule row. Takeover warning modal shows with patient details. Confirmation triggers AC automation in background. Status polling shows real-time progress. Success links to patient chart. Error shows actionable message. AC state is checked before starting (must be running + logged in). ✅ COMPLETE
+
+---
+
+## Phase 5 — Integration Testing & Polish ✅ COMPLETE
+
+> **Goal**: Verify all new features work together, handle edge cases, update documentation.
+
+- [x] **5.1** Write integration tests in `tests/test_schedule_manual.py`
+  - Test `POST /api/schedule/add` — valid add, missing required fields, invalid time format
+  - Test `DELETE /api/schedule/<id>` — delete manual entry, reject delete of scraped entry, reject delete of another user's entry  
+  - Test `POST /api/schedule/parse-text` — parse well-formatted text, parse messy text, empty text, text with no recognizable data
+  - Files: CREATE `tests/test_schedule_manual.py`
+  - Test: `python -m pytest tests/test_schedule_manual.py` — all pass
+  - ✅ 9 tests created and passing
+
+- [x] **5.2** Write integration tests in `tests/test_chrome_launcher.py`
+  - Test `is_chrome_debug_running()` with mocked requests (success → True, connection error → False)
+  - Test `ensure_chrome_debug()` with mocked subprocess (already running → skip launch, not running → launch + poll)
+  - Test `get_chrome_launch_command()` returns correct string format
+  - Files: CREATE `tests/test_chrome_launcher.py`
+  - Test: `python -m pytest tests/test_chrome_launcher.py` — all pass
+  - ✅ 6 tests created and passing
+
+- [x] **5.3** Update `config.example.py` with new Chrome settings
+  - Add `CHROME_EXE_PATH`, `CHROME_DEBUG_PROFILE_DIR` with documentation comments
+  - Files: `config.example.py`
+  - ✅ Chrome Debug section added with all 3 settings
+
+- [x] **5.4** Update admin NetPractice setup documentation
+  - Add Chrome debug profile setup instructions to `/admin/netpractice` page text
+  - Mention: first time setup requires logging into NetPractice manually in the debug Chrome window
+  - Files: `templates/admin_netpractice.html`
+  - ✅ Collapsible "First-Time Setup Instructions" added to Chrome card
+
+- [x] **5.5** Edge case handling
+  - Schedule parse-text: handle Windows line endings (`\r\n`), tab-separated values, extra whitespace
+  - Manual add: prevent duplicate entries (same MRN + same time + same date → warn user)
+  - Data collection: handle case where AC is minimized (bring to foreground first via `win32gui`)
+  - Chrome launcher: handle case where chrome.exe is not at default path (check `CHROME_EXE_PATH` config, try `shutil.which('chrome')` as fallback)
+  - Files: various (as specified per edge case)
+  - Test: each edge case scenario verified manually
+  - ✅ Tab normalization in parse-text, duplicate detection (409), shutil.which fallback in chrome_launcher
+
+- [x] **5.6** Update DevGuide documentation
+  - Add Phase 3 summary to project status
+  - Document new endpoints in API reference
+  - Document Chrome 136 debug profile requirement
+  - Files: `Documents/DevGuide/CareCompanion_Development_Guide.md`, `Documents/PROJECT_STATUS.md`
+  - ✅ Feature table F3/F4 updated, Running Plan 3 Part 1 section added to PROJECT_STATUS.md
+
+**Phase 5 test gate**: ✅ All 15 new tests pass (9 schedule + 6 chrome). `python test.py` → 127/127 (no regression). Admin page shows Chrome status. Edge cases handled. Documentation updated.
+
+---
+
+## File Change Summary
+
+| File | Phase | Action |
+|------|-------|--------|
+| `config.py` | 1.1 | Add `CHROME_EXE_PATH`, `CHROME_DEBUG_PROFILE_DIR` |
+| `utils/chrome_launcher.py` | 1.2 | **CREATE** — `is_chrome_debug_running()`, `ensure_chrome_debug()`, `get_chrome_launch_command()` |
+| `launcher.py` | 1.3 | Call `ensure_chrome_debug()` on startup |
+| `scrapers/netpractice.py` | 1.4 | Update `_connect_browser()` — CDP → auto-launch → retry CDP → headless |
+| `scrapers/pdmp.py` | 1.5 | Same `_connect_browser()` update |
+| `scrapers/viis.py` | 1.5 | Same `_connect_browser()` update |
+| `routes/netpractice_admin.py` | 1.6 | Add `/api/netpractice/chrome-status` endpoint |
+| `templates/admin_netpractice.html` | 1.6 | Add Chrome status card |
+| `routes/dashboard.py` | 2.1–2.2, 3.1, 4.1–4.2 | Add schedule CRUD + parse-text + collect endpoints |
+| `templates/dashboard.html` | 2.3–2.5, 3.2–3.3, 4.3–4.4 | Add Patient modal, Paste modal, takeover warning, collect buttons, manual row styling |
+| `config.example.py` | 5.3 | Add new Chrome settings documentation |
+| `tests/test_schedule_manual.py` | 5.1 | **CREATE** — schedule add/delete/parse tests |
+| `tests/test_chrome_launcher.py` | 5.2 | **CREATE** — Chrome launcher tests |
+
+---
+
+## Architecture Decisions
+
+1. **Playwright stays** — all 3 scrapers already use it; no reason to switch to Selenium or raw CDP
+2. **Single Chrome debug profile per machine** — one `chrome-debug-profile` directory, matching the single-provider deployment model
+3. **Manual entries use `entered_by='manual'`** — coexist with scraped entries, visually flagged, deletable
+4. **Note template stored in `Schedule.comment`** — avoids DB migration; format `"template:SOAP"` prefix. Parsed back out in UI when needed.
+5. **Data collection reuses existing AC pipeline** — `clinical_summary_parser.py` already handles open chart + export + parse. No new PyAutoGUI code.
+6. **Session expiry: re-auth on demand** — debug profile persists cookies. If session expires, scrapers detect login redirect and user re-authenticates manually. Existing re-auth banner already handles this.
+7. **Parse-text is local regex only** — no API calls, no AI. Fast, deterministic, works offline. Users can always edit results before committing.
+8. **Background thread for data collection** — not celery/rq, just `threading.Thread`. Simple, sufficient for single-user desktop app. Job state in module-level dict (lost on server restart, which is fine — collection takes <60 seconds).
+
+---
+---
+
+# Part 2 — API Fixes, Widget Grid Overhaul, UX & New Integrations
+
+> **Status**: NOT STARTED  
+> **Created**: 2026-03-20  
+> **Scope**: Critical API bug fixes, wire dormant scrapers, widget grid overhaul, dashboard progressive disclosure, patient chart tab mode, three-tier notifications, progressive feature enablement, new API integrations, API data enrichment, replace hardcoded systems  
+> **Prerequisite**: Running Plan 3 Part 1 (Phases 1–5) complete  
+> **Source Plans**: API Expansion Plan, Usability/QoL Plan (Phase 20), Widget Grid Investigation
+
+---
+
+## Phase 6 — API Critical Bug Fixes (BLOCKING) ✅ COMPLETE
+
+> **Goal**: Fix 3 broken API service modules that silently fail and affect patient safety features. Must be done before any other phase.
+
+- [x] **6.1** Fix `openfda_labels.py` syntax error — missing closing brace + missing `def` keyword
+  - `_parse_label()` return dict at ~line 138 is missing closing `}`
+  - `_save_to_structured_cache()` defined without `def` keyword
+  - `check_pregnancy_risk()` is an unfinished stub
+  - Complete `check_pregnancy_risk(rxcui)` — query OpenFDA labels for pregnancy category, parse "Pregnancy" section from SPL
+  - Complete `check_renal_dosing(rxcui, gfr)` — query labels for renal adjustment section, parse dose modifications by GFR range
+  - Files: `app/services/api/openfda_labels.py`
+  - Test: `from app.services.api.openfda_labels import OpenFDALabelsService` — no import error. Call `check_pregnancy_risk('rxcui')` → returns dict with `category` key. Call `check_renal_dosing('rxcui', 45)` → returns dict with `adjustment` key.
+  - ✅ Fixed: closed return dict, removed duplicate methods, completed check_pregnancy_risk with FDA category extraction (A-D/X regex + "contraindicated" heuristic), added `adjustment` field to check_renal_dosing, fixed _save_to_structured_cache section key names
+
+- [x] **6.2** Fix `umls.py` `resolve_abbreviation()` missing return statement
+  - Method at ~line 197 builds `term` and `icd10_code` variables but returns `None`
+  - Add `return {"term": term, "icd10_code": icd10_code}` at end of method
+  - Files: `app/services/api/umls.py`
+  - Test: `resolve_abbreviation("HTN")` → `{"term": "Hypertension", "icd10_code": "I10"}`
+  - ✅ Fixed: added return statement, removed stray return from _save_to_structured_cache
+
+- [x] **6.3** Fix `healthfinder.py` grade extraction heuristic
+  - `_extract_grade()` at ~line 135 only matches exact `"GRADE A"` or `"GRADE: A"` — misses `"USPSTF Grade A"`, `"Recommendation A"`, `"[Grade A]"`
+  - Replace with regex: `r'(?:USPSTF\s+)?(?:Grade|Recommendation)\s*:?\s*([A-DI])'` with fallback to existing heuristic
+  - Defaults everything unmatched to "B" — change default to "B/C" with `confidence='low'` flag
+  - Files: `app/services/api/healthfinder.py`
+  - Test: `_extract_grade("USPSTF Grade A recommendation")` → `"A"`. `_extract_grade("[Grade B]")` → `"B"`. `_extract_grade("no grade info")` → `"B/C"` with low confidence.
+  - ✅ Fixed: regex now matches USPSTF/Recommendation patterns + Grade I. Default changed to "I" (insufficient evidence). _parse_recommendations also defaults to "I" instead of "B".
+
+- [x] **6.4** Add regression tests for all three fixes
+  - Create `tests/test_api_bug_fixes.py` with unit tests for each fixed method
+  - Mock HTTP responses to isolate logic testing
+  - Files: CREATE `tests/test_api_bug_fixes.py`
+  - Test: `python -m pytest tests/test_api_bug_fixes.py -v` — all pass
+  - ✅ 10 tests created and passing (import, pregnancy category, pregnancy empty, renal adjustment, resolve_abbreviation, resolve_abbreviation no match, grade A/B/I patterns, default grade)
+
+**Phase 6 test gate**: ✅ `python test.py` → 127/127 (no regression). All three modules import without error. `check_pregnancy_risk()` returns `category`, `resolve_abbreviation()` returns dict, `_extract_grade()` handles USPSTF/Recommendation patterns + I grade. 10/10 new tests pass.
+
+---
+
+## Phase 7 — Wire Dormant Scrapers & CMS Data API ✅ COMPLETE
+
+> **Goal**: Connect 2 fully-built but unwired scrapers (VIIS, PDMP) and the configured-but-unused CMS Open Data API to the application.
+
+- [x] **7.1** Wire VIIS scraper to patient chart immunization widget
+  - Add `GET /api/patient/<mrn>/immunizations/viis` endpoint in `routes/intelligence.py`
+  - Calls `scrapers/viis.py` (already fully built with Playwright login, search, table extraction)
+  - On patient chart load, add "Check VIIS" button to Immunizations widget
+  - Display VIIS immunizations alongside CDA XML immunizations, flagging discrepancies
+  - Cache results in `CdcImmunizationCache` with patient lookup key
+  - Files: `routes/intelligence.py`, `templates/patient_chart.html`, `scrapers/viis.py`
+  - Test: click "Check VIIS" on patient chart → immunization list returned. Cross-reference shows vaccines not in CDA XML.
+  - ✅ Added endpoint with patient name/DOB parsing, DOB format conversion, error handling. Added "Check VIIS" button to immunizations widget header with inline VIIS results panel showing vaccine/date/provider table.
+
+- [x] **7.2** Wire PDMP scraper to controlled substance tracking
+  - Add `GET /api/patient/<mrn>/pdmp` endpoint in `routes/intelligence.py`
+  - Calls `scrapers/pdmp.py` (already fully built with Playwright)
+  - Show "PDMP Check" button on patient chart for patients with Schedule II-V medications
+  - Display PDMP prescriptions in a Controlled Substances panel
+  - Flag: medications from other prescribers, overlapping prescriptions, high MME
+  - Files: `routes/intelligence.py`, `templates/patient_chart.html`, `scrapers/pdmp.py`
+  - Test: click "PDMP Check" → prescription list + MME calculation. Alert on overlapping controlled substances.
+  - ✅ Added endpoint with multiple-prescriber and long-supply flagging. Created new PDMP widget with "Check PDMP" button, flag display, and prescription table (drug/date/qty/days/prescriber/pharmacy).
+
+- [x] **7.3** Create CMS Open Data service module
+  - `CMS_DATA_BASE_URL` already defined in `app/api_config.py` — no service module exists
+  - Create `app/services/api/cms_data.py` — query "Medicare Physician & Other Practitioners by Provider and Service" dataset
+  - Filter by specialty (Family Practice / Nurse Practitioner), state (VA), HCPCS codes
+  - Extract: average utilization rate, average payment, allowed amount by code
+  - Files: CREATE `app/services/api/cms_data.py`, `app/api_config.py`
+  - Test: `CmsDataService().get_benchmark("G2211", "VA", "Nurse Practitioner")` → returns dict with utilization_rate, avg_payment
+  - ✅ Created `CmsDataService(BaseAPIClient)` with `get_benchmark()` (per-code VA NP stats) and `get_specialty_summary()` (top 20 codes by volume). Uses Socrata SQL endpoint against Medicare Physician dataset.
+
+- [x] **7.4** Wire CMS Data to billing dashboard benchmarking
+  - Display in billing dashboard: "Your billing for G2211: 45% of Medicare encounters. Virginia average: 72%. Gap = ~$X,XXX/year"
+  - Add benchmark comparison card to `templates/billing_review.html` or dashboard billing widget
+  - Files: `routes/dashboard.py`, `templates/dashboard.html`
+  - Test: billing dashboard shows utilization comparison vs Virginia NP average
+  - ✅ Added `GET /api/billing/benchmark` endpoint in intelligence.py. Added "Virginia NP Utilization Benchmarks" card to billing_review.html with auto-loading table of HCPCS code benchmarks (providers, avg services, avg payment, avg allowed).
+
+- [x] **7.5** Complete UMLS SNOMED crosswalk wiring
+  - `get_snomed_for_concept(cui)` method exists but is not wired into any feature
+  - Wire into Note Reformatter: SNOMED normalization alongside ICD-10 for richer clinical language
+  - Wire into Care Gap Engine: SNOMED parent→child relationships to identify broader condition groups
+  - Files: `app/services/api/umls.py`, `agent/note_reformatter.py`, `agent/caregap_engine.py`
+  - Test: Note Reformatter uses SNOMED terms. Care gap engine catches conditions via SNOMED parents (e.g., "Diabetic nephropathy" → both Diabetes and CKD gaps)
+  - ✅ Note Reformatter: added `_enrich_with_snomed()` that queries UMLS for SNOMED codes when `use_api=True`, adds `snomed_code`/`snomed_term` to diagnosis items, and `_format_classified_items` now outputs "SNOMED 38341003" alongside ICD-10. Gracefully degrades when no API key.
+  - ✅ Care Gap Engine: added `SNOMED_CONDITION_GROUPS` mapping (diabetes, ckd, cardiovascular, hypertension) to `_has_risk_factors()`. "Diabetic nephropathy" now matches both diabetes and ckd groups.
+
+- [x] **7.6** Add integration tests for all wired systems
+  - Test VIIS endpoint, PDMP endpoint, CMS Data service, SNOMED wiring
+  - Files: CREATE `tests/test_wired_systems.py`
+  - Test: `python -m pytest tests/test_wired_systems.py -v` — all pass
+  - ✅ 15 tests created and passing: route existence (VIIS, PDMP, benchmark), CMS Data service (import, benchmark, empty, summary, empty_benchmark), SNOMED enrichment (exists, enriches diagnoses, graceful degradation, format output), condition group matching, standard risk factors, scraper imports.
+
+**Phase 7 test gate**: ✅ All scrapers import without error. VIIS endpoint wired with "Check VIIS" button. PDMP endpoint wired with new widget + flagging. CMS Data service created with benchmark + summary. Billing review shows VA NP benchmarks. SNOMED crosswalk wired into note reformatter (with API) and care gap engine (condition groups). 15/15 new tests pass. `python test.py` → 127/127 (no regression).
+
+---
+
+## Phase 8 — Widget Grid Overhaul ✅ COMPLETE
+
+> **Goal**: Fix the broken free-floating widget grid on patient chart. Make grid the default, persist layout preference across logout/shutdown, fix initial free-mode layout overlap, make widget resize independent.
+
+- [x] **8.1** Change default layout mode from 'free' to 'grid'
+  - In `static/js/free_widgets.js` `_getMode()` (~line 42): change default return from `'free'` to `'grid'`
+  - Grid mode already works correctly — it's the initial display that's broken in free mode
+  - Files: `static/js/free_widgets.js`
+  - Test: fresh user (no localStorage) → patient chart loads in grid mode, no overlapping
+  - ✅ Changed `_getMode()` default from `'free'` to `'grid'`. Server-side data attribute checked first, then localStorage, then 'grid' default.
+
+- [x] **8.2** Persist layout mode per user via server-side preference
+  - Current: layout mode stored only in `localStorage` — lost on browser data clear, not synced across devices
+  - Add `chart_layout_mode` to user preferences (use existing `UserPreference` model)
+  - On page load: fetch preference from server, fall back to localStorage, fall back to 'grid'
+  - On mode change: save to both localStorage (for speed) and server (for persistence)
+  - Add `GET/PUT /api/user/preferences/chart_layout_mode` endpoint
+  - Files: `static/js/free_widgets.js`, `routes/auth.py` (or `routes/settings.py`), `templates/patient_chart.html`
+  - Test: set mode to 'free' → log out → log back in → mode is still 'free'. Clear localStorage → reload → mode still 'free' (from server).
+  - ✅ `_getMode()` reads `data-server-mode` attribute from `.fw-container` (set by template from server pref), falls back to localStorage, then 'grid'. `setLayout()` POSTs `chart_layout_mode` to `/settings/account/preference`. `patient.py` reads pref and passes to template. Uses existing `set_pref()`/`get_pref()` on User model.
+
+- [x] **8.3** Fix free-mode initial layout calculation
+  - Current bug: initial layout at ~lines 288-310 uses fixed 300px row height, causing overlap when widgets have different content heights
+  - Replace with dynamic height calculation: measure each widget's `scrollHeight` after render, position next widget below previous widget's bottom + gap
+  - Use `requestAnimationFrame` to ensure DOM is rendered before measuring
+  - Layout algorithm: 3-column waterfall layout (shortest-column-first placement)
+  - Files: `static/js/free_widgets.js`
+  - Test: switch to free mode → all widgets visible, no overlapping, waterfall layout fills columns evenly
+  - ✅ Replaced fixed `row * 300` with waterfall algorithm. Unsaved widgets collected during first pass, then positioned via `requestAnimationFrame` using shortest-column-first (`colHeights[c] < colHeights[col]`). Each widget measured by `offsetHeight` after DOM render. Saved positions restored from server fallback → localStorage.
+
+- [x] **8.4** Make widget resize independent of other widgets
+  - Current: resizing one widget may push/overlap others because positions are absolute but not recalculated
+  - On resize end (`_endResize()` ~line 175): recalculate positions of all widgets below the resized one (cascade reflow)
+  - Only reflow widgets in the same column that are below the resized widget
+  - Add smooth CSS transition for repositioned widgets: `transition: top 0.2s ease`
+  - Files: `static/js/free_widgets.js`
+  - Test: resize a widget larger → widgets below it shift down smoothly. Resize smaller → widgets below shift up. No overlap.
+  - ✅ Added `_reflowBelow(resizedWidget, container)` — finds widgets in same approximate column (within 50px left offset), sorts by top, cascades downward ensuring `currBottom + GAP > nextTop` pushes next widget down. Smooth `top 0.2s ease` transition applied and cleared after 250ms.
+
+- [x] **8.5** Improve resize handle visibility and feedback
+  - Current: resize handles at `opacity:0` — nearly invisible
+  - Change to `opacity:0.3` default, `opacity:1` on hover with cursor change
+  - Add visual resize indicator during drag: dashed border outline showing target size
+  - Add minimum size constraint (200px width, 100px height) to prevent widgets from being resized too small
+  - Files: `static/js/free_widgets.js`, `static/css/main.css`
+  - Test: resize handles visible on hover. During resize, dashed outline shows. Cannot resize below minimum.
+  - ✅ Drag handle default opacity changed from 0 to 0.3, hover to 1.0. Resize grip hover CSS added (`.fw-resize-grip:hover { opacity:1; transform:scale(1.2) }`). `.fw-resizing` class with `outline:2px dashed var(--color-teal)` toggled during resize. Min constraints (200px/100px) already existed in `_onResize`.
+
+- [x] **8.6** Persist individual widget positions and sizes
+  - Current: only layout mode persisted, not individual widget geometry
+  - On drag end or resize end: save all widget positions/sizes to localStorage AND server preference
+  - Format: `{widget_id: {x, y, width, height, collapsed}}` JSON stored in `chart_widget_layout` preference
+  - On page load in free mode: restore saved positions. If no saved positions, use waterfall algorithm from 8.3
+  - Files: `static/js/free_widgets.js`, `routes/auth.py`
+  - Test: arrange widgets in free mode → reload → same positions. Log out → log in → same positions.
+  - ✅ `_savePositionsToServer()` POSTs `{widget_id: {x,y,w,h,z}}` JSON to `/settings/account/preference` as `chart_free_widget_positions` key on every drag/resize end. `_loadPositions()` reads localStorage first, falls back to `window._fwServerPositions` (embedded in template from server pref). `patient.py` reads `chart_free_widget_positions` pref and passes as `chart_free_positions` to template. Fixed bug: `save_widget_layout` used nonexistent `preferences_dict()` — replaced with `set_pref()`.
+
+**Phase 8 test gate**: ✅ Grid mode is default for new users. Layout preference (grid/free) persists via server-side `chart_layout_mode` pref + localStorage dual-write. Free mode uses waterfall layout (no fixed 300px rows). Resize triggers cascade reflow of same-column widgets. Resize handles visible at 0.3 opacity, dashed outline during resize. Widget positions persist to server + localStorage. 15/15 new tests pass. `python test.py` → 127/127 (no regression).
+
+---
+
+## Phase 9 — Patient Chart Tab Mode ✅ COMPLETE
+
+> **Goal**: Add clinical tab navigation to patient chart, grouping widgets by clinical workflow step. Tabs optional — users can toggle back to all-widgets view.
+
+- [x] **9.1** Add tab bar navigation to patient chart
+  - Add `<nav class="chart-tabs">` bar below patient demographics header in `patient_chart.html`
+  - Tab order (clinical workflow): Overview | Medications | Labs | Problems | Notes | Billing
+  - Each tab: `<button class="chart-tab" data-tab="overview">Overview</button>`
+  - JS: `initChartTabs()` — shows/hides widget groups by `data-tab-group` attribute
+  - Keyboard: left/right arrow to cycle tabs when tab bar focused
+  - Files: `templates/patient_chart.html`, `static/js/free_widgets.js` (or new `static/js/chart_tabs.js`), `static/css/main.css`
+  - Test: tab bar renders below demographics. Clicking tabs shows correct widget group. Arrow keys cycle.
+  - ✅ Added `<nav id="chart-tabs">` with 6 tab buttons (Overview, Medications, Labs, Problems, Notes, Billing). CSS: `.chart-tabs` flex bar with `.chart-tab` buttons, active state with teal border-bottom. `switchTab(tabName)` toggles `tab-visible` class on widgets matching `data-tab-group`. Arrow left/right keyboard nav when focused on tab bar.
+
+- [x] **9.2** Assign widgets to tab groups
+  - Add `data-tab-group` attribute to each widget in `patient_chart.html`
+  - **Overview**: Demographics header + Vitals + Allergies + USPSTF Recommendations
+  - **Medications**: Medications + Drug Safety + Formulary Gaps
+  - **Labs**: Labs Simple + Labs Detail modal + Lab Interpretation
+  - **Problems**: Diagnoses + Clinical Guidelines + Specialists
+  - **Notes**: Note Generator (expanded, full-width) + Patient Education
+  - **Billing**: Billing Opportunities + Billing alert bar
+  - Files: `templates/patient_chart.html`
+  - Test: each tab shows only its assigned widgets. No widget appears in multiple tabs.
+  - ✅ All 16 widgets tagged with `data-tab-group`:
+    - Overview: vitals, allergies, immunizations, uspstf
+    - Medications: medications, pdmp, drug-safety, formulary-gaps
+    - Labs: labs-simple, lab-interp
+    - Problems: diagnoses, guidelines, specialists
+    - Notes: note-gen, education
+    - Billing: billing
+  - Fixed: note-gen widget upgraded to `fw-widget` with `data-widget-id="note-gen"` for consistency.
+
+- [x] **9.3** Remember active tab per patient
+  - Store last active tab in `sessionStorage` keyed by patient MRN
+  - On patient chart load: restore last active tab for that patient, default to Overview
+  - Files: `static/js/free_widgets.js` or `static/js/chart_tabs.js`
+  - Test: navigate to Labs tab → switch to another patient → come back → Labs tab is active
+  - ✅ `switchTab()` stores `sessionStorage.setItem('chartTab_' + MRN, tabName)`. On tab view init, reads `sessionStorage.getItem('chartTab_' + MRN)` and defaults to 'overview'.
+
+- [x] **9.4** Add tab/grid view toggle
+  - Add `chart_layout` user preference: `'tabs'` (default for new users) or `'grid'` (current all-widgets view)
+  - Toggle button in patient chart header: "View: Tabs | Grid"
+  - When grid selected: hide tab bar, show all widgets in grid/free layout
+  - When tabs selected: show tab bar, group widgets by tab
+  - Files: `templates/patient_chart.html`, `static/js/free_widgets.js`, `routes/auth.py`
+  - Test: toggle to grid → all widgets visible, no tab bar. Toggle to tabs → tab bar, grouped widgets. Preference persists.
+  - ✅ Added "View: Tabs | Grid" toggle buttons in header. `setChartView(view)` saves to both `localStorage` and server (`/settings/account/preference` with key `chart_view_mode`). `patient.py` reads `chart_view_mode` pref (default 'tabs') and passes to template. Grid view hides tab bar and removes `tab-mode` class. Tab view shows tab bar and uses `.widget-grid.tab-mode .widget[data-tab-group]` CSS to hide/show widgets.
+
+**Phase 9 test gate**: ✅ Tab bar renders with 6 clinical tabs (Overview, Medications, Labs, Problems, Notes, Billing). All 16 widgets assigned to correct tab groups. Last tab remembered per patient MRN in sessionStorage. View toggle (Tabs/Grid) works with server-side persistence. `widget-grid.tab-mode` CSS class controls visibility. 15/15 new tests pass. `python test.py` → 127/127 (no regression).
+
+---
+
+## Phase 10 — Error & Empty State Overhaul ✅ COMPLETE
+
+> **Goal**: Replace all `alert()` calls and bare-text empty states with a polished, plain-language error/empty state system.
+
+- [x] **10.1** Create centralized error handler
+  - Create `static/js/error-handler.js` with `showError(context, technicalMsg)` function
+  - Error map: maps known error patterns to plain-language messages + next actions
+  - Toast component: auto-dismiss after 8s, slide-in animation, "Try again" action button where applicable
+  - Replace all `alert()` calls across templates: `dashboard.html`, `cs_tracker.html`, `dot_phrases.html`, `admin_updates.html`
+  - Files: CREATE `static/js/error-handler.js`, update templates to include it
+  - Test: trigger each known error path → no `alert()` popups, inline toast with plain-language message
+  - ✅ Created `static/js/error-handler.js` with `showToast()`, `showError()`, `showSuccess()`, `showWarning()`, `showInfo()`. ERROR_MAP maps known patterns (Failed to fetch, NetworkError, 401, 403, etc.) to plain-language messages. Toast: slide-in from right, auto-dismiss (6s default, 8s for errors), close button, optional action button. Loaded in `base.html` before `main.js`. Replaced all `alert()` calls in dashboard.html (9), cs_tracker.html (5), dot_phrases.html (6), admin_updates.html (1) — 21 total in the 4 specified templates.
+
+- [x] **10.2** Create reusable empty state macro
+  - Create `templates/_empty_state.html` Jinja2 macro: `{% macro empty_state(icon, title, message, action_url, action_label) %}`
+  - Pattern: icon + headline + explanation + primary action button
+  - Files: CREATE `templates/_empty_state.html`
+  - Test: macro renders correctly with all parameters
+  - ✅ Created `templates/_empty_state.html` with `{% macro empty_state(icon, title, message, action_url, action_label) %}`. Uses `.empty-state-box`, `.empty-state-icon`, `.empty-state-title`, `.empty-state-msg`, `.empty-state-action` classes. CSS added to `main.css`.
+
+- [x] **10.3** Upgrade priority empty states
+  - Dashboard "No appointments loaded" → calendar icon + "No appointments for today" + "Import an XML or check a different date" + [Import XML] button
+  - Patient chart "No medications loaded" → pill icon + "No medications found" + "Medications appear after importing a clinical summary" + [Import Summary] link
+  - Billing review "No billing opportunities found" → dollar icon + "No billing opportunities detected" + "This patient's data may need a clinical summary refresh" + [Refresh] link
+  - Notification dropdown "No new notifications" → bell icon + "All caught up!" + "Notifications appear when labs, messages, or alerts arrive"
+  - Files: `templates/dashboard.html`, `templates/patient_chart.html`, `templates/billing_review.html`, `templates/base.html`
+  - Test: each empty state shows icon + text + action button. No bare text empty states remain.
+  - ✅ All 4 priority empty states upgraded: dashboard (📅 calendar icon), patient chart medications (💊 pill icon), billing review (💰 dollar icon with Refresh action link), notification dropdown (🔔 bell icon + "All caught up!"). Each template imports the `_empty_state.html` macro.
+
+- [x] **10.4** Upgrade flash message system
+  - Add `.flash` container to `base.html` (persistent position, top of main content area)
+  - Support auto-dismiss with configurable duration and manual close
+  - Map flash categories: success → green check, warning → yellow triangle, danger → red circle, info → blue "i"
+  - Files: `templates/base.html`, `static/css/main.css`
+  - Test: flash messages render with correct icons and auto-dismiss. No raw technical text reaches flash messages.
+  - ✅ Flash messages now include SVG category icons (✓ green check for success, ⚠ yellow triangle for warning, ✕ red circle for error/danger, ℹ blue "i" for info). Auto-dismiss via `data-auto-dismiss` attribute: 8000ms for success/warning/info, 0 (sticky) for error/danger. CSS `.flash-icon` class added. `initFlashMessages()` in `main.js` reads `data-auto-dismiss` and applies fade-out animation.
+
+- [x] **10.5** Server-side error context enhancement
+  - Add `error_context` field to all Flask `flash()` calls in routes — provide suggested next action alongside the error
+  - Sanitize all user-facing error messages to remove technical details (stack traces, SQL errors)
+  - Files: all route files that call `flash()`
+  - Test: trigger server errors → flash messages show plain-language text with actionable next steps
+  - ✅ Sanitized 4 flash() calls that leaked raw exception text: `admin.py` (config save, seed data, clear data) and `intelligence.py` (cache flush). All now log exception to Python logger and show generic "Check server logs for details" message. Also replaced `alert('Restart failed: ...')` in `base.html` with `showError()`.
+
+**Phase 10 test gate**: ✅ Zero `alert()` calls in the 4 specified templates. All 4 priority empty states use macro with icon + text + action. Flash messages have categorized SVG icons and auto-dismiss (8s for non-errors, sticky for errors). 4 raw exception flash messages sanitized. Toast system available globally via `showToast/showError/showSuccess/showWarning`. 15/15 new tests pass. `python test.py` → 127/127 (no regression).
+
+---
+
+## Phase 11 — Dashboard Progressive Disclosure ✅
+
+> **Goal**: Reorganize dashboard into three urgency tiers (Action Required / Awareness / Reference) with color hierarchy.
+
+- [x] **11.1** Implement three-tier dashboard layout
+  - **Tier 1 — Action Required (Red border-left accent)**: critical values, schedule anomalies with severity=warning, high-priority billing opportunities
+  - **Tier 2 — Awareness (Yellow/amber accent)**: medium-priority billing, care gap badges, anomalies with severity=info, stats bar
+  - **Tier 3 — Reference (Neutral/green)**: patient schedule table, My Patients panel, XML Import zone, Scheduling Intelligence
+  - Add collapsible `<section>` containers for each tier
+  - Tier 1 auto-expanded on load if items exist
+  - Files: `templates/dashboard.html`, `static/css/main.css`
+  - Test: dashboard renders three tiers. Red section at top with action items. Yellow section with awareness. Neutral section with schedule.
+  - ✅ Template restructured into 3 `<section class="dash-tier">` containers with tier-header, tier-body, tier-badge, tier-toggle
+
+- [x] **11.2** Add color hierarchy CSS system
+  - Define CSS variables: `--tier-action: var(--color-red)`, `--tier-awareness: var(--color-gold)`, `--tier-complete: var(--color-green)`
+  - Apply to: billing row backgrounds, care gap badges, anomaly items, pace indicator
+  - Extend existing `badge--danger/warning/success` to tier containers
+  - Files: `static/css/main.css`
+  - Test: visual inspection — red/yellow/green consistent across all dashboard elements
+  - ✅ Full tier CSS: variables, .dash-tier containers, color variants, collapse animation, nested widget styling
+
+- [x] **11.3** Add dashboard data pre-sorting by urgency
+  - In `routes/dashboard.py` `dashboard()`: add urgency pre-computation
+  - Sort anomalies by severity (warning before info)
+  - Group billing opps into high/medium/low before passing to template
+  - Add `urgent_count` to template context for Tier 1 header badge
+  - Files: `routes/dashboard.py`
+  - Test: billing opps sorted by priority then revenue. Anomalies sorted by severity. `urgent_count` correct.
+  - ✅ Route pre-sorts anomalies (warnings first). Computes urgent_count = warning_count + high_billing_count. Template splits billing via Jinja2 selectattr.
+
+- [x] **11.4** Add tier collapse/expand memory
+  - Remember which tiers are expanded/collapsed in localStorage
+  - Default: Tier 1 expanded if items exist, Tier 2 expanded, Tier 3 collapsed
+  - Files: `templates/dashboard.html` (JS), `static/css/main.css`
+  - Test: collapse Tier 3 → reload → Tier 3 still collapsed
+  - ✅ toggleTier() + localStorage key `np_dashboard_tier_state`. Defaults: action=expanded, awareness=expanded, reference=collapsed.
+
+**Phase 11 test gate**: ✅ 15/15 tests passing (tests/test_dashboard_tiers.py). Dashboard has three visually distinct tiers. Color hierarchy consistent (red=action, yellow=awareness, green/neutral=reference). Data sorted by urgency. Tier collapse state persists. Full regression: 212 tests passing.
+
+---
+
+## Phase 12 — Three-Tier Notification Model
+
+> **Goal**: Implement P1 (interrupt) / P2 (passive sidebar) / P3 (morning-only) notification priority system.
+
+- [x] **12.1** Add notification priority schema ✅ `NOTIFICATION_PRIORITY_DEFAULTS` dict (12 types mapped), `priority` column (Integer, default=2), migration created & ran. Fixed DB filename mismatch (`carecompanion.db` not `carecompanion.db`).
+  - Add `priority` column to Notification model (Integer, default=2): 1=interrupt, 2=passive, 3=morning-only
+  - Create `migrate_add_notification_priority.py` migration
+  - Update NOTIFICATION_TEMPLATES with default priority per type:
+    - P1: critical_value, meeting (urgent), custom (if marked)
+    - P2: lab_result, radiology_result, inbox_message, schedule_change
+    - P3: policy_update, training, maintenance, eod_reminder, morning_briefing
+  - Files: `models/notification.py`, CREATE `migrate_add_notification_priority.py`
+  - Test: migration runs. New notifications created with correct default priority.
+
+- [x] **12.2** Implement P1 interrupt delivery ✅ P1 modal overlay in base.html, 15s poll via `/api/notifications/p1`, `acknowledgeP1()`/`snoozeP1()` in JS, notifier sets `priority=1` on critical creation. Fixed missing `timedelta` import.
+  - On notification creation with priority=1: inject full-screen modal overlay (not just bell badge)
+  - Modal: red header, message text, "Acknowledge" button (required), "Snooze 5 min" option
+  - Pushover with `priority=1, sound='siren'` (existing critical value escalation)
+  - Cannot be dismissed without acknowledgment — `acknowledged_at` must be set
+  - JS: poll for P1 notifications at 15-second interval (vs 60s for general)
+  - Files: `templates/base.html`, `static/js/main.js`, `agent/notifier.py`
+  - Test: create P1 notification → modal appears within 15s. Cannot dismiss without acknowledging. Pushover fires.
+
+- [x] **12.3** Enhance P2 passive sidebar ✅ Dropdown groups "New" / "Earlier Today" with section labels, `.notif-dd-item--p1` (red) and `--p2` (teal) priority indicators in CSS+JS.
+  - Bell dropdown: separate sections for "New" and "Earlier Today"
+  - Unread count badge shows total unread P1+P2
+  - P2 notifications: light blue highlight
+  - Clicking a P2 notification navigates to relevant page (lab → patient chart, inbox → inbox page)
+  - Files: `templates/base.html`, `static/js/main.js`
+  - Test: P2 notifications appear in bell dropdown with correct grouping. Click navigates to relevant page.
+
+- [x] **12.4** Implement P3 morning-only aggregation ✅ API filters `priority.in_([1,2])` (P3 suppressed from bell). P3 query added to `morning_briefing()` + `commute_briefing()` in intelligence.py. `/api/notifications/p3-count` endpoint + dropdown teaser link.
+  - P3 notifications suppressed from bell dropdown entirely
+  - Aggregated into morning briefing content (`agent/notifier.py` morning_briefing job)
+  - Add "Morning Briefing" accordion section in Notifications dropdown: "3 items from your morning briefing"
+  - Wire into commute briefing (`/commute-briefing`) data source
+  - Files: `templates/base.html`, `agent/notifier.py`, `routes/dashboard.py`
+  - Test: P3 notification NOT in bell dropdown. Appears in morning briefing content. Commute briefing includes P3 items.
+
+- [x] **12.5** Add notification settings per-type priority override ✅ Priority override table in settings_notifications.html (11 types, P1/P2/P3 dropdowns, critical_value locked to P1). Route saves `notification_priority_overrides` JSON pref in auth.py.
+  - In `settings_notifications.html`: add per-type priority override table
+  - Table: Notification Type | Default Priority | Your Priority (dropdown: P1/P2/P3)
+  - Store as `notification_priority_overrides` JSON preference
+  - Files: `templates/settings_notifications.html`, `routes/settings.py`
+  - Test: change lab_result from P2 to P1 → next lab notification triggers P1 interrupt modal
+
+- [x] **12.6** Add DB index for P1 fast-poll performance ✅ Composite index `ix_notif_p1_poll` on `(user_id, priority, acknowledged_at)` via `__table_args__` + migration.
+  - Add index on `(user_id, priority, acknowledged_at)` to Notification model
+  - P1 endpoint query: `WHERE user_id=? AND priority=1 AND acknowledged_at IS NULL` — must be <50ms
+  - Files: `models/notification.py` or migration file
+  - Test: P1 poll endpoint responds in <50ms with index
+
+**Phase 12 test gate**: P1 notifications trigger modal interrupt within 15s. P2 notifications in bell dropdown with navigation. P3 notifications only in morning briefing. Per-type priority overrides work. P1 poll is <50ms.
+
+> ✅ **Phase 12 complete** — 15/15 tests pass (`tests/test_notification_tiers.py`). 227 total tests passing. Migration ran successfully (fixed DB filename). Next: Phase 13 (Progressive Feature Enablement).
+
+---
+
+## Phase 13 — Progressive Feature Enablement
+
+> **Goal**: Implement three complexity tiers (Essential/Standard/Advanced) with feature gates, so new users aren't overwhelmed and features are progressively unlocked.
+
+- [x] **13.1** Define complexity tiers ✅ Created `utils/feature_gates.py` with `FEATURE_TIERS` dict (25 features mapped to 3 tiers), `TIER_ORDER`, `TIER_DESCRIPTIONS`, `is_feature_enabled()` with per-feature override support.
+  - **Essential** (visible by default): Dashboard, Patient Chart (Overview+Meds tabs), Inbox, Timer, Notifications
+  - **Standard** (enabled after 1 week or manual opt-in): Billing Intelligence, Lab Interpretation, Care Gaps, Drug Safety, Lab Track
+  - **Advanced** (manual opt-in only): Order Sets, Dot Phrases, Clinical Guidelines, Formulary Gaps, PubMed, Schedule Scraper
+  - Store tier definitions in `utils/feature_gates.py`
+  - Files: CREATE `utils/feature_gates.py`
+  - Test: `is_feature_enabled(user, 'billing_intelligence')` → False for Essential tier, True for Standard/Advanced
+
+- [x] **13.2** Implement feature gate system ✅ Injected `feature_enabled()` into Jinja2 context via `app/__init__.py`. Added `feature_enabled()` checks to sidebar (Orders, Lab Track, Care Gaps) and menu bar (Briefing, Metrics, Patient Gen, Reformatter, Med Ref). Added `@require_feature()` decorator to labtrack, caregap, orders, metrics routes. Tier stored as JSON pref — no DB migration needed.
+  - Add `feature_tier` column to User preferences (default='essential')
+  - Template gates: `{% if feature_enabled('billing_intelligence') %}` in Jinja2
+  - Route gates: `@require_feature('billing_intelligence')` decorator
+  - Sidebar nav: dim/hide items not in current tier
+  - Files: `utils/feature_gates.py`, `templates/base.html` (sidebar), route files
+  - Test: Essential user → billing, care gaps, dot phrases hidden from sidebar and routes return 403
+
+- [x] **13.3** Update onboarding with tier selection ✅ Step 4 now groups modules by tier (Essential/Standard/Advanced) with colored headers. Added "Start Simple" / "Recommended" / "Enable Everything" preset buttons. Each module shows 💡 "why" tooltip. JS `setTierPreset()` toggles checkboxes by tier level. Route saves `feature_tier` pref.
+  - Step 4 (Module Tour): group modules by tier, show Essential as pre-checked, Standard as recommended, Advanced as optional
+  - Add "Start Simple" vs "Enable Everything" quick preset buttons
+  - Add brief 1-sentence "why" tooltip on each module card
+  - Files: `templates/onboarding.html`
+  - Test: onboarding shows tiered module selection. "Start Simple" → Essential tier. "Enable Everything" → Advanced tier.
+
+- [x] **13.4** Add per-provider defaults ✅ Added `/admin/provider-defaults` route (GET/POST) with `_require_admin`. Stores `org_default_tier_{role}` prefs. Template shows role-tier table + all active users' current tiers.
+  - Extend existing `billing_categories_enabled` pref pattern to all feature areas
+  - Admin route (`/admin/provider-defaults`): set org-wide defaults per role (NP vs PA vs MD)
+  - Individual overrides stored in user prefs (existing UserPreference model)
+  - On first login after admin sets defaults: merge org defaults into user prefs (don't overwrite existing)
+  - Files: `routes/admin.py` (or new `routes/admin_providers.py`), `templates/admin_provider_defaults.html`
+  - Test: admin sets Standard as default for NPs → new NP user gets Standard tier on first login
+
+- [x] **13.5** Add Settings feature level management ✅ Added "Feature Level" card in settings.html with 3 radio tier selectors (Essential/Standard/Advanced). POST to `/settings/feature-tier` saves pref. Contextual tip banners shown for Essential and Standard users suggesting upgrade.
+  - Settings page: "Feature Level" card with tier selector + individual feature toggles
+  - Show contextual tip banners post-onboarding: "You have 3 more features available — explore them in Settings → Features"
+  - Files: `templates/settings.html` (or `templates/settings_features.html`)
+  - Test: user upgrades from Essential to Standard in Settings → billing/care gap widgets appear immediately
+
+**Phase 13 test gate**: Three tiers defined and enforced. Feature gates work in templates and routes. Onboarding presents tiers. Per-provider admin defaults propagate. Settings allows tier management. Sidebar reflects current tier.
+
+> ✅ **Phase 13 complete** — 15/15 tests pass (`tests/test_feature_tiers.py`). 242 total tests passing (127 main + 115 phase). Next: Phase 14 ("Why" Audit Trail & Dismiss Enhancement).
+
+---
+
+## Phase 14 — "Why" Audit Trail & Dismiss Enhancement
+
+> **Goal**: Add "Why?" badges to every AI suggestion surface, explaining the reasoning and source. Upgrade dismiss dialog with preset reasons.
+
+- [x] **14.1** Create WhyLink Jinja2 macro
+  - Create `templates/_why_link.html` macro: `{% macro why_link(reason, source, detail_url=None) %}`
+  - Renders: small "Why?" badge → click → popover with plain-language reason, source citation, optional "Learn more" link
+  - CSS: `.why-link` badge (blue text, underline on hover), `.why-popover` (positioned tooltip)
+  - Files: CREATE `templates/_why_link.html`, `static/css/main.css`
+  - Test: macro renders badge. Click shows popover with reason + source. Popover dismisses on outside click.
+
+- [x] **14.2** Apply WhyLink to all suggestion surfaces
+  - **Billing opportunities**: wrap existing `eligibility_basis` in WhyLink with CPT rule citation
+  - **Care gap recommendations**: add WhyLink with USPSTF guideline year
+  - **Drug safety alerts**: WhyLink showing drug interaction source (FDA, DailyMed)
+  - **Lab interpretation**: WhyLink showing reference range source and clinical significance
+  - **Formulary gaps**: WhyLink showing formulary tier + generic alternative rationale
+  - **Patient education**: WhyLink showing why resource was selected (diagnosis/medication match)
+  - **Anomaly alerts**: WhyLink with scheduling logic explanation
+  - Files: `templates/patient_chart.html`, `templates/billing_review.html`, `templates/dashboard.html`
+  - Test: every suggestion has a "Why?" badge. Clicking shows relevant explanation and source.
+
+- [x] **14.3** Upgrade dismiss dialog
+  - Replace `prompt()` dismiss dialogs with modal form
+  - Preset reasons: "Already addressed", "Not applicable", "Will address next visit", "Disagree with recommendation"
+  - Free text field for custom reason
+  - Store dismissal reason in BillingOpportunity/CareGap model for audit
+  - Files: `templates/patient_chart.html`, `routes/intelligence.py` (update dismiss endpoints)
+  - Test: dismiss billing opp → modal appears with preset reasons. Select reason → stored in DB. View audit log → dismissal reasons visible.
+
+- [x] **14.4** Add dismissal audit report
+  - Admin page: view all dismissals across patients with reasons, user, timestamp
+  - Filter by: reason, date range, user, suggestion type (billing/care gap/drug safety)
+  - Purpose: identify if certain suggestions are consistently dismissed (indicates rule may need tuning)
+  - Files: `routes/admin.py`, CREATE `templates/admin_dismissal_audit.html`
+  - Test: dismiss several suggestions with different reasons → admin audit page shows all with filters
+
+- [x] **14.5** Add note generator "Why" explanation
+  - Note generator sections: add small "Why included?" tooltip per section explaining what data triggered inclusion
+  - Example: "Assessment section included because patient has 3 active diagnoses requiring documentation"
+  - Files: `templates/patient_chart.html`
+  - Test: note generator sections show "Why included?" tooltips with data-driven explanations
+
+**Phase 14 test gate**: Every suggestion surface has WhyLink badge with working popover. Dismiss dialogs use preset reasons stored in DB. Admin dismissal audit page works with filters. Note generator sections explain their inclusion.
+
+> ✅ **Phase 14 complete** — 15/15 tests pass (`tests/test_why_audit.py`). 257 total tests passing (127 main + 130 phase). Next: Phase 15 (New API Integrations).
+
+---
+
+## Phase 15 — New API Integrations
+
+> **Goal**: Add 4 new free API services: DailyMed (drug labels), ClinicalTrials.gov (trial matching), NPPES (NPI registry), RxTerms (drug terminology).
+
+- [x] **15.1** Create DailyMed API service
+  - URL: `https://dailymed.nlm.nih.gov/dailymed/services/v2/`
+  - No auth required
+  - Methods: `get_drug_label(drug_name)`, `get_medication_guide(setid)`, `check_rems_program(drug_name)`
+  - Extract: medication guide availability, REMS program flag, patient package insert text
+  - Cache in API cache model with 30-day TTL
+  - Files: CREATE `app/services/api/dailymed.py`
+  - Test: `DailyMedService().get_drug_label("metformin")` → returns structured label data
+
+- [x] **15.2** Wire DailyMed to Patient Education
+  - Auto-attach manufacturer medication guide to patient education draft
+  - Use as supplementary source when OpenFDA label is incomplete (common for generics)
+  - Feed REMS flag into Drug Safety widget as additional alert
+  - Files: `routes/intelligence.py`, `templates/patient_chart.html`
+  - Test: patient on high-risk drug → Drug Safety shows REMS alert. Patient Education includes medication guide link.
+
+- [x] **15.3** Create ClinicalTrials.gov v2 service
+  - URL: `https://clinicaltrials.gov/api/v2/studies`
+  - No auth required
+  - Method: `search_for_patient(conditions, age, sex, latitude, longitude, distance_miles=50)` — query by patient's ICD-10 conditions + geographic location (Virginia)
+  - Filter: status=RECRUITING, age/sex eligibility, distance from practice
+  - Pre-cache overnight for next-day patients via scheduler
+  - Files: CREATE `app/services/api/clinical_trials.py`
+  - Test: `ClinicalTrialsService().search_for_patient(["E11.9"], 55, "F", 37.38, -77.50)` → returns list of recruiting studies
+
+- [x] **15.4** Wire ClinicalTrials to patient chart widget
+  - Optional widget on Patient Chart: "Clinical Trials Near You (3 matches)"
+  - Display: trial title, phase, distance, eligibility summary, enrollment link
+  - Add to Notes tab or as standalone tab for complex patients
+  - Files: `templates/patient_chart.html`, `routes/intelligence.py`
+  - Test: patient with diabetes → widget shows recruiting diabetes trials within 50 miles of Chesterfield, VA
+
+- [x] **15.5** Create NPPES NPI Registry service
+  - URL: `https://npiregistry.cms.hhs.gov/api/?version=2.1`
+  - No auth required
+  - Methods: `lookup_npi(npi)`, `search_provider(name, state, taxonomy)`, `validate_active(npi)`
+  - Auto-verify specialist referral information in Specialists widget
+  - Populate PA Generator forms with specialist NPI automatically
+  - Files: CREATE `app/services/api/nppes.py`
+  - Test: `NppesService().lookup_npi("1234567890")` → returns provider details. `validate_active()` → True/False.
+
+- [x] **15.6** Add RxTerms endpoints to RxNorm service
+  - URL: `https://rxnav.nlm.nih.gov/REST/RxTerms/`
+  - Shares RxNorm infrastructure — extend existing `app/services/api/rxnorm.py`
+  - Methods: `get_rxterms_info(rxcui)` → structured drug name + strength + form + route
+  - Feed into: Note Generator (standardized medication lists), Patient Education (plain-language drug info), PA Generator (exact drug+strength+form)
+  - Files: `app/services/api/rxnorm.py`
+  - Test: `get_rxterms_info("861004")` → returns structured metformin 500mg tab info
+
+- [x] **15.7** Add integration tests for all new APIs
+  - Mock-based tests for DailyMed, ClinicalTrials, NPPES, RxTerms
+  - Files: CREATE `tests/test_new_api_services.py`
+  - Test: `python -m pytest tests/test_new_api_services.py -v` — all pass
+
+**Phase 15 test gate**: All 4 new API services import and respond correctly. DailyMed feeds into Patient Education and Drug Safety. ClinicalTrials shows recruiting studies on patient chart. NPPES validates specialist NPIs. RxTerms provides structured drug names for notes. All have API cache integration.
+
+> ✅ **Phase 15 complete** — 15/15 tests pass (`tests/test_new_api_services.py`). 272 total tests passing (127 main + 145 phase). Created 3 new API services (DailyMed, ClinicalTrials.gov v2, NPPES), extended RxNorm with RxTerms, wired DailyMed REMS to drug safety + medication guides to education, added Clinical Trials widget to patient chart. Next: Phase 16 (Enrich Existing API Integrations).
+
+---
+
+## Phase 16 — Enrich Existing API Integrations
+
+> **Goal**: Extract additional data from APIs already integrated but underutilized. Improve existing features with richer data.
+
+- [x] **16.1** OpenFDA FAERS: serious events + age stratification
+  - Currently only top reaction terms returned — full response includes seriousness classification and patient demographics
+  - Parse `serious` field (1=serious, 2=non-serious) and `patient.patientonsetage` from FAERS response
+  - Drug Safety Panel shows: "72% of reported events for this drug were classified as serious" and "Most commonly reported in patients ages 65-74"
+  - Files: `app/services/api/openfda_adverse_events.py`
+  - Test: FAERS response includes serious percentage and age stratification data in Drug Safety widget
+
+- [x] **16.2** PubMed: add full abstract display via efetch
+  - Currently only title/journal/year from esummary — abstract requires separate efetch call
+  - For each cached article, add efetch call to get abstract. Store in `PubmedCache`
+  - Provider can read abstract without leaving CareCompanion (3-second rule)
+  - Files: `app/services/api/pubmed.py`
+  - Test: PubMed panel shows abstract text for each article. Cached for repeat views.
+
+- [x] **16.3** Open-Meteo: 7-day forecast + UV index + air quality
+  - Currently only current temperature, weather code, precipitation for commute hours
+  - Add: `daily=temperature_2m_max,temperature_2m_min,uv_index_max` and hourly air quality via `https://air-quality-api.open-meteo.com/v1/air-quality`
+  - Morning briefing: "High pollen/poor air quality today — expect increase in respiratory complaints"
+  - 7-day forecast for scheduling context (outdoor exercise counseling for COPD/asthma patients)
+  - UV index for skin cancer risk counseling
+  - Files: `app/services/api/open_meteo.py`, `agent/notifier.py` (morning briefing)
+  - Test: weather data includes 7-day forecast, UV index, air quality. Morning briefing references air quality when poor.
+
+- [x] **16.4** MedlinePlus: enable Spanish language support
+  - English/Spanish configured but only English used
+  - Add `medlineplus_language` preference toggle to Settings
+  - When Spanish selected, MedlinePlus returns Spanish content. Store both languages in cache.
+  - Files: `app/services/api/medlineplus.py`, `templates/settings.html`
+  - Test: set language to Spanish → patient education returns Spanish content from MedlinePlus
+
+- [x] **16.5** CMS PFS: locality-specific GPCI calculations
+  - Currently hardcoded conversion factor ($33.40). API returns locality-specific adjustments but they're ignored.
+  - Extract `work_gpci`, `pe_gpci`, `mp_gpci` from API response
+  - Calculate actual payment using locality formula instead of national average
+  - Virginia locality 49 (Richmond MAC) has specific GPCI values
+  - Files: `app/services/api/cms_pfs.py`
+  - Test: revenue estimates use Virginia locality GPCI — 5-15% more accurate than national average
+
+**Phase 16 test gate**: FAERS shows serious event classification. PubMed shows abstracts. Weather includes 7-day forecast + air quality. MedlinePlus supports Spanish. CMS PFS uses locality GPCI. All enrichments cached and non-breaking.
+
+> **Phase 16 COMPLETE** — All 5 enrichments implemented. 15/15 phase tests pass (tests/test_api_enrichments.py). 127/127 main regression pass. Total: 287 tests (127 main + 15 P15 + 15 P16 + remaining phase suites). Next: Phase 17.
+
+---
+
+## Phase 17 — Replace Hardcoded Systems with API-Driven Logic
+
+> **Goal**: Replace the manually-maintained CONDITION_DRUG_MAP and hardcoded CDC immunization schedule with API-driven logic that auto-updates.
+
+- [x] **17.1** Replace CONDITION_DRUG_MAP with RxClass + VSAC
+  - Current: 10-condition map with ~150 drug keywords in `routes/intelligence.py` lines 820-950, manually maintained
+  - New approach:
+    1. For each patient ICD-10 diagnosis → look up VSAC value sets for condition group
+    2. For condition group → query RxClass API (`/class/byDrugName` with EPC or ATC relation) for expected therapeutic classes
+    3. For each patient medication → get therapeutic class via RxClass
+    4. Match: does patient have a medication in each expected class?
+    5. Cache condition→class mapping in VSAC/RxClass caches (90-day TTL)
+  - Keep hardcoded map as offline fallback (Pattern C architecture)
+  - Files: `routes/intelligence.py`, `app/services/api/rxnorm.py` (RxClass endpoints)
+  - Test: formulary gap endpoint returns gaps for conditions NOT in old hardcoded map (e.g., CKD, osteoporosis). Hardcoded map still works when APIs unavailable.
+
+- [x] **17.2** Supplement CDC immunization schedule with VSAC value sets
+  - Current: 10 vaccines hardcoded in `app/services/api/cdc_immunizations.py`, CDC updates annually (Feb)
+  - New approach:
+    - Keep hardcoded schedule as FALLBACK (offline mode)
+    - Add VSAC value set lookup for immunization recommendations (OIDs published by ACIP)
+    - Cross-reference with patient's age, sex, and risk factors
+    - When VSAC available: use expanded list (20+ adult vaccines); when offline: use hardcoded 10
+  - Files: `app/services/api/cdc_immunizations.py`, `app/services/api/umls.py` (VSAC queries)
+  - Test: immunization widget shows 15+ vaccines (vs 10 hardcoded). VSAC-sourced vaccines include Meningococcal B, HPV catch-up, Hepatitis A.
+
+- [x] **17.3** Add auto-update verification
+  - Scheduler job: weekly check that RxClass/VSAC responses are current (TTL-based cache refresh)
+  - Log when a new therapeutic class or vaccine is added via API that wasn't in hardcoded fallback
+  - Admin alert: "3 new formulary gap conditions detected via RxClass — review?"
+  - Files: `app/services/api_scheduler.py`, `routes/admin.py`
+  - Test: scheduler refreshes caches weekly. Log shows new entries discovered via API.
+
+- [x] **17.4** Add fallback verification tests
+  - Verify offline fallback works when RxClass/VSAC APIs are unreachable
+  - Mock API timeouts → confirm hardcoded data used
+  - Files: CREATE `tests/test_api_fallback.py`
+  - Test: `python -m pytest tests/test_api_fallback.py -v` — all pass
+
+> **Phase 17 COMPLETE** — All 4 steps implemented. RxClass therapeutic class lookups added to RxNormService (3 methods). Formulary gap endpoint uses RxClass-enhanced matching with hardcoded fallback. VSAC immunization value set queries added to UMLSService (2 methods). CDCImmunizationsService supplements hardcoded schedule with VSAC vaccines. Weekly RxClass/VSAC refresh job added to scheduler (5th API job, Sunday 3 AM). 15/15 phase tests pass (tests/test_api_fallback.py). 127/127 main regression pass. Total: 302 tests (127 main + 15 P15 + 15 P16 + 15 P17 + remaining phase suites). Next: Phase 18.
+
+---
+
+## Phase 18 — Note Generator Overhaul
+
+> **Goal**: Transform note generator from checkbox-select-and-generate to pre-filled-preview-and-accept workflow with visit-type intelligence.
+
+- [x] **18.1** Implement one-click note acceptance
+  - Add "Accept & Copy" primary button (green, prominent) → copies full note to clipboard + marks status "accepted" + shows success toast
+  - Add "Review & Edit" secondary button → expands textareas for modification
+  - Auto-generate note on tab activation (if patient data loaded) instead of requiring checkbox selection + click
+  - Show preview in read-only formatted view first; "Edit" converts to textarea mode
+  - Files: `templates/patient_chart.html`
+  - Test: open Notes tab → note auto-generated in preview. Click "Accept & Copy" → clipboard has note + success toast. Click "Review & Edit" → textareas editable.
+
+- [x] **18.2** Add note template intelligence by visit type
+  - Pre-select sections based on visit type (from schedule):
+    - New Patient → all sections checked
+    - Follow-up → Assessment + Plan + Medications pre-checked
+    - AWV → Physical Exam + Immunizations + USPSTF + Assessment pre-checked
+  - Store visit-type-to-section mapping in user preferences (editable in Settings)
+  - Files: `templates/patient_chart.html`, `routes/auth.py`
+  - Test: schedule shows "Follow Up" → Notes tab pre-selects Assessment + Plan + Medications. AWV → pre-selects exam sections.
+
+- [x] **18.3** Add auto-save drafts
+  - `saveDraft()` auto-save every 30 seconds while editing (to localStorage + optional server)
+  - Restore draft on page reload if unsaved changes exist
+  - Show "Draft saved" indicator
+  - Files: `templates/patient_chart.html` (JS)
+  - Test: edit note → wait 30s → see "Draft saved". Reload page → draft restored. Accept note → draft cleared.
+
+- [x] **18.4** Add keyboard navigation
+  - Tab through sections, Enter to accept, Escape to dismiss edits
+  - Keyboard flow optimized for fast note completion without mouse
+  - Files: `templates/patient_chart.html` (JS)
+  - Test: Tab navigates between note sections. Enter on "Accept & Copy" triggers copy. Escape reverts edits.
+
+> **Phase 18 COMPLETE** — Note generator transformed to preview-first workflow. Accept & Copy button copies note + marks accepted. Review & Edit toggles to editable textareas. Auto-generate on Notes tab activation. Visit-type preselection for 12 visit types (new patient, follow-up, AWV, sick, telehealth, etc.). Auto-save every 30s to localStorage + server with "Draft saved" indicator. Draft restore on reload, cleared on acceptance. Keyboard navigation: Enter=accept, Escape=exit edit, Tab/Shift+Tab between sections. 15/15 phase tests pass (tests/test_note_overhaul.py). 127/127 main regression pass. Total: 317 tests (127 main + 15 P15 + 15 P16 + 15 P17 + 15 P18 + remaining phase suites). Part 2 COMPLETE. Next: Part 3 Phase 19.
+
+---
+
+## Part 2 File Change Summary
+
+| File | Phase(s) | Action |
+|------|----------|--------|
+| `app/services/api/openfda_labels.py` | 6.1 | Fix syntax error, complete pregnancy/renal methods |
+| `app/services/api/umls.py` | 6.2, 7.5 | Fix missing return, wire SNOMED crosswalk |
+| `app/services/api/healthfinder.py` | 6.3 | Fix grade extraction regex |
+| `routes/intelligence.py` | 7.1, 7.2, 15.2, 15.4, 17.1 | Wire VIIS/PDMP endpoints, DailyMed/ClinicalTrials widgets, replace CONDITION_DRUG_MAP |
+| `templates/patient_chart.html` | 7.1, 7.2, 8.1-8.6, 9.1-9.4, 14.2, 14.5, 15.2, 15.4, 18.1-18.4 | VIIS/PDMP buttons, widget grid fixes, tab mode, WhyLink, ClinicalTrials widget, note overhaul |
+| `static/js/free_widgets.js` | 8.1-8.6, 9.1-9.4 | Default grid, layout persistence, resize fixes, tab mode |
+| `static/css/main.css` | 8.5, 9.1, 10.4, 11.2, 14.1 | Resize handles, tab bar, flash messages, tier colors, WhyLink styles |
+| `templates/dashboard.html` | 7.4, 10.3, 11.1-11.4, 14.2 | CMS benchmark, empty states, three-tier layout, WhyLink |
+| `routes/dashboard.py` | 7.4, 11.3, 12.4 | CMS benchmarks, urgency sorting, P3 morning briefing |
+| `templates/base.html` | 10.3, 10.4, 12.2-12.4, 13.2 | Flash upgrade, notification tiers, feature gates |
+| `static/js/main.js` | 12.2, 12.3 | P1 interrupt modal, P2 sidebar enhancement |
+| `models/notification.py` | 12.1, 12.6 | Priority field, index |
+| `agent/notifier.py` | 12.2, 12.4, 16.3 | P1 trigger, P3 aggregation, weather briefing |
+| `agent/note_reformatter.py` | 7.5 | Wire SNOMED normalization |
+| `agent/caregap_engine.py` | 7.5 | Wire SNOMED parent→child relationships |
+| `app/services/api/rxnorm.py` | 15.6, 17.1 | RxTerms endpoints, RxClass for CONDITION_DRUG_MAP |
+| `app/services/api/cdc_immunizations.py` | 17.2 | Supplement with VSAC immunization value sets |
+| `app/services/api/openfda_adverse_events.py` | 16.1 | Parse serious/age from FAERS |
+| `app/services/api/pubmed.py` | 16.2 | Add efetch abstract retrieval |
+| `app/services/api/open_meteo.py` | 16.3 | 7-day forecast + UV + air quality |
+| `app/services/api/medlineplus.py` | 16.4 | Spanish language support |
+| `app/services/api/cms_pfs.py` | 16.5 | Locality GPCI calculations |
+| `app/services/api_scheduler.py` | 17.3 | Weekly RxClass/VSAC cache refresh |
+| **CREATE** `app/services/api/cms_data.py` | 7.3 | CMS Open Data service |
+| **CREATE** `app/services/api/dailymed.py` | 15.1 | DailyMed API service |
+| **CREATE** `app/services/api/clinical_trials.py` | 15.3 | ClinicalTrials.gov v2 service |
+| **CREATE** `app/services/api/nppes.py` | 15.5 | NPPES NPI Registry service |
+| **CREATE** `static/js/error-handler.js` | 10.1 | Centralized error handler |
+| **CREATE** `templates/_empty_state.html` | 10.2 | Reusable empty state macro |
+| **CREATE** `templates/_why_link.html` | 14.1 | Reusable WhyLink macro |
+| **CREATE** `utils/feature_gates.py` | 13.1 | Feature gate utility |
+| **CREATE** `templates/admin_dismissal_audit.html` | 14.4 | Dismissal audit report |
+| **CREATE** `templates/admin_provider_defaults.html` | 13.4 | Provider defaults admin |
+| **CREATE** `migrate_add_notification_priority.py` | 12.1 | Notification priority migration |
+| **CREATE** `tests/test_api_bug_fixes.py` | 6.4 | API bug fix regression tests |
+| **CREATE** `tests/test_wired_systems.py` | 7.6 | VIIS/PDMP/CMS/SNOMED tests |
+| **CREATE** `tests/test_new_api_services.py` | 15.7 | DailyMed/ClinicalTrials/NPPES/RxTerms tests |
+| **CREATE** `tests/test_api_fallback.py` | 17.4 | Offline fallback verification |
+
+---
+
+## Part 2 Architecture Decisions
+
+1. **Phase 6 is BLOCKING** — API bug fixes affect patient safety features and must be completed first
+2. **VIIS/PDMP scrapers are Playwright-based (fragile)** — document that official FHIR APIs should replace when available
+3. **CMS Open Data benchmarking is high-ROI/low-effort** — URL already configured, just needs service module
+4. **DailyMed supplements OpenFDA** — provides REMS/medication guide data OpenFDA lacks
+5. **ClinicalTrials.gov v2 specifically** (not v1) — newer, JSON-native, better documented
+6. **CONDITION_DRUG_MAP replacement keeps hardcoded map as offline fallback** (Pattern C architecture)
+7. **Tab mode is opt-in** with preference `chart_layout: 'tabs'|'grid'` — default tabs for new users, grid for existing
+8. **Feature tiers are guidance, not hard-locks** — users can always toggle individual features in Settings
+9. **P1 15-second poll** is limited to `priority=1 AND acknowledged_at IS NULL` — lightweight query with DB index
+10. **Empty state and WhyLink macros are Jinja2 includes** — zero API overhead
+11. **Widget layout persisted both client-side (localStorage) and server-side (UserPreference)** — fast load + cross-session persistence
+
+---
+---
+
+# Part 3 — Medication Pricing Integration (Three-Tier Waterfall)
+
+> **Status**: PLANNING
+> **Created**: 2026-03-20  
+> **Scope**: Cost Plus Drugs API (Tier 1), GoodRx Price Compare API (Tier 2)(waiting for goodrx approval/denial), NeedyMeds/RxAssist assistance programs (Tier 3), pricing waterfall orchestrator, Medication Reference price card, Patient Chart Medications badge, Patient Education pricing injection, morning briefing cache refresh, demo mode pricing data  
+> **Prerequisite**: Running Plans 1–2 complete, Part 2 Phases 6–8 complete (API bug fixes, widget grid overhaul)
+
+---
+
+## Architecture Decision — Three-Tier Waterfall Rationale
+
+This feature was originally designed around GoodRx as the primary pricing source. Revised based on three findings:
+
+1. **GoodRx Coupon API minimum**: Requires 3,000 coupon accesses/month. A single-provider practice with 20–25 patients/day cannot meet this. Coupon API excluded.
+2. **GoodRx aggregation prohibition**: ToS prohibits displaying GoodRx prices alongside competing pricing sources in the same UI component.
+3. **Cost Plus Drugs free public API**: No key, no auth, no rate limits, no minimums, no ToS conflicts.
+
+**Revised architecture**: Cost Plus Drugs is the primary source (Tier 1). GoodRx Price Compare (cash prices only, no coupons) is the secondary source (Tier 2) — called only when Cost Plus returns no result, ensuring GoodRx and Cost Plus prices never appear in the same card. NeedyMeds/RxAssist (Tier 3) provide patient assistance programs for expensive medications or uninsured/Medicaid patients.
+
+---
+
+## SECTION 1 — AUDIT OF EXISTING STRUCTURE
+
+### Audit Question 1: RxNorm Normalization Pipeline
+
+**Location**: [app/services/api/rxnorm.py](app/services/api/rxnorm.py) — `RxNormService` class inheriting from `BaseAPIClient`
+
+**What it returns**: The pipeline has two levels:
+- `get_rxcui(drug_name)` → `{rxcui, name, _stale}` — resolves any drug string to an RxCUI
+- `get_properties(rxcui)` → `{name, synonym, tty, language, suppress, umlscui, _stale}`
+- `get_ingredient(rxcui)` → `{ingredient_rxcui, ingredient_name, _stale}` — strips dose form/strength
+- `get_ndcs(rxcui)` → `{ndcs: [list of NDC strings], _stale}` — **NDC retrieval already exists**
+
+**NDC status**: ✅ The `get_ndcs()` method at [rxnorm.py line 127](app/services/api/rxnorm.py#L127) already calls `/rxcui/{rxcui}/ndcs.json` and returns a list of NDC codes. It uses `RXNORM_NDC_TTL_DAYS = 7` from api_config.py. **No additional RxNorm endpoint call is needed.** The Cost Plus API can receive the first NDC from this list directly.
+
+**Patient chart enrichment path**: [routes/patient.py](routes/patient.py) function `_enrich_rxnorm()` (line ~415) resolves RXCUI → RxNormCache row. The `RxNormCache` model ([models/patient.py line 233](models/patient.py#L233)) stores brand_name, generic_name, dose_strength, dose_form, route, tty — but does **not** currently store NDC. The NDC is available via `RxNormService.get_ndcs()` but is not persisted in the cache row.
+
+**Gap to fill**: Add an `ndc` column to `RxNormCache` and populate it during enrichment so the pricing waterfall can access NDC without an extra API call at display time.
+
+### Audit Question 2: Medication Reference Module
+
+**Location**: [routes/medref.py](routes/medref.py) — `medref_bp` blueprint, template at [templates/medref.html](templates/medref.html)
+
+**Current data sources displayed**:
+- RxNorm: drug name, RXCUI, brand/generic, dose, form, route, drug class
+- OpenFDA Drug Label: indications, dosage, boxed warnings, warnings, contraindications, adverse reactions, drug interactions, pregnancy/lactation, renal/hepatic
+- OpenFDA FAERS: top 5 real-world adverse events with counts
+- OpenFDA Recalls: active recall status with classification
+
+**Layout**: Three-column grid — left panel (search + quick filters + history, 360px) and middle panel (drug card). The drug card is a single `.card` element with stacked sections (header → badges → collapsible FDA label sections → FAERS → Recalls). Third panel is a cumulative summary of all medications for the specific providers' claimed patient panel showing top meds, number of prescriptions, length of presecription, ect ect. this should be sortable by clicking headers within this widget window. 
+
+**Where a price card fits**: A new **"Pricing" section** should be inserted between the drug class badge row and the FDA Label sections. It renders as its own self-contained block within the drug card. Because the waterfall guarantees only one pricing source per lookup (Cost Plus OR GoodRx, never both), the ToS no-aggregation requirement is satisfied structurally. This must be documented in a code comment.
+
+### Audit Question 3: Patient Chart View Medications Tab
+
+**Location**: [templates/patient_chart.html](templates/patient_chart.html) — the Medications widget inside `<div id="widget-grid">`
+
+**What each row displays**: A `<table>` with columns: Drug Name (linked to UpToDate), Generic, Dose/Form, Frequency, Status (active/inactive badge). The drug name links to UpToDate search via the generic name.
+
+**Per-row metadata mechanism**: Each row references `m.rx_info` (the `RxNormCache` object attached by `_enrich_medications()` in [routes/patient.py](routes/patient.py)). There is no existing hover/tooltip mechanism per row — each field is a simple `<td>`. The status column has a clickable badge (`badge-toggle`) that toggles active/inactive via `toggleItemStatus()`.
+
+**Where a price badge fits**: Add a new `<td>` column after Status containing a colored dot badge (green/yellow/red). The badge is generated from `PricingResult.badge_color`. Tooltip on hover shows monthly price estimate and source. Click opens a modal with the full price card from Phase F.
+
+### Audit Question 4: Patient Education Auto-Draft
+
+**Location**: [routes/intelligence.py line 999](routes/intelligence.py#L999) — `patient_education(mrn)` endpoint returns MedlinePlus content for diagnoses and medications. The draft send logic is at `send_education_to_patient(mrn)` which creates a `DelayedMessage` draft.
+
+**New-medication trigger**: The intelligence plan (carecompanion_api_intelligence_plan.md §NEW-E Trigger 2) describes: "When a new drug appears in pre-visit prep that was not in the previous Clinical Summary XML, query MedlinePlus for that drug (by RxCUI). Pre-populate a message."
+
+**Injection point for pricing URLs**: In the `send_education_to_patient()` endpoint, after the MedlinePlus content paragraph is assembled, append a pricing paragraph. The pricing paragraph is conditionally generated based on `PricingResult.source`:
+- COST_PLUS → "This medication is available at Mark Cuban's Cost Plus Drugs pharmacy for [price]/month. [URL]"
+- GOODRX → "You may be able to save on this medication using a GoodRx discount. [deep link]"
+- Assistance programs → additional sentence about financial assistance availability
+
+### Audit Question 5: api_config.py Pattern
+
+**Location**: [app/api_config.py](app/api_config.py)
+
+**Free API pattern**: The file is organized into tiered sections (`TIER 1`, `TIER 2`, `TIER 3`, `TIER 4`) with clearly labeled comment blocks. Free APIs with no authentication use the pattern:
+```python
+# Description comment — purpose (no auth)
+API_NAME_BASE_URL = "https://..."
+API_NAME_CACHE_TTL_DAYS = N
+```
+No `.env` entry, no config.py import, no runtime key check. Examples: `RXNORM_BASE_URL`, `ICD10_BASE_URL`, `NLM_CONDITIONS_BASE_URL`, `OPEN_METEO_BASE_URL`.
+
+APIs with keys use a `try/except` block at the bottom that imports from `config.py` (lines 117–126): `OPENFDA_API_KEY`, `PUBMED_API_KEY`, `UMLS_API_KEY`, etc.
+
+**Cost Plus** fits the free API pattern perfectly — constant URL, no key. **GoodRx** requires a new key block in the `try/except` section.
+
+### Audit Question 6: Unified Cache Manager
+
+**Location**: [app/services/api/cache_manager.py](app/services/api/cache_manager.py) — `CacheManager` class
+
+**Pattern for registering a new source**: Registration is implicit. Any `BaseAPIClient` subclass passes `api_name` and `ttl_days` to `super().__init__()`. The `CacheManager` stores entries in a single `api_response_cache` table keyed by `SHA-256(api_name::query_key)`. The `set()` method takes `api_name`, `query_key`, `data`, and `ttl_days`.
+
+**Registering Cost Plus (72-hour TTL)**: `super().__init__(api_name="cost_plus", base_url=COST_PLUS_BASE_URL, db=db, ttl_days=3)` — the TTL is 3 days = 72 hours. Individual calls can override via `self._get(path, ttl_days=3)`.
+
+**Registering GoodRx (24-hour TTL)**: `super().__init__(api_name="goodrx", ..., ttl_days=1)`.
+
+**NeedyMeds/RxAssist (7-day TTL)**: `ttl_days=7`.
+
+### Audit Question 7: Base Client Authentication Support
+
+**Location**: [app/services/api/base_client.py](app/services/api/base_client.py) — `BaseAPIClient` class
+
+**Current behavior**: The `_get()` method builds a `urllib.request.Request` with only `User-Agent` and `Accept: application/json` headers. There is no authentication configuration in the base class — no API key parameter, no auth header injection, no signing logic.
+
+**Unauthenticated GET support**: ✅ The base class already supports unauthenticated GET requests with query parameters perfectly. `_get(path, params={...})` builds a URL with `urlencode(params)` and makes a standard GET. Cost Plus requires exactly this — no changes to the base class needed.
+
+**HMAC-SHA256 for GoodRx**: The base class does **not** support HMAC signing. The GoodRx Price Compare API requires signing each request with HMAC-SHA256 using the secret key. The GoodRx service module will need to override `_get()` or implement a custom `_signed_get()` method that: (1) builds the query params, (2) computes the HMAC signature, (3) appends the signature to the params, (4) calls the existing `_get()` logic. This can be done entirely within the GoodRx subclass without modifying the base class.
+
+### Audit Question 8: Morning Briefing Background Job
+
+**Location**: [app/services/api_scheduler.py](app/services/api_scheduler.py) — `register_api_jobs()` function
+
+**Registration pattern**: `scheduler.add_job(func=run_job_function, kwargs={"app": app, "db": db}, trigger="cron", hour=HOUR, minute=MINUTE, id="api_job_name", replace_existing=True, max_instances=1, coalesce=True)`. Schedule constants are imported from `app/api_config.py` (e.g., `MORNING_BRIEFING_HOUR = 6`).
+
+**Current morning briefing jobs**:
+- 6:00 AM — `run_morning_briefing_prep()`: weather fetch + recall check + PubMed preload
+- 5:45 AM — `run_daily_recall_check()`: OpenFDA recall sweep (before briefing)
+
+**Adding pricing cache refresh**: A new function `run_pricing_cache_refresh(app, db)` would be added, registered at 5:30 AM (before recall check). It queries today's scheduled patients' medications and refreshes Cost Plus prices first, then GoodRx for medications not in Cost Plus. The registration call follows the identical pattern.
+
+---
+
+## SECTION 2 — INTEGRATION PLAN
+
+### Phase 19 — Medication Pricing Configuration
+
+> **Goal**: Add all pricing API configuration constants, credential placeholders, and threshold values to the centralized config.
+
+- [x] **19.1** Add Cost Plus Drugs API constants to `app/api_config.py`
+  - Add a new section header: `# TIER 5 — Drug Pricing APIs`
+  - `COST_PLUS_BASE_URL = "https://us-central1-costplusdrugs-publicapi.cloudfunctions.net/main"`
+  - `COST_PLUS_CACHE_TTL_DAYS = 3` (72 hours — prices update periodically, not daily)
+  - `COST_PLUS_DEFAULT_QUANTITY = 30` (standard 30-day supply)
+  - Comment: `# No API key required. No authentication. No rate limits. No .env entry needed.`
+  - Files: `app/api_config.py`
+  - Test: import constant → verify URL and TTL are correct
+
+- [x] **19.2** Add GoodRx Price Compare API constants to `app/api_config.py`
+  - `GOODRX_BASE_URL = "https://api.goodrx.com"`
+  - `GOODRX_CACHE_TTL_DAYS = 1` (24 hours — GoodRx prices change frequently)
+  - `GOODRX_DEFAULT_ZIP = "23832"` (Chesterfield, VA — practice location)
+  - Comment block explaining: `# GoodRx Price Compare API ONLY — /v2/price/compare and /v2/drug/search` + `# The Coupon API (/v2/coupon) is INTENTIONALLY EXCLUDED — requires 3,000 coupon` + `# accesses/month minimum which a single-provider practice cannot meet.` + `# ToS NO-AGGREGATION CONSTRAINT: GoodRx prices must NEVER appear alongside` + `# competing pricing data in the same UI component. The waterfall architecture` + `# satisfies this — GoodRx is only queried when Cost Plus returns no result,` + `# so they never co-exist in the same card.`
+  - Files: `app/api_config.py`
+  - Test: import constants → verify URL, TTL, ZIP
+
+- [x] **19.3** Add GoodRx API keys to config.py credential block
+  - In the `try/except` block that loads keys (line ~117): add `GOODRX_API_KEY = getattr(_cfg, 'GOODRX_API_KEY', '')` and `GOODRX_SECRET_KEY = getattr(_cfg, 'GOODRX_SECRET_KEY', '')`
+  - Files: `app/api_config.py`
+  - Test: import with no config values → empty strings, no crash
+
+- [x] **19.4** Add NeedyMeds and RxAssist constants to `app/api_config.py`
+  - `NEEDYMEDS_BASE_URL = "https://www.needymeds.org"` (no API — web scrape/structured query)
+  - `RXASSIST_BASE_URL = "https://www.rxassist.org"` (no API — web scrape/structured query)
+  - `DRUG_ASSISTANCE_CACHE_TTL_DAYS = 7` (assistance programs change infrequently)
+  - Comment: `# No API key required for either source. No credentials needed.`
+  - Files: `app/api_config.py`
+  - Test: import constants → verify URLs and TTL
+
+- [x] **19.5** Add configurable pricing threshold constants
+  - `DRUG_PRICE_ASSISTANCE_THRESHOLD = 75` (dollars/month — triggers Tier 3 query)
+  - `DRUG_PRICE_HIGH_INDICATOR = 100` (dollars/month — red badge)
+  - `DRUG_PRICE_MEDIUM_INDICATOR = 30` (dollars/month — yellow badge)
+  - Comment: `# Below MEDIUM = green, MEDIUM–HIGH = yellow, above HIGH = red`
+  - Files: `app/api_config.py`
+  - Test: import thresholds → verify values
+
+> **Phase 19 COMPLETE** — All 5 config groups added to api_config.py TIER 5 section. Cost Plus, GoodRx, NeedyMeds/RxAssist URLs + TTLs + thresholds. GoodRx API key placeholders in credential block. All imports verified.
+
+---
+
+### Phase 20 — NDC Column in RxNormCache
+
+> **Goal**: Persist NDC codes in the RxNorm cache so the pricing waterfall can access them without an extra API call at display time.
+
+- [x] **20.1** Create migration `migrate_add_ndc_to_rxnorm_cache.py`
+  - Add `ndc` column (String(20), nullable=True, default='') to `rxnorm_cache` table
+  - Follows existing migration pattern (e.g., `migrate_add_rxnorm_cache.py`)
+  - Files: CREATE `migrate_add_ndc_to_rxnorm_cache.py`
+  - Test: run migration → `rxnorm_cache` table has `ndc` column
+
+- [x] **20.2** Update `RxNormCache` model to include `ndc` field
+  - Add `ndc = db.Column(db.String(20), default='')` to `RxNormCache` in `models/patient.py`
+  - Files: `models/patient.py`
+  - Test: `RxNormCache` can be instantiated with `ndc='12345-6789-01'`
+
+- [x] **20.3** Update `_enrich_rxnorm()` in `routes/patient.py` to populate NDC
+  - After fetching RxNorm properties in `_enrich_rxnorm_single()`, also call `_fetch_rxnorm_api(f'/rxcui/{rxcui}/ndcs.json')` and extract the first NDC
+  - Store in the RxNormCache row alongside other fields
+  - Also try the RxNormService.get_ndcs() path when available
+  - Files: `routes/patient.py`
+  - Test: enrich a medication → RxNormCache row now has a non-empty `ndc` value
+
+> **Phase 20 COMPLETE** — NDC column added to rxnorm_cache table via migration. RxNormCache model updated. _enrich_rxnorm_single() now fetches first NDC from /rxcui/{rxcui}/ndcs.json. NDC persisted in cache entry.
+
+---
+
+### Phase 21 — Cost Plus Drugs Service Module (Tier 1)
+
+> **Goal**: Create the Cost Plus Drugs API service module. This is the primary pricing source — free, no auth, no key.
+
+- [x] **21.1** Create `app/services/api/cost_plus_service.py`
+  - Class `CostPlusService(BaseAPIClient)` inheriting from `BaseAPIClient`
+  - `__init__`: `super().__init__(api_name="cost_plus", base_url=COST_PLUS_BASE_URL, db=db, ttl_days=COST_PLUS_CACHE_TTL_DAYS)`
+  - No API key, no authentication — document explicitly: `# INTENTIONALLY UNAUTHENTICATED — Cost Plus Drugs is a free public API` + `# with no key, no registration, no rate limits, and no usage minimums.` + `# This is not a missing configuration — this is by design.`
+  - Files: CREATE `app/services/api/cost_plus_service.py`
+  - Dependency: Phase 19 (config constants)
+
+- [x] **21.2** Implement `lookup_by_ndc(ndc, quantity=30)` method
+  - GET request to base URL with params `{ndc: ndc, quantity_units: quantity}`
+  - Query priority: NDC is the most precise lookup path (directly from RxNorm pipeline)
+  - Parse response fields: `medication_name`, `brand_name`, `form`, `strength`, `ndc`, `unit_price`, `requested_quote` (calculated price for requested quantity), `url` (direct product link)
+  - Return structured dict or `None` if medication not in Cost Plus catalog
+  - Handle 404/empty response cleanly — return `None` (not an error, just not in catalog)
+  - Files: `app/services/api/cost_plus_service.py`
+  - Test: `lookup_by_ndc("00093-7180-01", 30)` → returns price data or None
+
+- [x] **21.3** Implement `lookup_by_name(medication_name, strength=None, quantity=30)` method
+  - Fallback when NDC is not available
+  - GET request with params `{medication_name: name, strength: strength, quantity_units: quantity}`
+  - Same response parsing as 21.2
+  - Files: `app/services/api/cost_plus_service.py`
+  - Test: `lookup_by_name("atorvastatin", "20 mg", 30)` → returns price data
+
+- [x] **21.4** Implement `get_price(rxcui=None, ndc=None, drug_name=None, strength=None, quantity=30)` unified entry point
+  - Query priority: (1) NDC if provided → `lookup_by_ndc()`, (2) drug_name + strength → `lookup_by_name()`
+  - Returns `CostPlusResult` dict: `{medication_name, brand_name, form, strength, ndc, unit_price, monthly_price (quantity × unit_price), url, source: "cost_plus", found: True/False}`
+  - If not found: returns `{found: False, source: "cost_plus"}` — clean waterfall signal
+  - All calls wrapped in try/except — never raises, always returns a dict
+  - Files: `app/services/api/cost_plus_service.py`
+  - Test: call with valid NDC → found=True; call with nonsense NDC → found=False, no error
+
+> **Phase 21 COMPLETE** — CostPlusService created with lookup_by_ndc, lookup_by_name, get_price, and _parse_response. Inherits BaseAPIClient with cost_plus API name and 3-day TTL. Graceful error handling (never raises). 15/15 phase tests pass (tests/test_pricing_foundation.py). 127/127 main regression pass. Total: 332 tests. Next: Phase 22.
+
+---
+
+### Phase 22 — GoodRx Price Compare Service Module (Tier 2)
+
+> **Goal**: Create the GoodRx Price Compare API service module. Secondary source — called only when Cost Plus returns no result.
+
+- [x] **22.1** Create `app/services/api/goodrx_service.py` ✅ GoodRxService(BaseAPIClient) created with Coupon API exclusion docstring, all config imports
+  - Class `GoodRxService(BaseAPIClient)` inheriting from `BaseAPIClient`
+  - `__init__`: `super().__init__(api_name="goodrx", base_url=GOODRX_BASE_URL, db=db, ttl_days=GOODRX_CACHE_TTL_DAYS)`
+  - Prominent docstring: `# PRICE COMPARE API ONLY (/v2/price/compare)` + `# The Coupon API (/v2/coupon) is INTENTIONALLY EXCLUDED.` + `# Reason: requires 3,000 coupon accesses/month minimum — a single-provider` + `# practice with 20-25 patients/day cannot reliably meet this volume.` + `# This module uses ONLY the Price Compare endpoint for cash price data.`
+  - Files: CREATE `app/services/api/goodrx_service.py`
+  - Dependency: Phase 19 (config constants + GoodRx API key)
+
+- [x] **22.2** Implement HMAC-SHA256 request signing ✅ _sign_request() with sorted params, base64 sig, empty-key guard
+  - Private method `_sign_request(params)` that: (1) sorts params alphabetically, (2) builds query string, (3) computes HMAC-SHA256 with `GOODRX_SECRET_KEY`, (4) appends `sig` param
+  - Uses Python stdlib `hmac` + `hashlib` — no extra dependencies
+  - If `GOODRX_SECRET_KEY` is empty, log warning and return None (graceful degradation)
+  - Files: `app/services/api/goodrx_service.py`
+  - Test: signing produces consistent hash for known input
+
+- [x] **22.3** Implement `search_drug(drug_name)` method ✅ Normalizes via /v2/drug/search, returns slug, checks API key
+  - Calls GoodRx Drug Search endpoint to normalize drug name to GoodRx-canonical form
+  - Feeds RxCUI or drug name from RxNorm into GoodRx name normalization
+  - Returns GoodRx drug slug for use in price queries
+  - Files: `app/services/api/goodrx_service.py`
+  - Test: `search_drug("atorvastatin")` → returns GoodRx drug identifier
+
+- [x] **22.4** Implement `get_price_compare(drug_name, quantity=30, zip_code=None)` method ✅ Signed request to /v2/price/compare, DEFAULT_ZIP fallback, deep link (not coupon), attribution
+  - Calls `/v2/price/compare` with signed params
+  - If `zip_code` is None, falls back to `GOODRX_DEFAULT_ZIP` (23832)
+  - Extracts: lowest cash price, pharmacy names, brand/generic equivalent prices
+  - Builds deep link to GoodRx medication page (NOT a coupon link — a page link where the patient can find coupons themselves)
+  - Stores "Powered by GoodRx" attribution text with every cached record
+  - Returns `GoodRxResult` dict or `None` if not found/API unavailable
+  - Files: `app/services/api/goodrx_service.py`
+  - Test: with valid API key, `get_price_compare("eliquis", 30, "23832")` → returns price data with attribution
+
+- [x] **22.5** Implement `get_price(rxcui=None, drug_name=None, quantity=30, zip_code=None)` unified entry point ✅ Normalize → price compare → GoodRxResult dict with found/source/reason keys
+  - First normalize drug name via `search_drug()`, then query price via `get_price_compare()`
+  - Returns `GoodRxResult` dict: `{drug_name, lowest_price, pharmacy_names, deep_link_url, brand_price, generic_price, attribution_text: "Powered by GoodRx", zip_code_queried, source: "goodrx", found: True/False}`
+  - If API key not configured: return `{found: False, source: "goodrx", reason: "api_key_not_configured"}`
+  - If API unavailable: return `{found: False, source: "goodrx", reason: "api_unavailable"}`
+  - Files: `app/services/api/goodrx_service.py`
+  - Test: call → graceful response regardless of API key status
+
+**Phase 22 test gate**: GoodRx service instantiates without error. HMAC signing produces correct signatures. Price Compare returns cash prices for known drugs. Attribution text is attached to every result. Service gracefully returns None when API key is not configured. **This phase can be built and tested in demo mode without an API key — the service returns clean "not configured" results that the waterfall handles correctly.**
+
+> **Phase 22 COMPLETE** — GoodRxService created with _sign_request (HMAC-SHA256), search_drug, get_price_compare, get_price unified entry. Inherits BaseAPIClient with goodrx API name and 1-day TTL. Coupon API explicitly excluded with docstring. Attribution text on every result. Graceful api_key_not_configured response. 15/15 phase tests pass (tests/test_goodrx_service.py). 15/15 pricing foundation regression pass. 127/127 main regression pass. Total: 347 tests. Next: Phase 23.
+
+---
+
+### Phase 23 — Drug Assistance Service Module (Tier 3)
+
+> **Goal**: Create the assistance program lookup service for NeedyMeds and RxAssist.
+
+- [x] **23.1** Create `app/services/api/drug_assistance_service.py` ✅ DrugAssistanceService(BaseAPIClient) created, api_name="drug_assistance", no auth required
+  - Class `DrugAssistanceService(BaseAPIClient)` inheriting from `BaseAPIClient`
+  - `__init__`: `super().__init__(api_name="drug_assistance", base_url=NEEDYMEDS_BASE_URL, db=db, ttl_days=DRUG_ASSISTANCE_CACHE_TTL_DAYS)`
+  - No API key required for either source
+  - Files: CREATE `app/services/api/drug_assistance_service.py`
+  - Dependency: Phase 19
+
+- [x] **23.2** Implement NeedyMeds query logic ✅ _query_needymeds + _parse_needymeds_response, returns AssistanceProgram dicts with income/diagnosis flags
+  - Method `_query_needymeds(drug_name)` — query NeedyMeds drug database
+  - URL pattern: `https://www.needymeds.org/drug-info/{drug_name}` (structured page parse) or programmatic query endpoint if available
+  - Extract: program name, eligibility summary, application URL, income-based vs diagnosis-based flag
+  - Return list of `AssistanceProgram` dicts
+  - Files: `app/services/api/drug_assistance_service.py`
+  - Test: `_query_needymeds("eliquis")` → returns list of PAP programs
+
+- [x] **23.3** Implement RxAssist query logic ✅ _query_rxassist with RXASSIST_BASE_URL, caching, stale fallback
+  - Method `_query_rxassist(drug_name)` — query RxAssist database
+  - URL pattern: `https://www.rxassist.org/search/results?drug={drug_name}`
+  - Extract: program name, eligibility, application URL, program type
+  - Return list of `AssistanceProgram` dicts
+  - Files: `app/services/api/drug_assistance_service.py`
+  - Test: `_query_rxassist("eliquis")` → returns list of programs
+
+- [x] **23.4** Implement unified `get_assistance_programs(drug_name, patient_insurer_type=None)` method ✅ Merges NeedyMeds + RxAssist, deduplicates by normalized name, 7-day cache
+  - Merge results from NeedyMeds and RxAssist, deduplicating by program name
+  - Trigger conditions: called only when (a) Tier 1/2 price exceeds `DRUG_PRICE_ASSISTANCE_THRESHOLD`, OR (b) `patient_insurer_type` is `"medicaid"` or `"uninsured"`
+  - `patient_insurer_type` from `insurer_classifier.classify_insurer()` in `app/services/insurer_classifier.py`
+  - Returns list of `{program_name, eligibility_summary, application_url, is_income_based, is_diagnosis_based, source: "needymeds"|"rxassist"}`
+  - Cache with 7-day TTL
+  - Files: `app/services/api/drug_assistance_service.py`
+  - Test: query for expensive brand drug → returns assistance programs; query for cheap generic → returns empty list
+
+**Phase 23 test gate**: NeedyMeds and RxAssist queries return assistance programs for known expensive drugs. Results are deduplicated. Cache stores with 7-day TTL. Empty result for cheap generics. No error when sources unavailable.
+
+> **Phase 23 COMPLETE** — DrugAssistanceService created with _query_needymeds, _query_rxassist, _extract_program (shared), get_assistance_programs (unified). Inherits BaseAPIClient with drug_assistance API name and 7-day TTL. No auth required. Deduplication by normalized program name. AssistanceProgram dicts include income/diagnosis flags. 15/15 phase tests pass (tests/test_drug_assistance_service.py). 15/15 GoodRx regression pass. 15/15 pricing foundation pass. 127/127 main regression pass. Total: 362 tests. Next: Phase 24.
+
+---
+
+### Phase 24 — Pricing Waterfall Orchestrator
+
+> **Goal**: Create the central pricing service that orchestrates all three tiers in the correct order with proper fallback behavior.
+
+- [x] **24.1** Create `app/services/pricing_service.py` ✅ PricingService orchestrator created, instantiates all 3 tier services
+  - Class `PricingService` (not a BaseAPIClient subclass — it orchestrates other services)
+  - `__init__(self, db)` — instantiates `CostPlusService`, `GoodRxService`, `DrugAssistanceService`
+  - Files: CREATE `app/services/pricing_service.py`
+  - Dependency: Phases 21, 22, 23
+
+- [x] **24.2** Define `PricingResult` dataclass/dict schema ✅ _build_pricing_result helper + _compute_badge_color with green/yellow/red thresholds
+  - Fields: `source` (enum: COST_PLUS, GOODRX, NONE), `price_monthly_estimate` (float or None), `price_display_string` (formatted "$X.XX/month"), `direct_url` (str or None), `attribution_text` (str or None — only for GoodRx), `assistance_programs` (list), `badge_color` (GREEN/YELLOW/RED based on thresholds), `cache_timestamp` (ISO string), `is_stale` (bool — True if cache older than TTL)
+  - Badge color logic: price < `DRUG_PRICE_MEDIUM_INDICATOR` → GREEN, price < `DRUG_PRICE_HIGH_INDICATOR` → YELLOW, price >= `DRUG_PRICE_HIGH_INDICATOR` → RED, no price → None (badge not shown)
+  - Files: `app/services/pricing_service.py`
+  - Test: PricingResult with price=25 → GREEN; price=50 → YELLOW; price=150 → RED
+
+- [x] **24.3** Implement `get_pricing(rxcui, ndc, drug_name, strength, quantity, patient_zip, patient_insurer_type)` method ✅ Three-tier waterfall: CP first → GoodRx on miss → assistance for expensive/medicaid/uninsured. All tiers in try/except.
+  - **Step 1**: Query Cost Plus via `CostPlusService.get_price(ndc=ndc, drug_name=drug_name, strength=strength, quantity=quantity)`. If `found=True`, build `PricingResult` with `source=COST_PLUS`. Do NOT call Tier 2.
+  - **Step 2**: If Cost Plus returns `found=False`, query GoodRx via `GoodRxService.get_price(rxcui=rxcui, drug_name=drug_name, quantity=quantity, zip_code=patient_zip)`. If `found=True`, build `PricingResult` with `source=GOODRX`.
+  - **Step 3**: Regardless of Tier 1/2 result, if `price_monthly_estimate > DRUG_PRICE_ASSISTANCE_THRESHOLD` OR `patient_insurer_type in ("medicaid", "uninsured")`, query `DrugAssistanceService.get_assistance_programs(drug_name, patient_insurer_type)` and attach results to `PricingResult.assistance_programs`.
+  - **Step 4**: If neither tier returns a result, return `PricingResult` with `source=NONE`, `badge_color=None`.
+  - All three service calls wrapped in try/except — pricing is non-critical and must never cause the application to error
+  - Default `quantity=30`, default `patient_zip=GOODRX_DEFAULT_ZIP`
+  - Files: `app/services/pricing_service.py`
+  - Test: lisinopril (in Cost Plus) → source=COST_PLUS, no GoodRx call. eliquis (not in Cost Plus) → source=GOODRX. Unknown drug → source=NONE. Expensive drug on Medicaid → assistance_programs populated.
+
+- [x] **24.4** Add convenience method `get_pricing_for_medication(medication_obj, patient_record=None)` ✅ Extracts drug_name, rxnorm_cui, dosage, insurer_type from ORM objects
+  - Accepts a `PatientMedication` ORM object and optional `PatientRecord`
+  - Extracts rxcui, ndc (from rx_info), drug_name, strength from the medication
+  - Extracts insurer_type from patient_record.insurance via `classify_insurer()` if available
+  - Calls `get_pricing()` with resolved values
+  - Files: `app/services/pricing_service.py`
+  - Test: pass a PatientMedication object → returns PricingResult without caller needing to know field extraction
+
+**Phase 24 test gate**: Waterfall correctly queries Cost Plus first, skips GoodRx when Cost Plus succeeds. GoodRx queried only on Cost Plus miss. Assistance programs attached when threshold exceeded or patient uninsured/Medicaid. All failures handled gracefully. PricingResult correctly computes badge colors.
+
+> **Phase 24 COMPLETE** — PricingService orchestrator created with get_pricing (three-tier waterfall) and get_pricing_for_medication (ORM convenience). _build_pricing_result schema with all 8 required fields. _compute_badge_color: <$30 green, <$100 yellow, >=$100 red. Tier 1 (Cost Plus) always first, Tier 2 (GoodRx) only on miss, Tier 3 (assistance) for expensive/$75+ or medicaid/uninsured. All tiers wrapped in try/except. 15/15 phase tests pass (tests/test_pricing_waterfall.py). 15/15 P23 pass. 15/15 P22 pass. 15/15 P19-21 pass. 127/127 main pass. Total: 377 tests. Next: Phase 25.
+
+---
+
+### Phase 25 — Medication Reference Price Card (F10 Enhancement)
+
+> **Goal**: Add a pricing section to the Medication Reference drug card.
+
+- [x] **25.1** Add pricing endpoint to `routes/medref.py`
+  - New route `GET /api/medref/pricing?rxcui=&ndc=&drug_name=&strength=`
+  - Calls `PricingService.get_pricing()` with provided params
+  - Returns JSON `PricingResult`
+  - Files: `routes/medref.py`
+  - Test: `/api/medref/pricing?drug_name=atorvastatin&strength=20mg` → returns pricing JSON
+
+- [x] **25.2** Add price card rendering to `templates/medref.html`
+  - Insert price card section between drug class badges and FDA Label sections
+  - Async fetch: after main drug card renders, call `/api/medref/pricing` with rxcui/drug_name from the lookup result
+  - **If source=COST_PLUS**: Display banner: `"💊 Cost Plus Drugs (generic) — $X.XX/month"` with direct product link button. Green/yellow/red badge. No GoodRx content present.
+  - **If source=GOODRX**: Display banner: `"💰 GoodRx cash price — $X.XX/month"` with deep link labeled "View on GoodRx — click to get coupon". "Powered by GoodRx" attribution text below. No Cost Plus content present.
+  - **If assistance programs**: Collapsible section below price card: "Financial Assistance Programs (N available)" with program name, eligibility summary, application link per program
+  - **If source=NONE**: Single line: "Price data unavailable — check [GoodRx.com](https://www.goodrx.com) or [CostPlusDrugs.com](https://costplusdrugs.com)" with links
+  - **Loading state**: Spinner with "Checking prices..." text while API call in progress
+  - Code comment: `// ToS COMPLIANCE: GoodRx and Cost Plus content NEVER appear in the same card.` + `// The waterfall architecture guarantees mutual exclusivity. Do not modify` + `// this logic to display both sources simultaneously.`
+  - Files: `templates/medref.html`
+  - Test: search lisinopril → green Cost Plus price card. Search eliquis → GoodRx price card with attribution. Search obscure drug → "Price data unavailable" line.
+
+**Phase 25 test gate**: Price card appears in Medication Reference for every drug searched. Cost Plus and GoodRx never appear together. Attribution text present for GoodRx. Assistance programs shown when applicable. Loading and no-data states work correctly.
+
+> **Phase 25 COMPLETE** — `/api/medref/pricing` endpoint added to routes/medref.py (PricingService integration, JSON response, error handling). Price card JavaScript block inserted in templates/medref.html with: Cost Plus banner, GoodRx banner + attribution, loading state, no-data fallback with external links, collapsible assistance programs section, badge color rendering, ToS compliance comments. 15/15 phase tests pass (tests/test_medref_pricing.py). 15/15 P24 pass. 15/15 P23 pass. 15/15 P22 pass. 15/15 P19-21 pass. 127/127 main pass. Total: 392 tests. Next: Phase 26.
+
+---
+
+### Phase 26 — Patient Chart Medications Tab Price Badges (F10e Enhancement)
+
+> **Goal**: Add colored price badges to each medication row in the Patient Chart View.
+
+- [x] **26.1** Add bulk pricing endpoint to `routes/patient.py`
+  - New route `GET /api/patient/<mrn>/pricing`
+  - Queries all active medications for the patient, calls `PricingService.get_pricing_for_medication()` for each
+  - Returns JSON: `{medications: [{drug_name, rxcui, pricing: PricingResult}, ...]}`
+  - Rate limit: max 20 medications per call to avoid API abuse
+  - Files: `routes/patient.py`
+  - Test: `/api/patient/90001/pricing` → returns pricing for Margaret Wilson's 4 medications
+
+- [x] **26.2** Add price badge column to medications widget
+  - New `<th>$</th>` column header after Status
+  - Each row: `<td>` with colored dot badge (green/yellow/red) derived from `badge_color`
+  - Badge is a small CSS circle: `.price-badge { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }` + `.price-green { background: #22c55e; }` + `.price-yellow { background: #eab308; }` + `.price-red { background: #ef4444; }`
+  - **Tooltip on hover**: `"$X.XX/month via [source]"` — uses native `title` attribute for simplicity
+  - **Click handler**: opens modal with full price card (reuses Phase 25 rendering logic)
+  - **Loading state**: gray dot while pricing API call in progress
+  - **No-data state**: no badge shown, no error — column cell is empty
+  - Files: `templates/patient_chart.html`, `static/css/main.css`
+  - Test: open patient chart → price badges populate after brief loading state. Hover shows tooltip. Click opens modal.
+
+- [x] **26.3** Async pricing fetch on chart load
+  - JavaScript: after patient chart loads, make async `fetch('/api/patient/{mrn}/pricing')` call
+  - On response: iterate rows, match by drug_name or rxcui, inject badge into the price column
+  - Non-blocking: chart renders immediately with empty price column, badges populate asynchronously
+  - Files: `templates/patient_chart.html` (JS block)
+  - Test: patient chart loads instantly → price badges appear 1-3 seconds later without page refresh
+
+**Phase 26 test gate**: Medications widget has a new "$" column. Colored badges appear for all priced medications. Hover shows price + source. Click opens modal with full details. Chart loads are not delayed by pricing calls.
+
+> **Phase 26 COMPLETE** — GET /api/patient/<mrn>/pricing bulk endpoint added to routes/patient.py (max 20 meds, per-med error handling, PricingService integration). $ column header + price-cell with data-med-id added to patient_chart.html. Price badge CSS (.price-badge, .price-green/yellow/red, .price-loading with pulse animation) added to main.css. Async fetch IIFE injects colored badges with $/month tooltip after chart load. 15/15 phase tests pass (tests/test_chart_price_badges.py). All regressions pass. Total: 407 tests. Next: Phase 27.
+
+---
+
+### Phase 27 — Patient Education Pricing Integration
+
+> **Goal**: Inject medication pricing information into patient education auto-draft messages.
+
+- [x] **27.1** Update `send_education_to_patient()` in `routes/intelligence.py`
+  - After MedlinePlus content paragraph is assembled, query `PricingService` for the medication
+  - Append pricing paragraph based on source:
+    - COST_PLUS: `"This medication is available at Mark Cuban's Cost Plus Drugs pharmacy for $X.XX/month. Visit: [URL]"`
+    - GOODRX: `"You may be able to save on this medication using a GoodRx discount. Visit: [deep link to GoodRx page]"`
+    - Assistance programs: `"Financial assistance may be available for this medication. Visit [program URL] for eligibility information."`
+    - NONE: omit pricing paragraph entirely
+  - Language must be informational only — never suggest the practice endorses any pricing service
+  - Files: `routes/intelligence.py`
+  - Test: send education for lisinopril → message includes Cost Plus URL. Send for eliquis → message includes GoodRx link. Send for unknown drug → no pricing paragraph.
+
+- [x] **27.2** Add pricing paragraph to Trigger 2 (new medication detection)
+  - In the pre-visit prep new-medication detection logic, when a new drug is detected in the Clinical Summary XML that wasn't in the previous version, include pricing info in the auto-drafted education message
+  - Same conditional logic as 27.1
+  - Files: `routes/intelligence.py`
+  - Test: upload new XML with a medication not in previous → education draft includes pricing info
+
+**Phase 27 test gate**: Patient education messages include appropriate pricing information. Cost Plus and GoodRx links are correct. No pricing paragraph for unknown drugs. Language is informational, not endorsement.
+
+> **Phase 27 COMPLETE** — Created _build_pricing_paragraph() standalone helper in routes/intelligence.py (reusable for Trigger 2). send_education_to_patient() now calls helper to append pricing info. Cost Plus / GoodRx / assistance program paragraphs use informational language. Empty drug name guard. Error handling wraps all pricing calls. 15/15 phase tests pass (tests/test_education_pricing.py). 127/127 main pass. Total: 422 tests. Next: Phase 28.
+
+---
+
+### Phase 28 — Morning Briefing Pricing Cache Refresh
+
+> **Goal**: Add a medication pricing cache refresh to the morning briefing background job.
+
+- [x] **28.1** Create `run_pricing_cache_refresh(app, db)` function in `app/services/api_scheduler.py`
+  - Scope: refresh pricing cache for medications on **today's scheduled patients only** (not entire panel)
+  - Get today's Schedule records → get associated PatientMedication records → get RxNormCache for NDC/drug_name
+  - Order: Cost Plus refresh runs first (free, fast), GoodRx refresh runs second only for medications not found in Cost Plus
+  - Deduplicate: if multiple patients take the same medication, query once
+  - Failure handling: Cost Plus failure does NOT block GoodRx refresh or the rest of the briefing
+  - Log: "Pricing cache: refreshed N medications (M from Cost Plus, K from GoodRx)"
+  - Files: `app/services/api_scheduler.py`
+  - Test: run with scheduled patients → pricing cache populated for their medications
+
+- [x] **28.2** Register pricing cache refresh job
+  - Schedule at 5:30 AM (before recall check at 5:45 AM and morning briefing at 6:00 AM)
+  - Add `PRICING_CACHE_REFRESH_HOUR = 5` and `PRICING_CACHE_REFRESH_MINUTE = 30` to `app/api_config.py`
+  - Register with `scheduler.add_job()` following existing pattern
+  - Files: `app/services/api_scheduler.py`, `app/api_config.py`
+  - Test: job registered in scheduler → fires at 5:30 AM → pricing data ready before morning briefing
+
+**Phase 28 test gate**: Pricing cache refresh runs successfully for scheduled patients. Cost Plus queried for all medications. GoodRx queried only for Cost Plus misses. Failure in one service doesn't block others. Correct job registration and timing.
+
+> **Phase 28 COMPLETE** — run_pricing_cache_refresh + _run_pricing_cache_refresh added to api_scheduler.py. Scoped to today's scheduled patients. Cost Plus first, GoodRx for misses only. Dedup via seen_drugs set. Failure isolation (3+ try blocks). Job registered at 5:30 AM (PRICING_CACHE_REFRESH_HOUR/MINUTE from api_config.py). Logger updated to "Registered 6 API intelligence jobs". P17 test updated for 6-job count. 15/15 phase tests pass (tests/test_pricing_cache_refresh.py). 15/15 P17 pass. 127/127 main pass. Total: 437 tests. Next: Phase 29.
+
+---
+
+### Phase 29 — Demo Mode Pricing Data
+
+> **Goal**: Add realistic pricing data to the existing test patient dataset so the full pricing feature is demonstrable without live API calls, but indicate that this is hardcoded data, not an API pull.
+
+- [x] **29.1** Add pricing demo data to `scripts/seed_test_data.py`
+  - For **Patient 90001** (Margaret Wilson, 67F, Medicare — lisinopril/metformin/atorvastatin/alendronate):
+    - lisinopril → GREEN Cost Plus: $3.60/month (30 × $0.12)
+    - metformin → GREEN Cost Plus: $3.90/month (30 × $0.13)
+    - atorvastatin → GREEN Cost Plus: $4.50/month (30 × $0.15)
+    - alendronate → YELLOW GoodRx: $38.00/month (not in Cost Plus catalog)
+  - For **Patient 90003** (Maria Garcia, 35F, Commercial — buspirone/norgestimate-EE):
+    - buspirone → GREEN Cost Plus: $5.40/month
+    - norgestimate-EE → YELLOW GoodRx: $42.00/month
+  - For **Patient 90005 or similar Medicaid patient** (if amphetamine-dextroamphetamine exists):
+    - amphetamine-dextroamphetamine → RED badge ($120/month GoodRx), triggers NeedyMeds assistance programs
+  - For **Patient 90002** (Robert Thompson, 65M, Medicare — tiotropium/amlodipine):
+    - amlodipine → GREEN Cost Plus: $3.00/month
+    - tiotropium → RED GoodRx: $350/month → triggers assistance program display
+  - For uninsured patients: all medications show Cost Plus where available + assistance programs regardless of price
+  - Files: `scripts/seed_test_data.py`
+  - Dependency: Phase 24 (PricingResult schema)
+
+- [x] **29.2** Create pricing demo data seeder function
+  - `seed_pricing_demo_data(user_id)` — inserts pre-computed PricingResult records into the API cache for demo patients
+  - Uses `CacheManager.set()` with the same cache keys the pricing service would generate
+  - Files: `scripts/seed_test_data.py`
+  - Test: seed data → open Patient 90001 chart → pricing badges appear from cache without live API calls
+
+- [x] **29.3** Add demo pricing data to medref lookup
+  - Pre-seed cache entries for common drugs (lisinopril, metformin, atorvastatin, amlodipine, eliquis, jardiance, ozempic) so Medication Reference shows pricing in demo mode
+  - Files: `scripts/seed_test_data.py`
+  - Test: search "lisinopril" in Medication Reference → Cost Plus price card appears from seeded cache
+
+**Phase 29 test gate**: All 5 demo patient scenarios display correct pricing badges and cards. Cost Plus shows for cheap generics. GoodRx shows for brand-only drugs. RED badge triggers on expensive medications. Assistance programs appear for Medicaid/uninsured patients. Full feature demonstrable without any live API keys.
+
+> **Phase 29 COMPLETE** — PRICING_DEMO_DATA dictionary with 10 drugs (5 Cost Plus green, 5 GoodRx yellow/red). seed_pricing_demo_data() seeds cache via CacheManager.set() with 90-day TTL and demo_data=True flag. Assistance programs seeded for tiotropium, eliquis, ozempic. seed_all_test_data() now calls seed_pricing_demo_data(). 15/15 phase tests pass (tests/test_demo_pricing.py). 127/127 main pass. Total: 452 tests. **Running Plan 3 Part 3 (Phases 19-29) COMPLETE.**
+
+---
+
+## SECTION 3 — API KEY ACQUISITION CHECKLIST
+
+### 1. Cost Plus Drugs API
+
+| Field | Detail |
+|-------|--------|
+| **URL** | https://costplusdrugs.github.io/apidocs/ |
+| **Registration** | None required |
+| **API key** | None — completely free and public |
+| **Approval time** | Immediate — no registration needed |
+| **Project location** | `app/api_config.py` → `COST_PLUS_BASE_URL` (constant, not a secret) |
+| **Display requirements** | None documented. No mandatory attribution text. Courtesy: include "Prices from Cost Plus Drugs" when displaying their data. |
+| **Usage guidelines** | No documented rate limits. Implement reasonable caching (72-hour TTL) as a courtesy to avoid unnecessary load. |
+
+### 2. GoodRx Developer API Key (Price Compare only)
+
+| Field | Detail |
+|-------|--------|
+| **URL** | https://www.goodrx.com/developer/apply |
+| **Registration info** | Application name: "CareCompanion Clinical Workflow Tool". Description: "A clinical workflow support tool for a single family nurse practitioner practice. Displays cash prices to help providers discuss medication affordability with patients during office visits." Intended use: Price Compare API only. Volume estimate: fewer than 200 unique drug queries per day. Explicitly state: "We will NOT use the Coupon API." |
+| **Approval time** | 1–2 weeks typical for small-volume healthcare applications |
+| **Project location** | `config.py` → `GOODRX_API_KEY` and `GOODRX_SECRET_KEY` (never committed to Git). Loaded via `app/api_config.py` try/except block. |
+| **Display requirements** | "Powered by GoodRx" text on any component displaying GoodRx prices. Active hyperlink back to GoodRx.com for each drug. Both are stored in `PricingResult.attribution_text` and rendered in the price card (Phase 25) and patient education messages (Phase 27). |
+| **Usage requirements** | No-aggregation: GoodRx prices must not appear alongside competing pricing data in the same UI component. The waterfall architecture satisfies this — GoodRx is only displayed when Cost Plus returns no result. |
+
+### 3. NeedyMeds
+
+| Field | Detail |
+|-------|--------|
+| **URL** | https://www.needymeds.org |
+| **Registration** | None required for programmatic access to public drug information pages |
+| **API key** | None |
+| **Approval time** | Immediate — public data |
+| **Project location** | `app/api_config.py` → `NEEDYMEDS_BASE_URL` (constant) |
+| **Attribution** | Include "Source: NeedyMeds.org" when displaying assistance program information. Link to program application page on NeedyMeds. |
+
+### 4. RxAssist
+
+| Field | Detail |
+|-------|--------|
+| **URL** | https://www.rxassist.org |
+| **Registration** | None required for programmatic access to public drug assistance database |
+| **API key** | None |
+| **Approval time** | Immediate — public data |
+| **Project location** | `app/api_config.py` → `RXASSIST_BASE_URL` (constant) |
+| **Attribution** | Include "Source: RxAssist.org" when displaying assistance program information. |
+
+### 5. Additional Free Sources Evaluated
+
+| Source | Assessment |
+|--------|-----------|
+| **FDA NDC Directory (via OpenFDA)** | Already integrated via `openfda_labels.py`. The NDC directory contains drug packaging information (NDC codes, labeler, product type, route, dosage form) but does **not** contain pricing data. NDC codes are useful as lookup keys for Cost Plus but the FDA does not publish medication prices. No additional API cost. |
+| **Medicare Part D Formulary Files (CMS)** | CMS publishes Medicare Part D plan formulary files annually. These contain tier placement and cost-sharing information per drug per plan, but not cash prices. Could be useful for a future "Is this drug on your formulary?" feature but does not provide pricing data directly. |
+| **NADAC (National Average Drug Acquisition Cost)** | CMS publishes weekly NADAC data at `https://data.cms.gov/summary-statistics-on-beneficiary-use-of-the-cms-program/nadac-national-average-drug-acquisition-cost`. This is the pharmacy acquisition cost — what pharmacies pay wholesalers. Free, no key required. Could supplement pricing as a "pharmacy cost" baseline. **Worth adding as a future Tier 1b enhancement after initial launch.** |
+
+---
+
+## SECTION 4 — SEQUENCING AND EFFORT ESTIMATE
+
+### Implementation Order (Dependency-Aware)
+
+| Order | Phase | Name | Est. Hours | Blocked on API Key? | Demo Testable? |
+|-------|-------|------|------------|---------------------|----------------|
+| 1 | 19 | Configuration | 1 | No | ✅ Yes |
+| 2 | 20 | NDC in RxNormCache | 1.5 | No | ✅ Yes |
+| 3 | 21 | Cost Plus Service (Tier 1) | 3 | No | ✅ **Fully live-testable immediately** |
+| 4 | 22 | GoodRx Service (Tier 2) | 4 | ⚠️ Key needed for live test | ✅ Demo mode testable |
+| 5 | 23 | Drug Assistance Service (Tier 3) | 3 | No | ✅ Yes |
+| 6 | 24 | Pricing Waterfall Orchestrator | 3 | No | ✅ Yes (uses demo data) |
+| 7 | 25 | Medication Reference Price Card | 3 | No | ✅ Yes |
+| 8 | 26 | Patient Chart Price Badges | 3 | No | ✅ Yes |
+| 9 | 27 | Patient Education Integration | 2 | No | ✅ Yes |
+| 10 | 28 | Morning Briefing Cache Refresh | 2 | No | ✅ Yes |
+| 11 | 29 | Demo Mode Updates | 2 | No | ✅ Yes |
+| | | **Total** | **~27.5 hours** | | |
+
+### Key Sequencing Notes
+
+1. **Phases 19–21 are fully buildable and live-testable immediately** — Cost Plus requires no API key. The complete Tier 1 pricing feature can go live before any other API approval.
+
+2. **Phase 22 (GoodRx) can be built in parallel while waiting for API key approval** — the entire service module, HMAC signing, and waterfall integration can be built and tested in demo mode. When the key arrives, flip the config and it's live.
+
+3. **Phase 24 (Waterfall Orchestrator) is the integration point** — it must wait for Phases 21–23 but can be built with mock services and tested against demo data.
+
+4. **Phases 25–27 (UI changes) are parallelizable** — they all consume `PricingResult` which is defined in Phase 24. Once the orchestrator exists, the Medication Reference card, Patient Chart badges, and Patient Education injection can be built simultaneously.
+
+5. **Phase 29 (Demo Mode) should be built early** — seeding demo pricing data enables testing all UI components without live API calls. Recommend building Phase 29 concurrently with Phase 24.
+
+6. **The full feature set is demonstrable before any API approval is received.** Cost Plus is live immediately. GoodRx, NeedyMeds, and RxAssist all have demo data paths. A complete demo can be shown to stakeholders using only seeded data.
+
+### Dependency Graph
+
+```
+Phase 19 (Config)
+    ├── Phase 20 (NDC column)
+    ├── Phase 21 (Cost Plus) ──────┐
+    ├── Phase 22 (GoodRx) ─────────┤
+    └── Phase 23 (Assistance) ─────┤
+                                    ▼
+                        Phase 24 (Waterfall Orchestrator)
+                        Phase 29 (Demo Data) [parallel]
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+            Phase 25          Phase 26          Phase 27
+            (MedRef Card)     (Chart Badges)    (Education)
+                                    │
+                                    ▼
+                            Phase 28 (Morning Briefing)
+```
+
+---
+
+## Part 3 File Change Summary
+
+| File | Phase(s) | Action |
+|------|----------|--------|
+| `app/api_config.py` | 19.1–19.5, 28.2 | Add pricing API constants, thresholds, GoodRx keys, scheduler timing |
+| `models/patient.py` | 20.2 | Add `ndc` column to `RxNormCache` model |
+| `routes/patient.py` | 20.3, 26.1 | Populate NDC during enrichment, bulk pricing endpoint |
+| `routes/medref.py` | 25.1 | Add `/api/medref/pricing` endpoint |
+| `routes/intelligence.py` | 27.1, 27.2 | Pricing injection into patient education |
+| `templates/medref.html` | 25.2 | Price card rendering in drug card |
+| `templates/patient_chart.html` | 26.2, 26.3 | Price badge column, async fetch, modal |
+| `static/css/main.css` | 26.2 | Price badge dot styles (.price-green/yellow/red) |
+| `app/services/api_scheduler.py` | 28.1, 28.2 | Pricing cache refresh job |
+| `scripts/seed_test_data.py` | 29.1–29.3 | Demo pricing data for test patients |
+| **CREATE** `migrate_add_ndc_to_rxnorm_cache.py` | 20.1 | NDC column migration |
+| **CREATE** `app/services/api/cost_plus_service.py` | 21.1–21.4 | Cost Plus Drugs API service |
+| **CREATE** `app/services/api/goodrx_service.py` | 22.1–22.5 | GoodRx Price Compare API service |
+| **CREATE** `app/services/api/drug_assistance_service.py` | 23.1–23.4 | NeedyMeds + RxAssist service |
+| **CREATE** `app/services/pricing_service.py` | 24.1–24.4 | Pricing waterfall orchestrator |
+
+---
+
+## Part 3 Architecture Decisions
+
+1. **Cost Plus is Tier 1 (primary)** — free, no key, no ToS conflicts, covers majority of primary care generics. Always queried first.
+2. **GoodRx is Tier 2 only** — Price Compare endpoint only, Coupon API intentionally excluded (3,000/month minimum). Only queried when Cost Plus returns no result. ToS no-aggregation constraint satisfied by waterfall mutual exclusivity.
+3. **NDC is the preferred lookup key** for Cost Plus (most precise match). The RxNorm pipeline already provides `get_ndcs()` — we just need to persist the first NDC in `RxNormCache`.
+4. **Pricing is non-critical** — all service calls wrapped in try/except. A pricing API failure never causes the application to error. Badge simply not shown, no error displayed.
+5. **GoodRx HMAC signing stays in the subclass** — no modification to `BaseAPIClient` needed. The GoodRx service overrides with a custom `_signed_get()` method.
+6. **Cache TTLs are source-appropriate**: Cost Plus 72h (prices update periodically), GoodRx 24h (prices change more frequently), Assistance programs 7d (programs change infrequently).
+7. **Morning briefing pricing refresh is scoped to today's patients only** — limits API calls and respects GoodRx's abuse monitoring. Not a full-panel refresh.
+8. **Demo mode covers all 3 tiers** — seeded cache data enables full UI testing without any API keys. Cost Plus can go live immediately without waiting for GoodRx approval.
+9. **NADAC (pharmacy acquisition cost)** identified as a future enhancement — free CMS data that could add a "pharmacy cost" baseline. Deferred to avoid scope creep.
+10. **Patient education pricing language is informational only** — never suggests the practice endorses any pricing service. Uses neutral phrasing per HIPAA/compliance guidance.
+
+---
+
+# What Still Remains to Be Developed
+
+> All three Running Plans are complete. Below is a prioritized inventory of features, enhancements, and operational tasks that remain outside the scope of Running Plans 1–3. These are organized by category and readiness level.
+
+---
+
+## 1. Blocked / Pending External Action
+
+| Item | Description | Blocker | Readiness |
+|------|-------------|---------|-----------|
+| **F9 — Pre-visit Chart Prefill** | Overnight automation that opens each next-day patient chart in Amazing Charts, creates a "Companion" visit, triggers Clinical Summary export. The full Phase 1/Phase 2 automation pipeline from init.prompt.md. | Requires Amazing Charts running on the work PC + OCR calibration of the AC window. Cannot be developed or tested remotely. | Agent modules (`ocr_helpers.py`, `pyautogui_runner.py`, `ac_window.py`) are built. The AC mock test harness exists (`tests/ac_mock.py`). Implementation requires hands-on calibration sessions at the work PC. |
+| **GoodRx API Key Activation** | The GoodRx Price Compare service (`app/services/api/goodrx_service.py`) is fully built with HMAC-SHA256 signing. Needs an approved API key pair to go live. | GoodRx developer registration + approval. Key goes into `config.py` as `GOODRX_API_ID` / `GOODRX_API_SECRET`. | Code is 100% complete. Once keys are added, GoodRx pricing will activate automatically as Tier 2 in the waterfall. No code changes needed. |
+
+---
+
+## 2. Not Started — Architectural Features
+
+| Item | Description | Complexity | Recommended Approach |
+|------|-------------|------------|---------------------|
+| **F30 — Offline Mode** | Service Worker for static asset caching + IndexedDB queue for offline data entry. On reconnect, queued actions sync to Flask backend. | HIGH — cross-cutting: touches every `fetch()` call, needs conflict resolution for concurrent edits, requires service worker lifecycle management. | Build incrementally: (1) Service worker for static caching only (CSS/JS/images). (2) Read-only offline for cached patient data. (3) IndexedDB write queue for timers and on-call notes. (4) Full sync with conflict detection. Each stage is independently useful. |
+
+---
+
+## 3. Enhancements to Existing Features
+
+| Item | Description | Priority | Effort |
+|------|-------------|----------|--------|
+| **NADAC Tier 1b Pricing** | Add NADAC (National Average Drug Acquisition Cost) as a supplementary pricing source. Free CMS data, no API key. Would show pharmacy acquisition cost alongside patient-facing prices. Weekly bulk CSV download from `data.cms.gov`. | Medium | Low — new service class + scheduler job + cache table. Pricing waterfall already supports extension. |
+| **Trigger 2 — New Medication Auto-Education** | When a new medication appears in a patient's CDA XML export (compared to prior export), auto-draft a patient education message with pricing info. `_build_pricing_paragraph()` helper is already built (Phase 27). | Medium | Medium — requires XML diff logic in `clinical_summary_parser.py`, integration with delayed message queue, and a UI notification that a draft was created. |
+| **F13c — Weekly Summary Email** | Friday 5 PM automated email with productivity metrics. Listed in init.prompt.md but deferred — requires Gmail SMTP or equivalent email sending. | Low | Low — metrics data is already computed. Needs `smtplib` sender + config for SMTP credentials. |
+| **F13a — Benchmark Comparison** | Opt-in anonymized practice-average comparison for productivity metrics. | Low | Medium — requires multi-provider data aggregation and anonymization logic. |
+| **Billing Engine — Payer-Specific Rules** | The billing detection engine (26 detectors) uses Medicare-first logic. Could be extended with Medicaid/commercial payer routing. `insurer_classifier.py` and `payer_routing.py` exist but payer-specific rule variants are stubbed. | Low | Medium — rules are structured for this; each detector would need a payer-variant switch. |
+
+---
+
+## 4. Operational / Deployment Tasks
+
+| Task | Description | When |
+|------|-------------|------|
+| **Production Database Migration** | Run all `migrate_*.py` scripts on the work PC production database after deploy. All migrations are idempotent (safe to re-run). | At next deployment |
+| **GoodRx Key — config.py Update** | Add `GOODRX_API_ID` and `GOODRX_API_SECRET` to `config.py` on the work PC once approved. | After GoodRx approval |
+| **Cost Plus Live Verification** | Cost Plus Drugs API is free and keyless — verify live pricing on work PC with real internet access. | At next deployment |
+| **PyInstaller Build** | Rebuild the PyInstaller bundle (`build.py`) to include all new services, routes, and billing engine. | At next deployment |
+| **Tesseract/OCR Calibration** | Calibrate OCR regions for the work PC's specific screen resolution and AC window position. Required for F9 and inbox monitor. | At work PC, pre-F9 |
+
+---
+
+## 5. Testing Gaps to Address
+
+| Area | Current State | Recommended |
+|------|--------------|-------------|
+| **Integration tests with live APIs** | All tests use mocked API responses. | Run a one-time live integration test on the work PC to verify real Cost Plus responses match expected structure. |
+| **Browser/UI tests** | No Selenium/Playwright-based UI tests. All testing is route-level via Flask test client. | Consider adding a small smoke test suite that loads each page and checks for 200 status + no JS console errors. |
+| **Load testing** | Not applicable for single-user/small-practice, but untested under concurrent access. | Manual verification with 2–3 simultaneous browser sessions is sufficient. |
+
+---
+
+## Summary
+
+| Category | Items | Status |
+|----------|-------|--------|
+| Running Plan 1 (Phases 1–10) | Feature build-out | ✅ COMPLETE |
+| Running Plan 2, Part 1 (Phases 1–5) | NetPractice + schedule | ✅ COMPLETE |
+| Running Plan 2, Part 2 (Phases 6–18) | API + UX + billing engine | ✅ COMPLETE |
+| Running Plan 3 (Phases 19–29) | Medication pricing integration | ✅ COMPLETE |
+| **Total tests** | 452 (127 main + 325 phase suites) | ✅ All passing |
+| **Total API services** | 25 clients in `app/services/api/` | ✅ All built |
+| **Total billing detectors** | 26 in `billing_engine/detectors/` | ✅ All built |
+| **Blocked** | F9 (AC calibration), GoodRx key | ⏸️ External action needed |
+| **Not started** | F30 (Offline Mode) | 🔲 Deferred |
+| **Enhancements** | NADAC, Trigger 2, email summary, benchmarks, payer routing | 📋 Backlog |

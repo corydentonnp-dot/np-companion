@@ -1,7 +1,7 @@
 """
-NP Companion — Note Reformatter Model
+CareCompanion — Note Reformatter Model
 
-File location: np-companion/models/reformatter.py
+File location: carecompanion/models/reformatter.py
 
 Tracks each note-reformatting session (Phase 9).  When a provider
 runs the reformatter wizard, this record logs which note was

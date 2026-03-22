@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Monitoring Calendar — CareCompanion{% endblock %}
+{% block page_id %}monitoring-calendar{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>Monitoring</h3></div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Summary</div>
+    <div class="cp-stat"><span>Total Active</span><span class="cp-stat-value">{{ total_count }}</span></div>
+    <div class="cp-stat"><span>Overdue</span><span class="cp-stat-value" style="color:var(--color-red)">{{ overdue_count }}</span></div>
+    <div class="cp-stat"><span>REMS Critical</span><span class="cp-stat-value" style="color:var(--color-red)">{{ rems_count }}</span></div>
+    <div class="cp-stat"><span>High Priority</span><span class="cp-stat-value" style="color:var(--color-amber)">{{ critical_count }}</span></div>
+</div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Filters</div>
+    <div class="cp-filter">
+        <select onchange="var u=new URL(window.location);u.searchParams.set('priority',this.value);window.location=u">
+            <option value="">All Priorities</option>
+            <option value="critical" {{ 'selected' if priority_filter=='critical' }}>Critical</option>
+            <option value="high" {{ 'selected' if priority_filter=='high' }}>High</option>
+            <option value="standard" {{ 'selected' if priority_filter=='standard' }}>Standard</option>
+            <option value="low" {{ 'selected' if priority_filter=='low' }}>Low</option>
+        </select>
+    </div>
+    <div class="cp-filter" style="margin-top:6px;">
+        <select onchange="var u=new URL(window.location);u.searchParams.set('trigger',this.value);window.location=u">
+            <option value="">All Triggers</option>
+            <option value="medication" {{ 'selected' if trigger_filter=='medication' }}>Medication</option>
+            <option value="condition" {{ 'selected' if trigger_filter=='condition' }}>Condition</option>
+            <option value="rems" {{ 'selected' if trigger_filter=='rems' }}>REMS</option>
+        </select>
+    </div>
+    <div class="cp-filter" style="margin-top:6px;">
+        <select onchange="var u=new URL(window.location);u.searchParams.set('source',this.value);window.location=u">
+            <option value="">All Sources</option>
+            <option value="MANUAL" {{ 'selected' if source_filter=='MANUAL' }}>Manual / Seed</option>
+            <option value="DAILYMED" {{ 'selected' if source_filter=='DAILYMED' }}>DailyMed</option>
+            <option value="VSAC" {{ 'selected' if source_filter=='VSAC' }}>VSAC</option>
+            <option value="REMS" {{ 'selected' if source_filter=='REMS' }}>REMS</option>
+            <option value="RXCLASS" {{ 'selected' if source_filter=='RXCLASS' }}>RxClass</option>
+            <option value="DRUG_AT_FDA" {{ 'selected' if source_filter=='DRUG_AT_FDA' }}>Drug@FDA</option>
+            <option value="UPTODATE" {{ 'selected' if source_filter=='UPTODATE' }}>UpToDate</option>
+            <option value="LLM_EXTRACTED" {{ 'selected' if source_filter=='LLM_EXTRACTED' }}>LLM Extracted</option>
+        </select>
+    </div>
+    {% if priority_filter or trigger_filter or source_filter %}
+    <a href="/monitoring/calendar" class="cp-link" style="margin-top:6px;display:block;color:var(--text-secondary);">Clear Filters</a>
+    {% endif %}
+</div>
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/labtrack" class="cp-link">Lab Tracker</a>
+    <a href="/caregap" class="cp-link">Care Gaps</a>
+    <a href="/orders" class="cp-link">Orders</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">&#128197; Monitoring Calendar</h1>
+    <span style="font-size:14px;color:var(--text-secondary);">Phase 23 — Labs &amp; Monitoring Due</span>
+</div>
+
+
+
+{# ---- REMS Critical Banner ---- #}
+{% if rems_entries %}
+<div style="background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-size:20px;">&#9888;</span>
+        <strong style="font-size:15px;">REMS COMPLIANCE — {{ rems_entries|length }} Active Tracker{{ 's' if rems_entries|length != 1 }}</strong>
+    </div>
+    {% for r in rems_entries %}
+    <div style="display:flex;gap:16px;align-items:center;padding:6px 0;border-top:1px solid rgba(255,255,255,0.2);font-size:13px;">
+        <span style="font-weight:600;min-width:120px;">{{ r.drug_name }}</span>
+        <span>{{ r.rems_program_name }}</span>
+        <span>Phase: {{ r.current_phase }}</span>
+        <span>Due: {{ r.next_due_date.strftime('%m/%d/%Y') if r.next_due_date else 'N/A' }}</span>
+        {% if r.escalation_level >= 2 %}
+        <span style="background:#fff;color:#c0392b;padding:2px 8px;border-radius:3px;font-weight:700;">OVERDUE L{{ r.escalation_level }}</span>
+        {% elif r.escalation_level == 1 %}
+        <span style="background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:3px;">Due Soon</span>
+        {% else %}
+        <span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:3px;">On Track</span>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ---- Date-Range Buckets ---- #}
+{% for bucket in buckets %}
+{% if bucket.patients %}
+<div class="card" style="margin-bottom:20px;border-left:4px solid {{ bucket.color }};">
+    <div class="card-header" style="display:flex;align-items:center;gap:10px;">
+        <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:{{ bucket.color }};"></span>
+        <strong>{{ bucket.label }}</strong>
+        {% set ns = namespace(total=0) %}{% for pg in bucket.patients %}{% set ns.total = ns.total + pg.entries|length %}{% endfor %}
+        <span style="font-size:13px;color:var(--text-secondary);">— {{ ns.total }} lab{{ 's' if ns.total != 1 }}</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        {% for pg in bucket.patients %}
+        <div data-filterable style="border-top:1px solid var(--border-color,#333);padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <strong style="font-size:14px;">Patient ****{{ pg.display_mrn }}</strong>
+                {% for due_date, count in pg.bundles.items() %}
+                <span style="background:var(--bg-tertiary,#333);padding:2px 8px;border-radius:10px;font-size:12px;color:var(--text-secondary);" title="These {{ count }} labs can be drawn together">&#129656; 1 draw — {{ count }} labs ({{ due_date }})</span>
+                {% endfor %}
+            </div>
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                <thead>
+                    <tr style="color:var(--text-secondary);text-align:left;">
+                        <th style="padding:4px 8px;font-weight:600;">Lab</th>
+                        <th style="padding:4px 8px;font-weight:600;">Due Date</th>
+                        <th style="padding:4px 8px;font-weight:600;">Indication</th>
+                        <th style="padding:4px 8px;font-weight:600;">Trigger</th>
+                        <th style="padding:4px 8px;font-weight:600;">Source</th>
+                        <th style="padding:4px 8px;font-weight:600;">Last Result</th>
+                        <th style="padding:4px 8px;font-weight:600;">Priority</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in pg.entries %}
+                    <tr style="border-top:1px solid var(--border-color,#222);">
+                        <td style="padding:6px 8px;font-weight:500;">{{ e.lab_name }}</td>
+                        <td style="padding:6px 8px;">{{ e.next_due_date.strftime('%m/%d/%Y') if e.next_due_date else '—' }}</td>
+                        <td style="padding:6px 8px;color:var(--text-secondary);">{{ e.clinical_indication or '—' }}</td>
+                        <td style="padding:6px 8px;">
+                            {% if e.triggering_medication %}
+                            <span style="background:#2980b9;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;">MED</span> {{ e.triggering_medication }}
+                            {% elif e.triggering_condition %}
+                            <span style="background:#8e44ad;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;">DX</span> {{ e.triggering_condition }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td style="padding:6px 8px;">
+                            <span style="font-size:11px;color:var(--text-secondary);">{{ e.source or '—' }}</span>
+                        </td>
+                        <td style="padding:6px 8px;">
+                            {% if e.last_result_value %}
+                            <span>{{ e.last_result_value }}</span>
+                            {% if e.last_result_flag == 'critical' %}
+                            <span style="background:#e74c3c;color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;margin-left:4px;">CRIT</span>
+                            {% elif e.last_result_flag == 'abnormal' %}
+                            <span style="background:#f39c12;color:#fff;padding:1px 5px;border-radius:3px;font-size:10px;margin-left:4px;">ABN</span>
+                            {% endif %}
+                            {% else %}
+                            <span style="color:var(--text-secondary);">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding:6px 8px;">
+                            {% if e.priority == 'critical' %}
+                            <span style="background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">CRITICAL</span>
+                            {% elif e.priority == 'high' %}
+                            <span style="background:#f39c12;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">HIGH</span>
+                            {% elif e.priority == 'standard' %}
+                            <span style="background:var(--bg-tertiary,#444);color:var(--text-primary);padding:2px 8px;border-radius:4px;font-size:11px;">STANDARD</span>
+                            {% else %}
+                            <span style="font-size:11px;color:var(--text-secondary);">LOW</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{# ---- Empty State ---- #}
+{% set ns_empty = namespace(has_any=false) %}
+{% for bucket in buckets %}{% if bucket.patients %}{% set ns_empty.has_any = true %}{% endif %}{% endfor %}
+{% if not ns_empty.has_any %}
+<div class="card" style="text-align:center;padding:48px;">
+    <div style="font-size:48px;margin-bottom:16px;">&#128203;</div>
+    <div style="font-size:16px;color:var(--text-secondary);">No monitoring entries found.</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-top:8px;">
+        Monitoring schedules are populated when patient medications and diagnoses are processed by the Monitoring Rule Engine.
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,7 @@
 """
-NP Companion — Order Set Manager & Executor (F8, F8a–e)
+CareCompanion — Order Set Manager & Executor (F8, F8a–e)
 
-File location: np-companion/routes/orders.py
+File location: carecompanion/routes/orders.py
 
 Order set CRUD, sharing, version history, execution with
 PyAutoGUI, and partial execution recovery.
@@ -18,6 +18,7 @@ from models.orderset import (
     OrderSet, OrderItem, MasterOrder, OrderSetVersion,
     OrderExecution, OrderExecutionItem, ORDER_TABS,
 )
+from utils.feature_gates import require_feature
 
 orders_bp = Blueprint('orders', __name__)
 
@@ -27,6 +28,7 @@ orders_bp = Blueprint('orders', __name__)
 # ======================================================================
 @orders_bp.route('/orders')
 @login_required
+@require_feature('orders')
 def index():
     """Order set manager: list sets, show items, execute."""
     tab = request.args.get('tab', 'mine')  # 'mine' or 'community'
@@ -91,6 +93,9 @@ def create_set():
     name = request.form.get('name', '').strip()
     if not name:
         flash('Order set name is required.', 'error')
+        return redirect(url_for('orders.index'))
+    if len(name) > 200:
+        flash('Order set name is too long.', 'error')
         return redirect(url_for('orders.index'))
 
     os = OrderSet(

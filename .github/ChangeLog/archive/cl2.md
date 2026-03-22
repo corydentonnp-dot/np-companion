@@ -70,7 +70,7 @@ Two new tables added (17 total now):
 
 ### Checkpoint 1 — Confirm new tables exist
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
+cd C:\Users\coryd\Documents\CareCompanion
 venv\Scripts\python.exe -c "from app import create_app; app = create_app(); from models import db; tables = sorted(db.metadata.tables.keys()); print(f'{len(tables)} tables'); [print(f'  {t}') for t in tables]"
 ```
 **Expected:** 17 tables listed, including `agent_logs` and `agent_errors`.
@@ -84,7 +84,7 @@ venv\Scripts\python.exe -c "from app import create_app; app = create_app(); from
 
 ### Checkpoint 3 — Start the agent and watch the dot turn green
 1. Open a **second terminal** (keep the Flask server running in the first)
-2. Navigate to the project: `cd C:\Users\coryd\Documents\NP_Companion`
+2. Navigate to the project: `cd C:\Users\coryd\Documents\CareCompanion`
 3. Run: `venv\Scripts\python.exe agent.py`
 4. You should see log output: `Agent starting...` → `Startup logged` → `Agent running (PID ...)`
 5. Go back to Chrome — within 15 seconds, the **dot should turn green** with a gentle pulse

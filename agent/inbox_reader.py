@@ -1,7 +1,7 @@
 """
-NP Companion — Inbox OCR Reader
+CareCompanion — Inbox OCR Reader
 
-File location: np-companion/agent/inbox_reader.py
+File location: carecompanion/agent/inbox_reader.py
 
 Reads the Amazing Charts inbox by cycling through filter tabs,
 performing OCR on each view, and tracking changes via diff hashing.
@@ -62,6 +62,9 @@ def _categorize_subject(subject):
         return 'refill'
     if upper.startswith('RAD:') or 'RADIOLOGY' in upper:
         return 'radiology'
+    if any(kw in upper for kw in ('DISCHARGE', 'DC SUMMARY', 'HOSPITAL SUMMARY',
+                                   'SNF DISCHARGE', 'DISCH SUMM', 'TRANSITION OF CARE')):
+        return 'discharge'
     return 'other'
 
 
@@ -187,6 +190,36 @@ def _parse_rows(text, filter_name):
     return items
 
 
+def _auto_create_tcm_watch(user_id, item, now):
+    """Create a TCMWatchEntry when a discharge inbox item is detected."""
+    try:
+        from models.tcm import TCMWatchEntry
+        from models import db
+
+        # Extract facility from subject if possible (e.g. "DC Summary - Memorial Hospital")
+        subject = item.get('subject', '')
+        facility = ''
+        for sep in (' - ', ': ', ' from '):
+            if sep in subject:
+                facility = subject.split(sep, 1)[1].strip()
+                break
+
+        # Use item hash as patient_mrn_hash (no PHI available from OCR subject)
+        entry = TCMWatchEntry(
+            patient_mrn_hash=item['hash'],
+            user_id=user_id,
+            discharge_date=now.date(),
+            discharge_facility=facility or 'Unknown',
+            status='active',
+            notes=f'Auto-created from inbox: {subject}',
+        )
+        entry.compute_deadlines()
+        db.session.add(entry)
+        logger.info(f'Auto-created TCM watch entry from discharge inbox item: {item["hash"]}')
+    except Exception as e:
+        logger.error(f'Failed to auto-create TCM watch entry: {e}')
+
+
 def read_inbox(user_id):
     """
     Main inbox reading function called by the agent.
@@ -260,6 +293,10 @@ def read_inbox(user_id):
             )
             db.session.add(new_entry)
             new_count += 1
+
+            # Auto-create TCM watch entry for discharge items
+            if item['category'] == 'discharge':
+                _auto_create_tcm_watch(user_id, item, now)
         else:
             # Update last_seen_at for existing items
             existing_hashes[item['hash']].last_seen_at = now
@@ -284,7 +321,8 @@ def read_inbox(user_id):
         radiology_count=counts.get('radiology', 0),
         messages_count=counts.get('message', 0),
         refills_count=counts.get('refill', 0),
-        other_count=counts.get('other', 0) + counts.get('chart', 0) + counts.get('immunization', 0),
+        other_count=counts.get('other', 0) + counts.get('chart', 0)
+                    + counts.get('immunization', 0) + counts.get('discharge', 0),
     )
     db.session.add(snapshot)
     db.session.commit()

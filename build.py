@@ -1,5 +1,5 @@
 """
-NP Companion — Build Script
+CareCompanion — Build Script
 
 Creates a distributable .exe package using PyInstaller.
 
@@ -28,9 +28,9 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(PROJECT_DIR, 'dist')
 BUILD_DIR = os.path.join(PROJECT_DIR, 'build')
 CONFIG_FILE = os.path.join(PROJECT_DIR, 'config.py')
-SPEC_FILE = os.path.join(PROJECT_DIR, 'npcompanion.spec')
-ICON_FILE = os.path.join(PROJECT_DIR, 'NP_Companion.ico')
-APP_NAME = 'NP_Companion'
+SPEC_FILE = os.path.join(PROJECT_DIR, 'carecompanion.spec')
+ICON_FILE = os.path.join(PROJECT_DIR, 'CareCompanion.ico')
+APP_NAME = 'CareCompanion'
 
 
 # ── Version helpers ──────────────────────────────────────────────
@@ -85,17 +85,17 @@ def _ensure_icon():
         draw = ImageDraw.Draw(img)
         # Navy blue circle
         draw.ellipse((1, 1, sz-2, sz-2), fill=(27, 58, 107, 255))
-        # White "NP" text
+        # White "CC" text
         font_size = max(sz // 3, 8)
         try:
             font = ImageFont.truetype('arial.ttf', font_size)
         except OSError:
             font = ImageFont.load_default()
-        bbox = draw.textbbox((0, 0), 'NP', font=font)
+        bbox = draw.textbbox((0, 0), 'CC', font=font)
         tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
         x = (sz - tw) // 2
         y = (sz - th) // 2
-        draw.text((x, y), 'NP', fill=(255, 255, 255, 255), font=font)
+        draw.text((x, y), 'CC', fill=(255, 255, 255, 255), font=font)
         images.append(img)
 
     images[0].save(ICON_FILE, format='ICO', sizes=[(s, s) for s in sizes], append_images=images[1:])
@@ -130,7 +130,7 @@ def _create_zip(version: str, release_notes: str | None) -> str:
     if release_notes:
         notes_file = os.path.join(out_dir, 'release_notes.txt')
         with open(notes_file, 'w') as f:
-            f.write(f'NP Companion v{version}\n')
+            f.write(f'CareCompanion v{version}\n')
             f.write('=' * 40 + '\n\n')
             f.write(release_notes + '\n')
 
@@ -169,7 +169,7 @@ def _open_google_drive():
 # ── Main ─────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description='Build NP Companion .exe')
+    parser = argparse.ArgumentParser(description='Build CareCompanion .exe')
     parser.add_argument('--bump', choices=['major', 'minor', 'patch'],
                         help='Bump version before building')
     parser.add_argument('--usb', metavar='DRIVE',
@@ -182,7 +182,7 @@ def main():
                         help='Skip PyInstaller (just zip and deliver)')
     args = parser.parse_args()
 
-    print(f'NP Companion Build Script')
+    print(f'CareCompanion Build Script')
     print(f'========================\n')
 
     # 1. Bump version

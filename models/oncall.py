@@ -1,7 +1,7 @@
 """
-NP Companion — On-Call Note Model
+CareCompanion — On-Call Note Model
 
-File location: np-companion/models/oncall.py
+File location: carecompanion/models/oncall.py
 
 Stores after-hours and weekend call notes.  These are entered on
 the provider's phone via Tailscale and reviewed the next morning.

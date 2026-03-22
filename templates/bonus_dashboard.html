@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}Bonus Tracker — CareCompanion{% endblock %}
+{% block page_id %}bonus-dashboard{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>Bonus Tracker</h3></div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">{{ status.quarter_label }}</div>
+    <div class="cp-stat"><span>Receipts YTD</span><span class="cp-stat-value">${{ "{:,.0f}".format(status.receipts_to_date) }}</span></div>
+    <div class="cp-stat"><span>Threshold</span><span class="cp-stat-value">${{ "{:,.0f}".format(status.threshold) }}</span></div>
+    <div class="cp-stat"><span>Progress</span><span class="cp-stat-value" style="{{ 'color:#27ae60;' if status.pct_of_threshold >= 100 else '' }}">{{ status.pct_of_threshold }}%</span></div>
+    <div class="cp-stat"><span>Gap</span><span class="cp-stat-value">${{ "{:,.0f}".format(status.gap) }}</span></div>
+    <div class="cp-stat"><span>Days Left</span><span class="cp-stat-value">{{ status.days_remaining }}</span></div>
+</div>
+
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/timer" class="cp-link">Timer</a>
+    <a href="/billing/staff-tasks" class="cp-link">Billing Tasks</a>
+    <a href="/ccm" class="cp-link">CCM Registry</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:24px;">
+    <h1 style="margin:0;">&#128176; Bonus Tracker</h1>
+</div>
+
+{# ---- Threshold Mismatch Warning (17.9) ---- #}
+{% if threshold_warning %}
+<div style="background:var(--color-warning,#f59e0b);color:#000;padding:12px 16px;border-radius:8px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+    <span style="font-size:20px;">&#9888;</span>
+    <div style="flex:1;">
+        <strong>Threshold Verification Required</strong>
+        <div style="font-size:13px;">Master prompt states $115K; Bonus workbook uses $105K. Current threshold: ${{ "{:,.0f}".format(status.threshold) }}. Please verify your contract threshold.</div>
+    </div>
+    <form method="post" action="/bonus/confirm-threshold" style="margin:0;">
+        <button type="submit" style="background:#fff;color:#000;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px;">Confirm ${{ "{:,.0f}".format(status.threshold) }}</button>
+    </form>
+</div>
+{% endif %}
+
+{# ---- Quarter-End Surge Mode (17.5 §7) ---- #}
+{% if surge_mode %}
+<div style="background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+    <span style="font-size:24px;">&#128293;</span>
+    <div>
+        <strong style="font-size:15px;">QUARTER-END SURGE MODE</strong>
+        <div style="font-size:13px;">{{ status.days_remaining }} days left &bull; Gap: ${{ "{:,.0f}".format(status.gap) }} &bull; Daily rate needed: ${{ "{:,.0f}".format(status.daily_rate_needed) }}</div>
+    </div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:24px;">
+
+    {# ---- 1. Current Quarter Status Bar ---- #}
+    <div class="card" style="grid-column:1/-1;">
+        <div class="card-header">&#128200; Current Quarter Status</div>
+        <div class="card-body">
+            <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:12px;">
+                <div>
+                    <div style="font-size:28px;font-weight:700;color:var(--text-primary);">${{ "{:,.0f}".format(status.receipts_to_date) }}</div>
+                    <div style="font-size:13px;color:var(--text-secondary);">of ${{ "{:,.0f}".format(status.threshold) }}</div>
+                </div>
+                <div style="flex:1;min-width:200px;">
+                    {% set pct = status.pct_of_threshold if status.pct_of_threshold <= 100 else 100 %}
+                    {% set bar_color = '#27ae60' if status.will_exceed else ('#f59e0b' if pct > 60 else '#e74c3c') %}
+                    <div style="background:var(--bg-tertiary,#333);border-radius:8px;height:24px;overflow:hidden;position:relative;">
+                        <div style="background:{{ bar_color }};height:100%;width:{{ pct }}%;border-radius:8px;transition:width .5s;"></div>
+                        <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:12px;font-weight:700;color:#fff;">{{ status.pct_of_threshold }}%</span>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    {% if status.will_exceed %}
+                    <span style="background:#27ae60;color:#fff;padding:4px 10px;border-radius:4px;font-weight:600;font-size:13px;">WILL EXCEED</span>
+                    {% else %}
+                    <span style="background:#e74c3c;color:#fff;padding:4px 10px;border-radius:4px;font-weight:600;font-size:13px;">PROJECTED MISS</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;font-size:13px;">
+                <div>
+                    <span style="color:var(--text-secondary);">Gap:</span>
+                    <strong>${{ "{:,.0f}".format(status.gap) }}</strong>
+                </div>
+                <div>
+                    <span style="color:var(--text-secondary);">Daily Rate Needed:</span>
+                    <strong>${{ "{:,.0f}".format(status.daily_rate_needed) }}/day</strong>
+                </div>
+                <div>
+                    <span style="color:var(--text-secondary);">Run Rate (proj.):</span>
+                    <strong>${{ "{:,.0f}".format(status.run_rate) }}</strong>
+                </div>
+                <div>
+                    <span style="color:var(--text-secondary);">Days Remaining:</span>
+                    <strong>{{ status.days_remaining }} ({{ status.business_days_remaining }} biz)</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- 2. Cumulative Deficit Tracker ---- #}
+    <div class="card">
+        <div class="card-header">&#128202; Deficit Timeline</div>
+        <div class="card-body">
+            {% if deficit_history %}
+            <div style="max-height:300px;overflow-y:auto;">
+                <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;color:var(--text-secondary);border-bottom:1px solid var(--border-color,#444);">
+                            <th style="padding:6px 4px;">Quarter</th>
+                            <th style="padding:6px 4px;text-align:right;">Receipts</th>
+                            <th style="padding:6px 4px;text-align:right;">Surplus</th>
+                            <th style="padding:6px 4px;text-align:right;">Deficit</th>
+                            <th style="padding:6px 4px;text-align:center;">Bonus</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in deficit_history %}
+                        <tr style="border-bottom:1px solid var(--border-color,#333);">
+                            <td style="padding:6px 4px;font-weight:600;">{{ h.quarter }}</td>
+                            <td style="padding:6px 4px;text-align:right;">${{ "{:,.0f}".format(h.receipts) }}</td>
+                            <td style="padding:6px 4px;text-align:right;color:{{ '#27ae60' if h.gross_surplus > 0 else '#e74c3c' }};">
+                                ${{ "{:,.0f}".format(h.gross_surplus) }}
+                            </td>
+                            <td style="padding:6px 4px;text-align:right;color:{{ '#e74c3c' if h.cumulative_deficit > 0 else '#27ae60' }};">
+                                ${{ "{:,.0f}".format(h.cumulative_deficit) }}
+                            </td>
+                            <td style="padding:6px 4px;text-align:center;">
+                                {% if h.exceeded %}
+                                <span style="color:#27ae60;font-weight:700;">${{ "{:,.0f}".format(h.bonus_amount) }}</span>
+                                {% else %}
+                                <span style="color:var(--text-secondary);">&mdash;</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p style="color:var(--text-secondary);font-style:italic;">No receipt data yet. Enter monthly receipts below.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- 3. First Bonus Quarter Projection ---- #}
+    <div class="card">
+        <div class="card-header">&#128302; First Bonus Projection</div>
+        <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div style="padding:12px;background:var(--bg-tertiary,#2a2a2a);border-radius:8px;">
+                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">Scenario A — Current Pace</div>
+                    {% if proj_a.first_bonus_quarter %}
+                    <div style="font-size:20px;font-weight:700;color:var(--text-primary);">{{ proj_a.first_bonus_quarter }}</div>
+                    <div style="font-size:12px;color:var(--text-secondary);">{{ proj_a.first_bonus_date.strftime('%B %Y') if proj_a.first_bonus_date else '' }}</div>
+                    {% else %}
+                    <div style="font-size:14px;color:#e74c3c;font-weight:600;">Not projected within 3 years</div>
+                    {% endif %}
+                </div>
+                <div style="padding:12px;background:var(--bg-tertiary,#2a2a2a);border-radius:8px;">
+                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">Scenario B — With Optimization (+5%/mo)</div>
+                    {% if proj_b.first_bonus_quarter %}
+                    <div style="font-size:20px;font-weight:700;color:#27ae60;">{{ proj_b.first_bonus_quarter }}</div>
+                    <div style="font-size:12px;color:var(--text-secondary);">{{ proj_b.first_bonus_date.strftime('%B %Y') if proj_b.first_bonus_date else '' }}</div>
+                    {% else %}
+                    <div style="font-size:14px;color:#e74c3c;font-weight:600;">Not projected within 3 years</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if proj_a.first_bonus_quarter and proj_b.first_bonus_quarter and proj_a.first_bonus_quarter != proj_b.first_bonus_quarter %}
+            <div style="margin-top:12px;padding:8px 12px;background:rgba(39,174,96,0.1);border-radius:6px;font-size:13px;color:#27ae60;">
+                &#9889; Optimization could accelerate your first bonus by {{ _quarters_diff(proj_a.first_bonus_quarter, proj_b.first_bonus_quarter) }} quarter(s)
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- 4. Receipt Pipeline Predictor ---- #}
+    <div class="card">
+        <div class="card-header">&#128176; Receipt Pipeline</div>
+        <div class="card-body">
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">
+                Charges submitted × collection rate = expected receipts
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+                {% for payer, rate in collection_rates.items() %}
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-color,#333);">
+                    <span style="text-transform:capitalize;">{{ payer }}</span>
+                    <span style="font-weight:600;">{{ (rate * 100)|round(1) }}%</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% if not collection_rates %}
+            <p style="color:var(--text-secondary);font-style:italic;">No collection rates configured. Use calibration below.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- 5. CCM Impact Calculator ---- #}
+    <div class="card">
+        <div class="card-header">&#128137; CCM Impact Calculator</div>
+        <div class="card-body">
+            <div style="font-size:13px;margin-bottom:12px;">
+                <span style="color:var(--text-secondary);">CCM per patient per quarter:</span>
+                <strong>${{ "{:,.0f}".format(ccm_per_quarter) }}</strong>
+                <span style="color:var(--text-secondary);margin-left:8px;">Collection:</span>
+                <strong>{{ (ccm_collection * 100)|round(1) }}%</strong>
+            </div>
+            <div id="ccm-calc" style="display:flex;align-items:center;gap:12px;">
+                <label style="font-size:13px;">Enroll next</label>
+                <input type="number" id="ccm-count" value="10" min="1" max="500" style="width:60px;padding:4px 8px;border:1px solid var(--border-color,#555);border-radius:4px;background:var(--bg-secondary,#222);color:var(--text-primary);text-align:center;">
+                <span style="font-size:13px;">patients &rarr;</span>
+                <span id="ccm-result" style="font-weight:700;font-size:15px;color:#27ae60;"></span>
+            </div>
+        </div>
+    </div>
+
+    {# ---- 6. Monthly Receipt Entry Form ---- #}
+    <div class="card">
+        <div class="card-header">&#128221; Monthly Receipt Entry</div>
+        <div class="card-body">
+            <form id="receipt-form" style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;">
+                <div>
+                    <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:2px;">Month</label>
+                    <input type="month" name="month_key" id="receipt-month" style="padding:6px 10px;border:1px solid var(--border-color,#555);border-radius:4px;background:var(--bg-secondary,#222);color:var(--text-primary);">
+                </div>
+                <div>
+                    <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:2px;">Amount ($)</label>
+                    <input type="number" name="amount" id="receipt-amount" step="0.01" min="0" placeholder="0.00" style="padding:6px 10px;border:1px solid var(--border-color,#555);border-radius:4px;background:var(--bg-secondary,#222);color:var(--text-primary);width:120px;">
+                </div>
+                <button type="submit" style="padding:6px 16px;background:var(--color-primary,#3498db);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Save</button>
+                <span id="receipt-msg" style="font-size:13px;margin-left:8px;"></span>
+            </form>
+
+            {# Existing receipts #}
+            {% set receipts = tracker.get_receipts() %}
+            {% if receipts %}
+            <div style="margin-top:12px;max-height:200px;overflow-y:auto;">
+                <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <thead>
+                        <tr style="color:var(--text-secondary);border-bottom:1px solid var(--border-color,#444);">
+                            <th style="text-align:left;padding:4px;">Month</th>
+                            <th style="text-align:right;padding:4px;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for k, v in receipts|dictsort|reverse %}
+                        <tr style="border-bottom:1px solid var(--border-color,#333);">
+                            <td style="padding:4px;">{{ k }}</td>
+                            <td style="text-align:right;padding:4px;">${{ "{:,.2f}".format(v) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ---- Collection Rate Calibration ---- #}
+    <div class="card">
+        <div class="card-header">&#9881; Collection Rate Calibration</div>
+        <div class="card-body">
+            <form id="calibrate-form" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:2px;">Medicare</label>
+                    <input type="number" name="medicare" step="0.01" min="0" max="1" value="{{ collection_rates.get('medicare', 0.90) }}" style="width:100%;padding:4px 8px;border:1px solid var(--border-color,#555);border-radius:4px;background:var(--bg-secondary,#222);color:var(--text-primary);">
+                </div>
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:2px;">Medicaid</label>
+                    <input type="number" name="medicaid" step="0.01" min="0" max="1" value="{{ collection_rates.get('medicaid', 0.65) }}" style="width:100%;padding:4px 8px;border:1px solid var(--border-color,#555);border-radius:4px;background:var(--bg-secondary,#222);color:var(--text-primary);">
+                </div>
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:2px;">Commercial</label>
+                    <input type="number" name="commercial" step="0.01" min="0" max="1" value="{{ collection_rates.get('commercial', 0.85) }}" style="width:100%;padding:4px 8px;border:1px solid var(--border-color,#555);border-radius:4px;background:var(--bg-secondary,#222);color:var(--text-primary);">
+                </div>
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:2px;">CCM</label>
+                    <input type="number" name="ccm" step="0.01" min="0" max="1" value="{{ collection_rates.get('ccm', 0.85) }}" style="width:100%;padding:4px 8px;border:1px solid var(--border-color,#555);border-radius:4px;background:var(--bg-secondary,#222);color:var(--text-primary);">
+                </div>
+                <div style="grid-column:1/-1;">
+                    <button type="submit" style="padding:6px 16px;background:var(--color-primary,#3498db);color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;">Update Rates</button>
+                    <span id="calibrate-msg" style="font-size:13px;margin-left:8px;"></span>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+    // CCM Impact Calculator
+    const ccmCount = document.getElementById('ccm-count');
+    const ccmResult = document.getElementById('ccm-result');
+    const ccmPerQ = {{ ccm_per_quarter }};
+    const ccmColl = {{ ccm_collection }};
+    function updateCCM(){
+        const n = parseInt(ccmCount.value) || 0;
+        const impact = n * ccmPerQ * ccmColl;
+        ccmResult.textContent = '+$' + impact.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0}) + '/quarter';
+    }
+    ccmCount.addEventListener('input', updateCCM);
+    updateCCM();
+
+    // Receipt Entry Form
+    const receiptForm = document.getElementById('receipt-form');
+    const receiptMsg = document.getElementById('receipt-msg');
+    if(receiptForm){
+        receiptForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            const fd = new FormData(receiptForm);
+            const monthVal = document.getElementById('receipt-month').value;
+            if(monthVal) fd.set('month_key', monthVal);
+            fetch('/bonus/entry', {method:'POST', body:fd})
+            .then(r=>r.json())
+            .then(d=>{
+                if(d.ok){
+                    receiptMsg.textContent = '\u2713 Saved ' + d.month;
+                    receiptMsg.style.color = '#27ae60';
+                    setTimeout(()=>location.reload(), 800);
+                } else {
+                    receiptMsg.textContent = d.error || 'Error';
+                    receiptMsg.style.color = '#e74c3c';
+                }
+            })
+            .catch(()=>{receiptMsg.textContent='Network error'; receiptMsg.style.color='#e74c3c';});
+        });
+    }
+
+    // Calibration Form
+    const calForm = document.getElementById('calibrate-form');
+    const calMsg = document.getElementById('calibrate-msg');
+    if(calForm){
+        calForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            const data = {};
+            calForm.querySelectorAll('input[name]').forEach(inp=>{
+                data[inp.name] = parseFloat(inp.value);
+            });
+            fetch('/bonus/calibrate', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(data)
+            })
+            .then(r=>r.json())
+            .then(d=>{
+                if(d.ok){
+                    calMsg.textContent = '\u2713 Rates updated';
+                    calMsg.style.color = '#27ae60';
+                } else {
+                    calMsg.textContent = d.error || 'Error';
+                    calMsg.style.color = '#e74c3c';
+                }
+            })
+            .catch(()=>{calMsg.textContent='Network error'; calMsg.style.color='#e74c3c';});
+        });
+    }
+})();
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 """
-NP Companion — API Services Package
+CareCompanion — API Services Package
 File: app/services/api/__init__.py
 
 One module per external API. All modules inherit from BaseAPIClient
@@ -22,7 +22,7 @@ Available services:
 - medlineplus    — NLM MedlinePlus patient education content
 - open_meteo     — Weather data for morning briefing
 
-NP Companion features that rely on this package:
+CareCompanion features that rely on this package:
 - Medication Reference (F10), Drug Safety Panel, Interaction Checker
 - Lab Value Tracker (F11), Lab Panel Grouping (F11d)
 - Care Gap Tracker (F15), Immunization Gap Detection

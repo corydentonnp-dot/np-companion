@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Dismissal Audit — CareCompanion{% endblock %}
+{% block page_id %}admin-dismissal-audit{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Dismissal Audit Trail</h1>
+    <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+</div>
+
+{# ---- Filters ---- #}
+<div class="card" style="margin-bottom:20px;">
+    <div class="card-body" style="padding:12px 16px;">
+        <form method="get" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <div>
+                <label style="font-size:11px;display:block;margin-bottom:2px;">Type</label>
+                <select name="type" class="form-input" style="font-size:12px;padding:4px 8px;">
+                    <option value="">All</option>
+                    <option value="billing" {{ 'selected' if suggestion_type == 'billing' }}>Billing</option>
+                    <option value="caregap" {{ 'selected' if suggestion_type == 'caregap' }}>Care Gap</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:11px;display:block;margin-bottom:2px;">Reason contains</label>
+                <input type="text" name="reason" value="{{ reason_filter }}" class="form-input" style="font-size:12px;padding:4px 8px;width:180px;" placeholder="e.g. Not applicable">
+            </div>
+            <div>
+                <label style="font-size:11px;display:block;margin-bottom:2px;">From</label>
+                <input type="date" name="date_from" value="{{ date_from }}" class="form-input" style="font-size:12px;padding:4px 8px;">
+            </div>
+            <div>
+                <label style="font-size:11px;display:block;margin-bottom:2px;">To</label>
+                <input type="date" name="date_to" value="{{ date_to }}" class="form-input" style="font-size:12px;padding:4px 8px;">
+            </div>
+            <button class="btn btn-primary btn-sm" type="submit">Filter</button>
+            <a href="/admin/dismissal-audit" class="btn btn-outline btn-sm">Reset</a>
+        </form>
+    </div>
+</div>
+
+{# ---- Results table ---- #}
+<div class="card">
+    <div class="card-header">
+        Dismissals <span class="badge badge--info" style="margin-left:8px;">{{ dismissals|length }}</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        {% if dismissals %}
+        <table class="schedule-table" style="font-size:12px;">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Provider</th>
+                    <th>Type</th>
+                    <th>Reason</th>
+                    <th>Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in dismissals %}
+                <tr>
+                    <td>{{ d.timestamp.strftime('%m/%d/%Y %H:%M') if d.timestamp else '—' }}</td>
+                    <td>{{ d.user_name }}</td>
+                    <td><span class="badge badge--info" style="font-size:10px;">{{ d.type }}</span></td>
+                    <td>{{ d.reason or '—' }}</td>
+                    <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ d.detail }}">{{ d.detail[:80] if d.detail else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="text-align:center;padding:24px;color:var(--text-secondary);font-size:13px;">
+            No dismissals found matching your filters.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

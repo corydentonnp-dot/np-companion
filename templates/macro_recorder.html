@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+{% block title %}Macro Recorder — CareCompanion{% endblock %}
+{% block page_id %}macro-recorder{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Macro Recorder</h1>
+    <span class="badge badge--info">F23</span>
+    <a href="/tools/macros" class="btn btn-sm btn-outline">← Back to Library</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:20px;">
+    {# ---- Left: Step List + Controls ---- #}
+    <div>
+        {# Recording controls #}
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <button id="btn-record" class="btn btn-primary" onclick="toggleRecording()">⏺ Start Recording</button>
+                <span id="record-status" style="font-size:13px;color:var(--text-secondary,#666);">Click Start to begin capturing keyboard/mouse events</span>
+            </div>
+        </div>
+
+        {# Step palette - draggable action blocks #}
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h3 style="margin:0 0 10px;font-size:14px;">Step Palette — click to add</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-sm btn-outline" onclick="addStep('click')">🖱 Click</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('double_click')">🖱🖱 Double Click</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('right_click')">🖱 Right Click</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('send_keys')">⌨ Send Keys</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('send_text')">📝 Type Text</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('sleep')">⏱ Sleep/Wait</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('window_activate')">🪟 Window Activate</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('hotkey')">⚡ Hotkey Combo</button>
+                <button class="btn btn-sm btn-outline" onclick="addStep('dot_phrase')">•• Dot Phrase</button>
+            </div>
+        </div>
+
+        {# Step list table #}
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h3 style="margin:0 0 10px;font-size:14px;">Steps <span id="step-count" style="color:var(--text-muted,#999);">(0)</span></h3>
+            <div style="overflow-x:auto;">
+                <table id="step-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:2px solid var(--border-color,#ddd);">
+                            <th style="padding:8px;width:40px;">#</th>
+                            <th style="padding:8px;width:130px;">Action</th>
+                            <th style="padding:8px;width:100px;">X, Y</th>
+                            <th style="padding:8px;">Keys / Text</th>
+                            <th style="padding:8px;width:80px;">Delay (ms)</th>
+                            <th style="padding:8px;">Comment</th>
+                            <th style="padding:8px;width:80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="step-body"></tbody>
+                </table>
+            </div>
+            <div id="empty-msg" style="text-align:center;padding:24px;color:var(--text-muted,#999);">
+                No steps yet. Use the palette above or start recording.
+            </div>
+        </div>
+
+        {# Variable Manager #}
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <h3 style="margin:0;font-size:14px;">Variables</h3>
+                <button class="btn btn-sm btn-outline" onclick="addVariable()">+ Add Variable</button>
+            </div>
+            <div id="var-list"></div>
+            <div id="var-empty" style="text-align:center;padding:12px;color:var(--text-muted,#999);font-size:13px;">
+                No variables. Variables become InputBox prompts in the exported AHK script.
+            </div>
+        </div>
+    </div>
+
+    {# ---- Right: Properties + Preview + Save ---- #}
+    <div>
+        {# Properties panel #}
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h3 style="margin:0 0 10px;font-size:14px;">Step Properties</h3>
+            <div id="props-panel" style="font-size:13px;color:var(--text-muted,#999);">Select a step to edit its properties.</div>
+            <div id="props-form" style="display:none;">
+                <label class="form-label" style="font-size:12px;">Action Type</label>
+                <select id="prop-action" class="form-input" style="margin-bottom:8px;font-size:12px;" onchange="updateSelectedStep()">
+                    <option value="click">Click</option>
+                    <option value="double_click">Double Click</option>
+                    <option value="right_click">Right Click</option>
+                    <option value="send_keys">Send Keys</option>
+                    <option value="send_text">Type Text</option>
+                    <option value="sleep">Sleep/Wait</option>
+                    <option value="mouse_move">Mouse Move</option>
+                    <option value="hotkey">Hotkey Combo</option>
+                    <option value="window_activate">Window Activate</option>
+                    <option value="dot_phrase">Dot Phrase</option>
+                </select>
+
+                <label class="form-label" style="font-size:12px;">Target X, Y</label>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                    <input type="number" id="prop-x" class="form-input" placeholder="X" style="font-size:12px;" onchange="updateSelectedStep()">
+                    <input type="number" id="prop-y" class="form-input" placeholder="Y" style="font-size:12px;" onchange="updateSelectedStep()">
+                </div>
+
+                <label class="form-label" style="font-size:12px;">Keys / Text</label>
+                <input type="text" id="prop-keys" class="form-input" style="margin-bottom:4px;font-size:12px;font-family:monospace;" onchange="updateSelectedStep()">
+                <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;" onclick="insertKey('{Enter}')">{Enter}</button>
+                    <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;" onclick="insertKey('{Tab}')">{Tab}</button>
+                    <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;" onclick="insertKey('{Escape}')">{Esc}</button>
+                    <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;" onclick="insertKey('^c')">Ctrl+C</button>
+                    <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;" onclick="insertKey('^v')">Ctrl+V</button>
+                    <button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 6px;" onclick="insertKey('!{F4}')">Alt+F4</button>
+                </div>
+
+                <label class="form-label" style="font-size:12px;">Delay (ms)</label>
+                <input type="number" id="prop-delay" class="form-input" value="100" min="0" max="30000" style="margin-bottom:8px;font-size:12px;" onchange="updateSelectedStep()">
+
+                <label class="form-label" style="font-size:12px;">Window Title</label>
+                <input type="text" id="prop-window" class="form-input" style="margin-bottom:8px;font-size:12px;" onchange="updateSelectedStep()">
+
+                <label class="form-label" style="font-size:12px;">Comment</label>
+                <input type="text" id="prop-comment" class="form-input" style="font-size:12px;" onchange="updateSelectedStep()">
+            </div>
+        </div>
+
+        {# AHK Preview #}
+        <div class="card" style="padding:16px;margin-bottom:16px;">
+            <h3 style="margin:0 0 10px;font-size:14px;">AHK Preview</h3>
+            <pre id="ahk-preview" style="background:var(--bg-secondary,#1e1e1e);color:var(--text-primary,#d4d4d4);padding:12px;border-radius:8px;font-size:12px;max-height:300px;overflow-y:auto;white-space:pre-wrap;margin:0;font-family:Consolas,monospace;"></pre>
+        </div>
+
+        {# Save Macro Form #}
+        <div class="card" style="padding:16px;">
+            <h3 style="margin:0 0 12px;font-size:14px;">Save Macro</h3>
+            <label class="form-label" style="font-size:12px;">Name</label>
+            <input type="text" id="save-name" class="form-input" placeholder="My Macro" style="margin-bottom:8px;">
+
+            <label class="form-label" style="font-size:12px;">Description</label>
+            <input type="text" id="save-desc" class="form-input" placeholder="Optional description" style="margin-bottom:8px;">
+
+            <label class="form-label" style="font-size:12px;">Hotkey</label>
+            <input type="text" id="save-hotkey" class="form-input" placeholder="e.g. ^!n (Ctrl+Alt+N)" style="margin-bottom:8px;font-family:monospace;">
+
+            <label class="form-label" style="font-size:12px;">Category</label>
+            <select id="save-category" class="form-input" style="margin-bottom:12px;">
+                <option value="navigation">Navigation</option>
+                <option value="template">Template</option>
+                <option value="order_entry">Order Entry</option>
+                <option value="data_entry">Data Entry</option>
+                <option value="custom" selected>Custom</option>
+            </select>
+
+            <button class="btn btn-primary" onclick="saveMacro()" style="width:100%;">💾 Save Macro</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── State ── */
+let steps = [];
+let variables = [];
+let selectedStepIdx = -1;
+let isRecording = false;
+
+/* ── Recording ── */
+function toggleRecording() {
+    isRecording = !isRecording;
+    const btn = document.getElementById('btn-record');
+    const status = document.getElementById('record-status');
+    if (isRecording) {
+        btn.innerHTML = '⏹ Stop Recording';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+        status.textContent = 'Recording... Press keys or click in the page.';
+        document.addEventListener('keydown', captureKey);
+    } else {
+        btn.innerHTML = '⏺ Start Recording';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-primary');
+        status.textContent = 'Recording stopped. ' + steps.length + ' step(s) captured.';
+        document.removeEventListener('keydown', captureKey);
+    }
+}
+
+function captureKey(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    e.preventDefault();
+    let keySeq = '';
+    if (e.ctrlKey) keySeq += '^';
+    if (e.altKey) keySeq += '!';
+    if (e.shiftKey) keySeq += '+';
+    const key = e.key;
+    const mapped = {'Enter':'{Enter}','Tab':'{Tab}','Escape':'{Escape}','Backspace':'{Backspace}','Delete':'{Delete}',
+                    'ArrowUp':'{Up}','ArrowDown':'{Down}','ArrowLeft':'{Left}','ArrowRight':'{Right}',
+                    ' ':'{Space}','Control':'','Alt':'','Shift':''};
+    if (key in mapped) {
+        if (!mapped[key]) return; // modifier-only press
+        keySeq += mapped[key];
+    } else {
+        keySeq += key.length === 1 ? key : '{' + key + '}';
+    }
+    steps.push({action_type:'send_keys', target_x:null, target_y:null, key_sequence:keySeq, delay_ms:100, window_title:'', comment:''});
+    renderSteps();
+    updatePreview();
+}
+
+/* ── Step Management ── */
+function addStep(actionType) {
+    const defaults = {
+        click:{target_x:0,target_y:0,key_sequence:'',delay_ms:100},
+        double_click:{target_x:0,target_y:0,key_sequence:'',delay_ms:100},
+        right_click:{target_x:0,target_y:0,key_sequence:'',delay_ms:100},
+        send_keys:{target_x:null,target_y:null,key_sequence:'',delay_ms:100},
+        send_text:{target_x:null,target_y:null,key_sequence:'',delay_ms:100},
+        sleep:{target_x:null,target_y:null,key_sequence:'',delay_ms:500},
+        mouse_move:{target_x:0,target_y:0,key_sequence:'',delay_ms:100},
+        hotkey:{target_x:null,target_y:null,key_sequence:'',delay_ms:100},
+        window_activate:{target_x:null,target_y:null,key_sequence:'',delay_ms:300},
+        dot_phrase:{target_x:null,target_y:null,key_sequence:'',delay_ms:100},
+    };
+    const d = defaults[actionType] || defaults.sleep;
+    steps.push({action_type:actionType, target_x:d.target_x, target_y:d.target_y, key_sequence:d.key_sequence, delay_ms:d.delay_ms, window_title:'', comment:''});
+    renderSteps();
+    selectStep(steps.length - 1);
+    updatePreview();
+}
+
+function removeStep(idx) {
+    steps.splice(idx, 1);
+    if (selectedStepIdx >= steps.length) selectedStepIdx = steps.length - 1;
+    renderSteps();
+    if (selectedStepIdx >= 0) selectStep(selectedStepIdx);
+    else { document.getElementById('props-form').style.display='none'; document.getElementById('props-panel').style.display=''; }
+    updatePreview();
+}
+
+function moveStep(idx, dir) {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= steps.length) return;
+    [steps[idx], steps[newIdx]] = [steps[newIdx], steps[idx]];
+    selectedStepIdx = newIdx;
+    renderSteps();
+    selectStep(newIdx);
+    updatePreview();
+}
+
+function selectStep(idx) {
+    selectedStepIdx = idx;
+    const s = steps[idx];
+    document.getElementById('props-panel').style.display = 'none';
+    document.getElementById('props-form').style.display = '';
+    document.getElementById('prop-action').value = s.action_type;
+    document.getElementById('prop-x').value = s.target_x || '';
+    document.getElementById('prop-y').value = s.target_y || '';
+    document.getElementById('prop-keys').value = s.key_sequence || '';
+    document.getElementById('prop-delay').value = s.delay_ms || 100;
+    document.getElementById('prop-window').value = s.window_title || '';
+    document.getElementById('prop-comment').value = s.comment || '';
+    // Highlight selected row
+    document.querySelectorAll('#step-body tr').forEach((tr, i) => {
+        tr.style.background = i === idx ? 'var(--bg-secondary,#e8f0fe)' : '';
+    });
+}
+
+function updateSelectedStep() {
+    if (selectedStepIdx < 0) return;
+    const s = steps[selectedStepIdx];
+    s.action_type = document.getElementById('prop-action').value;
+    s.target_x = parseInt(document.getElementById('prop-x').value) || null;
+    s.target_y = parseInt(document.getElementById('prop-y').value) || null;
+    s.key_sequence = document.getElementById('prop-keys').value;
+    s.delay_ms = parseInt(document.getElementById('prop-delay').value) || 100;
+    s.window_title = document.getElementById('prop-window').value;
+    s.comment = document.getElementById('prop-comment').value;
+    renderSteps();
+    updatePreview();
+}
+
+function insertKey(key) {
+    const input = document.getElementById('prop-keys');
+    const start = input.selectionStart;
+    input.value = input.value.substring(0, start) + key + input.value.substring(input.selectionEnd);
+    input.focus();
+    input.selectionStart = input.selectionEnd = start + key.length;
+    updateSelectedStep();
+}
+
+function renderSteps() {
+    const tbody = document.getElementById('step-body');
+    const empty = document.getElementById('empty-msg');
+    document.getElementById('step-count').textContent = '(' + steps.length + ')';
+    if (!steps.length) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    tbody.innerHTML = steps.map((s, i) => `
+        <tr style="border-bottom:1px solid var(--border-color,#eee);cursor:pointer;${i===selectedStepIdx?'background:var(--bg-secondary,#e8f0fe);':''}" onclick="selectStep(${i})">
+            <td style="padding:6px 8px;">${i+1}</td>
+            <td style="padding:6px 8px;"><span style="display:inline-block;background:var(--bg-secondary,#f0f0f0);padding:2px 8px;border-radius:6px;font-size:11px;">${s.action_type}</span></td>
+            <td style="padding:6px 8px;font-family:monospace;font-size:12px;">${s.target_x!=null?s.target_x+','+s.target_y:'-'}</td>
+            <td style="padding:6px 8px;font-family:monospace;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.key_sequence||'-'}</td>
+            <td style="padding:6px 8px;font-size:12px;">${s.delay_ms}</td>
+            <td style="padding:6px 8px;font-size:12px;color:var(--text-muted,#999);">${s.comment||''}</td>
+            <td style="padding:6px 8px;white-space:nowrap;">
+                <button class="btn btn-sm btn-outline" style="padding:1px 5px;font-size:10px;" onclick="event.stopPropagation();moveStep(${i},-1)" ${i===0?'disabled':''}>↑</button>
+                <button class="btn btn-sm btn-outline" style="padding:1px 5px;font-size:10px;" onclick="event.stopPropagation();moveStep(${i},1)" ${i===steps.length-1?'disabled':''}>↓</button>
+                <button class="btn btn-sm btn-outline" style="padding:1px 5px;font-size:10px;color:var(--danger,#e74c3c);" onclick="event.stopPropagation();removeStep(${i})">✕</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+/* ── AHK Preview ── */
+const ACTION_MAP = {
+    click: s => `Click, ${s.target_x}, ${s.target_y}`,
+    double_click: s => `Click, 2, ${s.target_x}, ${s.target_y}`,
+    right_click: s => `Click, Right, ${s.target_x}, ${s.target_y}`,
+    send_keys: s => `Send, ${s.key_sequence}`,
+    send_text: s => `SendInput, ${s.key_sequence}`,
+    sleep: s => `Sleep, ${s.delay_ms}`,
+    mouse_move: s => `MouseMove, ${s.target_x}, ${s.target_y}`,
+    hotkey: s => `Send, ${s.key_sequence}`,
+    window_activate: s => `WinActivate, ${s.window_title}`,
+    dot_phrase: s => `SendInput, ${s.key_sequence}`,
+};
+
+function updatePreview() {
+    const hotkey = document.getElementById('save-hotkey').value.trim();
+    let lines = ['; Generated by CareCompanion', '#NoEnv', '#SingleInstance Force', ''];
+    const indent = hotkey ? '    ' : '';
+    if (hotkey) lines.push(hotkey + '::');
+
+    variables.forEach(v => {
+        lines.push(indent + `InputBox, ${v.var_name}, ${v.var_label||v.var_name}, Enter ${v.var_label||v.var_name}:, , 300, 150`);
+    });
+
+    steps.forEach(s => {
+        if (s.comment) lines.push(indent + '; ' + s.comment);
+        const fn = ACTION_MAP[s.action_type];
+        lines.push(indent + (fn ? fn(s) : '; ' + s.action_type));
+        if (s.delay_ms && s.action_type !== 'sleep') lines.push(indent + `Sleep, ${s.delay_ms}`);
+    });
+
+    if (hotkey) lines.push('return');
+    document.getElementById('ahk-preview').textContent = lines.join('\n');
+}
+
+/* ── Variables ── */
+function addVariable() {
+    variables.push({var_name:'var_' + (variables.length+1), var_label:'', default_value:'', var_type:'text', choices:null});
+    renderVariables();
+    updatePreview();
+}
+
+function removeVariable(idx) {
+    variables.splice(idx, 1);
+    renderVariables();
+    updatePreview();
+}
+
+function updateVariable(idx, field, value) {
+    variables[idx][field] = value;
+    updatePreview();
+}
+
+function renderVariables() {
+    const container = document.getElementById('var-list');
+    const empty = document.getElementById('var-empty');
+    if (!variables.length) { container.innerHTML = ''; empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    container.innerHTML = variables.map((v, i) => `
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+            <input type="text" class="form-input" value="${v.var_name}" placeholder="var_name" style="font-size:12px;font-family:monospace;width:120px;" onchange="updateVariable(${i},'var_name',this.value)">
+            <input type="text" class="form-input" value="${v.var_label}" placeholder="Label" style="font-size:12px;flex:1;" onchange="updateVariable(${i},'var_label',this.value)">
+            <input type="text" class="form-input" value="${v.default_value}" placeholder="Default" style="font-size:12px;width:100px;" onchange="updateVariable(${i},'default_value',this.value)">
+            <button class="btn btn-sm btn-outline" style="padding:1px 5px;font-size:10px;color:var(--danger,#e74c3c);" onclick="removeVariable(${i})">✕</button>
+        </div>
+    `).join('');
+}
+
+/* ── Save Macro ── */
+function saveMacro() {
+    const name = document.getElementById('save-name').value.trim();
+    if (!name) { alert('Macro name is required.'); return; }
+    if (!steps.length) { alert('Add at least one step.'); return; }
+
+    const data = {
+        name: name,
+        description: document.getElementById('save-desc').value.trim(),
+        hotkey: document.getElementById('save-hotkey').value.trim(),
+        category: document.getElementById('save-category').value,
+        steps: steps.map((s, i) => ({...s, step_order: i+1})),
+        variables: variables,
+    };
+
+    fetch('/api/macros/record/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            alert('Macro "' + d.name + '" saved!');
+            window.location.href = '/tools/macros';
+        } else {
+            alert(d.error || 'Failed to save macro.');
+        }
+    });
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    renderSteps();
+    renderVariables();
+    updatePreview();
+    document.getElementById('save-hotkey').addEventListener('input', updatePreview);
+});
+</script>
+{% endblock %}

@@ -1,5 +1,5 @@
 """
-NP Companion — Virginia PDMP (PMP AWARxE) Scraper
+CareCompanion — Virginia PDMP (PMP AWARxE) Scraper
 File: scrapers/pdmp.py
 
 Uses Playwright to automate login and patient lookup on the Virginia
@@ -30,10 +30,9 @@ import asyncio
 import json
 import logging
 import os
-import pickle
 from datetime import date, datetime, timezone
 
-logger = logging.getLogger('np_companion.pdmp')
+logger = logging.getLogger('carecompanion.pdmp')
 
 
 class PDMPScraper:
@@ -102,14 +101,29 @@ class PDMPScraper:
             browser = None
             try:
                 # Try CDP first (attach to existing Chrome)
+                cdp_url = f'http://127.0.0.1:{self._cdp_port}'
                 try:
-                    browser = await pw.chromium.connect_over_cdp(
-                        f'http://127.0.0.1:{self._cdp_port}'
-                    )
+                    browser = await pw.chromium.connect_over_cdp(cdp_url)
                     logger.info('PDMP: connected via Chrome CDP')
                 except Exception:
-                    browser = await pw.chromium.launch(headless=True)
-                    logger.info('PDMP: launched headless Chromium')
+                    # Auto-launch Chrome debug profile and retry
+                    try:
+                        from utils.chrome_launcher import ensure_chrome_debug
+                        import asyncio
+                        exe = self.app.config.get('CHROME_EXE_PATH', '')
+                        pdir = self.app.config.get('CHROME_DEBUG_PROFILE_DIR', '')
+                        if exe and pdir and ensure_chrome_debug(exe, pdir, self._cdp_port):
+                            await asyncio.sleep(3)
+                            try:
+                                browser = await pw.chromium.connect_over_cdp(cdp_url)
+                                logger.info('PDMP: connected via CDP after auto-launch')
+                            except Exception:
+                                browser = None
+                    except ImportError:
+                        pass
+                    if browser is None:
+                        browser = await pw.chromium.launch(headless=True)
+                        logger.info('PDMP: launched headless Chromium')
 
                 context = await browser.new_context()
 
@@ -286,24 +300,27 @@ class PDMPScraper:
         return prescriptions
 
     async def _load_cookies(self, context):
-        """Load saved cookies from pickle file."""
+        """Load saved cookies from JSON file."""
         if not os.path.exists(self._cookie_file):
             return
         try:
-            with open(self._cookie_file, 'rb') as f:
-                cookies = pickle.load(f)
+            with open(self._cookie_file, 'r', encoding='utf-8') as f:
+                cookies = json.load(f)
             await context.add_cookies(cookies)
             logger.debug('PDMP: loaded %d saved cookies', len(cookies))
+        except (json.JSONDecodeError, ValueError):
+            logger.warning('PDMP: corrupt cookie file, removing')
+            os.remove(self._cookie_file)
         except Exception:
             pass
 
     async def _save_cookies(self, context):
-        """Save current cookies to pickle file."""
+        """Save current cookies to JSON file."""
         try:
             cookies = await context.cookies()
             os.makedirs(os.path.dirname(self._cookie_file), exist_ok=True)
-            with open(self._cookie_file, 'wb') as f:
-                pickle.dump(cookies, f)
+            with open(self._cookie_file, 'w', encoding='utf-8') as f:
+                json.dump(cookies, f)
             logger.debug('PDMP: saved %d cookies', len(cookies))
         except Exception:
             pass

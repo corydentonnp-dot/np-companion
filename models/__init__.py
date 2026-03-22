@@ -1,7 +1,7 @@
 """
-NP Companion — Database Models Package
+CareCompanion — Database Models Package
 
-File location: np-companion/models/__init__.py
+File location: carecompanion/models/__init__.py
 
 Creates the shared SQLAlchemy database instance that every model
 file and every route file imports.  Binding to the Flask app happens
@@ -43,6 +43,24 @@ from models.patient import (
     PatientVitals, PatientRecord, PatientMedication,
     PatientDiagnosis, PatientAllergy, PatientImmunization,
     PatientNoteDraft, PatientSpecialist, Icd10Cache, RxNormCache,
+    PatientLabResult, PatientSocialHistory,
 )
-from models.billing import BillingOpportunity, BillingRuleCache
+from models.billing import BillingOpportunity, BillingRuleCache, BillingRule, DiagnosisRevenueProfile, StaffRoutingRule, DocumentationPhrase, OpportunitySuppression, ClosedLoopStatus, BillingCampaign, PayerCoverageMatrix
+from models.bonus import BonusTracker
+from models.tcm import TCMWatchEntry
+from models.ccm import CCMEnrollment, CCMTimeEntry
 from models.tools import ControlledSubstanceEntry, CodeFavorite, CodePairing, PriorAuthorization, ReferralLetter
+from models.result_template import ResultTemplate
+from models.api_cache import (
+    RxClassCache, FdaLabelCache, FaersCache, RecallCache,
+    LoincCache, UmlsCache, HealthFinderCache, PubmedCache,
+    MedlinePlusCache, CdcImmunizationCache, VsacValueSetCache,
+    NlmConditionsCache,
+)
+from models.macro import AhkMacro, DotPhrase, MacroStep, MacroVariable
+from models.monitoring import MonitoringRule, MonitoringSchedule, REMSTrackerEntry
+from models.preventive import PreventiveServiceRecord
+from models.immunization import ImmunizationSeries
+from models.telehealth import CommunicationLog
+from models.calculator import CalculatorResult
+from models.bookmark import PracticeBookmark

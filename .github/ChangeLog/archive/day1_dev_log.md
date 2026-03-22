@@ -1,4 +1,4 @@
-# NP Companion — Day 1 Development Log
+# CareCompanion — Day 1 Development Log
 **Date:** March 15–16, 2026  
 **Phases Covered:** Phase 1 (Foundation) + Phase 2 (Data Layer — partial)
 
@@ -57,7 +57,7 @@
 2. Press Ctrl+` (backtick) to open the terminal
 3. Type these commands one at a time, pressing Enter after each:
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
+cd C:\Users\coryd\Documents\CareCompanion
 venv\Scripts\activate
 python app.py
 ```
@@ -68,7 +68,7 @@ python app.py
 
 ### STEP 2: Login Page (F1, F1a)
 
-- [ ] You see the NP Companion login page
+- [ ] You see the CareCompanion login page
 - [ ] Type your username (CORY) and password, then click "Log In"
 - [ ] You are taken to the Dashboard page
 - [ ] Your name appears in the top-right corner of the header
@@ -209,13 +209,13 @@ python app.py
 Open a **second terminal** (don't stop the running Flask server!) and run:
 
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
+cd C:\Users\coryd\Documents\CareCompanion
 venv\Scripts\python.exe -c "
 from app import create_app
 app = create_app()
 app.config['TESTING'] = True
 
-print('=== NP Companion Day 1 Verification ===')
+print('=== CareCompanion Day 1 Verification ===')
 print()
 
 # Check all database tables exist

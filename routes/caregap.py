@@ -1,7 +1,7 @@
 """
-NP Companion — Care Gap Routes
+CareCompanion — Care Gap Routes
 
-File location: np-companion/routes/caregap.py
+File location: carecompanion/routes/caregap.py
 
 Routes:
   GET  /caregap                         — Overview of upcoming patients' care gaps
@@ -15,6 +15,7 @@ Features: F15, F15a (auto-population), F15b (closure docs), F15c (panel report)
 """
 
 from datetime import date, datetime, timedelta, timezone
+import json
 
 from flask import (
     Blueprint, render_template, request, redirect,
@@ -26,6 +27,7 @@ from models import db
 from models.caregap import CareGap, CareGapRule
 from models.patient import PatientRecord
 from models.schedule import Schedule
+from utils.feature_gates import require_feature
 
 caregap_bp = Blueprint('caregap', __name__)
 
@@ -35,6 +37,7 @@ caregap_bp = Blueprint('caregap', __name__)
 # ======================================================================
 @caregap_bp.route('/caregap')
 @login_required
+@require_feature('caregap')
 def index():
     """
     Show care gaps for today's (and optionally tomorrow's) scheduled
@@ -157,6 +160,105 @@ def patient_gaps(mrn):
         patient_name=patient_name,
         open_gaps=open_gaps,
         addressed_gaps=addressed_gaps,
+        _derive_trigger_type=_derive_trigger_type,
+    )
+
+
+def _derive_trigger_type(gap):
+    """Return 'risk_factor' or 'demographic' based on the matching rule's criteria."""
+    rule = CareGapRule.query.filter_by(gap_type=gap.gap_type).first()
+    if rule and rule.criteria_json:
+        try:
+            criteria = json.loads(rule.criteria_json)
+        except (json.JSONDecodeError, TypeError):
+            criteria = {}
+        if criteria.get('risk_factors') or criteria.get('icd10_codes'):
+            return 'risk_factor'
+    return 'demographic'
+
+
+# ======================================================================
+# GET /caregap/<mrn>/print — Printer-optimized patient handout
+# ======================================================================
+@caregap_bp.route('/caregap/<mrn>/print')
+@login_required
+def print_handout(mrn):
+    """Render a clean, printer-friendly care gap handout for the patient."""
+    gaps = (
+        CareGap.query
+        .filter_by(user_id=current_user.id, mrn=mrn)
+        .order_by(CareGap.is_addressed, CareGap.gap_name)
+        .all()
+    )
+
+    patient_name = ''
+    if gaps:
+        patient_name = gaps[0].patient_name
+    if not patient_name:
+        sched = Schedule.query.filter_by(
+            user_id=current_user.id, patient_mrn=mrn
+        ).order_by(Schedule.appointment_date.desc()).first()
+        if sched:
+            patient_name = sched.patient_name
+
+    # Use first name only on printed handout — no MRN
+    first_name = (patient_name or 'Patient').split()[0] if patient_name else 'Patient'
+
+    # Build gap list with plain-English info
+    handout_gaps = []
+    for g in gaps:
+        rule = CareGapRule.query.filter_by(gap_type=g.gap_type).first()
+        interval_text = ''
+        if rule and rule.interval_days:
+            if rule.interval_days >= 3650:
+                interval_text = f"Every {rule.interval_days // 365} years"
+            elif rule.interval_days >= 365:
+                years = rule.interval_days // 365
+                interval_text = f"Every {years} year{'s' if years > 1 else ''}"
+            elif rule.interval_days > 0:
+                interval_text = f"Every {rule.interval_days} days"
+            else:
+                interval_text = "One-time"
+
+        age_range = ''
+        if rule and rule.criteria_json:
+            try:
+                criteria = json.loads(rule.criteria_json)
+                min_a = criteria.get('min_age', '')
+                max_a = criteria.get('max_age', '')
+                if min_a and max_a and max_a < 999:
+                    age_range = f"Ages {min_a}\u2013{max_a}"
+                elif min_a:
+                    age_range = f"Ages {min_a}+"
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        freq_note = ' \u00b7 '.join(filter(None, [interval_text, age_range]))
+
+        if g.is_addressed:
+            status = 'Up to Date'
+            status_class = 'green'
+        elif g.due_date and g.due_date < datetime.now(timezone.utc):
+            status = 'Overdue'
+            status_class = 'red'
+        else:
+            status = 'Due'
+            status_class = 'yellow'
+
+        handout_gaps.append({
+            'name': g.gap_name or g.gap_type.replace('_', ' ').title(),
+            'status': status,
+            'status_class': status_class,
+            'freq_note': freq_note,
+            'description': g.description or '',
+        })
+
+    return render_template(
+        'caregap_print_handout.html',
+        first_name=first_name,
+        provider_name=getattr(current_user, 'full_name', '') or current_user.username,
+        visit_date=date.today().strftime('%B %d, %Y'),
+        gaps=handout_gaps,
     )
 
 

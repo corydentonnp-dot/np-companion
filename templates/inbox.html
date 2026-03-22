@@ -1,6 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Inbox — NP Companion{% endblock %}
+{% block title %}Inbox — CareCompanion{% endblock %}
 {% block page_id %}inbox{% endblock %}
+{% block breadcrumb_badge %}{% if items %}{{ items|length }} item{{ 's' if items|length != 1 }}{% endif %}{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header">
+    <h3>{% if view is defined and view == 'held' %}Held Items{% elif view is defined and view == 'audit' %}Audit Log{% elif view is defined and view == 'digest' %}Digest{% else %}Inbox{% endif %}</h3>
+</div>
+
+<div class="context-panel-section">
+    <div class="cp-section-label">Views</div>
+    <a href="/inbox" class="cp-link {{ 'active' if view is not defined or view == 'inbox' else '' }}">&#128235; Inbox</a>
+    <a href="/inbox/held" class="cp-link {{ 'active' if view is defined and view == 'held' else '' }}">&#9203; Held Items</a>
+    <a href="/inbox/audit-log" class="cp-link {{ 'active' if view is defined and view == 'audit' else '' }}">&#128196; Audit Log</a>
+    <a href="/inbox/digest" class="cp-link {{ 'active' if view is defined and view == 'digest' else '' }}">&#128202; Digest</a>
+</div>
+
+{% if snapshot and (view is not defined or view == 'inbox') %}
+<div class="context-panel-section">
+    <div class="cp-section-label">Latest Snapshot</div>
+    <div class="cp-stat"><span>Labs</span><span class="cp-stat-value">{{ snapshot.labs_count }}</span></div>
+    <div class="cp-stat"><span>Radiology</span><span class="cp-stat-value">{{ snapshot.radiology_count }}</span></div>
+    <div class="cp-stat"><span>Messages</span><span class="cp-stat-value">{{ snapshot.messages_count }}</span></div>
+    <div class="cp-stat"><span>Refills</span><span class="cp-stat-value">{{ snapshot.refills_count }}</span></div>
+    <div class="cp-stat"><span>Other</span><span class="cp-stat-value">{{ snapshot.other_count }}</span></div>
+</div>
+{% endif %}
+
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/notifications" class="cp-link">Notifications</a>
+    <a href="/oncall" class="cp-link">On-Call</a>
+    <a href="/orders" class="cp-link">Orders</a>
+</div>
+{% endblock %}
 
 {% block content %}
 <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
@@ -9,14 +42,6 @@
         {% elif view is defined and view == 'audit' %}Inbox Audit Log
         {% else %}Inbox Monitor{% endif %}
     </h1>
-</div>
-
-{# ---- Tab Navigation ---- #}
-<div style="display:flex;gap:8px;margin-bottom:16px;">
-    <a href="/inbox" class="btn {{ 'btn-primary' if view is not defined or view == 'inbox' else 'btn-outline' }}">Inbox</a>
-    <a href="/inbox/held" class="btn {{ 'btn-primary' if view is defined and view == 'held' else 'btn-outline' }}">Held Items</a>
-    <a href="/inbox/audit-log" class="btn {{ 'btn-primary' if view is defined and view == 'audit' else 'btn-outline' }}">Audit Log</a>
-    <a href="/inbox/digest" class="btn {{ 'btn-primary' if view is defined and view == 'digest' else 'btn-outline' }}">Digest</a>
 </div>
 
 {% if view is defined and view == 'digest' %}
@@ -181,7 +206,7 @@
             </thead>
             <tbody>
             {% for item in items %}
-                <tr>
+                <tr data-filterable>
                     <td><span class="badge badge--info">{{ item.item_type }}</span></td>
                     <td>{{ item.held_reason or 'No reason given' }}</td>
                     <td>{{ item.first_seen_at.strftime('%m/%d/%Y %I:%M %p') }}</td>
@@ -204,37 +229,6 @@
 {% else %}
 {# ---- Main Inbox View ---- #}
 
-{# Snapshot Summary Card #}
-{% if snapshot %}
-<div class="card" style="max-width:640px;margin-bottom:24px;">
-    <div class="card-header">Latest Snapshot — {{ snapshot.captured_at.strftime('%m/%d/%Y %I:%M %p') if snapshot else 'N/A' }}</div>
-    <div class="card-body">
-        <div style="display:flex;gap:24px;flex-wrap:wrap;">
-            <div style="text-align:center;">
-                <div style="font-size:24px;font-weight:600;">{{ snapshot.labs_count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Labs</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:24px;font-weight:600;">{{ snapshot.radiology_count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Radiology</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:24px;font-weight:600;">{{ snapshot.messages_count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Messages</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:24px;font-weight:600;">{{ snapshot.refills_count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Refills</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:24px;font-weight:600;">{{ snapshot.other_count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Other</div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 {# Unresolved Items Table #}
 <div class="card" style="max-width:900px;">
     <div class="card-header">Unresolved Items ({{ items|length }})</div>
@@ -253,7 +247,7 @@
             </thead>
             <tbody>
             {% for item in items %}
-                <tr>
+                <tr data-filterable>
                     <td>
                         {% if item._age_class is defined and item._age_class == 'critical' %}
                             <span style="color:#e74c3c;" title="{{ item._age_hours }}h old">&#128340;</span>

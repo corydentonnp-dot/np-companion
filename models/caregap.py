@@ -1,7 +1,7 @@
 """
-NP Companion — Care Gap Models
+CareCompanion — Care Gap Models
 
-File location: np-companion/models/caregap.py
+File location: carecompanion/models/caregap.py
 
 Two tables:
   - CareGap:       Per-patient preventive care gaps evaluated by the
@@ -45,6 +45,9 @@ class CareGap(db.Model):
 
     # 'open', 'in_progress', 'addressed', 'declined', 'not_applicable'
     status = db.Column(db.String(30), default='open')
+
+    # If dismissed/declined, the provider's reason (Phase 14)
+    dismissal_reason = db.Column(db.Text, nullable=True)
 
     # ---- Provider actions ------------------------------------------------
     is_addressed = db.Column(db.Boolean, default=False)

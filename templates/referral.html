@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Referral Letter Generator — NP Companion{% endblock %}
+{% block title %}Referral Letter Generator — CareCompanion{% endblock %}
 {% block page_id %}referral{% endblock %}
 
 {% block content %}
@@ -51,6 +51,7 @@
                     <label class="form-label">Current Medications</label>
                     <textarea id="ref-meds" class="form-input" rows="2" placeholder="Active medication list..."></textarea>
                 </div>
+                <div id="specialty-fields"></div>
                 <button class="btn btn-primary" onclick="generateReferral()" id="ref-gen-btn" style="width:100%;">Generate Letter</button>
             </div>
         </div>
@@ -109,11 +110,41 @@
 </div>
 
 <script>
+var SPECIALTY_FIELDS = {{ specialty_fields_json|safe }};
+
+document.getElementById('ref-specialty').addEventListener('change', function() {
+    var container = document.getElementById('specialty-fields');
+    container.innerHTML = '';
+    var fields = SPECIALTY_FIELDS[this.value] || [];
+    fields.forEach(function(f) {
+        var div = document.createElement('div');
+        div.className = 'form-group';
+        var label = document.createElement('label');
+        label.className = 'form-label';
+        label.textContent = f.label;
+        div.appendChild(label);
+        var input;
+        if (f.type === 'textarea') {
+            input = document.createElement('textarea');
+            input.rows = 2;
+        } else {
+            input = document.createElement('input');
+            input.type = 'text';
+        }
+        input.className = 'form-input';
+        input.id = 'spec-' + f.name;
+        input.placeholder = f.placeholder || '';
+        div.appendChild(input);
+        container.appendChild(div);
+    });
+});
+
 function generateReferral() {
     var btn = document.getElementById('ref-gen-btn');
     btn.disabled = true; btn.textContent = 'Generating...';
+    var specialty = document.getElementById('ref-specialty').value;
     var data = {
-        specialty: document.getElementById('ref-specialty').value,
+        specialty: specialty,
         reason: document.getElementById('ref-reason').value.trim(),
         patient_display: document.getElementById('ref-patient').value.trim(),
         urgency: document.getElementById('ref-urgency').value,
@@ -121,6 +152,12 @@ function generateReferral() {
         key_findings: document.getElementById('ref-findings').value.trim(),
         current_medications: document.getElementById('ref-meds').value.trim(),
     };
+    // Include specialty-specific fields
+    var specFields = SPECIALTY_FIELDS[specialty] || [];
+    specFields.forEach(function(f) {
+        var el = document.getElementById('spec-' + f.name);
+        if (el) data[f.name] = el.value.trim();
+    });
     fetch('/referral/generate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
         .then(function(r){return r.json();})
         .then(function(d){

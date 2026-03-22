@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Staff Billing Tasks{% endblock %}
+{% block page_id %}staff-billing{% endblock %}
+
+{% block subpanel %}
+<div class="context-panel-header"><h3>Billing Tasks</h3></div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Filter by Role</div>
+    <button class="cp-filter" onclick="filterRole('all',this)" data-role="all">All Roles ({{ tasks|length if tasks is defined else 0 }})</button>
+    {% for role in roles %}
+    <button class="cp-filter" onclick="filterRole('{{ role }}',this)" data-role="{{ role }}">{{ role|replace('_',' ')|title }} ({{ role_counts.get(role, 0) }})</button>
+    {% endfor %}
+</div>
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/timer" class="cp-link">Timer</a>
+    <a href="/bonus" class="cp-link">Bonus Tracker</a>
+    <a href="/orders" class="cp-link">Orders</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1100px;margin:0 auto;padding:24px;">
+    <h2>&#128203; Staff Billing Tasks</h2>
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px;">
+        Role-filtered daily task view — shows billing-related prep, action, and follow-up tasks routed to each staff role.
+    </p>
+
+    {# Role filter tabs #}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;">
+        <button class="btn btn-sm role-tab active" data-role="all" onclick="filterRole('all',this)"
+                style="padding:6px 14px;border-radius:20px;font-size:12px;background:var(--color-primary);color:#fff;border:none;">All</button>
+        {% for role in roles %}
+        <button class="btn btn-sm role-tab" data-role="{{ role }}" onclick="filterRole('{{ role }}',this)"
+                style="padding:6px 14px;border-radius:20px;font-size:12px;background:var(--bg-muted);color:var(--text-primary);border:1px solid var(--border);">
+            {{ role|replace('_',' ')|title }}
+            <span class="badge" style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--color-primary);color:#fff;margin-left:4px;">{{ role_counts.get(role, 0) }}</span>
+        </button>
+        {% endfor %}
+    </div>
+
+    {# Timing groups #}
+    {% for timing_label, timing_key in [('Pre-Visit', 'pre_visit'), ('During Visit', 'during_visit'), ('Post-Visit', 'post_visit'), ('Daily', 'daily'), ('Monthly', 'monthly')] %}
+    {% set tasks = grouped.get(timing_key, []) %}
+    {% if tasks %}
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-header" style="font-size:14px;">
+            {% if timing_key == 'pre_visit' %}&#128197;{% elif timing_key == 'during_visit' %}&#9202;{% elif timing_key == 'post_visit' %}&#128203;{% elif timing_key == 'daily' %}&#128260;{% else %}&#128198;{% endif %}
+            {{ timing_label }}
+            <span style="font-size:12px;color:var(--text-secondary);margin-left:6px;">({{ tasks|length }} tasks)</span>
+        </div>
+        <div class="card-body" style="padding:0;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:var(--bg-muted);text-align:left;">
+                        <th style="padding:8px 12px;">Task</th>
+                        <th style="padding:8px 12px;width:120px;">Role</th>
+                        <th style="padding:8px 12px;width:100px;">Code</th>
+                        <th style="padding:8px 12px;">Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tasks %}
+                    <tr class="task-row" data-filterable data-role="{{ t.responsible_role }}" style="border-top:1px solid var(--border);">
+                        <td style="padding:8px 12px;font-weight:600;">{{ t.routing_reason }}</td>
+                        <td style="padding:8px 12px;">
+                            <span style="font-size:11px;padding:2px 8px;border-radius:10px;
+                                {% if t.responsible_role == 'ma' %}background:#dff0d8;color:#3c763d;
+                                {% elif t.responsible_role == 'nurse' %}background:#d9edf7;color:#31708f;
+                                {% elif t.responsible_role == 'provider' %}background:#fcf8e3;color:#8a6d3b;
+                                {% elif t.responsible_role == 'biller' %}background:#f2dede;color:#a94442;
+                                {% elif t.responsible_role == 'front_desk' %}background:#e8daef;color:#6c3483;
+                                {% elif t.responsible_role == 'referral_coordinator' %}background:#d5f5e3;color:#1e8449;
+                                {% else %}background:#eee;color:#333;{% endif %}">
+                                {{ t.responsible_role|replace('_',' ')|title }}
+                            </span>
+                        </td>
+                        <td style="padding:8px 12px;font-family:monospace;font-size:11px;">{{ t.opportunity_code }}</td>
+                        <td style="padding:8px 12px;color:var(--text-secondary);font-size:12px;">{{ t.prep_task_description }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% if not grouped %}
+    <div class="card">
+        <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
+            No staff routing rules configured. Run the seeder to populate.
+        </div>
+    </div>
+    {% endif %}
+
+    <div style="font-size:11px;color:var(--text-secondary);margin-top:16px;padding:12px;background:var(--bg-muted);border-radius:6px;">
+        <strong>About Staff Routing:</strong> Tasks are assigned based on the billing opportunity type and
+        optimal workflow efficiency. Roles include MA (rooming prep), Nurse (care coordination),
+        Front Desk (scheduling), Referral Coordinator (external orders), Biller (coding verification),
+        Provider (clinical decisions), and Office Manager (oversight).
+    </div>
+</div>
+
+<script>
+function filterRole(role, btn) {
+    document.querySelectorAll('.role-tab').forEach(function(t) {
+        t.classList.remove('active');
+        t.style.background = 'var(--bg-muted)';
+        t.style.color = 'var(--text-primary)';
+    });
+    btn.classList.add('active');
+    btn.style.background = 'var(--color-primary)';
+    btn.style.color = '#fff';
+    document.querySelectorAll('.task-row').forEach(function(row) {
+        if (role === 'all' || row.dataset.role === role) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

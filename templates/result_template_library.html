@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Result Template Library — CareCompanion{% endblock %}
+{% block page_id %}template-library{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Result Template Library</h1>
+    <span class="badge badge--success">F19a</span>
+    <button class="btn btn-primary" onclick="showCreateForm()" style="margin-left:auto;">+ New Template</button>
+</div>
+
+{# ---- Create / Edit Modal ---- #}
+<div id="template-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;display:none;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:520px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+        <h3 id="modal-title" style="margin:0 0 16px;">New Template</h3>
+        <div class="form-group">
+            <label class="form-label">Name</label>
+            <input type="text" id="tpl-name" class="form-input" placeholder="e.g., Normal CBC Result">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Category</label>
+            <select id="tpl-category" class="form-input">
+                {% for c in categories %}
+                <option value="{{ c }}">{{ c|replace('_',' ')|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Body Template</label>
+            <textarea id="tpl-body" class="form-input" rows="6" placeholder="Use {patient_name}, {test_name}, {result_value} as placeholders..."></textarea>
+        </div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+            Placeholders: <code>{patient_name}</code>, <code>{test_name}</code>, <code>{result_value}</code>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" id="modal-save-btn" onclick="saveTemplate()">Save</button>
+        </div>
+    </div>
+</div>
+
+{# ---- Preview Modal ---- #}
+<div id="preview-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:520px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+        <h3 style="margin:0 0 16px;">Template Preview</h3>
+        <div id="preview-content" style="padding:16px;background:var(--bg-secondary,#f8fafc);border-radius:6px;font-size:14px;line-height:1.6;white-space:pre-wrap;"></div>
+        <div style="margin-top:12px;text-align:right;">
+            <button class="btn btn-outline" onclick="document.getElementById('preview-modal').style.display='none'">Close</button>
+        </div>
+    </div>
+</div>
+
+{# ---- Tabs ---- #}
+<div style="display:flex;gap:4px;margin-bottom:16px;">
+    <button class="btn btn-sm" id="tab-mine" onclick="showTab('mine')" style="font-weight:600;">My Templates ({{ my_templates|length }})</button>
+    <button class="btn btn-sm btn-outline" id="tab-shared" onclick="showTab('shared')">Shared ({{ shared_templates|length }})</button>
+    <button class="btn btn-sm btn-outline" id="tab-system" onclick="showTab('system')">System ({{ system_templates|length }})</button>
+</div>
+
+{# ---- Category Filter ---- #}
+<div style="margin-bottom:12px;">
+    <select id="cat-filter" class="form-input" style="width:auto;min-width:160px;" onchange="filterCategory()">
+        <option value="">All Categories</option>
+        {% for c in categories %}
+        <option value="{{ c }}">{{ c|replace('_',' ')|title }}</option>
+        {% endfor %}
+    </select>
+</div>
+
+{# ---- My Templates ---- #}
+<div id="panel-mine">
+    {% if my_templates %}
+    <table class="schedule-table" style="font-size:13px;">
+        <thead>
+            <tr><th>Name</th><th>Category</th><th>Shared</th><th>Legal</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for t in my_templates %}
+            <tr data-cat="{{ t.category }}">
+                <td style="font-weight:500;">{{ t.name }}</td>
+                <td><span class="badge badge--info">{{ t.category|replace('_',' ')|title }}</span></td>
+                <td>{% if t.is_shared %}<span class="badge badge--success">Shared</span>{% else %}Private{% endif %}</td>
+                <td>{% if t.legal_reviewed %}<span class="badge badge--success">✓</span>{% else %}<span style="color:var(--color-orange);">Pending</span>{% endif %}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn btn-sm btn-outline" onclick="previewTemplate({{ t.id }}, '{{ t.body_template|e }}')">👁</button>
+                    <button class="btn btn-sm btn-outline" onclick="editTemplate({{ t.id }}, '{{ t.name|e }}', '{{ t.category }}', '{{ t.body_template|e }}')">✏️</button>
+                    <button class="btn btn-sm btn-outline" onclick="toggleShare({{ t.id }})">{{ '🔓' if t.is_shared else '🔒' }}</button>
+                    <button class="btn btn-sm btn-outline" onclick="deleteTemplate({{ t.id }})" title="Delete">🗑</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div style="padding:24px;text-align:center;color:var(--text-secondary);font-size:13px;">
+        No personal templates yet. Click "+ New Template" to create one, or fork a shared/system template.
+    </div>
+    {% endif %}
+</div>
+
+{# ---- Shared Templates ---- #}
+<div id="panel-shared" style="display:none;">
+    {% for t in shared_templates %}
+    {% if not t.legal_reviewed %}
+    <div style="padding:8px 12px;background:var(--color-orange,#e67e22);color:#fff;border-radius:6px;margin-bottom:8px;font-size:13px;">
+        ⚠ Some shared templates have not been legally reviewed.
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% if shared_templates %}
+    <table class="schedule-table" style="font-size:13px;">
+        <thead>
+            <tr><th>Name</th><th>Category</th><th>Owner</th><th>Legal</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for t in shared_templates %}
+            <tr data-cat="{{ t.category }}">
+                <td style="font-weight:500;">{{ t.name }}</td>
+                <td><span class="badge badge--info">{{ t.category|replace('_',' ')|title }}</span></td>
+                <td>{{ t.user.display_name or t.user.username if t.user else '—' }}</td>
+                <td>{% if t.legal_reviewed %}<span class="badge badge--success">✓</span>{% else %}<span style="color:var(--color-orange);">Pending</span>{% endif %}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn btn-sm btn-outline" onclick="previewTemplate({{ t.id }}, '{{ t.body_template|e }}')">👁</button>
+                    <button class="btn btn-sm btn-outline" onclick="forkTemplate({{ t.id }})" title="Fork to My Templates">📋 Fork</button>
+                    <button class="btn btn-sm btn-outline" onclick="flagReviewed({{ t.id }})" title="Mark as Legally Reviewed">⚖️</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div style="padding:24px;text-align:center;color:var(--text-secondary);font-size:13px;">No shared templates available.</div>
+    {% endif %}
+</div>
+
+{# ---- System Templates ---- #}
+<div id="panel-system" style="display:none;">
+    {% if system_templates %}
+    <table class="schedule-table" style="font-size:13px;">
+        <thead>
+            <tr><th>Name</th><th>Category</th><th>Legal</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            {% for t in system_templates %}
+            <tr data-cat="{{ t.category }}">
+                <td style="font-weight:500;">{{ t.name }}</td>
+                <td><span class="badge badge--info">{{ t.category|replace('_',' ')|title }}</span></td>
+                <td>{% if t.legal_reviewed %}<span class="badge badge--success">✓</span>{% else %}<span style="color:var(--color-orange);">Pending</span>{% endif %}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn btn-sm btn-outline" onclick="previewTemplate({{ t.id }}, '{{ t.body_template|e }}')">👁</button>
+                    <button class="btn btn-sm btn-outline" onclick="forkTemplate({{ t.id }})" title="Fork to My Templates">📋 Fork</button>
+                    <button class="btn btn-sm btn-outline" onclick="flagReviewed({{ t.id }})" title="Mark as Legally Reviewed">⚖️</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div style="padding:24px;text-align:center;color:var(--text-secondary);font-size:13px;">No system templates seeded.</div>
+    {% endif %}
+</div>
+
+<script>
+var _activeTab = 'mine';
+var _editingId = null;
+
+function showTab(tab) {
+    ['mine','shared','system'].forEach(function(t) {
+        document.getElementById('panel-' + t).style.display = (t === tab) ? '' : 'none';
+        var btn = document.getElementById('tab-' + t);
+        btn.className = (t === tab) ? 'btn btn-sm' : 'btn btn-sm btn-outline';
+        if (t === tab) btn.style.fontWeight = '600'; else btn.style.fontWeight = '';
+    });
+    _activeTab = tab;
+    filterCategory();
+}
+
+function filterCategory() {
+    var cat = document.getElementById('cat-filter').value;
+    var panel = document.getElementById('panel-' + _activeTab);
+    var rows = panel.querySelectorAll('tr[data-cat]');
+    rows.forEach(function(r) {
+        r.style.display = (!cat || r.getAttribute('data-cat') === cat) ? '' : 'none';
+    });
+}
+
+function showCreateForm() {
+    _editingId = null;
+    document.getElementById('modal-title').textContent = 'New Template';
+    document.getElementById('tpl-name').value = '';
+    document.getElementById('tpl-category').value = 'normal';
+    document.getElementById('tpl-body').value = '';
+    document.getElementById('template-modal').style.display = 'flex';
+}
+
+function editTemplate(id, name, category, body) {
+    _editingId = id;
+    document.getElementById('modal-title').textContent = 'Edit Template';
+    document.getElementById('tpl-name').value = name;
+    document.getElementById('tpl-category').value = category;
+    document.getElementById('tpl-body').value = body;
+    document.getElementById('template-modal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('template-modal').style.display = 'none';
+}
+
+function saveTemplate() {
+    var data = {
+        name: document.getElementById('tpl-name').value.trim(),
+        category: document.getElementById('tpl-category').value,
+        body_template: document.getElementById('tpl-body').value.trim(),
+    };
+    var url = _editingId ? '/tools/templates/' + _editingId + '/update' : '/tools/templates/create';
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.success) { location.reload(); } else { alert(d.error || 'Error'); }
+        });
+}
+
+function deleteTemplate(id) {
+    if (!confirm('Delete this template?')) return;
+    fetch('/tools/templates/' + id + '/delete', {method:'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (d.success) location.reload(); });
+}
+
+function toggleShare(id) {
+    fetch('/tools/templates/' + id + '/share', {method:'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (d.success) location.reload(); });
+}
+
+function forkTemplate(id) {
+    fetch('/tools/templates/' + id + '/fork', {method:'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (d.success) { alert('Forked! Check My Templates.'); location.reload(); } });
+}
+
+function flagReviewed(id) {
+    fetch('/tools/templates/' + id + '/flag-reviewed', {method:'POST'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (d.success) location.reload(); else alert(d.error || 'Error'); });
+}
+
+function previewTemplate(id, body) {
+    var rendered = body
+        .replace(/\{patient_name\}/g, 'Jane Doe')
+        .replace(/\{test_name\}/g, 'CBC with Differential')
+        .replace(/\{result_value\}/g, 'Within Normal Limits');
+    document.getElementById('preview-content').textContent = rendered;
+    document.getElementById('preview-modal').style.display = 'flex';
+}
+</script>
+{% endblock %}

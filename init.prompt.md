@@ -1,4 +1,4 @@
-# NP Companion — Master Project Instructions
+# CareCompanion Ã¢â‚¬â€ Master Project Instructions
 # File: init.prompt.md
 # Location: project root (alongside app.py)
 #
@@ -9,12 +9,12 @@
 
 ## Project Overview
 
-NP Companion is a locally-hosted clinical workflow automation platform for a
+CareCompanion is a locally-hosted clinical workflow automation platform for a
 family nurse practitioner at a primary care office. It automates repetitive
 tasks inside two legacy Windows desktop applications that have no public API:
 
-- **Amazing Charts** — the clinic's EHR / charting software (desktop app)
-- **NetPractice / WebPractice** — scheduling and patient communications (web app)
+- **Amazing Charts** Ã¢â‚¬â€ the clinic's EHR / charting software (desktop app)
+- **NetPractice / WebPractice** Ã¢â‚¬â€ scheduling and patient communications (web app)
 
 The platform runs as a Flask web server on the provider's work PC. It is
 accessible from any Chrome browser on the clinic network and remotely via
@@ -24,7 +24,7 @@ screen-reading, and scheduled jobs.
 
 **The developer is a non-programmer.** All code must be:
 - Clearly commented in plain English
-- Simple and explicit — never clever or overly terse
+- Simple and explicit Ã¢â‚¬â€ never clever or overly terse
 - Broken into small, testable functions
 - Consistent with patterns already established in the project
 
@@ -37,12 +37,14 @@ When two approaches are equally valid, always choose the more readable one.
 | Document | Location | Purpose |
 |----------|----------|---------|
 | This file | `init.prompt.md` | Coding rules, conventions, HIPAA, architecture |
-| Development Guide | `Documents/NP_Companion_Development_Guide.md` | Phase-by-phase feature specs, 94 features, master build checklist |
-| API Integration Plan | `Documents/np_companion_api_intelligence_plan.md` | All 17+ external APIs, caching, offline, billing intelligence |
-| AC Interface Reference | `Documents/ac_interface_reference_v2.md` | Amazing Charts UI ground truth, automation reference, clinical summary pipeline |
-| Deployment Guide | `Documents/Deployment_Guide.md` | Build, transfer, install, update workflow |
-| Verification Checklist | `Documents/VERIFICATION_CHECKLIST.md` | Step-by-step testing for non-programmers |
-| Project Status | `PROJECT_STATUS.md` | Current build state, what's done, what's next |
+| Copilot Instructions | `.github/copilot-instructions.md` | VS Code Copilot rules, HIPAA, doc management, session workflow |
+| Active Plan | `Documents/dev_guide/ACTIVE_PLAN.md` | Current sprint / work-in-progress plan |
+| Development Guide | `Documents/dev_guide/CARECOMPANION_DEVELOPMENT_GUIDE.md` | Phase-by-phase feature specs (the "bible") |
+| Project Status | `Documents/dev_guide/PROJECT_STATUS.md` | Build state, Feature Registry, dependency list |
+| API Integration Plan | `Documents/dev_guide/API_INTEGRATION_PLAN.md` | All 17+ external APIs, caching, offline, billing intelligence |
+| AC Interface Reference | `Documents/dev_guide/AC_INTERFACE_REFERENCE_V4.md` | Amazing Charts UI ground truth, automation reference |
+| Deployment Guide | `Documents/dev_guide/DEPLOYMENT_GUIDE.md` | Build, transfer, install, update workflow |
+| Changelog | `Documents/CHANGE_LOG.md` | All changes, single authoritative log |
 
 ---
 
@@ -50,7 +52,7 @@ When two approaches are equally valid, always choose the more readable one.
 
 | Layer              | Technology                                      |
 |--------------------|-------------------------------------------------|
-| Language           | Python 3.11 (strictly — not 3.12+)             |
+| Language           | Python 3.11 (strictly Ã¢â‚¬â€ not 3.12+)             |
 | Web framework      | Flask with app factory pattern                  |
 | Database ORM       | SQLAlchemy + SQLite                             |
 | Authentication     | Flask-Login + Flask-Bcrypt                      |
@@ -82,116 +84,126 @@ When two approaches are equally valid, always choose the more readable one.
 ## Project Folder Structure
 
 ```
-NP_Companion/
-├── app.py                    ← Flask app factory + blueprint registration
-├── agent_service.py          ← Windows system tray background agent
-├── config.py                 ← Machine-specific settings (NEVER commit)
-├── build.py                  ← PyInstaller build script
-├── npcompanion.spec          ← PyInstaller spec file
-├── requirements.txt          ← All Python dependencies pinned to versions
-├── init.prompt.md            ← This file
-├── PROJECT_STATUS.md         ← Current build state
-├── launcher.py               ← Starts Flask + agent together
-├── .gitignore
-│
-├── models/
-│   ├── __init__.py           ← db = SQLAlchemy(), import all models here
-│   ├── user.py               ← User accounts, roles, preferences, PIN
-│   ├── patient.py            ← Patient data, clinical summaries, cache tables
-│   ├── timelog.py            ← Chart time + face-to-face timer records
-│   ├── inbox.py              ← InboxSnapshot + InboxItem diff tracking
-│   ├── oncall.py             ← After-hours call notes
-│   ├── orderset.py           ← OrderSet + OrderItem + OrderSetVersion
-│   ├── medication.py         ← Medication reference entries
-│   ├── labtrack.py           ← LabTrack criteria + LabResult values
-│   ├── caregap.py            ← Preventive care gap records
-│   ├── tickler.py            ← Follow-up reminder items
-│   ├── message.py            ← Delayed message queue
-│   ├── notification.py       ← Notification log entries
-│   ├── audit.py              ← AuditLog model
-│   ├── schedule.py           ← Schedule data from NetPractice
-│   ├── agent.py              ← Agent status/error log models
-│   └── reformatter.py        ← Note reformat session logs
-│
-├── routes/
-│   ├── __init__.py
-│   ├── auth.py               ← /login /logout /register /settings
-│   ├── dashboard.py          ← / and /dashboard (Today View)
-│   ├── patient.py            ← /patient/<mrn> (Patient Chart View)
-│   ├── timer.py              ← /timer /billing
-│   ├── inbox.py              ← /inbox
-│   ├── oncall.py             ← /oncall
-│   ├── orders.py             ← /orders /prep
-│   ├── medref.py             ← /medref
-│   ├── labtrack.py           ← /labtrack
-│   ├── caregap.py            ← /caregap
-│   ├── metrics.py            ← /metrics /briefing
-│   ├── tools.py              ← /tickler /cs-tracker /pa /referral
-│   │                           /macros /coding /notifications /eod
-│   ├── admin.py              ← /admin/* routes
-│   ├── agent_api.py          ← /agent/* API endpoints
-│   ├── ai_api.py             ← /ai/* AI panel endpoints
-│   └── netpractice_admin.py  ← /netpractice/* admin routes
-│
-├── templates/
-│   ├── base.html             ← Shared layout: nav, header, auto-lock, AI panel
-│   ├── login.html
-│   ├── dashboard.html        ← Today View
-│   └── [one .html per route]
-│
-├── static/
-│   ├── css/main.css          ← All styles, CSS custom properties
-│   └── js/
-│       ├── main.js           ← Shared JS: dark mode, auto-lock, clock, AI panel
-│       └── service-worker.js ← Offline caching
-│
-├── agent/
-│   ├── mrn_reader.py         ← OCR loop: reads MRN every 3 seconds
-│   ├── inbox_monitor.py      ← Inbox OCR + diff snapshot comparison
-│   ├── inbox_reader.py       ← Filter dropdown cycling + OCR row extraction
-│   ├── inbox_digest.py       ← Daily inbox digest notification
-│   ├── ac_window.py          ← win32gui window management + MRN from title bar
-│   ├── ocr_helpers.py        ← OCR-first element detection engine for AC automation
-│   ├── clinical_summary_parser.py ← XML CDA parser, all structured sections
-│   ├── scheduler.py          ← APScheduler job definitions
-│   ├── notifier.py           ← Pushover sender with quiet hours logic
-│   ├── pyautogui_runner.py   ← Amazing Charts mouse/keyboard executor
-│   └── caregap_engine.py     ← USPSTF rules evaluation
-│
-├── utils/
-│   └── [utility modules]
-│
-├── scrapers/
-│   └── netpractice.py        ← Playwright schedule + messaging scraper
-│
-├── scripts/
-│   ├── seed_master_orders.py ← Seed order catalog from AC orders spreadsheet
-│   └── seed_test_data.py     ← Seed test data for development
-│
-├── Documents/                ← Project documentation (see Key Documents table)
+CareCompanion/
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app.py                    Ã¢â€ Â Flask app factory + blueprint registration
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ agent_service.py          Ã¢â€ Â Windows system tray background agent
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ config.py                 Ã¢â€ Â Machine-specific settings (NEVER commit)
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ build.py                  Ã¢â€ Â PyInstaller build script
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ carecompanion.spec          Ã¢â€ Â PyInstaller spec file
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ requirements.txt          Ã¢â€ Â All Python dependencies pinned to versions
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ init.prompt.md            Ã¢â€ Â This file
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ launcher.py               Ã¢â€ Â Starts Flask + agent together
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ .gitignore
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ models/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ __init__.py           Ã¢â€ Â db = SQLAlchemy(), import all models here
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ user.py               Ã¢â€ Â User accounts, roles, preferences, PIN
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ patient.py            Ã¢â€ Â Patient data, clinical summaries, cache tables
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ timelog.py            Ã¢â€ Â Chart time + face-to-face timer records
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ inbox.py              Ã¢â€ Â InboxSnapshot + InboxItem diff tracking
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ oncall.py             Ã¢â€ Â After-hours call notes
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ orderset.py           Ã¢â€ Â OrderSet + OrderItem + OrderSetVersion
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ medication.py         Ã¢â€ Â Medication reference entries
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ labtrack.py           Ã¢â€ Â LabTrack criteria + LabResult values
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ caregap.py            Ã¢â€ Â Preventive care gap records
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ tickler.py            Ã¢â€ Â Follow-up reminder items
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ message.py            Ã¢â€ Â Delayed message queue
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ notification.py       Ã¢â€ Â Notification log entries
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ audit.py              Ã¢â€ Â AuditLog model
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ schedule.py           Ã¢â€ Â Schedule data from NetPractice
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ agent.py              Ã¢â€ Â Agent status/error log models
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ reformatter.py        Ã¢â€ Â Note reformat session logs
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ routes/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ __init__.py
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ auth.py               Ã¢â€ Â /login /logout /register /settings
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ dashboard.py          Ã¢â€ Â / and /dashboard (Today View)
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ patient.py            Ã¢â€ Â /patient/<mrn> (Patient Chart View)
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ timer.py              Ã¢â€ Â /timer /billing
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ inbox.py              Ã¢â€ Â /inbox
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ oncall.py             Ã¢â€ Â /oncall
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ orders.py             Ã¢â€ Â /orders /prep
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ medref.py             Ã¢â€ Â /medref
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ labtrack.py           Ã¢â€ Â /labtrack
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ caregap.py            Ã¢â€ Â /caregap
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ metrics.py            Ã¢â€ Â /metrics /briefing
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ tools.py              Ã¢â€ Â /tickler /cs-tracker /pa /referral
+Ã¢â€â€š   Ã¢â€â€š                           /macros /coding /notifications /eod
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ admin.py              Ã¢â€ Â /admin/* routes
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ agent_api.py          Ã¢â€ Â /agent/* API endpoints
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ ai_api.py             Ã¢â€ Â /ai/* AI panel endpoints
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ netpractice_admin.py  Ã¢â€ Â /netpractice/* admin routes
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ templates/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ base.html             Ã¢â€ Â Shared layout: nav, header, auto-lock, AI panel
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ login.html
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ dashboard.html        Ã¢â€ Â Today View
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ [one .html per route]
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ static/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ css/main.css          Ã¢â€ Â All styles, CSS custom properties
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ js/
+Ã¢â€â€š       Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ main.js           Ã¢â€ Â Shared JS: dark mode, auto-lock, clock, AI panel
+Ã¢â€â€š       Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ service-worker.js Ã¢â€ Â Offline caching
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ agent/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ mrn_reader.py         Ã¢â€ Â OCR loop: reads MRN every 3 seconds
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ inbox_monitor.py      Ã¢â€ Â Inbox OCR + diff snapshot comparison
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ inbox_reader.py       Ã¢â€ Â Filter dropdown cycling + OCR row extraction
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ inbox_digest.py       Ã¢â€ Â Daily inbox digest notification
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ ac_window.py          Ã¢â€ Â win32gui window management + MRN from title bar
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ ocr_helpers.py        Ã¢â€ Â OCR-first element detection engine for AC automation
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ clinical_summary_parser.py Ã¢â€ Â XML CDA parser, all structured sections
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ scheduler.py          Ã¢â€ Â APScheduler job definitions
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ notifier.py           Ã¢â€ Â Pushover sender with quiet hours logic
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ pyautogui_runner.py   Ã¢â€ Â Amazing Charts mouse/keyboard executor
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ caregap_engine.py     Ã¢â€ Â USPSTF rules evaluation
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ utils/
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ [utility modules]
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ scrapers/
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ netpractice.py        Ã¢â€ Â Playwright schedule + messaging scraper
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ scripts/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ seed_master_orders.py Ã¢â€ Â Seed order catalog from AC orders spreadsheet
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ seed_test_data.py     Ã¢â€ Â Seed test data for development
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ Documents/                Ã¢â€ Â Project documentation (see Key Documents table)
 │   ├── ac_interface_reference/  ← AC screenshots + sample files
-│   │   ├── Amazing charts interface/
-│   │   │   ├── ..md files/
-│   │   │   │   └── ac_interface_reference_v4.md  ← GROUND TRUTH (3459 lines)
-│   │   │   ├── screenshots/       ← 50+ AC screenshots
-│   │   │   └── Order Sets/
-│   │   │       └── AC orders.xlsx  ← Full order catalog (~870 items)
-│   │   ├── *.png                  ← Legacy AC screenshots
-│   │   └── ClinicalSummary_*.xml  ← Sample CDA XML export
-│   └── [documentation .md files]
-│
-├── tests/
-│   ├── ac_mock.py             ← Mock provider: simulates AC using screenshots
-│   └── test_agent_mock.py     ← Standalone mock test runner
-│
-├── data/                     ← Runtime only — excluded from Git
-│   ├── npcompanion.db        ← SQLite database
-│   ├── np_session.pkl        ← NetPractice Playwright session cookies
-│   ├── active_user.json      ← Currently active provider ID for agent
-│   ├── clinical_summaries/   ← XML exports, auto-deleted after 183 days
-│   └── backups/              ← Nightly database backups
-│
-└── migrate_*.py              ← Database migration scripts (idempotent)
+│   │   ├── screenshots/       ← 56 AC screenshots (snake_case PNGs)
+│   │   └── order_sets/
+│   │       └── AC orders.xlsx  ← Full order catalog (~870 items)
+│   ├── dev_guide/              ← Development guides + plans
+│   │   ├── _ACTIVE_FINAL_PLAN.md  ← Current next-steps plan
+│   │   ├── RUNNING_PLAN.md        ← Frozen historical plan (Phases 1–38+)
+│   │   ├── AC_INTERFACE_REFERENCE_V4.md  ← GROUND TRUTH (3459 lines)
+│   │   ├── CARECOMPANION_DEVELOPMENT_GUIDE.md
+│   │   ├── API_INTEGRATION_PLAN.md
+│   │   ├── PRE_BETA_DEPLOYMENT_CHECKLIST.md
+│   │   ├── DEPLOYMENT_GUIDE.md     ← Build, transfer, install, update
+│   │   ├── SETUP_GUIDE.md          ← New machine setup instructions
+│   │   └── PROJECT_STATUS.md       ← Current build state snapshot
+│   ├── overview/               ← High-level project docs (hidden from deployment)
+│   │   ├── ABOUT.md
+│   │   ├── README.md
+│   │   └── SECURITY.md           ← HIPAA & compliance overview
+│   ├── billing_resources/      ← Billing prompts + payer guides
+│   ├── xml_test_patients/      ← Test patient XML files
+│   └── _archive/               ← Superseded/historical files
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ tests/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ ac_mock.py             Ã¢â€ Â Mock provider: simulates AC using screenshots
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ test_agent_mock.py     Ã¢â€ Â Standalone mock test runner
+Ã¢â€â€š
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ data/                     Ã¢â€ Â Runtime only Ã¢â‚¬â€ excluded from Git
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ carecompanion.db        Ã¢â€ Â SQLite database
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ np_session.pkl        Ã¢â€ Â NetPractice Playwright session cookies
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ active_user.json      Ã¢â€ Â Currently active provider ID for agent
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ clinical_summaries/   Ã¢â€ Â XML exports, auto-deleted after 183 days
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ backups/              Ã¢â€ Â Nightly database backups
+Ã¢â€â€š
+Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ migrate_*.py              Ã¢â€ Â Database migration scripts (idempotent)
 ```
 
 ---
@@ -200,7 +212,7 @@ NP_Companion/
 
 ### App Factory Pattern
 ```python
-# app.py — always use create_app()
+# app.py Ã¢â‚¬â€ always use create_app()
 def create_app():
     app = Flask(__name__)
     app.config.from_object('config')
@@ -253,7 +265,7 @@ def index():
 # CORRECT
 records = TimeLog.query.filter_by(user_id=current_user.id).all()
 
-# WRONG — never return all users' data
+# WRONG Ã¢â‚¬â€ never return all users' data
 records = TimeLog.query.all()
 ```
 
@@ -276,7 +288,7 @@ created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 ```
 
 ### Never Delete Clinical Records
-Use soft deletion — set an `is_archived` or `is_resolved` flag. Hard deletes
+Use soft deletion Ã¢â‚¬â€ set an `is_archived` or `is_resolved` flag. Hard deletes
 are only allowed on non-clinical data (e.g., draft messages not yet sent).
 Exception: discarded Note Reformatter items must be logged before any removal.
 
@@ -287,7 +299,7 @@ Exception: discarded Note Reformatter items must be logged before any removal.
 **These rules override any other consideration. Follow them in every
 code change without exception.**
 
-### Rule 1 — No PHI in Push Notifications
+### Rule 1 Ã¢â‚¬â€ No PHI in Push Notifications
 Pushover notifications must contain ONLY counts and flags. Never names,
 MRNs, dates of birth, diagnoses, or any other identifying information.
 
@@ -299,7 +311,7 @@ message = f"New labs: {new_labs}, Radiology: {new_rad}, Messages: {new_msg}"
 message = f"New lab result for {patient_name}: {result_value}"
 ```
 
-### Rule 2 — No PHI in Log Files
+### Rule 2 Ã¢â‚¬â€ No PHI in Log Files
 Application logs must never contain patient names or full MRNs. Use
 hashed identifiers or last-4 of MRN only.
 
@@ -311,21 +323,21 @@ def safe_patient_id(mrn: str) -> str:
     return hashlib.sha256(mrn.encode()).hexdigest()[:12]
 ```
 
-### Rule 3 — No PHI Leaves the Local Network
+### Rule 3 Ã¢â‚¬â€ No PHI Leaves the Local Network
 - SQLite database never leaves the work PC
 - No patient data is sent to any cloud service
-- Tailscale provides encrypted peer-to-peer access — no relay server sees data
+- Tailscale provides encrypted peer-to-peer access Ã¢â‚¬â€ no relay server sees data
 - The only outbound HTTP calls allowed are:
   - Pushover API (de-identified notification counts only)
   - Weather API (ZIP code only, no patient data)
   - Playwright navigating NetPractice (credentials stay local in session file)
-  - NIH/NLM APIs (RxNorm, RxClass, LOINC, UMLS, ICD-10, NLM Conditions, PubMed, MedlinePlus) — clinical vocabulary only, never patient identifiers
-  - FDA APIs (OpenFDA Labels, FAERS, Recalls) — drug names/RXCUI only, never patient data
-  - AHRQ HealthFinder API — age and sex only (no names, DOBs, or MRNs)
-  - CMS APIs (PFS, data.cms.gov) — CPT/HCPCS codes only, never patient data
-  - Open-Meteo API — ZIP code/coordinates only
+  - NIH/NLM APIs (RxNorm, RxClass, LOINC, UMLS, ICD-10, NLM Conditions, PubMed, MedlinePlus) Ã¢â‚¬â€ clinical vocabulary only, never patient identifiers
+  - FDA APIs (OpenFDA Labels, FAERS, Recalls) Ã¢â‚¬â€ drug names/RXCUI only, never patient data
+  - AHRQ HealthFinder API Ã¢â‚¬â€ age and sex only (no names, DOBs, or MRNs)
+  - CMS APIs (PFS, data.cms.gov) Ã¢â‚¬â€ CPT/HCPCS codes only, never patient data
+  - Open-Meteo API Ã¢â‚¬â€ ZIP code/coordinates only
 
-### Rule 4 — MRN Display in UI
+### Rule 4 Ã¢â‚¬â€ MRN Display in UI
 Show only the last 4 digits of MRN in any web UI element that might be
 visible on a shared screen. Full MRN is only used internally in the database
 and in the billing audit log (which requires login to access).
@@ -335,7 +347,7 @@ and in the billing audit log (which requires login to access).
 {{ mrn[-4:] }}  {# Shows only last 4 digits #}
 ```
 
-### Rule 5 — Audit Log Every Patient-Adjacent Action
+### Rule 5 Ã¢â‚¬â€ Audit Log Every Patient-Adjacent Action
 ```python
 from utils import log_access
 
@@ -346,7 +358,7 @@ def patient_labs(mrn):
     # ... rest of route
 ```
 
-### Rule 6 — Note Reformatter Discard Rule
+### Rule 6 Ã¢â‚¬â€ Note Reformatter Discard Rule
 Any clinical content the user chooses to discard during reformatting must be
 written to the ReformatLog.discarded_items JSON field BEFORE removal from
 the working state. The discard is permanent in the log even if the user
@@ -356,8 +368,8 @@ later reformats the same note.
 
 ## External API Conventions
 
-NP Companion integrates 17+ free government APIs (NIH, FDA, CMS, CDC, AHRQ).
-The full API specification is in `Documents/np_companion_api_intelligence_plan.md`.
+CareCompanion integrates 17+ free government APIs (NIH, FDA, CMS, CDC, AHRQ).
+The full API specification is in `Documents/carecompanion_api_intelligence_plan.md`.
 
 ### API Client Pattern
 All API calls go through `utils/api_client.py` using the `get_cached_or_fetch()`
@@ -368,19 +380,19 @@ or agent modules.
 from utils.api_client import get_cached_or_fetch
 from models.patient import RxNormCache
 
-# CORRECT — cache-first with graceful fallback
+# CORRECT Ã¢â‚¬â€ cache-first with graceful fallback
 data = get_cached_or_fetch(RxNormCache, rxcui, fetch_rxnorm_properties)
 
-# WRONG — direct API call bypasses cache and offline handling
+# WRONG Ã¢â‚¬â€ direct API call bypasses cache and offline handling
 data = requests.get(f"https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/properties.json").json()
 ```
 
 ### Cache Table Pattern
 All cache tables follow the `Icd10Cache` structure:
-- `lookup_key` (indexed, unique) — the search key
-- `response` (Text) — JSON string of the full API response
-- `fetched_at` (DateTime) — when fetched
-- `expires_at` (DateTime, nullable) — null means permanent cache
+- `lookup_key` (indexed, unique) Ã¢â‚¬â€ the search key
+- `response` (Text) Ã¢â‚¬â€ JSON string of the full API response
+- `fetched_at` (DateTime) Ã¢â‚¬â€ when fetched
+- `expires_at` (DateTime, nullable) Ã¢â‚¬â€ null means permanent cache
 
 ### Offline Behavior
 Every feature that uses an API must work without internet:
@@ -441,16 +453,16 @@ that communicate only through the shared SQLite database and the
 `data/active_user.json` file. They never call each other directly.
 
 ```
-Flask app (port 5000)    ←——— browser requests ———→   User's browser
-        ↕ reads/writes
+Flask app (port 5000)    Ã¢â€ ÂÃ¢â‚¬â€Ã¢â‚¬â€Ã¢â‚¬â€ browser requests Ã¢â‚¬â€Ã¢â‚¬â€Ã¢â‚¬â€Ã¢â€ â€™   User's browser
+        Ã¢â€ â€¢ reads/writes
    SQLite database
-        ↕ reads/writes
-Background agent         ←——— status JSON (port 5001) ←— Flask app polls
+        Ã¢â€ â€¢ reads/writes
+Background agent         Ã¢â€ ÂÃ¢â‚¬â€Ã¢â‚¬â€Ã¢â‚¬â€ status JSON (port 5001) Ã¢â€ ÂÃ¢â‚¬â€ Flask app polls
 ```
 
 The agent exposes a minimal status endpoint on port 5001.
 Every agent job is wrapped in try/except. Exceptions are logged to the
-database — they never crash the agent process.
+database Ã¢â‚¬â€ they never crash the agent process.
 
 ---
 
@@ -506,18 +518,17 @@ return jsonify({"success": False, "data": None, "error": "Description"}), 400
 
 ### No Page Reloads for Status Updates
 Use `fetch()` polling for live data (timer, agent status, prep progress).
-Never use WebSockets — too complex for this project's maintenance level.
+Never use WebSockets Ã¢â‚¬â€ too complex for this project's maintenance level.
 
 ---
 
 ## Amazing Charts Interface Reference
 
 **ALWAYS READ THIS FILE FIRST** before writing any AC automation code:
-`Documents/ac_interface_reference_v2.md`
+`Documents/dev_guide/AC_INTERFACE_REFERENCE_V4.md`
 
-This consolidated reference covers the entire AC desktop application UI.
-The detailed ground truth (3459 lines) is at:
-`Documents/ac_interface_reference/Amazing charts interface/..md files/ac_interface_reference_v4.md`
+This is the single canonical ground truth reference (2788 lines) for the entire AC desktop application UI.
+Screenshots are at: `Documents/ac_interface_reference/screenshots/`
 
 ### AC System Information
 | Property | Value |
@@ -547,7 +558,7 @@ The agent detects which of 4 states AC is in before performing any automation:
 
 ```python
 AC_STATES = {
-    'not_running':   'No AC process found — cannot automate',
+    'not_running':   'No AC process found Ã¢â‚¬â€ cannot automate',
     'login_screen':  'AC is open but at the login prompt',
     'home_screen':   'AC is logged in, showing the home screen (no chart open)',
     'chart_open':    'A patient chart window is in the foreground',
@@ -556,11 +567,11 @@ AC_STATES = {
 
 State detection logic:
 1. Check if `Amazing Charts EHR (32 bit)` appears in `win32gui.EnumWindows()`
-2. If found, read the window title — if it matches the chart regex
+2. If found, read the window title Ã¢â‚¬â€ if it matches the chart regex
    (`LASTNAME, FIRSTNAME  (DOB: M/D/YYYY; ID: XXXXX)`), state = `chart_open`
 3. If no chart match but AC window exists, check for "Amazing Charts Login"
-   → `login_screen`, otherwise → `home_screen`
-4. If no AC window → `not_running`
+   Ã¢â€ â€™ `login_screen`, otherwise Ã¢â€ â€™ `home_screen`
+4. If no AC window Ã¢â€ â€™ `not_running`
 
 ---
 
@@ -581,29 +592,29 @@ Test patient data: MRN 62815, Name TEST TEST, DOB 10/1/1980, Age 45, Female
 
 ## PyAutoGUI / Amazing Charts Automation Rules
 
-**OCR-FIRST APPROACH** — All UI element detection must use Tesseract OCR
+**OCR-FIRST APPROACH** Ã¢â‚¬â€ All UI element detection must use Tesseract OCR
 to find elements by their visible text labels before falling back to
 coordinates. This makes automation portable across any machine.
 
 The OCR detection engine lives in `agent/ocr_helpers.py`:
-- `find_and_click(text)` — find text via OCR and click it
-- `find_text_on_screen(text)` — find screen coordinates of a label
-- `find_element_near_text(anchor, direction, offset)` — find adjacent elements
+- `find_and_click(text)` Ã¢â‚¬â€ find text via OCR and click it
+- `find_text_on_screen(text)` Ã¢â‚¬â€ find screen coordinates of a label
+- `find_element_near_text(anchor, direction, offset)` Ã¢â‚¬â€ find adjacent elements
 
 Key rules:
-1. **OCR first, coordinates as fallback only** — pass `fallback_xy=` parameter
+1. **OCR first, coordinates as fallback only** Ã¢â‚¬â€ pass `fallback_xy=` parameter
 2. **Verify AC is foreground** before any click via `win32gui`
 3. **Screenshot before every order set execution** (audit trail)
 4. **Add delays between actions** (minimum 0.5s)
-5. **Stop immediately on any failure** — log what was/wasn't completed
+5. **Stop immediately on any failure** Ã¢â‚¬â€ log what was/wasn't completed
 6. **Use keyboard shortcuts** when available (Alt+P, Ctrl+S, etc.)
 
 ```python
-# CORRECT — OCR-first with fallback
+# CORRECT Ã¢â‚¬â€ OCR-first with fallback
 find_and_click('Export Clinical Summary',
                fallback_xy=config.EXPORT_CLIN_SUM_MENU_XY)
 
-# WRONG — hardcoded coordinates as primary
+# WRONG Ã¢â‚¬â€ hardcoded coordinates as primary
 pyautogui.click(*config.EXPORT_CLIN_SUM_MENU_XY)
 ```
 
@@ -613,7 +624,7 @@ pyautogui.click(*config.EXPORT_CLIN_SUM_MENU_XY)
 
 1. Always load saved session before navigating
 2. Check for Google login redirect before scraping
-3. Never automate Google login — set `needs_reauth = True` and notify
+3. Never automate Google login Ã¢â‚¬â€ set `needs_reauth = True` and notify
 4. Include placeholder comments for CSS selectors pending screenshot review
 
 ---
@@ -622,7 +633,7 @@ pyautogui.click(*config.EXPORT_CLIN_SUM_MENU_XY)
 
 1. Always preprocess images (grayscale, upscale 2x, contrast 2.0) before OCR
 2. Always validate MRN format after OCR (6-10 numeric digits)
-3. MRN capture uses AC window position via `win32gui.GetWindowRect()` — title bar only
+3. MRN capture uses AC window position via `win32gui.GetWindowRect()` Ã¢â‚¬â€ title bar only
 4. Use `agent/ocr_helpers.py` for all new OCR work
 
 ---
@@ -633,17 +644,17 @@ All notifications go through `agent/notifier.py`. Never call Pushover
 directly from routes or other modules.
 
 Pushover priority levels:
-- `-1` — Quiet (no sound)
-- ` 0` — Normal (default)
-- ` 1` — High priority (bypasses quiet hours)
-- ` 2` — Emergency (requires acknowledgment — critical values only)
+- `-1` Ã¢â‚¬â€ Quiet (no sound)
+- ` 0` Ã¢â‚¬â€ Normal (default)
+- ` 1` Ã¢â‚¬â€ High priority (bypasses quiet hours)
+- ` 2` Ã¢â‚¬â€ Emergency (requires acknowledgment Ã¢â‚¬â€ critical values only)
 
 ---
 
 ## Error Handling Conventions
 
 ```python
-# In routes — user-facing errors:
+# In routes Ã¢â‚¬â€ user-facing errors:
 try:
     result = some_operation()
 except Exception as e:
@@ -651,13 +662,13 @@ except Exception as e:
     app.logger.error(f"Error in module.action: {str(e)}")
     return jsonify({"success": False, "error": "Operation failed"}), 500
 
-# In agent jobs — never crash the agent:
+# In agent jobs Ã¢â‚¬â€ never crash the agent:
 try:
     run_inbox_check(user_id)
 except Exception as e:
     log_agent_error(user_id=user_id, job='inbox_check',
                     error=str(e), traceback=traceback.format_exc())
-    # Continue — do not re-raise
+    # Continue Ã¢â‚¬â€ do not re-raise
 ```
 
 ---
@@ -679,14 +690,14 @@ AC_SHORTCUTS = {
     'print_summary_sheet':   'Ctrl+P',
     'print_messages':        'Ctrl+G',
     'tracked_data':          'Ctrl+T',
-    'set_flags':             'Alt+P → Set Flags',
-    'set_reminder':          'Alt+P → Set Reminder',
-    'confidential':          'Alt+P → Confidential',
-    'allergies':             'Alt+P → Allergies',
-    'diagnoses':             'Alt+P → Diagnoses',
-    'physical_exam':         'Alt+P → Physical Exam',
-    'clinical_decision_support': 'Alt+P → Clinical Decision Support',
-    'export_clinical_summary': 'Alt+P → Export Clinical Summary',
+    'set_flags':             'Alt+P Ã¢â€ â€™ Set Flags',
+    'set_reminder':          'Alt+P Ã¢â€ â€™ Set Reminder',
+    'confidential':          'Alt+P Ã¢â€ â€™ Confidential',
+    'allergies':             'Alt+P Ã¢â€ â€™ Allergies',
+    'diagnoses':             'Alt+P Ã¢â€ â€™ Diagnoses',
+    'physical_exam':         'Alt+P Ã¢â€ â€™ Physical Exam',
+    'clinical_decision_support': 'Alt+P Ã¢â€ â€™ Clinical Decision Support',
+    'export_clinical_summary': 'Alt+P Ã¢â€ â€™ Export Clinical Summary',
     'save_and_close':        'Ctrl+S',
 }
 ```
@@ -702,25 +713,25 @@ AC_SHORTCUTS = {
 - Export folder: `config.CLINICAL_SUMMARY_EXPORT_FOLDER`
 - Retention: auto-delete after 183 days, audit log every parse
 
-### CRITICAL — Two-Phase Export Workflow
+### CRITICAL Ã¢â‚¬â€ Two-Phase Export Workflow
 
 Charts must be opened for ALL patients first (Phase 1), then XML exports
 happen for ALL patients (Phase 2). Exporting CANNOT be triggered while a
 patient chart window is open.
 
-**Phase 1 — Chart Opening** (repeat for each patient):
+**Phase 1 Ã¢â‚¬â€ Chart Opening** (repeat for each patient):
 1. Search patient in Patient List panel by ID
 2. Verify name matches expected patient
 3. Double-click to open chart
-4. Select Visit Template → Procedure Visit → Companion
+4. Select Visit Template Ã¢â€ â€™ Procedure Visit Ã¢â€ â€™ Companion
 5. Clear popups, Ctrl+S to save and close
 6. Repeat for all patients
 
-**Phase 2 — XML Export** (only after ALL charts are saved):
+**Phase 2 Ã¢â‚¬â€ XML Export** (only after ALL charts are saved):
 1. Ensure AC is on home screen (no chart windows open)
 2. In inbox, find patient's most recent chart
 3. Single-click to select (do NOT double-click)
-4. Alt+P → Export Clinical Summary
+4. Alt+P Ã¢â€ â€™ Export Clinical Summary
 5. Select "Full Patient Record" (never single encounter)
 6. Verify checkboxes and destination, click Export
 7. Repeat for all patients
@@ -775,7 +786,7 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 
 ---
 
-## Build Phases — Current Status Reference
+## Build Phases Ã¢â‚¬â€ Current Status Reference
 
 | Phase | Focus | Features |
 |-------|-------|---------|
@@ -793,7 +804,7 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 
 ## Complete Feature Reference
 
-### Phase 1 — Foundation
+### Phase 1 Ã¢â‚¬â€ Foundation
 - **F1** Project skeleton: Flask app, base.html, CSS, JS
 - **F1a** Multi-user accounts: User model, login, register, roles
 - **F1b** Role-based access: @require_role decorator, sidebar filtering
@@ -807,7 +818,7 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 - **F3b** Per-provider agent profiles: active_user.json tracking
 - **F3c** Crash recovery: incomplete session detection on agent startup
 
-### Phase 2 — Data Layer
+### Phase 2 Ã¢â‚¬â€ Data Layer
 - **F4** NetPractice schedule scraper: Playwright, session persistence
 - **F4a** New patient flag: gold NEW badge in Today View
 - **F4b** Visit duration estimator: historical avg vs booked time
@@ -823,7 +834,7 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 - **F6b** Idle detection: pause timer on inactivity, net vs gross time
 - **F6c** Manual MRN override: manual entry form, pencil icon in log
 
-### Phase 3 — High-Value Daily Tools
+### Phase 3 Ã¢â‚¬â€ High-Value Daily Tools
 - **F7** On-call note keeper: mobile-first, Tailscale accessible
 - **F7a** Voice-to-text: Web Speech API dictation on note form
 - **F7b** Callback tracker: overdue callbacks section, 30-min reminder
@@ -844,7 +855,7 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 - **F10c** Pregnancy + renal filter: context bar, contraindication hiding
 - **F10d** Guideline update flag: /medref/review-needed, yellow banner
 
-### Phase 4 — Monitoring & Tracking
+### Phase 4 Ã¢â‚¬â€ Monitoring & Tracking
 - **F11** Lab value tracker: per-patient criteria, inbox auto-population
 - **F11a** Trend visualization: Chart.js line graph, threshold lines
 - **F11b** Custom thresholds: alert_low/high/critical per patient, sliders
@@ -863,7 +874,7 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 - **F14b** Anomaly detector: under/over-billing flags, review filter
 - **F14c** Monthly billing report: RVU totals, prior month comparison
 
-### Phase 5 — Clinical Decision Support
+### Phase 5 Ã¢â‚¬â€ Clinical Decision Support
 - **F15** Care gap tracker: USPSTF rules engine, per-patient checklist
 - **F15a** Age/sex auto-population: evaluate on schedule pull
 - **F15b** Closure documentation: pre-generated snippet, copy button
@@ -876,7 +887,7 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 - **F17b** Specificity reminder: unspecified code detection, child codes
 - **F17c** Code pairing: historical + seeded common pairings
 
-### Phase 6 — Communication Tools
+### Phase 6 Ã¢â‚¬â€ Communication Tools
 - **F18** Delayed message sender: queue, Playwright execution, recurring
 - **F18a** Recurring templates: interval-based auto-scheduling
 - **F19** Abnormal result templates: 5 urgency tiers, bracketed fields
@@ -885,12 +896,12 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 - **F20a** Unsigned note counter: priority=1 push, 30-min closing reminder
 - **F20c** Configurable checklist: per-user toggles, custom items
 
-### Phase 7 — Notifications & Utilities
+### Phase 7 Ã¢â‚¬â€ Notifications & Utilities
 - **F21** Push notification system: Notifier class, quiet hours, logging
 - **F21b** Escalating alerts: unacknowledged critical resend
 - **F22** Morning briefing: schedule + gaps + inbox + weather, 6:30 AM
 - **F22a** Commute mode: /briefing/commute, SpeechSynthesis auto-read
-- **F23** AutoHotkey macros: macros.json-driven, NP Companion management UI
+- **F23** AutoHotkey macros: macros.json-driven, CareCompanion management UI
 - **F23a** Macro sync: macros.json stored in DB, synced to .ahk
 - **F24** Follow-up tickler: three-column dashboard, MA assignment
 - **F24a** Priority levels: routine/important/urgent, push on urgent
@@ -905,14 +916,14 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 - **F27a** Specialty-specific templates: per-specialty field prompts
 - **F27b** Referral tracking log: overdue return report flag
 
-### Phase 8 — Multi-User Platform
+### Phase 8 Ã¢â‚¬â€ Multi-User Platform
 - **F28** Onboarding wizard: 5-step, account + calibration + NetPractice + starter pack
 - **F28a** MRN calibration tool: click-to-set capture region
 - **F28b** Starter pack: import colleagues' order sets + macros + medref
 - **F29** Practice admin view: aggregate only, no individual breakdown
 - **F30** Offline mode: service worker, IndexedDB queue, sync on reconnect
 
-### Phase 9 — Note Reformatter
+### Phase 9 Ã¢â‚¬â€ Note Reformatter
 - **F31** Prior note reformatter: 6-step wizard with mandatory flagged review
   - note_reader.py: AC note capture via OCR/print
   - note_parser.py: section header detection, unclassified_text bucket
@@ -925,17 +936,17 @@ AC_SPECIAL_SECTIONS = ["Allergies", "Medications"]
 
 ---
 
-## Sensitive Files — Never Suggest Committing These
+## Sensitive Files Ã¢â‚¬â€ Never Suggest Committing These
 
 ```
-config.py           ← API tokens, IP addresses, screen coordinates
-data/               ← Database, session cookies, screenshots
-.env                ← If used
-*.pkl               ← Playwright session files
-*.log               ← Application logs
-venv/               ← Virtual environment
-dist/               ← PyInstaller build output
-build/              ← PyInstaller intermediate files
+config.py           Ã¢â€ Â API tokens, IP addresses, screen coordinates
+data/               Ã¢â€ Â Database, session cookies, screenshots
+.env                Ã¢â€ Â If used
+*.pkl               Ã¢â€ Â Playwright session files
+*.log               Ã¢â€ Â Application logs
+venv/               Ã¢â€ Â Virtual environment
+dist/               Ã¢â€ Â PyInstaller build output
+build/              Ã¢â€ Â PyInstaller intermediate files
 ```
 
 ---
@@ -944,12 +955,12 @@ build/              ← PyInstaller intermediate files
 
 1. **Don't use `Query.all()` without `filter_by(user_id=...)`** in any
    table that has a user_id column.
-2. **Don't suggest JavaScript frameworks** — vanilla JS only.
-3. **Don't suggest environment variables** — config comes from `config.py`.
-4. **Don't use `datetime.utcnow()`** — use `datetime.now(timezone.utc)`.
-5. **Don't use `db.session.delete()`** on clinical records — use soft deletion.
-6. **Don't put patient names or MRNs in notification bodies** — ever.
-7. **Don't hardcode pixel coordinates** — use OCR-first via `agent/ocr_helpers.py`.
-8. **Don't suggest `python-dotenv`** — not used in this project.
-9. **Don't use `redirect(request.referrer)`** — always use `url_for()`.
+2. **Don't suggest JavaScript frameworks** Ã¢â‚¬â€ vanilla JS only.
+3. **Don't suggest environment variables** Ã¢â‚¬â€ config comes from `config.py`.
+4. **Don't use `datetime.utcnow()`** Ã¢â‚¬â€ use `datetime.now(timezone.utc)`.
+5. **Don't use `db.session.delete()`** on clinical records Ã¢â‚¬â€ use soft deletion.
+6. **Don't put patient names or MRNs in notification bodies** Ã¢â‚¬â€ ever.
+7. **Don't hardcode pixel coordinates** Ã¢â‚¬â€ use OCR-first via `agent/ocr_helpers.py`.
+8. **Don't suggest `python-dotenv`** Ã¢â‚¬â€ not used in this project.
+9. **Don't use `redirect(request.referrer)`** Ã¢â‚¬â€ always use `url_for()`.
 10. **Don't skip the pre-execution screenshot** in PyAutoGUI runner.

@@ -1,11 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Care Gaps — {{ patient_name or mrn_display }} — NP Companion{% endblock %}
+{% block title %}Care Gaps — {{ patient_name or mrn_display }} — CareCompanion{% endblock %}
 {% block page_id %}caregap{% endblock %}
 
 {% block content %}
 <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
     <a href="/caregap" style="color:var(--text-secondary);text-decoration:none;font-size:14px;">← Back to Overview</a>
     <h1 style="margin:0;">{{ patient_name or 'Patient' }} <span style="font-size:16px;color:var(--text-secondary);font-weight:normal;">({{ mrn_display }})</span></h1>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        {# Personalized / All toggle #}
+        <div id="viewToggle" style="display:inline-flex;border-radius:20px;overflow:hidden;border:1px solid var(--border,#ccc);">
+            <button id="btnPersonalized" class="btn btn-sm" style="border-radius:20px 0 0 20px;border:none;padding:4px 14px;font-size:12px;background:var(--primary,#0d6efd);color:#fff;" onclick="setViewMode('personalized')">Personalized</button>
+            <button id="btnAllApplicable" class="btn btn-sm" style="border-radius:0 20px 20px 0;border:none;padding:4px 14px;font-size:12px;background:var(--bg-muted,#f0f0f0);color:var(--text-primary,#333);" onclick="setViewMode('all')">All Applicable</button>
+        </div>
+        <a href="/caregap/{{ mrn }}/print" target="_blank" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:4px;">
+            🖨️ Print Patient Handout
+        </a>
+    </div>
 </div>
 
 {# ---- OPEN GAPS ---- #}
@@ -21,7 +31,7 @@
     {% if open_gaps %}
     <div class="card-body" style="padding:0;">
         {% for g in open_gaps %}
-        <div style="padding:16px;border-bottom:1px solid var(--border,#eee);{% if loop.last %}border-bottom:none;{% endif %}">
+        <div class="gap-row" data-trigger-type="{{ _derive_trigger_type(g) }}" style="padding:16px;border-bottom:1px solid var(--border,#eee);{% if loop.last %}border-bottom:none;{% endif %}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                 <div style="flex:1;min-width:200px;">
                     <div style="font-weight:600;font-size:15px;margin-bottom:4px;">{{ g.gap_name or g.gap_type }}</div>
@@ -120,6 +130,35 @@
 {% endif %}
 
 <script>
+function setViewMode(mode) {
+    var rows = document.querySelectorAll('.gap-row[data-trigger-type]');
+    var btnP = document.getElementById('btnPersonalized');
+    var btnA = document.getElementById('btnAllApplicable');
+    if (mode === 'personalized') {
+        btnP.style.background = 'var(--primary,#0d6efd)';
+        btnP.style.color = '#fff';
+        btnA.style.background = 'var(--bg-muted,#f0f0f0)';
+        btnA.style.color = 'var(--text-primary,#333)';
+        rows.forEach(function(r) {
+            r.style.display = (r.getAttribute('data-trigger-type') === 'demographic') ? 'none' : '';
+        });
+    } else {
+        btnA.style.background = 'var(--primary,#0d6efd)';
+        btnA.style.color = '#fff';
+        btnP.style.background = 'var(--bg-muted,#f0f0f0)';
+        btnP.style.color = 'var(--text-primary,#333)';
+        rows.forEach(function(r) { r.style.display = ''; });
+    }
+    try { localStorage.setItem('caregap_view_mode_{{ mrn }}', mode); } catch(e) {}
+}
+// Restore saved preference on load
+(function() {
+    try {
+        var saved = localStorage.getItem('caregap_view_mode_{{ mrn }}');
+        if (saved === 'personalized' || saved === 'all') setViewMode(saved);
+    } catch(e) {}
+})();
+
 function showAddressForm(gapId) {
     var el = document.getElementById('address-form-' + gapId);
     if (el) el.style.display = 'block';

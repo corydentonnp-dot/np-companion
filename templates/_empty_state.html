@@ -1,0 +1,16 @@
+{# _empty_state.html — Reusable empty state component (Phase 10.2)
+   Usage:
+     {% from '_empty_state.html' import empty_state %}
+     {{ empty_state('📋', 'No appointments today', 'Import an XML or check a different date.', url_for('tools.import_xml'), 'Import XML') }}
+   All params except icon and title are optional.
+#}
+{% macro empty_state(icon, title, message='', action_url='', action_label='') %}
+<div class="empty-state-box">
+    {% if icon %}<div class="empty-state-icon">{{ icon }}</div>{% endif %}
+    <p class="empty-state-title">{{ title }}</p>
+    {% if message %}<p class="empty-state-msg">{{ message }}</p>{% endif %}
+    {% if action_url and action_label %}
+    <a href="{{ action_url }}" class="empty-state-action">{{ action_label }}</a>
+    {% endif %}
+</div>
+{% endmacro %}

@@ -1,5 +1,5 @@
 """
-NP Companion — Utilities Package
+CareCompanion — Utilities Package
 
 Re-exports log_access so existing `from utils import log_access` still works.
 Also provides path resolution helpers via utils.paths.

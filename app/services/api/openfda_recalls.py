@@ -1,5 +1,5 @@
 """
-NP Companion — OpenFDA Drug Recalls Service
+CareCompanion — OpenFDA Drug Recalls Service
 File: app/services/api/openfda_recalls.py
 
 Returns active and historical FDA drug recall enforcement actions.
@@ -13,7 +13,7 @@ Dependencies:
 - app/services/api/base_client.py (BaseAPIClient)
 - app/api_config.py (OPENFDA_RECALLS_BASE_URL, OPENFDA_RECALLS_CACHE_TTL_DAYS)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Drug Recall Alert System (new Feature A from API intelligence plan)
 - Morning Briefing (F22) — "No active recalls" or recall count
 - Patient Chart View — recall badge on Medications tab
@@ -23,6 +23,7 @@ NP Companion features that rely on this module:
 import logging
 from app.api_config import OPENFDA_RECALLS_BASE_URL, OPENFDA_RECALLS_CACHE_TTL_DAYS
 from app.services.api.base_client import BaseAPIClient, APIUnavailableError
+from models.api_cache import RecallCache
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,9 @@ class OpenFDARecallsService(BaseAPIClient):
                 },
             )
             recalls = results.get("results") or []
-            return [self._parse_recall(r) for r in recalls]
+            parsed = [self._parse_recall(r) for r in recalls]
+            self._save_recalls_to_cache(parsed)
+            return parsed
 
         except APIUnavailableError:
             logger.warning(f"OpenFDA recalls unavailable for drug: {drug_name}")
@@ -127,3 +130,25 @@ class OpenFDARecallsService(BaseAPIClient):
             "status": raw.get("status"),
             "alert_priority": RECALL_CLASS_PRIORITY.get(classification, "low"),
         }
+
+    def _save_recalls_to_cache(self, recalls):
+        """Persist parsed recall records to the structured RecallCache table."""
+        db = self.cache.db
+        try:
+            for r in recalls:
+                rid = r.get('recall_number') or ''
+                if not rid:
+                    continue
+                existing = RecallCache.query.filter_by(recall_id=rid).first()
+                if not existing:
+                    db.session.add(RecallCache(
+                        recall_id=rid,
+                        product_description=r.get('product_description', '')[:2000],
+                        reason=r.get('reason_for_recall', '')[:2000],
+                        status=r.get('status', ''),
+                        classification=r.get('classification', ''),
+                    ))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.debug(f'RecallCache save error: {e}')

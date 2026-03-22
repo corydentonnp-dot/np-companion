@@ -1,0 +1,15 @@
+# No Companion Patient Generator — Python dependencies
+# All modules used are Python stdlib — no pip installs required at runtime.
+# PyInstaller is only needed to BUILD the .exe (not to run the app in dev mode).
+
+# ---- BUILD TOOL (install once) ----
+pyinstaller>=6.0
+
+# ---- RUNTIME (all stdlib — already included with Python 3.9+) ----
+# tkinter      — GUI (bundled with Python on Windows; on Linux: sudo apt install python3-tk)
+# xml.etree    — CDA XML generation
+# uuid         — document UUIDs
+# random       — synthetic data randomization
+# datetime     — dates / ages
+# threading    — non-blocking GUI generation
+# os, sys      — file I/O, path handling

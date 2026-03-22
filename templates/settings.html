@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Settings — NP Companion{% endblock %}
+{% block title %}Settings — CareCompanion{% endblock %}
 {% block page_id %}settings{% endblock %}
 
 {% block content %}
@@ -125,8 +125,8 @@
             <div class="form-group">
                 <label class="form-label" for="np_provider_name">Provider Name in webPRACTICE</label>
                 <input type="text" id="np_provider_name" name="np_provider_name" class="form-input"
-                       value="{{ current_user.np_provider_name or '' }}" placeholder='FIRSTNAME LASTNAME (##)'>
-                <p class="form-help">Enter your name exactly as shown in the webPRACTICE schedule header. Example: ASHLEY MORSBERGER FNP (45)</p>
+                       value="{{ current_user.np_provider_name or '' }}" placeholder="e.g., DENTON CORY (12)">
+                <small class="form-help">Enter your name exactly as it appears in the NetPractice provider list. Include the provider number in parentheses.</small>
             </div>
             <button type="submit" class="btn btn-primary">Save Credentials</button>
         </form>
@@ -395,7 +395,7 @@ function testAIConnection() {
                 <p class="form-help">
                     Full path to the folder where Amazing Charts exports Clinical Summary XML files.
                     Leave blank to use the default (<code>data/clinical_summaries/</code>).
-                    NP Companion watches this folder for new files and auto-imports them.
+                    CareCompanion watches this folder for new files and auto-imports them.
                 </p>
             </div>
         </div>
@@ -546,7 +546,81 @@ window._applyAccent = function(aid) {
         body: JSON.stringify({accent: aid})
     });
 };
+
+window._applyTransition = function(preset) {
+    /* Remove any existing transition class */
+    ['none','fade','slide','zoom','subtle'].forEach(function(p) {
+        document.documentElement.classList.remove('page-transition-' + p);
+    });
+    if (preset && preset !== 'none') {
+        document.documentElement.classList.add('page-transition-' + preset);
+    }
+    localStorage.setItem('pageTransition', preset);
+
+    document.querySelectorAll('.transition-opt').forEach(function(el) {
+        el.classList.toggle('btn-primary', el.dataset.preset === preset);
+        el.classList.toggle('btn-outline', el.dataset.preset !== preset);
+    });
+
+    fetch('/api/settings/theme', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({page_transition: preset})
+    });
+};
 </script>
+
+<div class="card" style="margin-bottom:16px;max-width:720px;">
+    <div class="card-header">Page Transitions</div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">Animated transitions when navigating between pages. Preference is saved across sessions.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% set current_transition = current_user.get_pref('page_transition', 'none') %}
+            {% for preset_id, preset_name in [('none','None'),('fade','Fade'),('slide','Slide'),('zoom','Zoom'),('subtle','Subtle')] %}
+            <button class="btn transition-opt {% if current_transition == preset_id %}btn-primary{% else %}btn-outline{% endif %}"
+                    data-preset="{{ preset_id }}"
+                    onclick="window._applyTransition('{{ preset_id }}')">
+                {{ preset_name }}
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{# ---- Split View Pane Count (PH44-3) ---- #}
+<div class="card" style="margin-bottom:16px;max-width:720px;">
+    <div class="card-header">Split View</div>
+    <div class="card-body">
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">Maximum number of panes shown in split view mode. Ctrl+Click any link to activate split view.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% set current_panes = current_user.get_pref('split_max_panes', 2)|int %}
+            {% for n in [2, 3, 4] %}
+            <button class="btn split-panes-opt {% if current_panes == n %}btn-primary{% else %}btn-outline{% endif %}"
+                    data-panes="{{ n }}"
+                    onclick="window._setSplitPanes({{ n }})">
+                {{ n }} Panes
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script>
+window._setSplitPanes = function(n) {
+    document.querySelectorAll('.split-panes-opt').forEach(function(el) {
+        el.classList.toggle('btn-primary', parseInt(el.dataset.panes) === n);
+        el.classList.toggle('btn-outline', parseInt(el.dataset.panes) !== n);
+    });
+    localStorage.setItem('splitMaxPanes', n);
+    fetch('/api/settings/split_panes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({split_max_panes: n})
+    });
+};
+</script>
+
+{# dummy script tag removed — JS moved inline above #}
+<script>/* placeholder */
 
 {# ================================================================
    SECTION 4b: Billing Preferences
@@ -598,6 +672,54 @@ window._applyAccent = function(aid) {
     </div>
     <button type="submit" class="btn btn-primary" style="margin-bottom:24px;">Save Billing Preferences</button>
 </form>
+
+{# ================================================================
+   SECTION 4c: Billing Category Toggles
+   ================================================================ #}
+{% set cats = current_user.get_pref('billing_categories_enabled', {}) %}
+<form method="POST" action="{{ url_for('auth.settings_account') }}">
+    <input type="hidden" name="action" value="set_billing_categories">
+    <div class="card" style="margin-bottom:16px;max-width:600px;">
+        <div class="card-header">Billing Rule Categories</div>
+        <div class="card-body">
+            <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+                Enable or disable individual billing opportunity categories.
+                Disabled categories will not generate suggestions. All are enabled by default.
+            </p>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="ccm" {{ 'checked' if cats.get('ccm', true) }}><span>1 — Chronic Care Management (CCM)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="awv" {{ 'checked' if cats.get('awv', true) }}><span>2 — Annual Wellness Visit (AWV)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="g2211" {{ 'checked' if cats.get('g2211', true) }}><span>3 — G2211 Complexity Add-On</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="tcm" {{ 'checked' if cats.get('tcm', true) }}><span>4 — Transitional Care Management (TCM)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="prolonged_service" {{ 'checked' if cats.get('prolonged_service', true) }}><span>5 — Prolonged Services (99417)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="bhi" {{ 'checked' if cats.get('bhi', true) }}><span>6 — Behavioral Health Integration (BHI)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="rpm" {{ 'checked' if cats.get('rpm', true) }}><span>7 — Remote Patient Monitoring (RPM)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="care_gap_screenings" {{ 'checked' if cats.get('care_gap_screenings', true) }}><span>8 — Care Gap Screenings &amp; Vaccines</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="tobacco_cessation" {{ 'checked' if cats.get('tobacco_cessation', true) }}><span>9 — Tobacco Cessation Counseling</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="alcohol_screening" {{ 'checked' if cats.get('alcohol_screening', true) }}><span>10 — Alcohol/Substance Screening (SBIRT)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="cognitive_assessment" {{ 'checked' if cats.get('cognitive_assessment', true) }}><span>11 — Cognitive Assessment</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="obesity_nutrition" {{ 'checked' if cats.get('obesity_nutrition', true) }}><span>12 — Obesity/Nutrition Counseling</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="acp_standalone" {{ 'checked' if cats.get('acp_standalone', true) }}><span>13 — Advance Care Planning (ACP)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="sti_screening" {{ 'checked' if cats.get('sti_screening', true) }}><span>14 — STI/Hepatitis Screening</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="preventive_visit" {{ 'checked' if cats.get('preventive_visit', true) }}><span>15 — Preventive E&amp;M (non-Medicare)</span></label></div>
+            <div class="form-group"><label class="toggle-row"><input type="checkbox" name="vaccine_admin" {{ 'checked' if cats.get('vaccine_admin', true) }}><span>16 — Vaccine Administration</span></label></div>
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary" style="margin-bottom:24px;">Save Billing Categories</button>
+</form>
+
+{# ================================================================
+   SECTION 4d: Import Shared Resources (F28b)
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Shared Resources</h2>
+<div class="card" style="margin-bottom:24px;max-width:600px;">
+    <div class="card-body" style="padding:16px;">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Browse and import order sets, medication references, PA templates, and dot phrases
+            shared by your colleagues.
+        </p>
+        <a href="{{ url_for('auth.starter_pack_page') }}" class="btn btn-primary">📦 Browse Shared Resources</a>
+    </div>
+</div>
 
 {# ================================================================
    SECTION 5: Clinical Intelligence Preferences
@@ -679,7 +801,7 @@ window._applyAccent = function(aid) {
 <div class="card" style="margin-bottom:24px;max-width:600px;border-left:3px solid var(--color-teal,#0D7377);">
     <div class="card-header">About Clinical Intelligence APIs</div>
     <div class="card-body" style="font-size:13px;">
-        <p style="margin:0 0 8px;">NP Companion uses free, publicly available government APIs to enrich your patient data:</p>
+        <p style="margin:0 0 8px;">CareCompanion uses free, publicly available government APIs to enrich your patient data:</p>
         <ul style="margin:0;padding-left:20px;line-height:1.8;">
             <li><strong>RxNorm</strong> (NIH/NLM) — drug name standardization and properties</li>
             <li><strong>OpenFDA</strong> (FDA) — drug labels, recalls, adverse events</li>
@@ -705,4 +827,67 @@ window._applyAccent = function(aid) {
 .accent-btn--active          { border-color: var(--text-primary) !important;
                                box-shadow: 0 0 0 2px var(--text-primary); }
 </style>
+
+{# ================================================================
+   SECTION 7: Feature Level (Phase 13)
+   ================================================================ #}
+<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Feature Level</h2>
+
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-body" style="padding:24px;">
+        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 16px;">
+            Choose how many features to enable. You can upgrade or downgrade at any time.
+            Individual feature toggles are available below.
+        </p>
+
+        <form method="POST" action="{{ url_for('auth.settings_feature_tier') }}">
+            <div style="display:flex;gap:16px;margin-bottom:24px;">
+                {% set current_tier = current_user.get_pref('feature_tier', 'essential') %}
+                <label class="card" style="margin:0;flex:1;cursor:pointer;border:2px solid {% if current_tier == 'essential' %}var(--color-success, #22c55e){% else %}var(--border-color){% endif %};">
+                    <div class="card-body" style="padding:16px;text-align:center;">
+                        <input type="radio" name="feature_tier" value="essential" {% if current_tier == 'essential' %}checked{% endif %} style="margin-bottom:8px;">
+                        <div style="font-size:20px;">🟢</div>
+                        <strong style="font-size:14px;">Essential</strong>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Core tools for daily patient care</div>
+                    </div>
+                </label>
+                <label class="card" style="margin:0;flex:1;cursor:pointer;border:2px solid {% if current_tier == 'standard' %}var(--color-warning, #eab308){% else %}var(--border-color){% endif %};">
+                    <div class="card-body" style="padding:16px;text-align:center;">
+                        <input type="radio" name="feature_tier" value="standard" {% if current_tier == 'standard' %}checked{% endif %} style="margin-bottom:8px;">
+                        <div style="font-size:20px;">🟡</div>
+                        <strong style="font-size:14px;">Standard</strong>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Clinical intelligence and population health</div>
+                    </div>
+                </label>
+                <label class="card" style="margin:0;flex:1;cursor:pointer;border:2px solid {% if current_tier == 'advanced' %}var(--color-info, #3b82f6){% else %}var(--border-color){% endif %};">
+                    <div class="card-body" style="padding:16px;text-align:center;">
+                        <input type="radio" name="feature_tier" value="advanced" {% if current_tier == 'advanced' %}checked{% endif %} style="margin-bottom:8px;">
+                        <div style="font-size:20px;">🔵</div>
+                        <strong style="font-size:14px;">Advanced</strong>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Power tools for complex workflows</div>
+                    </div>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Feature Level</button>
+        </form>
+    </div>
+</div>
+
+{# Post-onboarding tip banner #}
+{% set user_tier = current_user.get_pref('feature_tier', 'essential') %}
+{% if user_tier == 'essential' %}
+<div class="card" style="margin-bottom:24px;border-left:4px solid var(--color-info, #3b82f6);">
+    <div class="card-body" style="padding:16px;">
+        <strong>💡 Tip:</strong> You have more features available.
+        Upgrade to <strong>Standard</strong> to unlock Billing Intelligence, Lab Tracking, Care Gaps, and more.
+    </div>
+</div>
+{% elif user_tier == 'standard' %}
+<div class="card" style="margin-bottom:24px;border-left:4px solid var(--color-info, #3b82f6);">
+    <div class="card-body" style="padding:16px;">
+        <strong>💡 Tip:</strong> Upgrade to <strong>Advanced</strong> to unlock Order Sets, Dot Phrases, Med Reference, and more power tools.
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}

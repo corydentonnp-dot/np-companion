@@ -1,7 +1,7 @@
 """
-NP Companion — User Model
+CareCompanion — User Model
 
-File location: np-companion/models/user.py
+File location: carecompanion/models/user.py
 
 Defines the User table: accounts, roles, PIN hashes, and a JSON
 column for per-user preferences (dark mode, notification settings, etc.).
@@ -34,7 +34,7 @@ def _get_fernet():
 
 class User(UserMixin, db.Model):
     """
-    One row per provider / MA / admin who uses NP Companion.
+    One row per provider / MA / admin who uses CareCompanion.
     Flask-Login's UserMixin supplies is_authenticated, is_active, etc.
     """
     __tablename__ = 'users'
@@ -76,6 +76,7 @@ class User(UserMixin, db.Model):
     # Only decrypted when the scraper needs to log in.
     np_username_enc = db.Column(db.Text, default='')      # Fernet-encrypted
     np_password_enc = db.Column(db.Text, default='')      # Fernet-encrypted
+    np_totp_secret_enc = db.Column(db.Text, default='')   # Fernet-encrypted TOTP secret for MFA
     np_provider_name = db.Column(db.String(200), default='')  # e.g. "ASHLEY MORSBERGER FNP (45)"
 
     # ---- Navigation steps (JSON) — recorded path to schedule page --------
@@ -210,6 +211,28 @@ class User(UserMixin, db.Model):
     def has_np_credentials(self):
         """Return True if both NP username and password are stored."""
         return bool(self.np_username_enc and self.np_password_enc)
+
+    # ------------------------------------------------------------------
+    # NetPractice TOTP secret helpers (encrypt / decrypt)
+    # ------------------------------------------------------------------
+    def set_np_totp_secret(self, secret):
+        """Encrypt and store the TOTP secret for NetPractice MFA."""
+        f = _get_fernet()
+        self.np_totp_secret_enc = f.encrypt(secret.encode()).decode() if secret else ''
+
+    def get_np_totp_secret(self):
+        """Decrypt and return the stored TOTP secret."""
+        if not self.np_totp_secret_enc:
+            return ''
+        try:
+            f = _get_fernet()
+            return f.decrypt(self.np_totp_secret_enc.encode()).decode()
+        except (InvalidToken, Exception):
+            return ''
+
+    def has_np_totp_secret(self):
+        """Return True if a TOTP secret is stored."""
+        return bool(self.np_totp_secret_enc)
 
     # ------------------------------------------------------------------
     # Navigation steps helpers (JSON)

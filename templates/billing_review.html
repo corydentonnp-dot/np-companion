@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Billing Review — NP Companion{% endblock %}
+{% from '_empty_state.html' import empty_state %}
+{% from '_why_link.html' import why_link %}
+{% block title %}Billing Review — CareCompanion{% endblock %}
 {% block page_id %}billing-review{% endblock %}
 
 {% block content %}
@@ -25,6 +27,7 @@
                     <th>Type</th>
                     <th>Codes</th>
                     <th>Est. Revenue</th>
+                    <th>Net Value</th>
                     <th>Confidence</th>
                     <th>Eligibility Basis</th>
                     <th>Documentation Required</th>
@@ -38,7 +41,8 @@
                     <td>{{ opp.visit_date.strftime('%m/%d/%Y') if opp.visit_date else '—' }}</td>
                     <td><span class="badge badge--info">{{ opp.opportunity_type }}</span></td>
                     <td class="mono" style="font-size:11px;">{{ opp.applicable_codes }}</td>
-                    <td style="font-weight:600;color:var(--color-green,#27ae60);">~${{ "%.0f"|format(opp.estimated_revenue or 0) }}</td>
+                    <td style="font-weight:600;color:var(--color-green,#27ae60);">~${{ "%.0f"|format(opp.estimated_revenue or 0) }}<div style="font-size:10px;color:var(--text-secondary);font-weight:400;">Bonus +${{ "%.0f"|format((opp.estimated_revenue or 0) * 0.85 * 0.25) }}</div></td>
+                    <td style="font-weight:600;color:var(--color-teal,#1abc9c);">{% if opp.expected_net_dollars %}${{ "%.0f"|format(opp.expected_net_dollars) }}{% else %}&mdash;{% endif %}</td>
                     <td>
                         {% if opp.confidence_level == 'HIGH' %}
                         <span class="badge badge--success">HIGH</span>
@@ -48,7 +52,7 @@
                         <span class="badge badge--muted">LOW</span>
                         {% endif %}
                     </td>
-                    <td style="font-size:12px;">{{ opp.eligibility_basis or '—' }}</td>
+                    <td style="font-size:12px;">{{ opp.eligibility_basis or '—' }} {{ why_link(opp.eligibility_basis or 'Billing opportunity detected', 'CMS CY2025 Fee Schedule rules') }}</td>
                     <td style="font-size:12px;">{{ opp.documentation_required or '—' }}</td>
                     <td>
                         {% if opp.status == 'captured' %}
@@ -78,11 +82,71 @@
     Estimates use CY2025 CMS national average non-facility rates. Actual reimbursement depends on payer contract.
     This tool provides informational billing suggestions only — all billing decisions require provider review.
 </div>
+
+{# ---- CMS Benchmark Comparison Card (Phase 7.4) ---- #}
+<div class="card" style="margin-top:24px;">
+    <div class="card-header">
+        &#128202; Virginia NP Utilization Benchmarks
+        <span style="font-size:11px;color:var(--text-secondary);margin-left:8px;">(CMS Medicare Open Data)</span>
+    </div>
+    <div class="card-body" id="benchmark-body">
+        <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
+            <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            Loading benchmark data...
+        </div>
+    </div>
+</div>
+
+<script>
+(function loadBenchmarks() {
+    var el = document.getElementById('benchmark-body');
+    if (!el) return;
+    /* Collect unique HCPCS codes from opportunities */
+    var codeSet = {};
+    {% for opp in opportunities %}
+    ({{ opp.applicable_codes|tojson }} || '').split(/[,\/\s]+/).forEach(function(c) {
+        c = c.trim().toUpperCase();
+        if (c && c.length >= 4) codeSet[c] = true;
+    });
+    {% endfor %}
+    var codes = Object.keys(codeSet);
+    if (codes.length === 0) {
+        el.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;text-align:center;">No HCPCS codes to benchmark.</p>';
+        return;
+    }
+    fetch('/api/billing/benchmark?codes=' + codes.join(',') + '&state=VA&specialty=Nurse+Practitioner')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var bms = (data.benchmarks || []).filter(function(b) { return b.total_providers > 0; });
+            if (bms.length === 0) {
+                el.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;text-align:center;">No CMS benchmark data available for these codes.</p>';
+                return;
+            }
+            var html = '<table class="schedule-table" style="font-size:12px;"><thead><tr>' +
+                '<th>HCPCS</th><th>VA NP Providers</th><th>Avg Services/Provider</th><th>Avg Payment</th><th>Avg Allowed</th>' +
+                '</tr></thead><tbody>';
+            bms.forEach(function(b) {
+                html += '<tr>' +
+                    '<td class="mono fw-500">' + b.hcpcs_code + '</td>' +
+                    '<td>' + b.total_providers.toLocaleString() + '</td>' +
+                    '<td>' + b.avg_services_per_provider + '</td>' +
+                    '<td style="color:var(--color-green,#27ae60);font-weight:600;">$' + b.avg_payment.toFixed(2) + '</td>' +
+                    '<td>$' + b.avg_allowed_amount.toFixed(2) + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table>';
+            html += '<div style="font-size:11px;color:var(--text-secondary);margin-top:8px;">Source: CMS Medicare Physician & Other Practitioners dataset (' + data.state + ', ' + data.specialty + ')</div>';
+            el.innerHTML = html;
+        })
+        .catch(function() {
+            el.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;text-align:center;">Benchmark data unavailable.</p>';
+        });
+})();
+</script>
 {% else %}
 <div class="card">
-    <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
-        <p style="font-size:16px;margin-bottom:8px;">No billing opportunities found for this patient</p>
-        <p style="font-size:13px;">Billing opportunities are generated during the overnight prep job (8 PM) for next-day appointments.</p>
+    <div class="card-body">
+        {{ empty_state('💰', 'No billing opportunities detected', 'This patient\\'s data may need a clinical summary refresh.', url_for('patient.chart', mrn=mrn), 'Refresh') }}
     </div>
 </div>
 {% endif %}
@@ -93,10 +157,7 @@ function captureOpp(id) {
         .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
 }
 function dismissOpp(id) {
-    var reason = prompt('Dismiss reason (optional):');
-    if (reason === null) return;
-    fetch('/api/billing/opportunity/' + id + '/dismiss', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})})
-        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+    showDismissDialog('billing', id, '/api/billing/opportunity/' + id + '/dismiss');
 }
 </script>
 {% endblock %}

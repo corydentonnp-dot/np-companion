@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Updates — NP Companion{% endblock %}
+{% block title %}Updates — CareCompanion{% endblock %}
 {% block page_id %}admin-updates{% endblock %}
 
 {% block content %}
@@ -62,7 +62,7 @@
 <script>
 function scanForUpdate() {
     const folder = document.getElementById('update-folder').value.trim();
-    if (!folder) { alert('Enter a folder path first.'); return; }
+    if (!folder) { showWarning('Enter a folder path first.'); return; }
     const btn = document.getElementById('scan-btn');
     const result = document.getElementById('scan-result');
     btn.disabled = true;
@@ -136,7 +136,7 @@ function applyUpdate(zipPath) {
 
 function restartApp() {
     document.getElementById('scan-result').innerHTML =
-        '<div class="alert alert-info">Restarting NP Companion...</div>';
+        '<div class="alert alert-info">Restarting CareCompanion...</div>';
     fetch('/admin/updates/restart', { method: 'POST' }).catch(function(){});
     setTimeout(function() {
         window.location.href = '/dashboard';

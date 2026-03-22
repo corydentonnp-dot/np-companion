@@ -1,7 +1,7 @@
 """
-NP Companion — Tickler (Follow-Up Reminder) Model
+CareCompanion — Tickler (Follow-Up Reminder) Model
 
-File location: np-companion/models/tickler.py
+File location: carecompanion/models/tickler.py
 
 A three-column dashboard item: upcoming | overdue | completed.
 Providers create ticklers for patient follow-ups; MAs can be

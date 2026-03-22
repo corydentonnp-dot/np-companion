@@ -108,7 +108,7 @@
 
 ### Checkpoint 1: Start the app
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
+cd C:\Users\coryd\Documents\CareCompanion
 venv\Scripts\python.exe app.py
 ```
 Open Chrome to http://localhost:5000 and log in as CORY.
@@ -151,7 +151,7 @@ Open Chrome to http://localhost:5000 and log in as CORY.
 
 ## Automated Verification Script
 ```powershell
-cd C:\Users\coryd\Documents\NP_Companion
+cd C:\Users\coryd\Documents\CareCompanion
 venv\Scripts\python.exe -c "
 from app import create_app
 app = create_app()

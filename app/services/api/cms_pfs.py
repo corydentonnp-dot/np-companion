@@ -1,5 +1,5 @@
 """
-NP Companion — CMS Physician Fee Schedule Service
+CareCompanion — CMS Physician Fee Schedule Service
 File: app/services/api/cms_pfs.py
 
 Queries the CMS Physician Fee Schedule REST API for CPT/HCPCS code rates,
@@ -14,7 +14,7 @@ Dependencies:
 - app/api_config.py (CMS_PFS_BASE_URL, CMS_PFS_CACHE_TTL_DAYS,
   CMS_LOCALITY_NUMBER, CY2025_CONVERSION_FACTOR, CURRENT_FEE_SCHEDULE_YEAR)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Billing Opportunity Engine — payment rate lookups for all billing rules
 - E&M Calculator (F14a) — RVU-based revenue estimation
 - Monthly Billing Report (F14c) — aggregate RVU totals
@@ -33,6 +33,10 @@ from app.api_config import (
 from app.services.api.base_client import BaseAPIClient, APIUnavailableError
 
 logger = logging.getLogger(__name__)
+
+# CMS payment formula:
+# Payment = [(Work RVU × Work GPCI) + (PE RVU × PE GPCI)
+#            + (MP RVU × MP GPCI)] × Conversion Factor
 
 
 class CMSPhysicianFeeScheduleService(BaseAPIClient):
@@ -130,7 +134,12 @@ class CMSPhysicianFeeScheduleService(BaseAPIClient):
 
         for code in hcpcs_codes:
             if code in code_data:
-                amount = code_data[code].get("non_facility_pricing_amount") or 0.0
+                # Prefer GPCI-adjusted locality payment; fall back to API pricing
+                amount = (
+                    code_data[code].get("gpci_adjusted_payment")
+                    or code_data[code].get("non_facility_pricing_amount")
+                    or 0.0
+                )
                 per_code[code] = amount
                 total += amount
             else:
@@ -157,12 +166,34 @@ class CMSPhysicianFeeScheduleService(BaseAPIClient):
                 return 0.0
 
         status_code = record.get("status_code") or record.get("stat_cd") or ""
+        work_rvu = to_float(record.get("work_rvu") or record.get("wrk_rvu"))
+        nf_pe_rvu = to_float(record.get("non_facility_pe_rvu") or record.get("nf_pe_rvu"))
+        mp_rvu = to_float(record.get("mp_rvu") or record.get("mal_rvu"))
+
+        # GPCI values — locality-specific cost adjustments
+        work_gpci = to_float(record.get("work_gpci") or record.get("wrk_gpci"))
+        pe_gpci = to_float(record.get("pe_gpci") or record.get("nf_pe_gpci") or record.get("practice_expense_gpci"))
+        mp_gpci = to_float(record.get("mp_gpci") or record.get("mal_gpci") or record.get("malpractice_gpci"))
+
+        # Calculate locality-adjusted payment if GPCI values are present
+        gpci_adjusted_payment = None
+        if work_gpci > 0 and pe_gpci > 0 and mp_gpci > 0:
+            gpci_adjusted_payment = round(
+                ((work_rvu * work_gpci) + (nf_pe_rvu * pe_gpci) + (mp_rvu * mp_gpci))
+                * CY2025_CONVERSION_FACTOR,
+                2,
+            )
+
         return {
             "hcpcs_code": record.get("hcpcs_code") or record.get("hcpcs_cd", ""),
             "description": record.get("hcpcs_description") or record.get("mod_desc") or "",
-            "work_rvu": to_float(record.get("work_rvu") or record.get("wrk_rvu")),
-            "non_facility_pe_rvu": to_float(record.get("non_facility_pe_rvu") or record.get("nf_pe_rvu")),
-            "mp_rvu": to_float(record.get("mp_rvu") or record.get("mal_rvu")),
+            "work_rvu": work_rvu,
+            "non_facility_pe_rvu": nf_pe_rvu,
+            "mp_rvu": mp_rvu,
+            "work_gpci": work_gpci,
+            "pe_gpci": pe_gpci,
+            "mp_gpci": mp_gpci,
+            "gpci_adjusted_payment": gpci_adjusted_payment,
             "total_rvu_non_facility": to_float(record.get("total_rvu_non_facility") or record.get("total_rvu")),
             "non_facility_pricing_amount": to_float(record.get("non_facility_pricing_amount") or record.get("nf_price")),
             "facility_pricing_amount": to_float(record.get("facility_pricing_amount") or record.get("fac_price")),

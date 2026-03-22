@@ -1,5 +1,5 @@
 """
-NP Companion — Note Reformatter Template Engine
+CareCompanion — Note Reformatter Template Engine
 File: agent/note_reformatter.py
 
 Step 4 of the Note Reformatter (F31). Takes classified content from
@@ -165,8 +165,14 @@ def _format_classified_items(section_key, items):
         elif item_type == 'diagnosis':
             name = item.get('name', '')
             icd10 = item.get('icd10', '')
+            snomed = item.get('snomed_code', '')
+            codes = []
             if icd10:
-                lines.append(f"{name} ({icd10})")
+                codes.append(icd10)
+            if snomed:
+                codes.append(f"SNOMED {snomed}")
+            if codes:
+                lines.append(f"{name} ({', '.join(codes)})")
             else:
                 lines.append(name)
 
@@ -235,6 +241,10 @@ def reformat_note(raw_text, user_template=None, use_api=False):
     # Step 3: Classify
     classified = classify_content(parsed, use_api=use_api)
 
+    # Step 3b: SNOMED enrichment (only when API mode active)
+    if use_api:
+        classified = _enrich_with_snomed(classified)
+
     # Step 4: Build template
     result = build_reformatted_note(classified, parsed, user_template)
 
@@ -242,3 +252,47 @@ def reformat_note(raw_text, user_template=None, use_api=False):
     result['parse_metadata'] = parsed.get('_metadata', {})
 
     return result
+
+
+def _enrich_with_snomed(classified_content):
+    """
+    Enrich diagnosis items with SNOMED CT codes via the UMLS crosswalk.
+    Adds 'snomed_code' and 'snomed_term' keys to classified diagnosis items.
+    Fails silently if UMLS is unavailable.
+    """
+    try:
+        from models import db
+        from app.services.api.umls import UMLSService
+        import config
+        api_key = getattr(config, 'UMLS_API_KEY', '')
+        if not api_key:
+            return classified_content
+
+        svc = UMLSService(db, api_key)
+
+        for section_key, section_data in classified_content.items():
+            if not isinstance(section_data, dict):
+                continue
+            items = section_data.get('classified_items', [])
+            for item in items:
+                if item.get('type') != 'diagnosis':
+                    continue
+                name = item.get('name', '')
+                if not name:
+                    continue
+                # Search UMLS for the diagnosis term
+                concepts = svc.search(name)
+                if not concepts:
+                    continue
+                cui = concepts[0].get('cui')
+                if not cui:
+                    continue
+                # Get SNOMED code
+                snomed_codes = svc.get_snomed_for_concept(cui)
+                if snomed_codes:
+                    item['snomed_code'] = snomed_codes[0].get('code', '')
+                    item['snomed_term'] = snomed_codes[0].get('description', '')
+    except Exception:
+        logger.debug('SNOMED enrichment skipped (UMLS unavailable)')
+
+    return classified_content

@@ -1,0 +1,33 @@
+{#
+    Cache staleness indicator badge (14.1)
+
+    Usage:
+        {% from "_cache_badge.html" import cache_badge %}
+        {{ cache_badge(some_datetime, ttl_days=7) }}
+
+    Parameters:
+        cached_at  — datetime of last cache refresh (or None)
+        ttl_days   — expected refresh interval in days (default 7)
+
+    Renders a small badge:
+        🟢 "Fresh"   if age < ttl
+        🟡 "Aging"   if age >= ttl but < 2×ttl
+        🔴 "Stale"   if age >= 2×ttl or cached_at is None
+
+    Requires `utcnow` in the template context (injected by context_processor).
+#}
+{% macro cache_badge(cached_at, ttl_days=7) %}
+{% if cached_at %}
+  {% set age_s = (utcnow - cached_at).total_seconds() %}
+  {% set ttl_s = ttl_days * 86400 %}
+  {% if age_s < ttl_s %}
+  <span class="cache-badge cache-badge--fresh" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;" title="Cached {{ cached_at.strftime('%m/%d/%Y %I:%M %p') }} — fresh (&lt; {{ ttl_days }}d)">🟢 Fresh</span>
+  {% elif age_s < ttl_s * 2 %}
+  <span class="cache-badge cache-badge--aging" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;" title="Cached {{ cached_at.strftime('%m/%d/%Y %I:%M %p') }} — aging (&gt; {{ ttl_days }}d)">🟡 Aging</span>
+  {% else %}
+  <span class="cache-badge cache-badge--stale" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;" title="Cached {{ cached_at.strftime('%m/%d/%Y %I:%M %p') }} — stale (&gt; {{ ttl_days * 2 }}d)">🔴 Stale</span>
+  {% endif %}
+{% else %}
+  <span class="cache-badge cache-badge--stale" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;" title="No cached data available">🔴 No cache</span>
+{% endif %}
+{% endmacro %}

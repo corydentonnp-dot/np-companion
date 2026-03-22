@@ -1,7 +1,7 @@
 """
-NP Companion — Medication Reference Model
+CareCompanion — Medication Reference Model
 
-File location: np-companion/models/medication.py
+File location: carecompanion/models/medication.py
 
 A local formulary / quick-reference for medications organized by
 condition.  Entries can be personal (user_id set) or shared with
@@ -50,6 +50,10 @@ class MedicationEntry(db.Model):
     # ---- Sharing & review ------------------------------------------------
     is_shared = db.Column(db.Boolean, default=False)
     guideline_review_flag = db.Column(db.Boolean, default=False)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=True
+    )
 
     # ---- Timestamps ------------------------------------------------------
     created_at = db.Column(
@@ -61,7 +65,10 @@ class MedicationEntry(db.Model):
     )
 
     # ---- Relationships ---------------------------------------------------
-    user = db.relationship('User', backref='medication_entries', lazy=True)
+    user = db.relationship(
+        'User', backref='medication_entries', lazy=True,
+        foreign_keys=[user_id],
+    )
 
     def __repr__(self):
         return f'<MedicationEntry {self.id} {self.drug_name} for {self.condition}>'

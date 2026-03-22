@@ -1,7 +1,7 @@
 """
-NP Companion — Schedule Model
+CareCompanion — Schedule Model
 
-File location: np-companion/models/schedule.py
+File location: carecompanion/models/schedule.py
 
 Stores appointment data scraped from NetPractice.  Each row is one
 appointment slot for one day.  The scraper runs nightly (for tomorrow)
@@ -50,6 +50,7 @@ class Schedule(db.Model):
     entered_by = db.Column(db.String(100), default='')            # who booked the appointment
     bg_color = db.Column(db.String(20), default='')               # schedule row color (e.g. "#FF99CC")
     verification = db.Column(db.String(200), default='')          # insurance verification status
+    insurer = db.Column(db.String(200), default='')               # active insurer at appointment time
 
     # ---- New patient detection -------------------------------------------
     is_new_patient = db.Column(db.Boolean, default=False)

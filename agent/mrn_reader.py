@@ -1,7 +1,7 @@
 """
-NP Companion — MRN Screen Reader
+CareCompanion — MRN Screen Reader
 
-File location: np-companion/agent/mrn_reader.py
+File location: carecompanion/agent/mrn_reader.py
 
 Core MRN detection loop called every 3 seconds by the agent scheduler.
 Implements three-tier detection, TimeLog management, idle detection (F6b),
@@ -13,9 +13,9 @@ Logs use sha256(mrn)[:12] only. UI displays last-4 digits only.
 
 import ctypes
 import ctypes.wintypes
-import hashlib
 import logging
 import re
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -27,10 +27,12 @@ from agent.ac_window import (
     is_ac_foreground,
 )
 from agent.ocr_helpers import get_ac_window_rect
+from utils import safe_patient_id
 
 logger = logging.getLogger('agent.mrn_reader')
 
 # Module-level state — persists across calls within the agent process
+_mrn_lock = threading.Lock()
 _last_known_mrn = None
 _last_mrn_seen_at = None
 _blank_since = None          # When MRN first went blank
@@ -43,7 +45,7 @@ _BLANK_TIMEOUT = 60
 
 def _hash_mrn(mrn):
     """Return a truncated SHA-256 hash of the MRN for safe logging."""
-    return hashlib.sha256(mrn.encode()).hexdigest()[:12]
+    return safe_patient_id(mrn)[:12]
 
 
 # Cached NP scraper instance for DOM MRN extraction
@@ -161,7 +163,7 @@ def _show_chart_duration_warning(mrn):
     try:
         from plyer import notification
         notification.notify(
-            title='NP Companion',
+            title='CareCompanion',
             message=msg,
             timeout=10,
         )
@@ -170,7 +172,7 @@ def _show_chart_duration_warning(mrn):
         try:
             from win10toast import ToastNotifier
             toast = ToastNotifier()
-            toast.show_toast('NP Companion', msg, duration=10, threaded=True)
+            toast.show_toast('CareCompanion', msg, duration=10, threaded=True)
             logger.info(f'Chart duration warning shown for ...{_hash_mrn(mrn)}')
         except Exception as e:
             logger.warning(f'Toast notification failed: {e}')
@@ -192,6 +194,13 @@ def read_mrn(user_id):
     dict
         {"mrn": str|None, "dob": str|None, "source": "title"|"ocr"|"none"}
     """
+    global _last_known_mrn, _last_mrn_seen_at, _blank_since
+
+    with _mrn_lock:
+        return _read_mrn_inner(user_id)
+
+
+def _read_mrn_inner(user_id):
     global _last_known_mrn, _last_mrn_seen_at, _blank_since
 
     now = datetime.now(timezone.utc)

@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+{% block title %}Feature Guide — CareCompanion{% endblock %}
+{% block page_id %}help-guide{% endblock %}
+
+{% block content %}
+<style>
+    .help-layout {
+        display: flex;
+        gap: 24px;
+        min-height: calc(100vh - 140px);
+    }
+
+    /* ---- Sidebar nav ---- */
+    .help-sidebar {
+        width: 280px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 0;
+        max-height: calc(100vh - 140px);
+        overflow-y: auto;
+        padding-right: 8px;
+    }
+    .help-search {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 13px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        background: var(--bg-card);
+        color: var(--text-primary);
+        margin-bottom: 16px;
+    }
+    .help-search:focus {
+        outline: none;
+        border-color: var(--color-teal);
+        box-shadow: 0 0 0 2px rgba(10,140,150,0.12);
+    }
+    .help-cat-group {
+        margin-bottom: 12px;
+    }
+    .help-cat-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-secondary);
+        padding: 6px 8px;
+        cursor: pointer;
+        user-select: none;
+        border-radius: var(--radius);
+    }
+    .help-cat-label:hover {
+        background: var(--bg-hover, rgba(0,0,0,0.04));
+    }
+    .help-cat-icon {
+        font-size: 14px;
+    }
+    .help-cat-items {
+        margin-left: 4px;
+        border-left: 2px solid var(--border-color);
+        padding-left: 12px;
+    }
+    .help-cat-items.collapsed {
+        display: none;
+    }
+    .help-nav-link {
+        display: block;
+        padding: 5px 8px;
+        font-size: 13px;
+        color: var(--text-primary);
+        text-decoration: none;
+        border-radius: var(--radius);
+        line-height: 1.4;
+    }
+    .help-nav-link:hover {
+        background: var(--bg-hover, rgba(0,0,0,0.04));
+        text-decoration: none;
+    }
+    .help-nav-link.active {
+        background: var(--color-lt-blue);
+        color: var(--color-teal);
+        font-weight: 600;
+    }
+    .help-nav-count {
+        font-size: 10px;
+        color: var(--text-secondary);
+        margin-left: 4px;
+    }
+
+    /* ---- Main content ---- */
+    .help-main {
+        flex: 1;
+        min-width: 0;
+    }
+    .help-header {
+        margin-bottom: 24px;
+    }
+    .help-header h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+    }
+    .help-header p {
+        color: var(--text-secondary);
+        margin: 0;
+        font-size: 14px;
+    }
+
+    /* Category overview cards */
+    .help-cat-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    .help-cat-card {
+        padding: 20px;
+        cursor: pointer;
+        transition: box-shadow var(--speed), border-color var(--speed);
+    }
+    .help-cat-card:hover {
+        box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1));
+        border-color: var(--color-teal);
+    }
+    .help-cat-card-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+    .help-cat-card h3 {
+        margin: 0 0 6px;
+        font-size: 16px;
+    }
+    .help-cat-card p {
+        margin: 0 0 10px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+    }
+    .help-cat-card .feature-count {
+        font-size: 11px;
+        color: var(--text-secondary);
+    }
+
+    /* Feature article */
+    .help-article {
+        max-width: 720px;
+    }
+    .help-article-header {
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .help-article-header h2 {
+        margin: 0 0 8px;
+        font-size: 20px;
+    }
+    .help-article-meta {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .help-article-section {
+        margin-bottom: 24px;
+    }
+    .help-article-section h3 {
+        font-size: 15px;
+        margin: 0 0 10px;
+        color: var(--text-primary);
+    }
+    .help-article-section p {
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    /* Step list */
+    .help-steps {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        counter-reset: step-counter;
+    }
+    .help-steps li {
+        counter-increment: step-counter;
+        display: flex;
+        gap: 12px;
+        padding: 10px 0;
+        font-size: 14px;
+        line-height: 1.5;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .help-steps li:last-child {
+        border-bottom: none;
+    }
+    .help-steps li::before {
+        content: counter(step-counter);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--color-teal);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    /* Tips list */
+    .help-tips {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .help-tips li {
+        position: relative;
+        padding: 8px 0 8px 24px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--text-primary);
+    }
+    .help-tips li::before {
+        content: '💡';
+        position: absolute;
+        left: 0;
+        top: 8px;
+        font-size: 12px;
+    }
+
+    /* Feature list within a category */
+    .help-feature-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .help-feature-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        text-decoration: none;
+        color: var(--text-primary);
+        border-radius: var(--radius);
+        transition: background var(--speed);
+    }
+    .help-feature-row:hover {
+        background: var(--bg-hover, rgba(0,0,0,0.04));
+        text-decoration: none;
+    }
+    .help-feature-row .fname {
+        font-weight: 600;
+        font-size: 14px;
+        min-width: 180px;
+    }
+    .help-feature-row .fdesc {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.4;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    /* Open-in-app link */
+    .help-open-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        color: var(--color-teal);
+        text-decoration: none;
+    }
+    .help-open-link:hover {
+        text-decoration: underline;
+    }
+
+    /* Back link */
+    .help-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        margin-bottom: 16px;
+    }
+    .help-back:hover {
+        color: var(--color-teal);
+        text-decoration: none;
+    }
+
+    /* Search results overlay */
+    .help-search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1));
+        max-height: 340px;
+        overflow-y: auto;
+        z-index: 100;
+        display: none;
+    }
+    .help-search-results.visible {
+        display: block;
+    }
+    .help-search-result {
+        display: block;
+        padding: 10px 14px;
+        text-decoration: none;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--border-color);
+        font-size: 13px;
+    }
+    .help-search-result:last-child {
+        border-bottom: none;
+    }
+    .help-search-result:hover {
+        background: var(--bg-hover, rgba(0,0,0,0.04));
+        text-decoration: none;
+    }
+    .help-search-result .sr-name {
+        font-weight: 600;
+    }
+    .help-search-result .sr-desc {
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-top: 2px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .help-layout {
+            flex-direction: column;
+        }
+        .help-sidebar {
+            width: 100%;
+            position: static;
+            max-height: none;
+            padding-right: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+        }
+    }
+</style>
+
+<div class="help-layout">
+    {# ---- SIDEBAR NAVIGATION ---- #}
+    <aside class="help-sidebar">
+        <div style="position:relative;">
+            <input type="text" class="help-search" id="help-search-input" placeholder="Search features..." autocomplete="off">
+            <div class="help-search-results" id="help-search-results"></div>
+        </div>
+
+        {% for cat in categories %}
+        {% set cg = grouped.get(cat.id, {}) %}
+        {% set feats = cg.get('features', []) %}
+        {% if feats %}
+        <div class="help-cat-group" data-cat="{{ cat.id }}">
+            <div class="help-cat-label" onclick="toggleCatGroup(this)">
+                <span class="help-cat-icon">{{ cat.icon }}</span>
+                {{ cat.name }}
+                <span class="help-nav-count">({{ feats|length }})</span>
+            </div>
+            <div class="help-cat-items{% if not selected_feature or selected_feature.category != cat.id %} collapsed{% endif %}">
+                {% for feat in feats %}
+                <a href="/help/{{ feat.id }}" class="help-nav-link{% if selected_feature and selected_feature.id == feat.id %} active{% endif %}">
+                    {{ feat.name }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </aside>
+
+    {# ---- MAIN CONTENT ---- #}
+    <div class="help-main">
+        {% if selected_feature %}
+        {# ---- FEATURE ARTICLE VIEW ---- #}
+        <a href="/help" class="help-back">← All Features</a>
+
+        <article class="help-article">
+            <div class="help-article-header">
+                <h2>{{ selected_feature.name }}</h2>
+                <div class="help-article-meta">
+                    {% for cat in categories if cat.id == selected_feature.category %}
+                    <span class="badge badge--info">{{ cat.icon }} {{ cat.name }}</span>
+                    {% endfor %}
+                    {% if selected_feature.admin_only %}
+                    <span class="badge badge--warning">Admin Only</span>
+                    {% endif %}
+                    {% if selected_feature.url %}
+                    <a href="{{ selected_feature.url }}" class="help-open-link">Open {{ selected_feature.name }} →</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Description #}
+            <div class="help-article-section">
+                <h3>What It Does</h3>
+                <p>{{ selected_feature.description }}</p>
+            </div>
+
+            {# How it works #}
+            {% if selected_feature.how_it_works %}
+            <div class="help-article-section">
+                <h3>How It Works</h3>
+                <p>{{ selected_feature.how_it_works }}</p>
+            </div>
+            {% endif %}
+
+            {# Steps #}
+            {% if selected_feature.steps %}
+            <div class="help-article-section">
+                <h3>Step-by-Step Guide</h3>
+                <ol class="help-steps">
+                    {% for step in selected_feature.steps %}
+                    <li>{{ step }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+
+            {# Tips #}
+            {% if selected_feature.tips %}
+            <div class="help-article-section" style="background:var(--bg-primary);padding:16px;border-radius:var(--radius-lg);border:1px solid var(--border-color);">
+                <h3 style="margin-bottom:8px;">Tips & Notes</h3>
+                <ul class="help-tips">
+                    {% for tip in selected_feature.tips %}
+                    <li>{{ tip }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </article>
+
+        {% else %}
+        {# ---- CATEGORY OVERVIEW (HOME) ---- #}
+        <div class="help-header">
+            <h1>Feature Guide</h1>
+            <p>Browse all CareCompanion features by category. Click any feature for detailed instructions.</p>
+        </div>
+
+        {# Category cards #}
+        <div class="help-cat-overview">
+            {% for cat in categories %}
+            {% set cg = grouped.get(cat.id, {}) %}
+            {% set feats = cg.get('features', []) %}
+            {% if feats %}
+            <div class="card help-cat-card" onclick="scrollToCat('{{ cat.id }}')">
+                <div class="help-cat-card-icon">{{ cat.icon }}</div>
+                <h3>{{ cat.name }}</h3>
+                <p>{{ cat.description }}</p>
+                <span class="feature-count">{{ feats|length }} feature{{ 's' if feats|length != 1 else '' }}</span>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {# Feature listings by category #}
+        {% for cat in categories %}
+        {% set cg = grouped.get(cat.id, {}) %}
+        {% set feats = cg.get('features', []) %}
+        {% if feats %}
+        <div id="cat-{{ cat.id }}" style="margin-bottom:32px;">
+            <h2 style="font-size:17px;margin:0 0 12px;display:flex;align-items:center;gap:8px;">
+                <span>{{ cat.icon }}</span> {{ cat.name }}
+            </h2>
+            <div class="card">
+                <div class="card-body" style="padding:8px 0;">
+                    <div class="help-feature-list">
+                        {% for feat in feats %}
+                        <a href="/help/{{ feat.id }}" class="help-feature-row">
+                            <span class="fname">{{ feat.name }}</span>
+                            <span class="fdesc">{{ feat.description[:120] }}{% if feat.description|length > 120 %}…{% endif %}</span>
+                            {% if feat.admin_only %}
+                            <span class="badge badge--warning" style="flex-shrink:0;">Admin</span>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        {% endif %}
+    </div>
+</div>
+
+<script>
+/* Toggle category sidebar groups */
+function toggleCatGroup(el) {
+    var items = el.nextElementSibling;
+    if (items) items.classList.toggle('collapsed');
+}
+
+/* Scroll to category section */
+function scrollToCat(catId) {
+    var el = document.getElementById('cat-' + catId);
+    if (el) {
+        el.scrollIntoView({behavior: 'smooth', block: 'start'});
+        /* Also expand sidebar */
+        var group = document.querySelector('.help-cat-group[data-cat="' + catId + '"] .help-cat-items');
+        if (group) group.classList.remove('collapsed');
+    }
+}
+
+/* Search */
+(function() {
+    var input = document.getElementById('help-search-input');
+    var results = document.getElementById('help-search-results');
+    var debounceTimer = null;
+
+    input.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var q = input.value.trim();
+        if (q.length < 2) {
+            results.classList.remove('visible');
+            return;
+        }
+        debounceTimer = setTimeout(function() {
+            fetch('/api/help/search?q=' + encodeURIComponent(q))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.length) {
+                        results.innerHTML = '<div style="padding:12px 14px;color:var(--text-secondary);font-size:13px;">No matching features found.</div>';
+                    } else {
+                        results.innerHTML = data.map(function(item) {
+                            return '<a href="' + item.url + '" class="help-search-result">' +
+                                '<div class="sr-name">' + escapeHtml(item.name) + '</div>' +
+                                '<div class="sr-desc">' + escapeHtml(item.description) + '</div>' +
+                            '</a>';
+                        }).join('');
+                    }
+                    results.classList.add('visible');
+                })
+                .catch(function() {
+                    results.classList.remove('visible');
+                });
+        }, 250);
+    });
+
+    /* Close on click outside */
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+            results.classList.remove('visible');
+        }
+    });
+
+    /* Close on Escape */
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            results.classList.remove('visible');
+            input.blur();
+        }
+    });
+
+    function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+})();
+</script>
+{% endblock %}

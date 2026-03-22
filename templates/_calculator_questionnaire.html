@@ -1,0 +1,184 @@
+{#
+  Phase 36.1 — Generic questionnaire form partial
+  Parent context provides: calc, key, mrn, prefilled, automation_labels
+  Handles: yesno, yesno_inv, likert4, likert6, select, number input types.
+  Features: running score total, C-SSRS conditional branching (JS).
+#}
+
+{% set likert4_labels = calc.likert_labels if calc.likert_labels is defined else ['Not at all', 'Several days', 'More than half the days', 'Nearly every day'] %}
+{% set likert6_labels = calc.likert_labels if calc.likert_labels is defined else ['0','1','2','3','4','5'] %}
+
+{# Running score bar #}
+<div style="display:flex;justify-content:space-between;align-items:center;
+            background:var(--bg-secondary,#1e1e1e);border-radius:8px;
+            padding:10px 14px;margin-bottom:14px;">
+    <span style="font-size:12px;color:var(--text-secondary,#94a3b8);">Running Score</span>
+    <div>
+        <span id="q-running-total"
+              style="font-size:22px;font-weight:700;color:var(--color-teal,#0d9488);">0</span>
+    </div>
+</div>
+
+{# Likert scale legend (shown if calc defines likert_labels) #}
+{% if calc.likert_labels is defined %}
+<div style="font-size:11px;color:var(--text-secondary,#94a3b8);
+            background:var(--bg-tertiary,#252525);padding:8px 12px;
+            border-radius:6px;margin-bottom:12px;line-height:1.8;">
+    {% for lbl in calc.likert_labels %}
+    <span style="margin-right:14px;"><strong>{{ loop.index0 }}</strong> = {{ lbl }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# C-SSRS safety-critical alert banner #}
+{% if key == 'cssrs' %}
+<div style="background:#fff1f2;border:1px solid #fda4af;border-radius:6px;
+            padding:10px 14px;margin-bottom:14px;font-size:12px;color:#9f1239;">
+    &#9888; <strong>Safety Note:</strong> High Risk result (Q4/Q5/Q6 = YES) requires
+    immediate clinical evaluation. Do not leave patient unattended.
+    Refer to your institution's suicide safety protocol.
+</div>
+{% endif %}
+
+<form id="calculator-form" onsubmit="computeCalc(event)">
+    {% if mrn %}<input type="hidden" name="mrn" value="{{ mrn }}">{% endif %}
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+    {% for inp in calc.inputs %}
+    {% set pf_val = prefilled.get(inp.key, '') if prefilled else '' %}
+    {% set is_auto = inp.source == 'auto' and pf_val != '' and pf_val is not none %}
+    {% set has_branch = inp.branch_show is defined and inp.branch_show %}
+    <div class="calc-input-row{% if has_branch %} q-branch-item{% endif %}"
+         {% if has_branch %}data-branch-trigger="{{ inp.branch_show }}"{% endif %}
+         {% if has_branch %}style="display:none;"{% endif %}>
+        <label class="calc-input-label">
+            {{ inp.label }}
+            {% if inp.required %}<span style="color:red;">*</span>{% endif %}
+            {% if is_auto %}
+            <span style="font-size:11px;color:var(--text-muted,#94a3b8);margin-left:4px;">🔒 from chart</span>
+            {% endif %}
+        </label>
+
+        {% if inp.type in ('yesno',) %}
+        <div class="calc-radio-row">
+            <label><input type="radio" name="{{ inp.key }}" value="1"
+                          {% if pf_val|string == '1' %}checked{% endif %}
+                          onchange="updateQTotal()"> Yes</label>
+            <label style="margin-left:14px;"><input type="radio" name="{{ inp.key }}" value="0"
+                          {% if pf_val|string == '0' %}checked{% endif %}
+                          onchange="updateQTotal()"> No</label>
+        </div>
+
+        {% elif inp.type == 'yesno_inv' %}
+        {# Inverted: "Yes" = 0 pts, "No" = 1 pt (e.g. GDS-15 positive items ask reverse) #}
+        <div class="calc-radio-row">
+            <label><input type="radio" name="{{ inp.key }}" value="0"
+                          {% if pf_val|string == '0' %}checked{% endif %}
+                          onchange="updateQTotal()"> Yes</label>
+            <label style="margin-left:14px;"><input type="radio" name="{{ inp.key }}" value="1"
+                          {% if pf_val|string == '1' %}checked{% endif %}
+                          onchange="updateQTotal()"> No</label>
+        </div>
+
+        {% elif inp.type == 'likert4' %}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">
+            {% for i in range(4) %}
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;
+                          padding:4px 10px;border:1px solid var(--border,#334155);
+                          border-radius:6px;cursor:pointer;">
+                <input type="radio" name="{{ inp.key }}" value="{{ i }}"
+                       {% if pf_val|string == i|string %}checked{% endif %}
+                       onchange="updateQTotal()">
+                <span>{% if i < likert4_labels|length %}{{ likert4_labels[i] }}{% else %}{{ i }}{% endif %}</span>
+            </label>
+            {% endfor %}
+        </div>
+
+        {% elif inp.type == 'likert6' %}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">
+            {% for i in range(6) %}
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;
+                          padding:4px 8px;border:1px solid var(--border,#334155);
+                          border-radius:6px;cursor:pointer;">
+                <input type="radio" name="{{ inp.key }}" value="{{ i }}"
+                       {% if pf_val|string == i|string %}checked{% endif %}
+                       onchange="updateQTotal()">
+                <span>{% if i < likert6_labels|length %}{{ likert6_labels[i] }}{% else %}{{ i }}{% endif %}</span>
+            </label>
+            {% endfor %}
+        </div>
+
+        {% elif inp.type == 'select' %}
+        {# Use option index as value so engine receives numeric score #}
+        <select id="inp-{{ inp.key }}" name="{{ inp.key }}"
+                class="calc-input {% if is_auto %}calc-input-prefilled{% endif %}"
+                {% if inp.required %}required{% endif %}
+                onchange="updateQTotal()">
+            <option value="">— select —</option>
+            {% for idx in range(inp.options|length) %}
+            <option value="{{ idx }}"
+                    {% if pf_val|string == idx|string %}selected{% endif %}>
+                {{ inp.options[idx] }}
+            </option>
+            {% endfor %}
+        </select>
+
+        {% else %}
+        {# Fallback: number or text #}
+        <input type="{{ inp.type if inp.type in ('number','text') else 'number' }}"
+               id="inp-{{ inp.key }}" name="{{ inp.key }}"
+               class="calc-input {% if is_auto %}calc-input-prefilled{% endif %}"
+               value="{{ pf_val }}"
+               {% if inp.min is defined %}min="{{ inp.min }}"{% endif %}
+               {% if inp.max is defined %}max="{{ inp.max }}"{% endif %}
+               {% if inp.required %}required{% endif %}
+               onchange="updateQTotal()">
+        {% endif %}
+    </div>
+    {% endfor %}
+    </div>
+
+    <button type="submit" id="calc-submit-btn" class="btn-primary"
+            style="margin-top:20px;width:100%;padding:10px;">
+        Calculate Score
+    </button>
+</form>
+
+<script>
+/* Phase 36 — Questionnaire running total + C-SSRS branching */
+function updateQTotal() {
+    var total = 0;
+    var form = document.getElementById('calculator-form');
+    if (!form) return;
+    form.querySelectorAll('input[type="radio"]:checked').forEach(function(r) {
+        total += parseInt(r.value) || 0;
+    });
+    form.querySelectorAll('select').forEach(function(s) {
+        if (s.name && s.name !== 'mrn' && s.value !== '') {
+            total += parseInt(s.value) || 0;
+        }
+    });
+    var el = document.getElementById('q-running-total');
+    if (el) el.textContent = total;
+}
+{% if key == 'cssrs' %}
+/* C-SSRS: Show Q3-Q5 only when Q2 = YES */
+function handleCssrsBranching() {
+    var q2Checked = document.querySelector('input[name="q2"]:checked');
+    var q2Val = q2Checked ? parseInt(q2Checked.value) : -1;
+    document.querySelectorAll('.q-branch-item[data-branch-trigger="q2"]').forEach(function(el) {
+        if (q2Val === 1) {
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+            el.querySelectorAll('input[type="radio"]').forEach(function(r) { r.checked = false; });
+        }
+    });
+    updateQTotal();
+}
+document.querySelectorAll('input[name="q2"]').forEach(function(r) {
+    r.addEventListener('change', handleCssrsBranching);
+});
+{% endif %}
+document.addEventListener('DOMContentLoaded', updateQTotal);
+</script>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>REMS Medication Database — CareCompanion</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            color: #222;
+            padding: 0.6in;
+            line-height: 1.45;
+        }
+        @media print {
+            @page { margin: 0.5in; size: letter; }
+            body { padding: 0; font-size: 9pt; }
+            .no-print { display: none !important; }
+            .rems-card { page-break-inside: avoid; }
+        }
+        h1 { font-size: 18pt; margin-bottom: 4px; color: #1a1a1a; }
+        .subtitle { font-size: 10pt; color: #666; margin-bottom: 16px; }
+        .search-bar {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .search-bar input {
+            padding: 6px 12px;
+            font-size: 11pt;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 350px;
+        }
+        .rems-card {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+        }
+        .rems-card.removed { border-left: 4px solid #ffc107; background: #fffbea; }
+        .rems-card.active { border-left: 4px solid #198754; }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+        .program-name { font-size: 13pt; font-weight: 700; color: #111; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 8pt;
+            font-weight: 600;
+        }
+        .status-badge.active { background: #d4edda; color: #155724; }
+        .status-badge.removed { background: #fff3cd; color: #856404; }
+        .clinical-area { font-size: 9pt; color: #666; margin-bottom: 6px; }
+        .meds-list { font-size: 9pt; margin-bottom: 6px; }
+        .meds-list strong { color: #333; }
+        .section-label {
+            font-weight: 700;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: #555;
+            margin-top: 8px;
+            margin-bottom: 3px;
+        }
+        .req-list, .lab-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .req-list li {
+            padding: 2px 0;
+            padding-left: 14px;
+            position: relative;
+            font-size: 9pt;
+        }
+        .req-list li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #888;
+        }
+        .lab-list li {
+            padding: 2px 0;
+            padding-left: 14px;
+            position: relative;
+            font-size: 9pt;
+        }
+        .lab-list li::before {
+            content: "🔬";
+            position: absolute;
+            left: -2px;
+            font-size: 9pt;
+        }
+        .lab-priority {
+            display: inline-block;
+            padding: 0 4px;
+            border-radius: 3px;
+            font-size: 7.5pt;
+            font-weight: 600;
+        }
+        .lab-priority.critical { background: #f8d7da; color: #721c24; }
+        .lab-priority.high { background: #fff3cd; color: #856404; }
+        .lab-priority.standard { background: #e9ecef; color: #444; }
+        .notes-box {
+            margin-top: 6px;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border-left: 3px solid #0d6efd;
+            font-size: 8.5pt;
+            color: #444;
+        }
+        .print-btn {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .print-btn button {
+            padding: 6px 20px;
+            font-size: 11pt;
+            cursor: pointer;
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+        }
+        .footer { margin-top: 20px; font-size: 8pt; color: #999; text-align: center; border-top: 1px solid #ddd; padding-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="print-btn no-print">
+        <button onclick="window.print()">&#128424; Print REMS Reference</button>
+    </div>
+
+    <h1>REMS Medication Database</h1>
+    <div class="subtitle">{{ program_count }} REMS programs &bull; FDA Risk Evaluation and Mitigation Strategies &bull; Quick clinical reference</div>
+
+    <div class="search-bar no-print">
+        <input type="text" id="rems-search" placeholder="Search medications, programs, or clinical areas..." oninput="filterCards()">
+    </div>
+
+    {% if not rems_programs %}
+    <p style="color:#888;font-style:italic;text-align:center;padding:40px;">REMS database not loaded. Check data/rems_database.json.</p>
+    {% endif %}
+
+    {% for prog in rems_programs %}
+    <div class="rems-card {% if prog.status == 'active' %}active{% else %}removed{% endif %}" data-search="{{ prog.program_name|lower }} {{ prog.medications|join(' ')|lower }} {{ prog.clinical_area|lower }}">
+        <div class="card-header">
+            <span class="program-name">{{ prog.program_name }}</span>
+            <span class="status-badge {% if prog.status == 'active' %}active{% else %}removed{% endif %}">
+                {% if prog.status == 'active' %}ACTIVE{% else %}REMOVED (2025){% endif %}
+            </span>
+        </div>
+        <div class="clinical-area">{{ prog.clinical_area }}</div>
+        <div class="meds-list">
+            <strong>Medications:</strong>
+            {% for med in prog.medications %}{{ med }}{% if not loop.last %}; {% endif %}{% endfor %}
+        </div>
+
+        {% if prog.status_detail %}
+        <div class="notes-box" style="border-left-color:#ffc107;">
+            <strong>Status Update:</strong> {{ prog.status_detail }}
+        </div>
+        {% endif %}
+
+        <div class="section-label">Requirements</div>
+        <ul class="req-list">
+            {% for req in prog.requirements %}
+            <li>{{ req }}</li>
+            {% endfor %}
+        </ul>
+
+        {% if prog.monitoring_labs %}
+        <div class="section-label">Monitoring Labs</div>
+        <ul class="lab-list">
+            {% for lab in prog.monitoring_labs %}
+            <li>
+                <strong>{{ lab.lab }}</strong> — {{ lab.interval }}
+                <span class="lab-priority {{ lab.priority }}">{{ lab.priority|upper }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if prog.notes %}
+        <div class="notes-box">
+            <strong>Clinical Notes:</strong> {{ prog.notes }}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        CareCompanion REMS Reference &bull; For clinical decision support only &bull; Verify with FDA REMS website for most current program requirements
+    </div>
+
+    <script>
+    function filterCards() {
+        const query = document.getElementById('rems-search').value.toLowerCase().trim();
+        document.querySelectorAll('.rems-card').forEach(function(card) {
+            const text = card.getAttribute('data-search') || '';
+            card.style.display = (!query || text.indexOf(query) !== -1) ? '' : 'none';
+        });
+    }
+    </script>
+</body>
+</html>

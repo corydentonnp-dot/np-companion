@@ -1,7 +1,7 @@
 """
-NP Companion — Order Set Models
+CareCompanion — Order Set Models
 
-File location: np-companion/models/orderset.py
+File location: carecompanion/models/orderset.py
 
 Tables:
   - OrderSet: a named collection of orders tied to a visit type.

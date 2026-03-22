@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}CCM Registry — CareCompanion{% endblock %}
+{% block page_id %}ccm-registry{% endblock %}
+
+{% block subpanel %}
+{% set active_list = registry|selectattr('enrollment.status', 'equalto', 'active')|list %}
+{% set ready_list = registry|selectattr('readiness', 'equalto', 'ready')|list %}
+<div class="context-panel-header"><h3>CCM Registry</h3></div>
+<div class="context-panel-section">
+    <div class="cp-section-label">Summary</div>
+    <div class="cp-stat"><span>Active</span><span class="cp-stat-value" style="color:var(--color-green)">{{ active_list|length }}</span></div>
+    <div class="cp-stat"><span>Ready to Bill</span><span class="cp-stat-value" style="color:var(--color-teal)">{{ ready_list|length }}</span></div>
+    <div class="cp-stat"><span>Monthly</span><span class="cp-stat-value" style="color:var(--color-green)">${{ (ready_list|length * 62) }}</span></div>
+</div>
+<div class="cp-quick-nav">
+    <div class="cp-section-label">Quick Nav</div>
+    <a href="/tcm" class="cp-link">TCM Watch</a>
+    <a href="/bonus" class="cp-link">Bonus Tracker</a>
+    <a href="/patients" class="cp-link">My Patients</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">&#128202; CCM Registry</h1>
+    <span style="font-size:14px;color:var(--text-secondary);">Chronic Care Management — $62/month per enrolled patient</span>
+</div>
+
+
+
+{# ---- Enroll Form ---- #}
+<div class="card" style="margin-bottom:24px;">
+    <div style="padding:16px;">
+        <h3 style="margin:0 0 12px 0;font-size:15px;">Enroll Patient</h3>
+        <form id="ccm-enroll-form" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+            <div>
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Patient MRN</label>
+                <input type="text" name="mrn" required maxlength="20" pattern="[A-Za-z0-9\-]+"
+                       style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;width:140px;">
+            </div>
+            <div>
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Consent Method</label>
+                <select name="consent_method" style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;">
+                    <option value="">— Not yet obtained —</option>
+                    <option value="verbal">Verbal</option>
+                    <option value="written">Written</option>
+                    <option value="portal">Patient Portal</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Qualifying Conditions (2+ required)</label>
+                <input type="text" name="conditions_text" placeholder="e.g. I10 HTN, E11 DM2, E78 HLD"
+                       style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;width:280px;">
+            </div>
+            <button type="submit" class="btn btn-sm" style="background:var(--color-green);color:#fff;border:none;padding:7px 16px;border-radius:4px;cursor:pointer;font-size:13px;">
+                + Enroll
+            </button>
+        </form>
+        <div id="ccm-enroll-msg" style="margin-top:8px;font-size:12px;display:none;"></div>
+    </div>
+</div>
+
+{# ---- Registry Table ---- #}
+{% if registry|length == 0 %}
+<div class="card" style="text-align:center;padding:40px;color:var(--text-secondary);">
+    <div style="font-size:36px;margin-bottom:8px;">&#128203;</div>
+    <p>No CCM enrollments yet. Enroll patients with 2+ chronic conditions above.</p>
+</div>
+{% else %}
+<div class="card" style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+            <tr style="background:var(--bg-muted);border-bottom:2px solid var(--border);">
+                <th style="padding:10px;text-align:left;">Patient</th>
+                <th style="padding:10px;text-align:left;">Status</th>
+                <th style="padding:10px;text-align:left;">Conditions</th>
+                <th style="padding:10px;text-align:left;">Consent</th>
+                <th style="padding:10px;text-align:center;">Time This Month</th>
+                <th style="padding:10px;text-align:center;">Billing</th>
+                <th style="padding:10px;text-align:center;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in registry %}
+        {% set e = item.enrollment %}
+        <tr data-filterable style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px;">
+                <div style="font-weight:600;">{{ e.patient_mrn_hash[:8] }}...</div>
+                <div style="font-size:11px;color:var(--text-secondary);">
+                    Enrolled: {{ e.enrollment_date.strftime('%m/%d/%Y') if e.enrollment_date else '—' }}
+                    {% if e.total_billed_months > 0 %}
+                    · {{ e.total_billed_months }} months billed
+                    {% endif %}
+                </div>
+            </td>
+            <td style="padding:10px;">
+                <span class="badge {{ 'badge--success' if e.status=='active' else 'badge--warning' if e.status=='pending' else 'badge--muted' }}" style="font-size:11px;">
+                    {{ e.status|title }}
+                </span>
+            </td>
+            <td style="padding:10px;font-size:12px;">
+                {% for cond in item.conditions[:4] %}
+                <span style="background:var(--bg-muted);padding:1px 6px;border-radius:3px;margin:1px;">
+                    {{ cond.code if cond is mapping else cond }}
+                </span>
+                {% endfor %}
+                {% if item.conditions|length > 4 %}
+                <span style="color:var(--text-secondary);">+{{ item.conditions|length - 4 }}</span>
+                {% endif %}
+                {% if item.conditions|length < 2 %}
+                <span style="color:var(--color-danger);font-size:11px;">Need {{ 2 - item.conditions|length }} more</span>
+                {% endif %}
+            </td>
+            <td style="padding:10px;font-size:12px;">
+                {% if e.consent_date %}
+                <span style="color:var(--color-green);">&#10003;</span>
+                {{ e.consent_method or 'obtained' }} ({{ e.consent_date.strftime('%m/%d') }})
+                {% else %}
+                <span style="color:var(--color-danger);">&#9675; Required</span>
+                {% endif %}
+            </td>
+            <td style="padding:10px;text-align:center;">
+                {# Progress bar #}
+                <div style="width:100%;max-width:120px;margin:0 auto;">
+                    <div style="background:var(--bg-muted);border-radius:4px;height:18px;overflow:hidden;position:relative;">
+                        <div style="background:{{ 'var(--color-green)' if item.pct >= 100 else 'var(--color-warning)' if item.pct >= 50 else 'var(--color-danger)' }};height:100%;width:{{ item.pct }}%;border-radius:4px;transition:width 0.3s;"></div>
+                        <span style="position:absolute;top:0;left:0;right:0;text-align:center;font-size:11px;line-height:18px;font-weight:600;">
+                            {{ item.minutes }}/{{ item.goal }} min
+                        </span>
+                    </div>
+                </div>
+            </td>
+            <td style="padding:10px;text-align:center;">
+                <span class="badge {{ 'badge--success' if item.readiness=='green' else 'badge--warning' if item.readiness=='yellow' else 'badge--muted' if item.readiness=='gray' else '' }}"
+                      style="font-size:11px;{{ 'background:var(--color-danger);color:#fff;' if item.readiness=='red' else '' }}">
+                    {{ item.readiness_label }}
+                </span>
+            </td>
+            <td style="padding:10px;text-align:center;">
+                {% if e.status == 'active' %}
+                <div style="display:flex;gap:4px;justify-content:center;">
+                    <button onclick="showTimeLog({{ e.id }})" class="btn btn-sm" style="font-size:11px;padding:3px 8px;">+ Time</button>
+                    <button onclick="ccmDisenroll({{ e.id }})" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:var(--color-danger);">Disenroll</button>
+                </div>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{# ---- Info footer ---- #}
+<div style="margin-top:24px;padding:12px;background:var(--bg-muted);border-radius:8px;font-size:12px;color:var(--text-secondary);">
+    <strong>CCM Requirements:</strong>
+    1) Patient consent (verbal, written, or portal).
+    2) 2+ chronic conditions expected to last ≥12 months.
+    3) Individualized care plan.
+    4) ≥20 minutes of non-face-to-face clinical staff time per month.
+    CPT 99490 (~$62). Time accumulated across staff roles. Not same month as PCM (99424-99427).
+</div>
+
+{# ---- Time Log Modal ---- #}
+<div id="time-log-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+    <div class="card" style="padding:24px;max-width:400px;width:90%;margin:auto;margin-top:15vh;">
+        <h3 style="margin:0 0 16px 0;font-size:15px;">Log CCM Time</h3>
+        <form id="time-log-form">
+            <input type="hidden" name="enrollment_id" id="tl-enrollment-id">
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Minutes</label>
+                <input type="number" name="minutes" min="1" max="120" required style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;width:80px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Activity Type</label>
+                <select name="activity_type" style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;width:100%;">
+                    <option value="care_coordination">Care Coordination</option>
+                    <option value="care_plan_review">Care Plan Review</option>
+                    <option value="medication_mgmt">Medication Management</option>
+                    <option value="phone_call">Phone Call</option>
+                    <option value="portal_message">Portal Message</option>
+                    <option value="referral_followup">Referral Follow-up</option>
+                </select>
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Staff Name</label>
+                <input type="text" name="staff_name" maxlength="100" style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;width:100%;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Role</label>
+                <select name="staff_role" style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;">
+                    <option value="provider">Provider</option>
+                    <option value="nurse">Nurse</option>
+                    <option value="ma">MA</option>
+                    <option value="care_coordinator">Care Coordinator</option>
+                </select>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-size:12px;display:block;margin-bottom:4px;">Description (optional)</label>
+                <textarea name="description" maxlength="500" rows="2" style="padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:13px;width:100%;resize:vertical;"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button type="button" onclick="closeTimeLog()" class="btn btn-sm" style="font-size:13px;padding:6px 14px;">Cancel</button>
+                <button type="submit" class="btn btn-sm" style="background:var(--color-green);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showTimeLog(enrollmentId) {
+    document.getElementById('tl-enrollment-id').value = enrollmentId;
+    document.getElementById('time-log-modal').style.display = 'flex';
+}
+function closeTimeLog() {
+    document.getElementById('time-log-modal').style.display = 'none';
+}
+document.getElementById('time-log-form').addEventListener('submit', function(ev) {
+    ev.preventDefault();
+    var eid = document.getElementById('tl-enrollment-id').value;
+    var fd = new FormData(this);
+    fetch('/ccm/' + eid + '/log-time', {method:'POST', body:new URLSearchParams(fd)})
+    .then(function(r){return r.json()}).then(function(d){
+        if(d.success){closeTimeLog();location.reload();}
+        else{alert(d.error||'Failed to log time.');}
+    });
+});
+function ccmDisenroll(id) {
+    if(!confirm('Disenroll this patient from CCM?'))return;
+    fetch('/ccm/' + id + '/disenroll', {method:'POST'})
+    .then(function(r){return r.json()}).then(function(d){
+        if(d.success)location.reload();else alert(d.error||'Failed');
+    });
+}
+document.getElementById('ccm-enroll-form').addEventListener('submit', function(ev) {
+    ev.preventDefault();
+    var fd = new FormData(this);
+    // Parse conditions text into JSON array
+    var raw = fd.get('conditions_text') || '';
+    var conds = raw.split(',').map(function(s){
+        s = s.trim();
+        if(!s)return null;
+        var parts = s.split(/\s+/);
+        return {code: parts[0], description: parts.slice(1).join(' ')};
+    }).filter(Boolean);
+    fd.set('conditions', JSON.stringify(conds));
+    fd.delete('conditions_text');
+    fetch('/ccm/enroll', {method:'POST', body:new URLSearchParams(fd)})
+    .then(function(r){return r.json()}).then(function(d){
+        var msg = document.getElementById('ccm-enroll-msg');
+        if(d.success){msg.style.color='var(--color-green)';msg.textContent='Patient enrolled.';msg.style.display='';location.reload();}
+        else{msg.style.color='var(--color-danger)';msg.textContent=d.error||'Failed.';msg.style.display='';}
+    });
+});
+</script>
+{% endblock %}

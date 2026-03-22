@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}NetPractice Settings — NP Companion{% endblock %}
+{% block title %}NetPractice Settings — CareCompanion{% endblock %}
 {% block page_id %}admin-netpractice{% endblock %}
 
 {% block content %}
@@ -122,6 +122,40 @@
     </div>
 </div>
 
+{# ---- Chrome Debug Profile Status -------------------------------- #}
+<div class="card" style="margin-bottom:24px;max-width:640px;">
+    <div class="card-header">Chrome Debug Profile</div>
+    <div class="card-body">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <span id="chrome-status-dot" style="width:12px;height:12px;border-radius:50%;background:#9ca3af;display:inline-block;"></span>
+            <span id="chrome-status-text" style="font-weight:500;">Checking...</span>
+        </div>
+        <div id="chrome-details" style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+            <div>Port: <span id="chrome-port">—</span></div>
+            <div>Profile: <span id="chrome-profile-dir">—</span> <span id="chrome-profile-exists"></span></div>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label class="form-label" style="font-size:13px;">Launch Command</label>
+            <pre id="chrome-launch-cmd" style="background:var(--bg-inset,#f1f5f9);padding:8px 12px;border-radius:6px;font-size:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;cursor:pointer;" title="Click to copy" onclick="navigator.clipboard.writeText(this.textContent)">Loading...</pre>
+        </div>
+        <div style="display:flex;gap:12px;">
+            <button class="btn btn-primary btn-sm" id="chrome-launch-btn" onclick="launchChrome()">Launch Chrome</button>
+            <button class="btn btn-secondary btn-sm" onclick="checkChromeStatus()">Refresh Status</button>
+        </div>
+        <div id="chrome-result" style="margin-top:12px;display:none;" class="flash"></div>
+        <details style="margin-top:16px;font-size:13px;color:var(--text-secondary);">
+            <summary style="cursor:pointer;font-weight:500;color:var(--text-primary);">First-Time Setup Instructions</summary>
+            <ol style="margin-top:8px;padding-left:20px;line-height:1.7;">
+                <li>Click <strong>Launch Chrome</strong> above. A separate Chrome window opens with a dedicated debug profile.</li>
+                <li>In that Chrome window, navigate to <strong>NetPractice</strong> and log in with your credentials.</li>
+                <li>Your login cookies are saved in the debug profile directory &mdash; you will stay logged in across restarts.</li>
+                <li>If the session expires, NP&nbsp;Companion will show a re-auth banner on the dashboard. Just log in again in the debug Chrome window.</li>
+            </ol>
+            <p style="margin-top:8px;"><strong>Why a separate profile?</strong> Chrome&nbsp;136+ requires a dedicated <code>--user-data-dir</code> for remote debugging (CDP). The debug profile keeps automation cookies isolated from your personal browsing.</p>
+        </details>
+    </div>
+</div>
+
 {# ---- Quick Actions ---------------------------------------------- #}
 <div class="card" style="max-width:640px;">
     <div class="card-header">Quick Actions</div>
@@ -168,5 +202,62 @@ function testMyLogin() {
             btn.textContent = 'Test My Login';
         });
 }
+
+function checkChromeStatus() {
+    fetch('/api/netpractice/chrome-status')
+        .then(function(res) { return res.json(); })
+        .then(function(d) {
+            var dot = document.getElementById('chrome-status-dot');
+            var txt = document.getElementById('chrome-status-text');
+            if (d.running) {
+                dot.style.background = '#22c55e';
+                txt.textContent = 'Running';
+            } else {
+                dot.style.background = '#ef4444';
+                txt.textContent = 'Not Running';
+            }
+            document.getElementById('chrome-port').textContent = d.port;
+            document.getElementById('chrome-profile-dir').textContent = d.profile_dir || '—';
+            document.getElementById('chrome-profile-exists').textContent = d.profile_exists ? '(exists)' : '(not created yet)';
+            document.getElementById('chrome-launch-cmd').textContent = d.launch_command || '—';
+        })
+        .catch(function() {
+            document.getElementById('chrome-status-text').textContent = 'Error checking status';
+        });
+}
+
+function launchChrome() {
+    var btn = document.getElementById('chrome-launch-btn');
+    var result = document.getElementById('chrome-result');
+    btn.disabled = true;
+    btn.textContent = 'Launching...';
+    result.style.display = 'none';
+
+    fetch('/api/netpractice/chrome-launch', { method: 'POST' })
+        .then(function(res) { return res.json(); })
+        .then(function(d) {
+            result.style.display = 'block';
+            if (d.success) {
+                result.className = 'flash flash--success';
+                result.textContent = d.message;
+            } else {
+                result.className = 'flash flash--error';
+                result.textContent = d.error;
+            }
+            btn.disabled = false;
+            btn.textContent = 'Launch Chrome';
+            checkChromeStatus();
+        })
+        .catch(function() {
+            result.style.display = 'block';
+            result.className = 'flash flash--error';
+            result.textContent = 'Request failed.';
+            btn.disabled = false;
+            btn.textContent = 'Launch Chrome';
+        });
+}
+
+// Check Chrome status on page load
+checkChromeStatus();
 </script>
 {% endblock %}

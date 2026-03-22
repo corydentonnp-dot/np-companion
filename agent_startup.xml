@@ -2,8 +2,8 @@
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
     <Date>2026-03-16T00:00:00</Date>
-    <Author>NP Companion</Author>
-    <Description>Start NP Companion background agent at user logon.</Description>
+    <Author>CareCompanion</Author>
+    <Description>Start CareCompanion background agent at user logon.</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>
@@ -39,9 +39,9 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>C:\Users\coryd\Documents\NP_Companion\venv\Scripts\python.exe</Command>
+      <Command>C:\Users\coryd\Documents\CareCompanion\venv\Scripts\python.exe</Command>
       <Arguments>agent.py</Arguments>
-      <WorkingDirectory>C:\Users\coryd\Documents\NP_Companion</WorkingDirectory>
+      <WorkingDirectory>C:\Users\coryd\Documents\CareCompanion</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>

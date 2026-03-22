@@ -1,5 +1,5 @@
 """
-NP Companion — Unified API Cache Manager
+CareCompanion — Unified API Cache Manager
 File: app/services/api/cache_manager.py
 
 Handles SQLite-backed caching for all external API responses.
@@ -8,7 +8,7 @@ When the TTL has expired, the cache entry is returned as "stale" so the caller
 can decide whether to show stale data (with a staleness notice) or re-fetch.
 
 Key design decisions:
-- Uses the main npcompanion.db SQLite database (no separate cache file)
+- Uses the main carecompanion.db SQLite database (no separate cache file)
 - Cache key is a SHA-256 hash of the API name + query parameters
 - Cache value is stored as JSON text
 - Stale entries are not deleted automatically — they serve as offline fallback
@@ -18,7 +18,7 @@ Dependencies:
 - models (SQLAlchemy db instance)
 - app/api_config.py (TTL values and table name)
 
-NP Companion features that rely on this module:
+CareCompanion features that rely on this module:
 - Every feature in the API intelligence layer (Phase 10A/10B)
 - Offline mode (F30) — stale cache serves as fallback when internet is unavailable
 """
@@ -27,6 +27,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime, timezone, timedelta
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class CacheManager:
         Safe to call multiple times — uses IF NOT EXISTS.
         """
         try:
-            self.db.engine.execute("""
+            self.db.session.execute(text("""
                 CREATE TABLE IF NOT EXISTS api_response_cache (
                     cache_key   TEXT PRIMARY KEY,
                     api_name    TEXT NOT NULL,
@@ -69,7 +70,8 @@ class CacheManager:
                     expires_at  TEXT NOT NULL,
                     hit_count   INTEGER DEFAULT 0
                 )
-            """)
+            """))
+            self.db.session.commit()
         except Exception:
             # If this fails (e.g., table already exists with different schema),
             # fall through — the table likely already exists from a prior run.
@@ -98,10 +100,10 @@ class CacheManager:
         """
         key = self._make_key(api_name, query_key)
         try:
-            row = self.db.engine.execute(
-                "SELECT response, cached_at, expires_at, hit_count "
-                "FROM api_response_cache WHERE cache_key = ?",
-                (key,)
+            row = self.db.session.execute(
+                text("SELECT response, cached_at, expires_at, hit_count "
+                     "FROM api_response_cache WHERE cache_key = :key"),
+                {"key": key}
             ).fetchone()
 
             if row is None:
@@ -112,10 +114,11 @@ class CacheManager:
             expires_at = datetime.fromisoformat(expires_at_str)
 
             # Increment hit counter
-            self.db.engine.execute(
-                "UPDATE api_response_cache SET hit_count = ? WHERE cache_key = ?",
-                (hit_count + 1, key)
+            self.db.session.execute(
+                text("UPDATE api_response_cache SET hit_count = :count WHERE cache_key = :key"),
+                {"count": hit_count + 1, "key": key}
             )
+            self.db.session.commit()
 
             data = json.loads(response_text)
             is_stale = now > expires_at
@@ -152,22 +155,23 @@ class CacheManager:
         expires_at = now + timedelta(days=ttl_days)
 
         try:
-            self.db.engine.execute("""
+            self.db.session.execute(text("""
                 INSERT INTO api_response_cache
                     (cache_key, api_name, query_key, response, cached_at, expires_at, hit_count)
-                VALUES (?, ?, ?, ?, ?, ?, 0)
+                VALUES (:key, :api, :qkey, :resp, :cat, :exp, 0)
                 ON CONFLICT(cache_key) DO UPDATE SET
                     response   = excluded.response,
                     cached_at  = excluded.cached_at,
                     expires_at = excluded.expires_at
-            """, (
-                key,
-                api_name,
-                query_key,
-                json.dumps(data),
-                now.isoformat(),
-                expires_at.isoformat(),
-            ))
+            """), {
+                "key": key,
+                "api": api_name,
+                "qkey": query_key,
+                "resp": json.dumps(data),
+                "cat": now.isoformat(),
+                "exp": expires_at.isoformat(),
+            })
+            self.db.session.commit()
         except Exception as e:
             logger.warning(f"Cache set error for {api_name}/{query_key}: {e}")
 
@@ -177,9 +181,10 @@ class CacheManager:
         """
         key = self._make_key(api_name, query_key)
         try:
-            self.db.engine.execute(
-                "DELETE FROM api_response_cache WHERE cache_key = ?", (key,)
+            self.db.session.execute(
+                text("DELETE FROM api_response_cache WHERE cache_key = :key"), {"key": key}
             )
+            self.db.session.commit()
         except Exception as e:
             logger.warning(f"Cache delete error for {api_name}/{query_key}: {e}")
 
@@ -189,9 +194,10 @@ class CacheManager:
         Used by the admin "Flush Cache" button per API.
         """
         try:
-            result = self.db.engine.execute(
-                "DELETE FROM api_response_cache WHERE api_name = ?", (api_name,)
+            result = self.db.session.execute(
+                text("DELETE FROM api_response_cache WHERE api_name = :api"), {"api": api_name}
             )
+            self.db.session.commit()
             deleted = result.rowcount
             logger.info(f"Cache flush: deleted {deleted} entries for {api_name}")
             return deleted
@@ -215,15 +221,15 @@ class CacheManager:
         """
         try:
             if api_name:
-                where = "WHERE api_name = ?"
-                params = (api_name,)
+                where = "WHERE api_name = :api"
+                params = {"api": api_name}
             else:
                 where = ""
-                params = ()
+                params = {}
 
-            row = self.db.engine.execute(
-                f"SELECT COUNT(*), MIN(cached_at), MAX(cached_at), SUM(hit_count) "
-                f"FROM api_response_cache {where}",
+            row = self.db.session.execute(
+                text(f"SELECT COUNT(*), MIN(cached_at), MAX(cached_at), SUM(hit_count) "
+                     f"FROM api_response_cache {where}"),
                 params
             ).fetchone()
 
@@ -250,17 +256,17 @@ class CacheManager:
         """
         try:
             now = datetime.now(timezone.utc).isoformat()
-            rows = self.db.engine.execute("""
+            rows = self.db.session.execute(text("""
                 SELECT
                     api_name,
                     COUNT(*) as entry_count,
                     SUM(hit_count) as total_hits,
                     MAX(cached_at) as newest_entry,
-                    SUM(CASE WHEN expires_at < ? THEN 1 ELSE 0 END) as stale_count
+                    SUM(CASE WHEN expires_at < :now THEN 1 ELSE 0 END) as stale_count
                 FROM api_response_cache
                 GROUP BY api_name
                 ORDER BY api_name
-            """, (now,)).fetchall()
+            """), {"now": now}).fetchall()
 
             return [
                 {

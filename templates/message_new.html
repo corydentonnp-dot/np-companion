@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}New Delayed Message — CareCompanion{% endblock %}
+{% block page_id %}message-new{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <h1 style="margin:0;">Schedule a Message</h1>
+    <span class="badge badge--info">F18</span>
+</div>
+
+{# ---- Template Picker (F19) ---- #}
+<div class="card" style="max-width:600px;margin-bottom:16px;">
+    <div class="card-body" style="padding:16px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <label class="form-label" style="margin:0;font-weight:600;">Use Template:</label>
+            <select id="template-category" class="form-input" style="width:auto;min-width:160px;" onchange="loadTemplates()">
+                <option value="">— Select category —</option>
+                <option value="normal">Normal Results</option>
+                <option value="abnormal">Abnormal Results</option>
+                <option value="critical">Critical Results</option>
+                <option value="follow_up">Follow-Up Needed</option>
+                <option value="referral">Referral Required</option>
+            </select>
+            <select id="template-select" class="form-input" style="width:auto;min-width:200px;display:none;" onchange="applyTemplate()">
+                <option value="">— Select template —</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="max-width:600px;">
+    <div class="card-body" style="padding:24px;">
+        <form method="POST" action="{{ url_for('messages.create') }}">
+            <div class="form-group">
+                <label class="form-label">Recipient</label>
+                <input type="text" name="recipient_identifier" class="form-input" placeholder="Patient name or identifier" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Message Content</label>
+                <textarea id="message-content" name="message_content" class="form-input" rows="6" placeholder="Type your message here…" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Send At (UTC)</label>
+                <input type="datetime-local" name="scheduled_send_at" class="form-input" required>
+            </div>
+
+            {# ---- Recurring Options (F18a) ---- #}
+            <div class="form-group" style="margin-top:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="recurring-toggle" name="is_recurring" value="1" onchange="toggleRecurring()">
+                    <span class="form-label" style="margin:0;">🔁 Make this a recurring message</span>
+                </label>
+            </div>
+
+            <div id="recurring-options" style="display:none;padding:12px;background:var(--bg-offset,#f8f9fa);border-radius:8px;margin-bottom:12px;">
+                <div class="form-group">
+                    <label class="form-label">Repeat every (days)</label>
+                    <input type="number" name="recurrence_interval_days" id="recurrence-interval" class="form-input" min="1" max="365" placeholder="e.g. 7 for weekly, 30 for monthly" style="max-width:260px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stop recurring after (optional)</label>
+                    <input type="datetime-local" name="recurrence_end_date" class="form-input" style="max-width:260px;">
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-muted,#6c757d);margin:4px 0 0;">
+                    After each send, the next message is auto-scheduled. Cancel the series from the message list.
+                </p>
+            </div>
+
+            <div style="display:flex;gap:12px;margin-top:20px;">
+                <button type="submit" class="btn btn-primary">Schedule Message</button>
+                <a href="{{ url_for('messages.index') }}" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+var _templateData = {};
+function loadTemplates() {
+    var cat = document.getElementById('template-category').value;
+    var sel = document.getElementById('template-select');
+    sel.innerHTML = '<option value="">— Select template —</option>';
+    if (!cat) { sel.style.display = 'none'; return; }
+    if (_templateData[cat]) { _populateSelect(cat); return; }
+    fetch('{{ url_for("messages.api_result_templates") }}')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { _templateData = data; _populateSelect(cat); });
+}
+function _populateSelect(cat) {
+    var sel = document.getElementById('template-select');
+    var items = _templateData[cat] || [];
+    sel.innerHTML = '<option value="">— Select template —</option>';
+    items.forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t.body_template;
+        opt.textContent = t.name;
+        sel.appendChild(opt);
+    });
+    sel.style.display = items.length ? '' : 'none';
+}
+function applyTemplate() {
+    var body = document.getElementById('template-select').value;
+    if (body) { document.getElementById('message-content').value = body; }
+}
+function toggleRecurring() {
+    var show = document.getElementById('recurring-toggle').checked;
+    document.getElementById('recurring-options').style.display = show ? '' : 'none';
+    var intv = document.getElementById('recurrence-interval');
+    if (show) { intv.setAttribute('required', ''); } else { intv.removeAttribute('required'); }
+}
+</script>
+{% endblock %}

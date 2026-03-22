@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% block title %}{{ calc.name }} — CareCompanion{% endblock %}
+{% block page_id %}calculator-detail{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="{{ url_for('static', filename='css/calculators.css') }}">{% endblock %}
+
+{% block content %}
+<div class="page-container" style="max-width:680px;margin:0 auto;padding:20px;">
+
+    {# — Back navigation — #}
+    <a href="/calculators" style="font-size:12px;color:var(--color-teal,#0d9488);text-decoration:none;">← All Calculators</a>
+
+    {# — Header — #}
+    <div style="margin:12px 0 18px;">
+        {% set tag = automation_labels.get(calc.automation_tag, {}) %}
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <h1 style="margin:0;font-size:20px;">{{ calc.name }}</h1>
+            {% if mrn %}
+            <span style="font-size:11px;background:#e0f2fe;color:#0369a1;padding:3px 8px;border-radius:10px;">Patient Context</span>
+            {% endif %}
+        </div>
+        <div style="font-size:12px;color:var(--text-secondary,#64748b);margin-top:4px;">{{ calc.description }}</div>
+        <div style="font-size:11px;color:var(--text-muted,#94a3b8);margin-top:2px;">{{ calc.citation }}</div>
+        <div style="margin-top:6px;">
+            <span class="calc-tag-badge tag-{{ calc.automation_tag }}" style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;">{{ tag.icon }} {{ tag.label }}</span>
+        </div>
+    </div>
+
+    {# — Blocked/licensed notice — #}
+    {% if calc.status == 'blocked' %}
+    <div class="calc-blocked-banner">
+        <strong>⚠️ Calculator Blocked</strong>
+        <p style="margin:4px 0 0;font-size:12px;">{{ calc.blocked_reason if calc.blocked_reason else 'This calculator cannot be computed automatically. Use manual scoring.' }}</p>
+    </div>
+    {% elif calc.status == 'restricted_or_licensed' %}
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:12px 16px;margin-bottom:18px;">
+        <strong>🔒 Licensed Instrument</strong>
+        <p style="margin:4px 0 0;font-size:12px;">{{ calc.license_note if calc.license_note else 'This tool requires a license for clinical use. Enter scores manually.' }}</p>
+    </div>
+    {# Manual score entry for licensed instruments #}
+    <div id="manual-entry-panel">
+        <form id="manual-score-form">
+            <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Enter Total Score</label>
+            <input type="number" id="manual-score-val" placeholder="Score" min="0" style="padding:7px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;width:120px;font-size:14px;">
+            <button type="button" onclick="interpretManual()" class="btn-primary" style="margin-left:8px;">Interpret</button>
+        </form>
+        <div id="manual-result" style="display:none;margin-top:14px;"></div>
+    </div>
+    {% else %}
+
+    {# — Clinical context hints (Phase 37) — #}
+    {% if context_hints %}
+    <div style="margin-bottom:14px;">
+        {% for hint in context_hints %}
+        <div class="calc-hint calc-hint-{{ hint.type }}">
+            {% if hint.type == 'warning' %}⚠️{% elif hint.type == 'error' %}🚫{% else %}ℹ️{% endif %}
+            <span>{{ hint.text }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Phase 36 — Dispatch to appropriate form renderer based on calc type #}
+    {% if calc.type == 'questionnaire' %}
+    {% include '_calculator_questionnaire.html' %}
+    {% elif calc.type == 'rule_based' %}
+    {% include '_calculator_rule_form.html' %}
+    {% else %}
+    {# — Interactive calculator form for formula / regression types — #}
+    <form id="calculator-form" onsubmit="computeCalc(event)">
+        {% if mrn %}<input type="hidden" name="mrn" value="{{ mrn }}">{% endif %}
+
+        <div style="display:flex;flex-direction:column;gap:12px;">
+        {% for inp in calc.inputs %}
+        {% set pf_val = prefilled.get(inp.key, '') if prefilled else '' %}
+        {% set is_auto = inp.source == 'auto' and pf_val != '' and pf_val is not none %}
+        <div class="calc-input-row">
+            <label class="calc-input-label" for="inp-{{ inp.key }}">
+                {{ inp.label }}
+                {% if inp.required %}<span style="color:red;">*</span>{% endif %}
+                {% if is_auto %}
+                <span title="Pre-filled from EHR" style="font-size:11px;color:var(--text-muted,#94a3b8);margin-left:4px;">🔒 from chart</span>
+                {% endif %}
+            </label>
+
+            {% if inp.type == 'select' %}
+            <select id="inp-{{ inp.key }}" name="{{ inp.key }}"
+                    class="calc-input {% if is_auto %}calc-input-prefilled{% endif %}"
+                    {% if inp.required %}required{% endif %}>
+                <option value="">— select —</option>
+                {% for opt in inp.options %}
+                <option value="{{ opt }}" {% if pf_val|string == opt %}selected{% endif %}>{{ opt|capitalize }}</option>
+                {% endfor %}
+            </select>
+
+            {% elif inp.type == 'boolean' %}
+            <select id="inp-{{ inp.key }}" name="{{ inp.key }}"
+                    class="calc-input {% if is_auto %}calc-input-prefilled{% endif %}">
+                <option value="">— select —</option>
+                <option value="true" {% if pf_val|string|lower in ('true','1','yes') %}selected{% endif %}>Yes</option>
+                <option value="false" {% if pf_val|string|lower in ('false','0','no') %}selected{% endif %}>No</option>
+            </select>
+
+            {% elif inp.type == 'yesno' %}
+            <div class="calc-radio-row">
+                <label><input type="radio" name="{{ inp.key }}" value="1" {% if pf_val|string == '1' %}checked{% endif %}> Yes</label>
+                <label style="margin-left:12px;"><input type="radio" name="{{ inp.key }}" value="0" {% if pf_val|string == '0' %}checked{% endif %}> No</label>
+            </div>
+
+            {% elif inp.type == 'likert4' %}
+            <div class="calc-radio-row" style="flex-wrap:wrap;gap:8px;">
+                {% set opts4 = inp.options if inp.options is defined else ['0','1','2','3'] %}
+                {% for idx in range(opts4|length) %}
+                <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
+                    <input type="radio" name="{{ inp.key }}" value="{{ idx }}"
+                           {% if pf_val|string == idx|string %}checked{% endif %}>
+                    <span>{{ idx }}&nbsp;–&nbsp;{{ opts4[idx] }}</span>
+                </label>
+                {% endfor %}
+            </div>
+
+            {% else %}
+            {# default: number or text #}
+            <input type="{{ inp.type if inp.type in ('number','text','email') else 'number' }}"
+                   id="inp-{{ inp.key }}" name="{{ inp.key }}"
+                   class="calc-input {% if is_auto %}calc-input-prefilled{% endif %}"
+                   value="{{ pf_val if pf_val != '' else '' }}"
+                   {% if inp.min is defined %}min="{{ inp.min }}"{% endif %}
+                   {% if inp.max is defined %}max="{{ inp.max }}"{% endif %}
+                   {% if inp.step is defined %}step="{{ inp.step }}"{% endif %}
+                   {% if inp.required %}required{% endif %}
+                   placeholder="{% if inp.unit is defined %}{{ inp.unit }}{% endif %}">
+            {% endif %}
+        </div>
+        {% endfor %}
+        </div>
+
+        <button type="submit" id="calc-submit-btn" class="btn-primary"
+                style="margin-top:20px;width:100%;padding:10px;">
+            Calculate
+        </button>
+    </form>
+    {% endif %}
+
+    {# — Result panel (shared by all form types) — #}
+    <div id="calc-result-panel" style="display:none;margin-top:18px;border-radius:8px;overflow:hidden;">
+        <div id="calc-result-header" style="padding:14px 16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-size:24px;font-weight:700;" id="calc-result-score">—</div>
+                    <div style="font-size:13px;" id="calc-result-label"></div>
+                </div>
+                <div id="calc-result-badge"
+                     style="font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;"></div>
+            </div>
+        </div>
+        <div id="calc-result-breakdown"
+             style="padding:10px 16px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;"></div>
+    </div>
+    {% endif %}
+
+</div>
+
+<style>
+.calc-input-row{display:flex;flex-direction:column;gap:4px;}
+.calc-input-label{font-size:13px;font-weight:500;}
+.calc-input{padding:7px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;width:100%;box-sizing:border-box;}
+.calc-input-prefilled{background:#f0fdf4;border-color:#86efac;}
+.calc-radio-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px;}
+.btn-primary{background:var(--color-teal,#0d9488);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;}
+.btn-primary:hover{opacity:0.9;}
+.result-bg-green{background:#dcfce7;color:#15803d;}
+.result-bg-yellow{background:#fef9c3;color:#854d0e;}
+.result-bg-orange{background:#ffedd5;color:#c2410c;}
+.result-bg-red{background:#fee2e2;color:#b91c1c;}
+.result-bg-blue{background:#dbeafe;color:#1d4ed8;}
+.result-bg-gray{background:#f3f4f6;color:#374151;}
+.calc-tag-badge{display:inline-block;}
+.tag-auto_ehr{background:#dcfce7;color:#15803d;}
+.tag-semi_auto{background:#fef9c3;color:#854d0e;}
+.tag-patient_reported{background:#dbeafe;color:#1d4ed8;}
+.tag-clinician{background:#ffedd5;color:#c2410c;}
+</style>
+
+<script>
+var CALC_KEY = {{ key|tojson }};
+var CALC_INTERP = {{ calc.interpretation|tojson }};
+
+function computeCalc(e){
+    e.preventDefault();
+    var form = document.getElementById('calculator-form');
+    var btn = document.getElementById('calc-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Computing…';
+
+    var formData = new FormData(form);
+    var data = {};
+    formData.forEach(function(v, k){ data[k] = v; });
+
+    // Convert boolean dropdowns
+    for (var k in data) {
+        if (data[k] === 'true') data[k] = true;
+        else if (data[k] === 'false') data[k] = false;
+    }
+
+    fetch('/calculators/' + CALC_KEY + '/compute', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(resp){
+        btn.disabled = false;
+        btn.textContent = 'Calculate';
+        if (resp.success) {
+            showResult(resp.data);
+        } else {
+            alert('Error: ' + resp.error);
+        }
+    })
+    .catch(function(err){
+        btn.disabled = false;
+        btn.textContent = 'Calculate';
+        alert('Request failed: ' + err);
+    });
+}
+
+function showResult(data){
+    var panel = document.getElementById('calc-result-panel');
+    var hdr = document.getElementById('calc-result-header');
+    var score = data.score !== undefined ? data.score : data.result;
+    if (score === null || score === undefined) score = '—';
+    var label = data.label || data.interpretation || '';
+    var color = data.color || getColorFromLabel(label);
+
+    document.getElementById('calc-result-score').textContent = (typeof score === 'number') ? Math.round(score * 100) / 100 : score;
+    document.getElementById('calc-result-label').textContent = label;
+
+    var badge = document.getElementById('calc-result-badge');
+    badge.textContent = label;
+    badge.className = 'result-bg-' + (color || 'gray');
+
+    hdr.className = 'result-bg-' + (color || 'gray');
+
+    // Breakdown
+    var bd = document.getElementById('calc-result-breakdown');
+    var components = data.components || data.details || {};
+    if (Object.keys(components).length) {
+        bd.innerHTML = '<strong>Components:</strong><br>' +
+            Object.entries(components).map(function(e){ return e[0] + ': ' + e[1]; }).join('<br>');
+        bd.style.display = '';
+    } else {
+        bd.style.display = 'none';
+    }
+
+    panel.style.display = '';
+    panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function getColorFromLabel(label){
+    if (!label) return 'gray';
+    var ll = label.toLowerCase();
+    if (ll.includes('low') || ll.includes('normal') || ll.includes('minimal') || ll.includes('optimal')) return 'green';
+    if (ll.includes('border') || ll.includes('mild') || ll.includes('moderate') || ll.includes('intermedia')) return 'yellow';
+    if (ll.includes('high') || ll.includes('sever') || ll.includes('obese')) return 'red';
+    return 'blue';
+}
+
+function interpretManual(){
+    var raw = document.getElementById('manual-score-val').value;
+    if (!raw) return;
+    var score = parseFloat(raw);
+    showResult({score: score, label: 'See clinician guidance', color: 'blue'});
+}
+</script>
+
+{# Phase 35.2 — Score history chart (only when viewing from patient chart context) #}
+{% if mrn %}
+<div id="score-history-section" style="margin-top:24px;padding:0 4px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:var(--text-primary);">&#128200; Score History</div>
+    <div id="score-history-chart" style="min-height:120px;background:var(--bg-secondary,#1e1e1e);border-radius:8px;padding:12px;"></div>
+</div>
+<script src="/static/js/calculator_charts.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    loadScoreHistory({{ mrn | tojson }}, {{ calc.key | tojson }}, 'score-history-chart');
+});
+</script>
+{% endif %}
+{% endblock %}
