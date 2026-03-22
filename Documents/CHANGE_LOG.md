@@ -6,6 +6,30 @@
 
 ---
 
+## CL-P7FIX — test_phase7.py Fix: CSRF + Unicode + pytest Collection
+**Completed:** 07-20-25 02:30:00 UTC
+
+### Root Cause
+`tests/test_phase7.py` was a standalone test script (68 checks) that had 3 compounding bugs:
+1. **Missing `WTF_CSRF_ENABLED = False`** — all POST routes returned 500 because Flask-WTF CSRF protection rejected requests without tokens. This caused 7 test failures (pin, bookmark, patient-gen, what's-new APIs).
+2. **Unicode arrow character `→` (U+2192)** — not representable in Windows cp1252 encoding when piped to file. Crashed the `ok()` print function, turning 4 PASSes into ERRORs.
+3. **No `if __name__ == '__main__':` guard** — `sys.exit(1)` at module level killed pytest's collection phase, blocking **all** pytest tests from running.
+
+### Fixes Applied
+- Added `app.config['WTF_CSRF_ENABLED'] = False` to test setup
+- Replaced `→` with `->` (17 occurrences) and `⏱️` with `[timer]`
+- Created `tests/conftest.py` with `collect_ignore = ['test_phase7.py']` to exclude standalone script from pytest collection
+
+### Result
+- `test_phase7.py`: 68/68 passed, 0 failed, 0 errors (was: 41 passed, 7 failed, 3 errors)
+- pytest collection: no longer crashes on import
+
+### Files Modified
+- `tests/test_phase7.py` — CSRF config + Unicode fixes
+- `tests/conftest.py` — NEW, pytest collection exclusion
+
+---
+
 ## CL-TEAM — Full Product Team Governance System
 **Completed:** 03-22-26 15:30:00 UTC
 

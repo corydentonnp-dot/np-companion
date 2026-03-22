@@ -161,10 +161,10 @@ if %SKIP_GIT%==1 (
 :: ------------------------------------------------------------------
 if %DEV_MODE%==1 (
     echo [6/6] Starting dev server ^(hot-reload^)...
-    start "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
+    start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
 ) else (
     echo [6/6] Starting server + agent...
-    start /min "CareCompanion Server" "%PYTHON%" launcher.py --mode=server
+    start /min /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=server
 )
 
 :: Wait for server to be ready
@@ -172,7 +172,7 @@ echo       Waiting for server...
 set RETRIES=0
 :WAIT_SERVER
 timeout /t 1 /nobreak >nul
-"%PYTHON%" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login')" >nul 2>&1
+"%PYTHON%" -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=3)" >nul 2>&1
 if %errorlevel% neq 0 (
     set /a RETRIES+=1
     if !RETRIES! geq 20 (

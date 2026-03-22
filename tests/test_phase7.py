@@ -56,6 +56,7 @@ def err(label, exc):
 
 app = create_app()
 app.config['TESTING'] = True
+app.config['WTF_CSRF_ENABLED'] = False
 
 # Find test user
 with app.app_context():
@@ -220,11 +221,11 @@ try:
 
     # Pin an item
     r = c.post('/api/prefs/pin-menu',
-               data=json.dumps({'label': 'Test Pin', 'url': '/timer', 'icon': '⏱️'}),
+               data=json.dumps({'label': 'Test Pin', 'url': '/timer', 'icon': '[timer]'}),
                content_type='application/json')
     d = r.get_json()
     if r.status_code == 200 and d.get('success'):
-        ok("Pin item → 200 success")
+        ok("Pin item -> 200 success")
     else:
         fail("Pin item", f"status={r.status_code} body={d}")
 
@@ -234,9 +235,9 @@ try:
                content_type='application/json')
     d = r.get_json()
     if d.get('success') and 'Already pinned' in d.get('message', ''):
-        ok("Duplicate pin → Already pinned")
+        ok("Duplicate pin -> Already pinned")
     elif d.get('success'):
-        ok("Duplicate pin → success (acceptable)")
+        ok("Duplicate pin -> success (acceptable)")
     else:
         fail("Duplicate pin", f"body={d}")
 
@@ -269,7 +270,7 @@ try:
                content_type='application/json')
     d = r.get_json()
     if r.status_code == 200 and d.get('success'):
-        ok("Unpin item → 200 success")
+        ok("Unpin item -> 200 success")
     else:
         fail("Unpin item", f"status={r.status_code} body={d}")
 
@@ -318,7 +319,7 @@ try:
                content_type='application/json')
     d = r.get_json()
     if r.status_code == 200 and d.get('success'):
-        ok("Add personal bookmark → 200 success")
+        ok("Add personal bookmark -> 200 success")
     else:
         fail("Add personal bookmark", f"status={r.status_code} body={d}")
 
@@ -341,7 +342,7 @@ try:
                content_type='application/json')
     d = r.get_json()
     if r.status_code == 200 and d.get('success'):
-        ok("Reorder bookmarks → 200 success")
+        ok("Reorder bookmarks -> 200 success")
     else:
         fail("Reorder bookmarks", f"status={r.status_code} body={d}")
 
@@ -366,7 +367,7 @@ try:
     r = c.delete('/api/bookmarks/personal/0')
     d = r.get_json()
     if r.status_code == 200 and d.get('success'):
-        ok("Delete personal bookmark → 200 success")
+        ok("Delete personal bookmark -> 200 success")
     else:
         fail("Delete personal bookmark", f"status={r.status_code} body={d}")
 
@@ -409,7 +410,7 @@ try:
                     content_type='application/json')
         d = r.get_json()
         if r.status_code == 200 and d.get('success') and d.get('id'):
-            ok(f"Admin add practice bookmark → id={d['id']}")
+            ok(f"Admin add practice bookmark -> id={d['id']}")
             bm_id = d['id']
 
             # Verify it shows up in GET
@@ -423,14 +424,14 @@ try:
             # Delete it
             r3 = c.delete(f'/admin/bookmarks/practice/{bm_id}')
             if r3.status_code == 200:
-                ok("Admin delete practice bookmark → 200")
+                ok("Admin delete practice bookmark -> 200")
             else:
                 fail("Admin delete practice bookmark", f"status={r3.status_code}")
 
             # Delete non-existent
             r4 = c.delete('/admin/bookmarks/practice/999999')
             if r4.status_code == 404:
-                ok("Delete non-existent practice bookmark → 404")
+                ok("Delete non-existent practice bookmark -> 404")
             else:
                 fail("Delete non-existent", f"status={r4.status_code}")
         else:
@@ -499,7 +500,7 @@ try:
     # Page renders
     r = c.get('/patient-generator')
     if r.status_code == 200:
-        ok("GET /patient-generator → 200")
+        ok("GET /patient-generator -> 200")
     else:
         fail("GET /patient-generator", f"status={r.status_code}")
 
@@ -511,7 +512,7 @@ try:
     if r.status_code == 200 and 'patients' in d and len(d['patients']) == 1:
         pat = d['patients'][0]
         if pat.get('xml_b64') and pat.get('mrn') and pat.get('name'):
-            ok(f"Generate 1 Simple → {pat['name']} (MRN={pat['mrn']})")
+            ok(f"Generate 1 Simple -> {pat['name']} (MRN={pat['mrn']})")
         else:
             fail("Generate 1 Simple", "missing xml_b64/mrn/name fields")
     else:
@@ -523,7 +524,7 @@ try:
                content_type='application/json')
     d = r.get_json()
     if r.status_code == 200 and len(d.get('patients', [])) == 3:
-        ok(f"Generate 3 Complex → {len(d['patients'])} patients")
+        ok(f"Generate 3 Complex -> {len(d['patients'])} patients")
 
         # ZIP test using those results
         files = [{'filename': p['filename'], 'xml_b64': p['xml_b64']} for p in d['patients']]
@@ -531,9 +532,9 @@ try:
                      data=json.dumps({'files': files}),
                      content_type='application/json')
         if r2.status_code == 200 and r2.content_type in ('application/zip', 'application/octet-stream'):
-            ok(f"ZIP download → {len(r2.data)} bytes")
+            ok(f"ZIP download -> {len(r2.data)} bytes")
         elif r2.status_code == 200:
-            ok(f"ZIP download → 200 (content_type={r2.content_type})")
+            ok(f"ZIP download -> 200 (content_type={r2.content_type})")
         else:
             fail("ZIP download", f"status={r2.status_code}")
     else:
@@ -554,7 +555,7 @@ try:
                content_type='application/json')
     d = r.get_json()
     if r.status_code == 200 and len(d.get('patients', [])) <= 20:
-        ok(f"Count clamped to max 20 → got {len(d['patients'])}")
+        ok(f"Count clamped to max 20 -> got {len(d['patients'])}")
     else:
         fail("Count clamping", f"status={r.status_code}")
 
@@ -587,7 +588,7 @@ try:
                content_type='application/json')
     d = r.get_json()
     if r.status_code == 200 and d.get('success'):
-        ok("Dismiss What's New → 200 success")
+        ok("Dismiss What's New -> 200 success")
     else:
         fail("Dismiss What's New", f"status={r.status_code} body={d}")
 

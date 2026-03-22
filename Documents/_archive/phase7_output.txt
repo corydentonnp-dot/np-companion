@@ -1,0 +1,119 @@
+Test user: CORY (role=admin, id=1)
+
+============================================================
+[7.1] Menu bar rendering & role gating
+============================================================
+  PASS  Menu bar HTML present on /dashboard
+  PASS  Menu group 'File' present
+  PASS  Menu group 'View' present
+  PASS  Menu group 'Tools' present
+  PASS  Menu group 'References' present
+  PASS  Admin menu visible for admin user
+  PASS  Menu group 'Help' present
+
+============================================================
+[7.2] Menu structure verification
+============================================================
+  PASS  Toggle Sidebar action
+  PASS  Toggle Bookmarks action
+  PASS  Toggle Compact Mode action
+  PASS  Keyboard Shortcuts action
+  PASS  About action
+  PASS  Settings URL item
+  PASS  Patient Generator URL item
+  PASS  Med Reference URL item
+
+============================================================
+[7.3] References external links
+============================================================
+  PASS  data-external='true' attributes found for external URLs
+  PASS  External reference site 'uptodate' present
+
+============================================================
+[7.4] Pin/Unpin API round-trip
+============================================================
+  PASS  Pin item -> 200 success
+  PASS  Duplicate pin -> Already pinned
+  PASS  Pin external URL rejected (400)
+  PASS  Max 8 pinned items enforced
+  PASS  Unpin item -> 200 success
+  PASS  Pinned items visible in sidebar HTML
+  PASS  Unpin empty URL rejected (400)
+
+============================================================
+[7.5] Bookmarks API
+============================================================
+  PASS  GET /api/bookmarks returns practice + personal arrays
+  PASS  Add personal bookmark -> 200 success
+  PASS  Personal bookmark persists in GET
+  PASS  Reorder bookmarks -> 200 success
+  PASS  Reorder verified ù Bing now first
+  PASS  Invalid reorder rejected (400)
+  PASS  Delete personal bookmark -> 200 success
+  PASS  Delete out-of-range index rejected (400)
+  PASS  Add bookmark with empty label rejected (400)
+  PASS  Max 20 personal bookmarks enforced
+  PASS  Admin add practice bookmark -> id=5
+  PASS  Practice bookmark in GET /api/bookmarks
+  PASS  Admin delete practice bookmark -> 200
+  PASS  Delete non-existent practice bookmark -> 404
+
+============================================================
+[7.6] Command palette
+============================================================
+  PASS  Command palette HTML present
+  PASS  window.__npRoutes array present
+  PASS  Command palette search input (loose match)
+
+============================================================
+[7.7] Patient generator
+============================================================
+  PASS  GET /patient-generator -> 200
+  PASS  Generate 1 Simple -> Mitchell, Nia (MRN=T37884)
+  PASS  Generate 3 Complex -> 3 patients
+  PASS  ZIP download -> 51844 bytes
+  PASS  Invalid complexity rejected (400)
+  PASS  Count clamped to max 20 -> got 20
+
+============================================================
+[7.8] What's New banner & dismiss
+============================================================
+  PASS  What's New banner present when version unseen
+  PASS  Dismiss What's New -> 200 success
+  PASS  last_seen_version set to '1.1.2' after dismiss
+  PASS  What's New banner hidden after dismiss
+
+============================================================
+[7.9] Retained sidebar links
+============================================================
+  PASS  Sidebar link: Dashboard (/dashboard)
+  PASS  Sidebar link: Patients (/patients)
+  PASS  Sidebar link: Timer (/timer)
+  PASS  Sidebar link: Inbox (/inbox)
+  PASS  Sidebar link: On-Call (/oncall)
+  PASS  Sidebar link: Orders (/orders)
+  PASS  Sidebar link: Lab Track (/labtrack)
+  PASS  Sidebar link: Care Gaps (/caregap)
+  PASS  Removed sidebar item 'Morning Briefing' ù manual visual check recommended
+  PASS  Removed sidebar item 'Note Reformatter' ù manual visual check recommended
+  PASS  Removed sidebar item 'Metrics' ù manual visual check recommended
+
+============================================================
+[7.10] Responsive CSS verification (structural)
+============================================================
+  PASS  Mobile breakpoint (768px) present in CSS
+  PASS  Tablet breakpoint (1024px) present in CSS
+  PASS  Hamburger button CSS present
+  PASS  CSS brace balance: 780/780
+  PASS  JS brace balance: 379/379
+
+============================================================
+Cleanup
+============================================================
+  PASS  User prefs restored to pre-test state
+
+============================================================
+PHASE 7 RESULTS: 68 passed, 0 failed, 0 errors
+============================================================
+
+*** ALL PHASE 7 CHECKS PASSED ***
