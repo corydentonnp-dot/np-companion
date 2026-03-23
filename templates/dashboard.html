@@ -5,12 +5,12 @@
 
 {% block content %}
 {# ---- DASHBOARD HEADER ---- #}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
-    <h1 style="margin:0;">
+<div class="page-header">
+    <h1 class="page-header__title">
         {% if is_today %}Today View{% else %}Schedule{% endif %}
     </h1>
-    <span style="font-size:14px;color:var(--text-secondary);">{{ view_date.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}</span>
-    <div style="margin-left:auto;">
+    <span class="page-header__subtitle">{{ view_date.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}</span>
+    <div class="page-header__actions">
         {% include '_free_widgets.html' %}
     </div>
 </div>
@@ -33,22 +33,22 @@
     </div>
 </div>
 
-{# ---- TCM Deadline Alert Banner (Phase 19.5) ---- #}
+{# ---- TCM Deadline Alert Banner (Phase 19.5 — UI_REFACTOR_PHASE_DASHBOARD) ---- #}
 {% if tcm_urgent is defined and tcm_urgent|length > 0 %}
-<div style="background:var(--color-danger,#e74c3c);color:#fff;padding:12px 16px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
-    <span style="font-size:20px;">&#127973;</span>
-    <div style="flex:1;">
-        <strong>TCM Deadline{{ 's' if tcm_urgent|length > 1 else '' }} Approaching!</strong>
+<div class="tcm-alert-bar">
+    <span class="tcm-alert-icon">&#127973;</span>
+    <div style="flex:1;min-width:0;">
+        <strong style="font-size:13px;">TCM Deadline{{ 's' if tcm_urgent|length > 1 else '' }} Approaching!</strong>
         {% for t in tcm_urgent %}
-        <div style="font-size:13px;margin-top:4px;">
+        <div style="font-size:12px;margin-top:2px;opacity:.92;">
             Patient {{ t.patient }}…{{ ' — ' + t.facility if t.facility else '' }}:
             <strong>{{ t.label }}</strong>
-            {% if t.days <= 0 %}OVERDUE{% elif t.days == 1 %}due tomorrow{% else %}{{ t.days }} days{% endif %}
-            ($230-$280 at risk)
+            {% if t.days <= 0 %}<span style="text-transform:uppercase;font-weight:700;">OVERDUE</span>{% elif t.days == 1 %}due tomorrow{% else %}{{ t.days }} days{% endif %}
+            ($230–$280 at risk)
         </div>
         {% endfor %}
     </div>
-    <a href="/tcm/watch-list" style="background:#fff;color:var(--color-danger);padding:6px 14px;border-radius:4px;font-weight:600;font-size:13px;text-decoration:none;">View TCM Watch</a>
+    <a href="/tcm/watch-list" class="tcm-alert-cta">Review TCM →</a>
 </div>
 {% endif %}
 
@@ -71,7 +71,7 @@
    ================================================================ #}
 {% if urgent_count > 0 %}
 <section class="dash-tier dash-tier--action" id="tier-action" data-tier="action">
-    <div class="dash-tier-header" onclick="toggleTier('action')">
+    <div class="dash-tier-header" onclick="toggleTier('action')" role="button" tabindex="0">
         <span>&#9888;&#65039; Action Required <span class="tier-badge">{{ urgent_count }}</span></span>
         <span class="dash-tier-toggle">&#9660;</span>
     </div>
@@ -102,50 +102,50 @@
         <div class="dash-widget dash-widget-full" data-widget-id="billing-high">
             <div class="dash-widget-header">
                 <span>&#128176; High-Priority Billing ({{ high_billing|length }})</span>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:14px;font-weight:700;color:var(--color-green,#27ae60);">
+                <div class="action-bar">
+                    <span class="fw-700 text-success" style="font-size:14px;">
                         Est. ${{ "%.0f"|format(high_billing|sum(attribute='estimated_revenue')) }}
                     </span>
-                    <button class="btn btn-sm btn-primary" onclick="batchAcceptHighPriority()" style="font-size:11px;">&#10003; Accept All</button>
+                    <button class="btn btn-sm btn-primary" onclick="batchAcceptHighPriority()">&#10003; Accept All</button>
                 </div>
             </div>
-            <div class="dash-widget-body" style="padding:0;">
-                <table class="schedule-table" style="font-size:13px;">
+            <div class="dash-widget-body p-0">
+                <table class="data-table data-table--striped">
                     <thead>
                         <tr>
-                            <th style="padding:8px 10px;">Patient</th>
-                            <th style="padding:8px 10px;">Category</th>
-                            <th style="padding:8px 10px;">Type</th>
-                            <th style="padding:8px 10px;">Codes</th>
-                            <th style="padding:8px 10px;text-align:right;">Est. Revenue</th>
-                            <th style="padding:8px 10px;text-align:right;">Net Value</th>
-                            <th style="padding:8px 10px;">Confidence</th>
-                            <th style="padding:8px 10px;">Action</th>
+                            <th>Patient</th>
+                            <th>Category</th>
+                            <th>Type</th>
+                            <th>Codes</th>
+                            <th class="text-right">Est. Revenue</th>
+                            <th class="text-right">Net Value</th>
+                            <th>Confidence</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for opp in high_billing %}
                         <tr data-opp-id="{{ opp.id }}" data-priority="high">
-                            <td style="font-weight:500;padding:8px 10px;">{{ opp.patient_mrn_hash[:8] }}…</td>
-                            <td style="padding:8px 10px;"><span class="badge" style="font-size:10px;background:var(--bg-secondary);text-transform:uppercase;">{{ (opp.category or opp.opportunity_type).replace('_', ' ') }}</span></td>
-                            <td style="padding:8px 10px;"><span class="badge badge--info">{{ opp.opportunity_code or opp.opportunity_type }}</span></td>
-                            <td class="mono" style="font-size:11px;padding:8px 10px;">{{ opp.applicable_codes }}</td>
-                            <td style="font-weight:600;color:var(--color-green,#27ae60);text-align:right;padding:8px 10px;">~${{ "%.0f"|format(opp.estimated_revenue or 0) }}
-                                <div style="font-size:10px;color:var(--text-secondary);font-weight:400;">Bonus +${{ "%.0f"|format((opp.estimated_revenue or 0) * 0.85 * 0.25) }}</div>
+                            <td class="fw-500">{{ opp.patient_mrn_hash[:8] }}…</td>
+                            <td><span class="badge badge--sm badge--uppercase" style="background:var(--bg-secondary);">{{ (opp.category or opp.opportunity_type).replace('_', ' ') }}</span></td>
+                            <td><span class="badge badge--info">{{ opp.opportunity_code or opp.opportunity_type }}</span></td>
+                            <td class="mono" style="font-size:11px;">{{ opp.applicable_codes }}</td>
+                            <td class="fw-600 text-success text-right">~${{ "%.0f"|format(opp.estimated_revenue or 0) }}
+                                <div class="text-muted" style="font-size:10px;font-weight:400;">Bonus +${{ "%.0f"|format((opp.estimated_revenue or 0) * 0.85 * 0.25) }}</div>
                             </td>
-                            <td style="font-weight:600;text-align:right;padding:8px 10px;color:var(--color-teal,#1abc9c);">{% if opp.expected_net_dollars %}${{ "%.0f"|format(opp.expected_net_dollars) }}{% else %}&mdash;{% endif %}</td>
-                            <td style="padding:8px 10px;">
+                            <td class="fw-600 text-teal text-right">{% if opp.expected_net_dollars %}${{ "%.0f"|format(opp.expected_net_dollars) }}{% else %}&mdash;{% endif %}</td>
+                            <td>
                                 {% if opp.confidence_level == 'HIGH' %}
-                                <span class="badge badge--success" style="font-size:10px;">HIGH</span>
+                                <span class="badge badge--success badge--sm">HIGH</span>
                                 {% elif opp.confidence_level == 'MEDIUM' %}
-                                <span class="badge badge--warning" style="font-size:10px;">MED</span>
+                                <span class="badge badge--warning badge--sm">MED</span>
                                 {% else %}
-                                <span class="badge badge--muted" style="font-size:10px;">LOW</span>
+                                <span class="badge badge--muted badge--sm">LOW</span>
                                 {% endif %}
                             </td>
-                            <td style="white-space:nowrap;padding:8px 10px;">
-                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }})" style="font-size:11px;">Capture</button>
-                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }})" style="font-size:11px;">Dismiss</button>
+                            <td style="white-space:nowrap;">
+                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }})">Capture</button>
+                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }})">Dismiss</button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -166,7 +166,7 @@
                 <p style="margin:0 0 8px;color:var(--text-secondary);">{{ pdmp_overdue|length }} controlled substance patient{{ 's' if pdmp_overdue|length != 1 }} overdue for PDMP check.</p>
                 <ul style="margin:0;padding-left:18px;">
                     {% for p in pdmp_overdue[:5] %}
-                    <li>&#8226;&#8226;{{ p.mrn[-4:] }} — {{ p.drug_name }} ({{ p.days_overdue }}d overdue)</li>
+                    <li>{{ p.mrn }} — {{ p.drug_name }} ({{ p.days_overdue }}d overdue)</li>
                     {% endfor %}
                     {% if pdmp_overdue|length > 5 %}
                     <li style="color:var(--text-secondary);font-style:italic;">+{{ pdmp_overdue|length - 5 }} more</li>
@@ -197,7 +197,7 @@
    Info-level anomalies + Medium/Low billing + Stats bar + Care gap badges
    ================================================================ #}
 <section class="dash-tier dash-tier--awareness" id="tier-awareness" data-tier="awareness">
-    <div class="dash-tier-header" onclick="toggleTier('awareness')">
+    <div class="dash-tier-header" onclick="toggleTier('awareness')" role="button" tabindex="0">
         <span>&#128161; Awareness {% if awareness_count > 0 %}<span class="tier-badge">{{ awareness_count }}</span>{% endif %}</span>
         <span class="dash-tier-toggle">&#9660;</span>
     </div>
@@ -265,26 +265,26 @@
         <div class="dash-widget dash-widget-full" data-widget-id="billing-other">
             <div class="dash-widget-header">
                 <span>&#128176; Billing Opportunities ({{ other_billing|length }})</span>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:14px;font-weight:700;color:var(--color-green,#27ae60);">
+                <div class="action-bar">
+                    <span class="fw-700 text-success" style="font-size:14px;">
                         Est. ${{ "%.0f"|format(other_billing|sum(attribute='estimated_revenue')) }}
                     </span>
-                    <a href="/billing/opportunity-report" class="btn btn-sm btn-outline" style="font-size:11px;">&#128202; Report</a>
+                    <a href="/billing/opportunity-report" class="btn btn-sm btn-outline">&#128202; Report</a>
                 </div>
             </div>
-            <div class="dash-widget-body" style="padding:0;">
-                <table class="schedule-table" style="font-size:13px;">
+            <div class="dash-widget-body p-0">
+                <table class="data-table data-table--striped">
                     <thead>
                         <tr>
-                            <th style="padding:8px 10px;">Patient</th>
-                            <th style="padding:8px 10px;">Category</th>
-                            <th style="padding:8px 10px;">Type</th>
-                            <th style="padding:8px 10px;">Codes</th>
-                            <th style="padding:8px 10px;text-align:right;">Est. Revenue</th>
-                            <th style="padding:8px 10px;text-align:right;">Net Value</th>
-                            <th style="padding:8px 10px;">Priority</th>
-                            <th style="padding:8px 10px;">Confidence</th>
-                            <th style="padding:8px 10px;">Action</th>
+                            <th>Patient</th>
+                            <th>Category</th>
+                            <th>Type</th>
+                            <th>Codes</th>
+                            <th class="text-right">Est. Revenue</th>
+                            <th class="text-right">Net Value</th>
+                            <th>Priority</th>
+                            <th>Confidence</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -292,33 +292,33 @@
                         {% for opp in other_billing %}
                         {% set ns.idx = ns.idx + 1 %}
                         <tr data-opp-id="{{ opp.id }}" data-priority="{{ opp.priority or 'medium' }}">
-                            <td style="font-weight:500;padding:8px 10px;">{{ opp.patient_mrn_hash[:8] }}…</td>
-                            <td style="padding:8px 10px;"><span class="badge" style="font-size:10px;background:var(--bg-secondary);text-transform:uppercase;">{{ (opp.category or opp.opportunity_type).replace('_', ' ') }}</span></td>
-                            <td style="padding:8px 10px;"><span class="badge badge--info">{{ opp.opportunity_code or opp.opportunity_type }}</span></td>
-                            <td class="mono" style="font-size:11px;padding:8px 10px;">{{ opp.applicable_codes }}</td>
-                            <td style="font-weight:600;color:var(--color-green,#27ae60);text-align:right;padding:8px 10px;">~${{ "%.0f"|format(opp.estimated_revenue or 0) }}
-                                <div style="font-size:10px;color:var(--text-secondary);font-weight:400;">Bonus +${{ "%.0f"|format((opp.estimated_revenue or 0) * 0.85 * 0.25) }}</div>
+                            <td class="fw-500">{{ opp.patient_mrn_hash[:8] }}…</td>
+                            <td><span class="badge badge--sm badge--uppercase" style="background:var(--bg-secondary);">{{ (opp.category or opp.opportunity_type).replace('_', ' ') }}</span></td>
+                            <td><span class="badge badge--info">{{ opp.opportunity_code or opp.opportunity_type }}</span></td>
+                            <td class="mono" style="font-size:11px;">{{ opp.applicable_codes }}</td>
+                            <td class="fw-600 text-success text-right">~${{ "%.0f"|format(opp.estimated_revenue or 0) }}
+                                <div class="text-muted" style="font-size:10px;font-weight:400;">Bonus +${{ "%.0f"|format((opp.estimated_revenue or 0) * 0.85 * 0.25) }}</div>
                             </td>
-                            <td style="font-weight:600;text-align:right;padding:8px 10px;color:var(--color-teal,#1abc9c);">{% if opp.expected_net_dollars %}${{ "%.0f"|format(opp.expected_net_dollars) }}{% else %}&mdash;{% endif %}</td>
-                            <td style="padding:8px 10px;">
+                            <td class="fw-600 text-teal text-right">{% if opp.expected_net_dollars %}${{ "%.0f"|format(opp.expected_net_dollars) }}{% else %}&mdash;{% endif %}</td>
+                            <td>
                                 {% if (opp.priority or 'medium') == 'medium' %}
-                                <span class="badge badge--warning" style="font-size:10px;">MED</span>
+                                <span class="badge badge--warning badge--sm">MED</span>
                                 {% else %}
-                                <span class="badge badge--muted" style="font-size:10px;">LOW</span>
+                                <span class="badge badge--muted badge--sm">LOW</span>
                                 {% endif %}
                             </td>
-                            <td style="padding:8px 10px;">
+                            <td>
                                 {% if opp.confidence_level == 'HIGH' %}
-                                <span class="badge badge--success" style="font-size:10px;">HIGH</span>
+                                <span class="badge badge--success badge--sm">HIGH</span>
                                 {% elif opp.confidence_level == 'MEDIUM' %}
-                                <span class="badge badge--warning" style="font-size:10px;">MED</span>
+                                <span class="badge badge--warning badge--sm">MED</span>
                                 {% else %}
-                                <span class="badge badge--muted" style="font-size:10px;">LOW</span>
+                                <span class="badge badge--muted badge--sm">LOW</span>
                                 {% endif %}
                             </td>
-                            <td style="white-space:nowrap;padding:8px 10px;">
-                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }})" style="font-size:11px;">Capture</button>
-                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }})" style="font-size:11px;">Dismiss</button>
+                            <td style="white-space:nowrap;">
+                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }})">Capture</button>
+                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }})">Dismiss</button>
                             </td>
                         </tr>
                         {# Documentation checklist preview for top 3 #}
@@ -334,7 +334,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
-                <div style="padding:8px 14px;font-size:11px;color:var(--text-secondary);border-top:1px solid var(--border,#e2e8f0);">
+                <div class="text-muted" style="padding:8px 14px;font-size:11px;border-top:1px solid var(--border,#e2e8f0);">
                     Estimates use CY2025 CMS national average non-facility rates. Actual reimbursement depends on payer contract.
                 </div>
             </div>
@@ -348,7 +348,7 @@
    Schedule table + My Patients + XML Import + Scheduling Intelligence
    ================================================================ #}
 <section class="dash-tier dash-tier--reference" id="tier-reference" data-tier="reference">
-    <div class="dash-tier-header" onclick="toggleTier('reference')">
+    <div class="dash-tier-header" onclick="toggleTier('reference')" role="button" tabindex="0">
         <span>&#128203; Reference <span class="tier-badge">{{ appointments|length }}</span></span>
         <span class="dash-tier-toggle">&#9660;</span>
     </div>
@@ -378,6 +378,7 @@
                     <button id="sched-view-table" class="btn btn-sm btn-primary" onclick="ScheduleGrid.toggleView('table')" title="Table view" style="border-radius:0;border:none;padding:3px 8px;font-size:11px;">&#9776; Table</button>
                     <button id="sched-view-grid" class="btn btn-sm btn-secondary" onclick="ScheduleGrid.toggleView('grid')" title="Grid view" style="border-radius:0;border:none;padding:3px 8px;font-size:11px;">&#9638; Grid</button>
                 </div>
+                <button class="btn btn-sm btn-secondary" onclick="openSchedSettings()" title="Schedule display hours" style="margin-right:4px;padding:3px 6px;font-size:12px;">⚙</button>
                 {% if is_today %}
                 <button class="btn btn-sm btn-primary" onclick="openAddPatientModal()" title="Add patient to schedule" style="margin-right:4px;">+ Add</button>
                 <button class="btn btn-sm btn-secondary" onclick="openPasteScheduleModal()" title="Paste schedule from clipboard" style="margin-right:8px;">&#128203; Paste</button>
@@ -400,33 +401,74 @@
             </div>
         </div>
         <div class="dash-widget-body" style="padding:0;">
-            {% if appointments %}
+            {%- if not appointments %}
+            {{ empty_state('📋', 'No appointments today', 'Import an XML or add appointments manually.') }}
+            {%- else %}
+            {# Build a lookup of appointments by HH:MM key #}
+            {%- set appt_by_time = {} -%}
+            {%- for appt in appointments -%}
+                {%- set tkey = appt.appointment_time[:5] if appt.appointment_time else '' -%}
+                {%- if tkey -%}
+                    {%- if appt_by_time.update({tkey: (appt_by_time.get(tkey, []) + [appt])}) -%}{%- endif -%}
+                {%- endif -%}
+            {%- endfor -%}
             <div id="schedule-table-view">
-            <div class="table-wrap">
-            <table class="schedule-table">
-                <thead>
+            <div class="table-wrap" style="max-height:600px;overflow-y:auto;">
+            <table class="data-table data-table--dashboard">
+                <thead style="position:sticky;top:0;z-index:2;background:var(--bg-surface,#fff);">
                     <tr>
-                        <th>Time</th>
+                        <th style="width:70px;">Time</th>
                         <th>Patient</th>
-                        <th>MRN</th>
-                        <th>Visit Type</th>
                         <th>Reason</th>
-                        <th>Duration</th>
-                        <th>Gaps</th>
-                        <th>Billing</th>
-                        <th>Status</th>
-                        <th style="width:60px;">Actions</th>
+                        <th style="text-align:center;" title="Care Gaps">Gaps</th>
+                        <th style="text-align:center;" title="Billing Opportunities">Billing</th>
+                        <th style="width:44px;text-align:center;" title="Delete">🗑</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for appt in appointments %}
-                    <tr class="{% if appt.is_new_patient %}schedule-row--new{% endif %}{% if appt.entered_by == 'manual' %} schedule-row--manual{% endif %}">
-                        <td class="schedule-time">{{ appt.appointment_time }}</td>
+                    {# Generate every 15-min slot from schedule_start_hour to schedule_end_hour #}
+                    {%- set sh = schedule_start_hour|default(7) -%}
+                    {%- set eh = schedule_end_hour|default(19) -%}
+                    {%- for slot_idx in range((eh - sh) * 4) -%}
+                        {%- set total_min = sh * 60 + slot_idx * 15 -%}
+                        {%- set hh = (total_min // 60) -%}
+                        {%- set mm = (total_min % 60) -%}
+                        {%- set slot_key = '%02d:%02d'|format(hh, mm) -%}
+                        {%- set is_hour = (mm == 0) -%}
+                        {%- set slot_appts = appt_by_time.get(slot_key, []) -%}
+
+                        {%- if slot_appts -%}
+                            {# Render one row per appointment in this slot #}
+                            {%- for appt in slot_appts -%}
+                    <tr class="sched-slot{% if appt.is_new_patient %} schedule-row--new{% endif %}{% if appt.entered_by == 'manual' %} schedule-row--manual{% endif %}" data-slot="{{ slot_key }}"
+                        draggable="true"
+                        ondragstart="event.dataTransfer.setData('text/plain','{{ appt.id }}');event.dataTransfer.effectAllowed='move'"
+                        ondragover="event.preventDefault();this.classList.add('sched-slot--hover')"
+                        ondragleave="this.classList.remove('sched-slot--hover')"
+                        ondrop="dropOnSlot(event,'{{ slot_key }}')">
+                        <td class="schedule-time" style="{{ 'font-weight:600;' if is_hour else 'color:var(--text-secondary);font-size:12px;' }}">{{ slot_key }}</td>
                         <td>
+                            {%- set raw_name = appt.patient_name or '' -%}
+                            {%- set parts = raw_name.split(',') -%}
+                            {%- if parts|length >= 2 -%}
+                                {%- set display_name = parts[1]|trim ~ ' ' ~ parts[0]|trim -%}
+                            {%- else -%}
+                                {%- set display_name = raw_name -%}
+                            {%- endif -%}
+                            {%- set dob_raw = appt.patient_dob or '' -%}
+                            {%- if dob_raw|length >= 8 and '/' in dob_raw -%}
+                                {%- set dob_display = dob_raw -%}
+                            {%- elif dob_raw|length >= 8 -%}
+                                {%- set dob_display = dob_raw[4:6] ~ '/' ~ dob_raw[6:8] ~ '/' ~ dob_raw[:4] -%}
+                            {%- else -%}
+                                {%- set dob_display = '' -%}
+                            {%- endif -%}
                             {% if appt.patient_mrn %}
-                            <a href="/patient/{{ appt.patient_mrn }}?name={{ appt.patient_name|urlencode }}{% if appt.patient_dob %}&dob={{ appt.patient_dob|urlencode }}{% endif %}{% if appt.appointment_time %}&appt={{ appt.appointment_time|urlencode }}{% endif %}{% if appt.visit_type %}&visit={{ appt.visit_type|urlencode }}{% endif %}{% if appt.reason %}&reason={{ appt.reason|urlencode }}{% endif %}" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--text-secondary);" title="Open chart">{{ appt.patient_name }}</a>
+                            <a href="/patient/{{ appt.patient_mrn }}?name={{ appt.patient_name|urlencode }}{% if appt.patient_dob %}&dob={{ appt.patient_dob|urlencode }}{% endif %}{% if appt.appointment_time %}&appt={{ appt.appointment_time|urlencode }}{% endif %}{% if appt.visit_type %}&visit={{ appt.visit_type|urlencode }}{% endif %}{% if appt.reason %}&reason={{ appt.reason|urlencode }}{% endif %}" class="sched-patient-link" title="Open chart">
+                                <span class="sched-patient-name">{{ display_name }}</span>{% if dob_display %} <span class="sched-patient-dob">({{ dob_display }})</span>{% endif %}
+                            </a>
                             {% else %}
-                            {{ appt.patient_name }}
+                            <span class="sched-patient-name">{{ display_name }}</span>{% if dob_display %} <span class="sched-patient-dob">({{ dob_display }})</span>{% endif %}
                             {% endif %}
                             {% if appt.is_new_patient %}
                             <span class="badge badge--new-patient" title="New Patient">NEW</span>
@@ -435,73 +477,61 @@
                             <span class="badge" style="background:var(--color-red,#e74c3c);color:#fff;font-size:10px;margin-left:4px;" title="Overlaps with adjacent appointment">⚠ OVERLAP</span>
                             {% endif %}
                         </td>
-                        <td style="font-family:monospace;font-size:13px;">
-                            {% if appt.patient_mrn %}
-                            &#8226;&#8226;{{ appt.patient_mrn[-4:] }}
-                            {% else %}&mdash;{% endif %}
-                        </td>
-                        <td>{{ appt.visit_type }}</td>
-                        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ appt.reason or '' }}">
+                        <td class="sched-reason" title="{{ appt.reason or '' }}">
                             {{ appt.reason or '&mdash;' }}
                         </td>
-                        <td>{{ appt.duration_minutes }} min</td>
-                        <td>
+                        <td style="text-align:center;">
                             {% set gap_count = care_gap_counts.get(appt.patient_mrn, 0) if appt.patient_mrn else 0 %}
                             {% if gap_count > 0 %}
-                            <a href="/caregap/{{ appt.patient_mrn }}" class="badge badge--warning" style="text-decoration:none;cursor:pointer;" title="View care gaps">
-                                {{ gap_count }} gap{{ 's' if gap_count != 1 }}
-                            </a>
+                            <a href="/caregap/{{ appt.patient_mrn }}" style="text-decoration:none;cursor:pointer;font-size:16px;" title="{{ gap_count }} care gap{{ 's' if gap_count != 1 }}">✅</a>
                             {% else %}
-                            <span style="color:var(--text-secondary);font-size:12px;">&mdash;</span>
+                            <span style="color:var(--text-secondary);font-size:14px;">&mdash;</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td style="text-align:center;">
                             {% set bill_count = billing_opp_counts.get(appt.patient_mrn, 0) if appt.patient_mrn else 0 %}
                             {% if bill_count > 0 %}
-                            <span class="badge badge--success" title="Billing opportunities">
-                                {{ bill_count }} opp{{ 's' if bill_count != 1 }}
-                            </span>
+                            <span style="font-size:16px;cursor:default;" title="{{ bill_count }} billing opportunit{{ 'ies' if bill_count != 1 else 'y' }}">✅</span>
                             {% else %}
-                            <span style="color:var(--text-secondary);font-size:12px;">&mdash;</span>
+                            <span style="color:var(--text-secondary);font-size:14px;">&mdash;</span>
                             {% endif %}
                         </td>
-                        <td>
-                            <span class="badge badge--status-{{ (appt.status or 'scheduled')|lower|replace(' ', '-') }}">
-                                {{ (appt.status or 'Scheduled')|title }}
-                            </span>
-                            {% if appt.entered_by == 'manual' %}
-                            <span class="badge" style="background:#0d9488;color:#fff;font-size:10px;margin-left:4px;">MANUAL</span>
-                            {% endif %}
-                        </td>
-                        <td style="width:60px;text-align:center;white-space:nowrap;">
-                            {% if appt.patient_mrn %}
-                            <button class="btn btn-sm" style="padding:2px 6px;font-size:12px;" onclick="confirmCollectData({{ appt.id }}, '{{ appt.patient_name|e }}', '{{ appt.patient_mrn|e }}')" title="Collect patient data from AC">&#128229;</button>
-                            {% endif %}
-                            {% if appt.entered_by == 'manual' and appt.id %}
-                            <button class="btn btn-sm" style="padding:2px 6px;font-size:12px;color:var(--text-secondary);" onclick="deleteManualAppointment({{ appt.id }})" title="Remove manual entry">&times;</button>
-                            {% endif %}
+                        <td style="width:44px;text-align:center;">
+                            <button class="btn btn-icon btn-sm" style="font-size:15px;color:var(--text-muted);"
+                                    onclick="openDeleteApptModal({{ appt.id }}, '{{ display_name|e }}', '{{ appt.patient_mrn|e }}')"
+                                    title="Remove appointment">🗑</button>
                         </td>
                     </tr>
-                    {% endfor %}
+                            {%- endfor -%}
+                        {%- else -%}
+                    {# Empty slot row — droppable target #}
+                    <tr class="sched-slot sched-slot--empty" data-slot="{{ slot_key }}"
+                        ondragover="event.preventDefault();this.classList.add('sched-slot--hover')"
+                        ondragleave="this.classList.remove('sched-slot--hover')"
+                        ondrop="dropOnSlot(event,'{{ slot_key }}')"
+                        style="height:28px;{{ 'border-top:1px solid var(--border-color,#e2e8f0);' if is_hour else '' }}">
+                        <td class="schedule-time" style="{{ 'font-weight:600;' if is_hour else 'color:var(--text-secondary);font-size:12px;' }}">{{ slot_key }}</td>
+                        <td colspan="5" style="color:var(--text-secondary);font-size:12px;opacity:.4;">&mdash;</td>
+                    </tr>
+                        {%- endif -%}
+                    {%- endfor -%}
                 </tbody>
             </table>
             </div>{# /table-wrap #}
             </div>{# /schedule-table-view #}
-            <div id="schedule-grid-view" style="display:none;"></div>
-            {% else %}
-            {{ empty_state('📅', 'No appointments for ' + view_date.strftime('%A, %B %d').replace(' 0', ' '), 'Import an XML schedule or check a different date.') }}
-            {% endif %}
+            <div id="schedule-grid-view" style="display:none;" data-start-hour="{{ schedule_start_hour|default(7) }}" data-end-hour="{{ schedule_end_hour|default(19) }}"></div>
+            {%- endif %}
         </div>
     </div>
 
-    {# ---- MY PATIENTS WIDGET ---- #}
-    <div class="dash-widget fw-widget" data-widget-id="patients">
+    {# ---- MY PATIENTS WIDGET (UI_REFACTOR_PHASE_DASHBOARD) ---- #}
+    <div class="dash-widget fw-widget my-patients-panel" data-widget-id="patients">
         <div class="dash-widget-header">
-            <div style="display:flex;align-items:center;gap:12px;">
-                <span>&#128100; My Patients</span>
-                {% if my_patients %}<span class="badge badge--info">{{ my_patients|length }}</span>{% endif %}
+            <div class="action-bar">
+                <span style="font-size:13px;">&#128100; My Patients</span>
+                {% if my_patients %}<span class="badge badge--muted badge--sm">{{ my_patients|length }}</span>{% endif %}
             </div>
-            <div style="display:flex;gap:8px;align-items:center;">
+            <div class="action-bar">
                 <input type="text" id="patient-search" class="form-input" placeholder="Search..."
                        style="width:160px;padding:4px 10px;font-size:13px;" oninput="filterPatientPanel()">
                 <select id="patient-sort" class="form-input" style="width:auto;padding:4px 8px;font-size:13px;" onchange="sortPatientPanel()">
@@ -511,9 +541,9 @@
                 </select>
             </div>
         </div>
-        <div class="dash-widget-body" style="padding:0;max-height:400px;overflow-y:auto;">
+        <div class="dash-widget-body p-0" style="max-height:400px;overflow-y:auto;">
             {% if my_patients %}
-            <table class="schedule-table" id="patient-panel-table">
+            <table class="data-table data-table--secondary data-table--striped" id="patient-panel-table">
                 <thead>
                     <tr>
                         <th>Patient</th>
@@ -525,19 +555,22 @@
                 <tbody>
                     {% for pt in my_patients %}
                     <tr data-name="{{ pt.patient_name|lower }}" data-mrn="{{ pt.mrn }}"
-                        data-recent="{{ pt.last_xml_parsed.isoformat() if pt.last_xml_parsed else '' }}">
+                        data-recent="{{ pt.last_xml_parsed.isoformat() if pt.last_xml_parsed else '' }}"
+                        draggable="true"
+                        ondragstart="event.dataTransfer.setData('application/patient',JSON.stringify({name:{{ pt.patient_name|tojson }},mrn:{{ pt.mrn|tojson }},dob:{{ (pt.patient_dob or '')|tojson }}}));event.dataTransfer.effectAllowed='copy'"
+                        class="cursor-grab">
                         <td>
                             <a href="/patient/{{ pt.mrn }}" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--text-secondary);">
                                 {{ pt.patient_name or '(unknown)' }}
                             </a>
                         </td>
-                        <td style="font-family:monospace;font-size:13px;">••{{ pt.mrn[-4:] }}</td>
-                        <td style="font-size:13px;">
+                        <td class="mono">{{ pt.mrn }}</td>
+                        <td>
                             {% if pt.patient_dob and pt.patient_dob|length >= 8 %}
                                 {{ pt.patient_dob[4:6] }}-{{ pt.patient_dob[6:8] }}-{{ pt.patient_dob[:4] }}
                             {% else %}&mdash;{% endif %}
                         </td>
-                        <td style="font-size:13px;color:var(--text-secondary);">
+                        <td class="text-muted">
                             {% if pt.last_xml_parsed %}
                                 {{ pt.last_xml_parsed.strftime('%m-%d-%Y %I:%M %p') }}
                             {% else %}&mdash;{% endif %}
@@ -839,108 +872,267 @@ function submitAddPatient() {
     });
 }
 
-function deleteManualAppointment(id) {
-    if (!confirm('Remove this manually-added appointment?')) return;
-    fetch('/api/schedule/' + id, { method: 'DELETE' })
+/* ---------- Table drag-drop onto empty slots ---------- */
+function dropOnSlot(e, slotTime) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('sched-slot--hover');
+
+    /* Case 1: Dropping a patient from My Patients panel → create new appointment */
+    var patientJson = e.dataTransfer.getData('application/patient');
+    if (patientJson) {
+        try {
+            var pt = JSON.parse(patientJson);
+            fetch('/api/schedule/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_name: pt.name,
+                    patient_mrn: pt.mrn,
+                    patient_dob: pt.dob || '',
+                    appointment_time: slotTime,
+                    visit_type: 'Office Visit',
+                    duration_minutes: 15
+                })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) window.location.reload();
+                else showError((d.errors || [d.error || 'Could not add appointment']).join(', '));
+            })
+            .catch(function() { showError('Failed to add appointment'); });
+        } catch(ex) { showError('Invalid patient data'); }
+        return;
+    }
+
+    /* Case 2: Moving an existing appointment to a new slot */
+    var apptId = e.dataTransfer.getData('text/plain');
+    if (!apptId) return;
+    fetch('/api/schedule/' + apptId + '/move', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_time: slotTime })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) window.location.reload();
+        else showError(d.error || 'Could not move appointment');
+    })
+    .catch(function() { showError('Failed to move appointment'); });
+}
+
+/* ---------- Schedule hours settings ---------- */
+function openSchedSettings() {
+    document.getElementById('sched-settings-modal').style.display = 'flex';
+}
+function closeSchedSettings() {
+    document.getElementById('sched-settings-modal').style.display = 'none';
+}
+function saveSchedSettings() {
+    var start = parseInt(document.getElementById('sched-start-hour').value, 10);
+    var end = parseInt(document.getElementById('sched-end-hour').value, 10);
+    if (isNaN(start) || isNaN(end) || start >= end) {
+        showError('Start must be before end.');
+        return;
+    }
+    fetch('/api/schedule/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_hour: start, end_hour: end })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) { closeSchedSettings(); window.location.reload(); }
+        else showError(d.error || 'Failed to save.');
+    })
+    .catch(function() { showError('Request failed.'); });
+}
+
+/* ---------- Delete Appointment Modal ---------- */
+var _delApptId = null;
+function openDeleteApptModal(id, name, mrn) {
+    _delApptId = id;
+    document.getElementById('del-appt-name').textContent = name + ' (••' + mrn.slice(-4) + ')';
+    document.getElementById('del-appt-modal').style.display = 'flex';
+}
+function closeDeleteApptModal() {
+    document.getElementById('del-appt-modal').style.display = 'none';
+    _delApptId = null;
+}
+function confirmDeleteAppt(deletePrep) {
+    if (!_delApptId) return;
+    var url = '/api/schedule/' + _delApptId;
+    if (deletePrep) url += '?delete_prep=true';
+    fetch(url, { method: 'DELETE' })
         .then(function(res) { return res.json(); })
         .then(function(d) {
+            closeDeleteApptModal();
             if (d.success) window.location.reload();
             else showError(d.error || 'Could not delete.');
         })
-        .catch(function() { showError('Request failed.'); });
+        .catch(function() {
+            closeDeleteApptModal();
+            showError('Request failed.');
+        });
 }
 </script>
 
-{# ---- Add Patient Modal ---- #}
-<div id="add-patient-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:500px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3);">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;justify-content:space-between;align-items:center;">
-            <h3 style="margin:0;font-size:16px;">Add Patient to Schedule</h3>
-            <button onclick="closeAddPatientModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary);">&times;</button>
+{# ---- Schedule Hours Settings Modal ---- #}
+<div id="sched-settings-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--sm">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title">Schedule Display Hours</h3>
+            <button class="cc-modal__close" onclick="closeSchedSettings()">&times;</button>
         </div>
-        <form id="add-patient-form" onsubmit="event.preventDefault();submitAddPatient();" style="padding:20px;">
-            <div style="display:flex;gap:12px;margin-bottom:12px;">
-                <div style="flex:2;">
-                    <label class="form-label" style="font-size:13px;">Patient Name *</label>
-                    <input type="text" id="add-patient-name" class="form-input" required placeholder="LAST, FIRST">
-                </div>
-                <div style="flex:1;">
-                    <label class="form-label" style="font-size:13px;">MRN *</label>
-                    <input type="text" id="add-patient-mrn" class="form-input" required placeholder="e.g. 54321">
-                </div>
-            </div>
-            <div style="display:flex;gap:12px;margin-bottom:12px;">
-                <div style="flex:1;">
-                    <label class="form-label" style="font-size:13px;">DOB</label>
-                    <input type="date" id="add-patient-dob" class="form-input">
-                </div>
-                <div style="flex:1;">
-                    <label class="form-label" style="font-size:13px;">Time *</label>
-                    <input type="time" id="add-patient-time" class="form-input" required>
-                </div>
-            </div>
-            <div style="display:flex;gap:12px;margin-bottom:12px;">
-                <div style="flex:1;">
-                    <label class="form-label" style="font-size:13px;">Visit Type</label>
-                    <select id="add-patient-visit-type" class="form-input">
-                        <option value="Office Visit">Office Visit</option>
-                        <option value="New Patient">New Patient</option>
-                        <option value="Physical">Physical</option>
-                        <option value="Follow Up">Follow Up</option>
-                        <option value="Sick Visit">Sick Visit</option>
-                        <option value="Procedure">Procedure</option>
-                        <option value="Telehealth">Telehealth</option>
-                        <option value="Other">Other</option>
+        <div class="cc-modal__body">
+            <div class="form-row" style="margin-bottom:16px;">
+                <div class="form-col">
+                    <label class="form-label">Start</label>
+                    <select id="sched-start-hour" class="form-input">
+                        {% for h in range(0, 24) %}
+                        <option value="{{ h }}" {{ 'selected' if h == schedule_start_hour|default(7) }}>{{ '%02d:00'|format(h) }}</option>
+                        {% endfor %}
                     </select>
                 </div>
-                <div style="flex:1;">
-                    <label class="form-label" style="font-size:13px;">Duration (min)</label>
-                    <input type="number" id="add-patient-duration" class="form-input" value="15" min="5" max="120">
+                <div class="form-col">
+                    <label class="form-label">End</label>
+                    <select id="sched-end-hour" class="form-input">
+                        {% for h in range(1, 25) %}
+                        <option value="{{ h }}" {{ 'selected' if h == schedule_end_hour|default(19) }}>{{ '%02d:00'|format(h) }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
-            <div style="margin-bottom:12px;">
-                <label class="form-label" style="font-size:13px;">Reason / Chief Complaint</label>
-                <input type="text" id="add-patient-reason" class="form-input" placeholder="e.g. BP follow-up">
+            <div class="action-bar" style="justify-content:flex-end;">
+                <button class="btn btn-secondary btn-sm" onclick="closeSchedSettings()">Cancel</button>
+                <button class="btn btn-primary btn-sm" onclick="saveSchedSettings()">Save</button>
             </div>
-            <div style="margin-bottom:16px;">
-                <label class="form-label" style="font-size:13px;">Note Template</label>
-                <select id="add-patient-template" class="form-input">
-                    <option value="">(none)</option>
-                    <option value="SOAP">SOAP</option>
-                    <option value="H&P">H&P</option>
-                    <option value="Follow-Up">Follow-Up</option>
-                    <option value="Procedure">Procedure</option>
-                    <option value="Telehealth">Telehealth</option>
-                </select>
+        </div>
+    </div>
+</div>
+
+{# ---- Delete Appointment Confirmation Modal ---- #}
+<div id="del-appt-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--sm">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title">Delete Appointment</h3>
+            <button class="cc-modal__close" onclick="closeDeleteApptModal()">&times;</button>
+        </div>
+        <div class="cc-modal__body">
+            <p style="margin:0 0 8px;font-size:14px;">Are you sure you want to remove:</p>
+            <p id="del-appt-name" style="margin:0 0 16px;font-weight:600;font-size:15px;"></p>
+            <p class="text-muted" style="margin:0 0 16px;font-size:13px;">What should happen to any prepped billing / care-gap work?</p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <button onclick="confirmDeleteAppt(true)"
+                    style="padding:10px 16px;border:1px solid var(--border,#e2e8f0);border-radius:8px;background:var(--bg-surface,#fff);cursor:pointer;text-align:left;font-size:13px;">
+                    🗑 <strong>Delete everything</strong> — remove appointment and all prepped work
+                </button>
+                <button onclick="confirmDeleteAppt(false)"
+                    style="padding:10px 16px;border:1px solid var(--border,#e2e8f0);border-radius:8px;background:var(--bg-surface,#fff);cursor:pointer;text-align:left;font-size:13px;">
+                    💾 <strong>Save prepped work</strong> — remove from schedule but keep prepped data for a revisit
+                </button>
+                <button onclick="closeDeleteApptModal()"
+                    style="padding:10px 16px;border:none;border-radius:8px;background:transparent;cursor:pointer;text-align:center;font-size:13px;color:var(--text-secondary);">
+                    Cancel
+                </button>
             </div>
-            <div id="add-patient-error" class="flash flash--error" style="display:none;margin-bottom:12px;"></div>
-            <div style="display:flex;gap:12px;justify-content:flex-end;">
-                <button type="button" class="btn btn-secondary" onclick="closeAddPatientModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="add-patient-submit-btn">Add to Schedule</button>
+        </div>
+    </div>
+</div>
+
+{# ---- Add Patient Modal ---- #}
+<div id="add-patient-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--md">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title">Add Patient to Schedule</h3>
+            <button class="cc-modal__close" onclick="closeAddPatientModal()">&times;</button>
+        </div>
+        <form id="add-patient-form" onsubmit="event.preventDefault();submitAddPatient();">
+            <div class="cc-modal__body">
+                <div class="form-row">
+                    <div class="form-col-2">
+                        <label class="form-label">Patient Name *</label>
+                        <input type="text" id="add-patient-name" class="form-input" required placeholder="LAST, FIRST">
+                    </div>
+                    <div class="form-col">
+                        <label class="form-label">MRN *</label>
+                        <input type="text" id="add-patient-mrn" class="form-input" required placeholder="e.g. 54321">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col">
+                        <label class="form-label">DOB</label>
+                        <input type="date" id="add-patient-dob" class="form-input">
+                    </div>
+                    <div class="form-col">
+                        <label class="form-label">Time *</label>
+                        <input type="time" id="add-patient-time" class="form-input" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-col">
+                        <label class="form-label">Visit Type</label>
+                        <select id="add-patient-visit-type" class="form-input">
+                            <option value="Office Visit">Office Visit</option>
+                            <option value="New Patient">New Patient</option>
+                            <option value="Physical">Physical</option>
+                            <option value="Follow Up">Follow Up</option>
+                            <option value="Sick Visit">Sick Visit</option>
+                            <option value="Procedure">Procedure</option>
+                            <option value="Telehealth">Telehealth</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-col">
+                        <label class="form-label">Duration (min)</label>
+                        <input type="number" id="add-patient-duration" class="form-input" value="15" min="5" max="120">
+                    </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label class="form-label">Reason / Chief Complaint</label>
+                    <input type="text" id="add-patient-reason" class="form-input" placeholder="e.g. BP follow-up">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label class="form-label">Note Template</label>
+                    <select id="add-patient-template" class="form-input">
+                        <option value="">(none)</option>
+                        <option value="SOAP">SOAP</option>
+                        <option value="H&P">H&P</option>
+                        <option value="Follow-Up">Follow-Up</option>
+                        <option value="Procedure">Procedure</option>
+                        <option value="Telehealth">Telehealth</option>
+                    </select>
+                </div>
+                <div id="add-patient-error" class="flash flash--error" style="display:none;margin-bottom:12px;"></div>
+                <div class="action-bar" style="justify-content:flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddPatientModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="add-patient-submit-btn">Add to Schedule</button>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
 <style>
-.schedule-row--manual { border-left: 3px solid #0d9488; }
-.paste-confidence-high { color: #16a34a; font-weight: 600; }
-.paste-confidence-medium { color: #ca8a04; font-weight: 600; }
-.paste-confidence-low { color: #dc2626; font-weight: 600; }
-.collect-spinner { display:inline-block;width:16px;height:16px;border:2px solid #e2e8f0;border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s linear infinite; }
+.schedule-row--manual { border-left: 3px solid var(--color-teal, #0d9488); }
+.sched-slot--empty td { padding: 3px 10px; }
+.sched-slot--hover { background: var(--color-lt-blue, #dbeafe) !important; }
+.sched-slot[draggable="true"] { cursor: grab; }
+.paste-confidence-high { color: var(--color-green, #16a34a); font-weight: 600; }
+.paste-confidence-medium { color: var(--color-gold, #ca8a04); font-weight: 600; }
+.paste-confidence-low { color: var(--color-red, #dc2626); font-weight: 600; }
+.collect-spinner { display:inline-block;width:16px;height:16px;border:2px solid var(--border,#e2e8f0);border-top-color:var(--color-primary,#3b82f6);border-radius:50%;animation:spin 0.8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
-#paste-results-table th, #paste-results-table td { padding: 6px 8px; font-size: 12px; border-bottom: 1px solid var(--border, #e2e8f0); }
 #paste-results-table input, #paste-results-table select { font-size: 12px; padding: 3px 6px; border: 1px solid var(--border, #e2e8f0); border-radius: 4px; background: var(--bg-surface, #fff); }
 </style>
 
 {# ---- Data Collection Takeover Warning Modal (Phase 4) ---- #}
-<div id="collect-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5100;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:480px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3);">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;justify-content:space-between;align-items:center;">
-            <h3 style="margin:0;font-size:16px;">&#9888;&#65039; Mouse &amp; Keyboard Takeover Warning</h3>
-            <button onclick="closeCollectModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary);">&times;</button>
+<div id="collect-modal" class="cc-modal" style="z-index:5100;">
+    <div class="cc-modal__dialog cc-modal__dialog--md">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title">&#9888;&#65039; Mouse &amp; Keyboard Takeover Warning</h3>
+            <button class="cc-modal__close" onclick="closeCollectModal()">&times;</button>
         </div>
-        <div style="padding:20px;">
+        <div class="cc-modal__body">
             {# Warning view (initial) #}
             <div id="collect-warning-view">
                 <p style="margin:0 0 12px;font-size:14px;">Continuing will allow CareCompanion to temporarily take control of your mouse and keyboard to collect patient information from Amazing Charts.</p>
@@ -950,7 +1142,7 @@ function deleteManualAppointment(id) {
                     <div>&#8226; The process typically takes 15&ndash;30 seconds</div>
                 </div>
                 <p style="margin:0 0 16px;font-size:14px;"><strong>Patient:</strong> <span id="collect-patient-display"></span></p>
-                <div style="display:flex;gap:12px;justify-content:flex-end;">
+                <div class="action-bar" style="justify-content:flex-end;">
                     <button class="btn btn-secondary" onclick="closeCollectModal()">Cancel</button>
                     <button class="btn btn-primary" id="collect-confirm-btn" onclick="startCollection()">Yes, Continue</button>
                 </div>
@@ -959,7 +1151,7 @@ function deleteManualAppointment(id) {
             <div id="collect-progress-view" style="display:none;text-align:center;padding:20px 0;">
                 <div id="collect-progress-spinner" class="collect-spinner" style="margin:0 auto 12px;"></div>
                 <p id="collect-progress-text" style="font-size:14px;margin:0 0 6px;">Starting data collection...</p>
-                <p id="collect-progress-detail" style="font-size:12px;color:var(--text-secondary);margin:0 0 16px;"></p>
+                <p id="collect-progress-detail" class="text-muted" style="font-size:12px;margin:0 0 16px;"></p>
                 <div id="collect-result-actions" style="display:none;">
                     <a id="collect-patient-link" href="#" class="btn btn-primary" style="margin-right:8px;">View Patient Chart &rarr;</a>
                     <button class="btn btn-secondary" onclick="closeCollectModal()">Close</button>
@@ -1044,30 +1236,30 @@ function showCollectError(msg) {
 </script>
 
 {# ---- Paste Schedule Modal (Phase 3) ---- #}
-<div id="paste-schedule-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:860px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);">
-        <div style="padding:16px 20px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;justify-content:space-between;align-items:center;">
-            <h3 style="margin:0;font-size:16px;">&#128203; Import Schedule from Text</h3>
-            <button onclick="closePasteScheduleModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-secondary);">&times;</button>
+<div id="paste-schedule-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--xl" style="max-height:90vh;display:flex;flex-direction:column;">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title">&#128203; Import Schedule from Text</h3>
+            <button class="cc-modal__close" onclick="closePasteScheduleModal()">&times;</button>
         </div>
-        <div style="padding:20px;overflow-y:auto;flex:1;">
+        <div class="cc-modal__body" style="overflow-y:auto;flex:1;">
             {# Input area #}
             <div id="paste-input-area">
-                <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px;">Paste your schedule text below. You can copy text from the NetPractice schedule using Windows Snipping Tool&rsquo;s text extractor, or type/paste from any source.</p>
-                <textarea id="paste-schedule-text" rows="8" class="form-input" style="width:100%;font-family:monospace;font-size:12px;resize:vertical;" placeholder="Paste schedule text here...&#10;Example:&#10;9:00 AM  SMITH, JOHN (54321)  Follow Up&#10;9:30 AM  DOE, JANE (12345)  New Patient - cough&#10;10:00 AM  BROWN, BOB (99887)  Physical"></textarea>
-                <div style="margin-top:12px;display:flex;gap:8px;">
+                <p class="text-muted" style="font-size:13px;margin:0 0 10px;">Paste your schedule text below. You can copy text from the NetPractice schedule using Windows Snipping Tool&rsquo;s text extractor, or type/paste from any source.</p>
+                <textarea id="paste-schedule-text" rows="8" class="form-input" style="font-family:monospace;font-size:12px;resize:vertical;" placeholder="Paste schedule text here...&#10;Example:&#10;9:00 AM  SMITH, JOHN (54321)  Follow Up&#10;9:30 AM  DOE, JANE (12345)  New Patient - cough&#10;10:00 AM  BROWN, BOB (99887)  Physical"></textarea>
+                <div class="action-bar" style="margin-top:12px;">
                     <button class="btn btn-primary" onclick="parseScheduleText()" id="parse-schedule-btn">Parse Schedule</button>
                     <button class="btn btn-secondary" onclick="closePasteScheduleModal()">Cancel</button>
                 </div>
             </div>
             {# Results area #}
             <div id="paste-results" style="display:none;">
-                <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px;">Review and edit the parsed appointments, then click &ldquo;Add All to Schedule&rdquo;:</p>
+                <p class="text-muted" style="font-size:13px;margin:0 0 10px;">Review and edit the parsed appointments, then click &ldquo;Add All to Schedule&rdquo;:</p>
                 <div id="paste-error" class="flash flash--error" style="display:none;margin-bottom:10px;"></div>
                 <div style="overflow-x:auto;">
-                    <table id="paste-results-table" style="width:100%;border-collapse:collapse;">
+                    <table id="paste-results-table" class="data-table data-table--compact">
                         <thead>
-                            <tr style="background:var(--bg-offset,#f8fafc);text-align:left;">
+                            <tr>
                                 <th>Time</th>
                                 <th>Patient Name</th>
                                 <th>MRN</th>
@@ -1081,10 +1273,10 @@ function showCollectError(msg) {
                         <tbody id="paste-results-body"></tbody>
                     </table>
                 </div>
-                <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
+                <div class="action-bar" style="margin-top:14px;">
                     <button class="btn btn-primary" onclick="submitParsedSchedule()" id="submit-parsed-btn">Add All to Schedule</button>
                     <button class="btn btn-secondary" onclick="backToPasteInput()">&#8592; Back to Edit</button>
-                    <span id="paste-progress" style="font-size:12px;color:var(--text-secondary);margin-left:8px;"></span>
+                    <span id="paste-progress" class="text-muted" style="font-size:12px;margin-left:8px;"></span>
                 </div>
             </div>
         </div>

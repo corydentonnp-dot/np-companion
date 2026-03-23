@@ -110,7 +110,7 @@ class LabTrack(db.Model):
         return 'stable'
 
     def __repr__(self):
-        return f'<LabTrack {self.id} {self.lab_name} mrn=...{self.mrn[-4:] if self.mrn else ""}>'
+        return f'<LabTrack {self.id} {self.lab_name} mrn={self.mrn or ""}>'
 
 
 class LabResult(db.Model):

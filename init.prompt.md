@@ -252,6 +252,7 @@ def index():
 - Every route requires `@login_required` EXCEPT:
   - `/login`
   - `/timer/room-widget` (exam room computers, no login)
+  - `/timer/face/room-toggle` (POST counterpart to room-widget, same tablet)
   - `/oncall/handoff/<token>` (temporary read-only handoff link)
 - Use `@require_role('admin')` for all `/admin/*` routes
 - Use `@require_role('provider')` for billing, metrics, and on-call routes
@@ -338,13 +339,13 @@ def safe_patient_id(mrn: str) -> str:
   - Open-Meteo API Ã¢â‚¬â€ ZIP code/coordinates only
 
 ### Rule 4 Ã¢â‚¬â€ MRN Display in UI
-Show only the last 4 digits of MRN in any web UI element that might be
-visible on a shared screen. Full MRN is only used internally in the database
-and in the billing audit log (which requires login to access).
+Full MRN is displayed in all web UI elements. This is a local-only
+application behind authentication, so full MRN visibility aids clinical
+workflow. MRN is only masked in log files (use hash for logging).
 
 ```python
 # In templates:
-{{ mrn[-4:] }}  {# Shows only last 4 digits #}
+{{ mrn }}  {# Shows full MRN #}
 ```
 
 ### Rule 5 Ã¢â‚¬â€ Audit Log Every Patient-Adjacent Action

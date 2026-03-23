@@ -286,7 +286,7 @@
                 var tr = document.createElement('tr');
                 tr.innerHTML =
                     '<td><strong>' + escHtml(p.name) + '</strong></td>' +
-                    '<td><code>' + escHtml(p.mrn) + '</code></td>' +
+                    '<td><code>••' + escHtml(p.mrn.slice(-4)) + '</code></td>' +
                     '<td>' + p.age + '</td>' +
                     '<td>' + escHtml(p.sex) + '</td>' +
                     '<td><div class="pg-dx">' + escHtml(p.diagnoses_summary) + '</div></td>' +

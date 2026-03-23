@@ -3,17 +3,17 @@
 {% block page_id %}admin-users{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
-    <h1 style="margin:0;">User Management</h1>
-    <div style="display:flex;gap:8px;">
-        <button class="btn btn-secondary" onclick="document.getElementById('send-notif-modal').style.display='flex'">&#128276; Send Notification</button>
+<div class="page-header">
+    <h1 class="page-header__title">User Management</h1>
+    <div class="page-header__actions">
+        <button class="btn btn-secondary" onclick="document.getElementById('send-notif-modal').classList.add('cc-modal--open')">&#128276; Send Notification</button>
         <a href="{{ url_for('auth.register') }}" class="btn btn-primary">+ New User</a>
     </div>
 </div>
 
 <div class="card">
     <div class="table-wrap">
-        <table class="table">
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -36,15 +36,14 @@
                     <td>
                         <form method="POST"
                               action="{{ url_for('auth.admin_change_role', user_id=user.id) }}"
-                              style="display:inline-flex;align-items:center;gap:6px;">
-                            <select name="role" class="form-input" style="width:auto;padding:4px 8px;font-size:13px;">
+                              class="form-inline">
+                            <select name="role" class="form-input form-input--auto">
                                 <option value="provider" {{ 'selected' if user.role == 'provider' }}>Provider</option>
                                 <option value="ma" {{ 'selected' if user.role == 'ma' }}>MA</option>
                                 <option value="admin" {{ 'selected' if user.role == 'admin' }}>Admin</option>
                             </select>
-                            <input type="password" name="admin_password" class="form-input"
+                            <input type="password" name="admin_password" class="form-input form-input--auto"
                                    placeholder="Your password" required
-                                   style="width:auto;max-width:140px;padding:4px 8px;font-size:13px;"
                                    autocomplete="current-password">
                             <button type="submit" class="btn btn-secondary btn-sm">Set</button>
                         </form>
@@ -113,11 +112,11 @@
                     </td>
                 </tr>
                 {# Hidden row â€” reset password #}
-                <tr id="reset-row-{{ user.id }}" style="display:none;">
-                    <td colspan="9" style="background:var(--color-lt-yellow);padding:12px 16px;">
+                <tr id="reset-row-{{ user.id }}" class="expand-row expand-row--yellow" style="display:none;">
+                    <td colspan="9">
                         <form method="POST"
                               action="{{ url_for('auth.admin_reset_password', user_id=user.id) }}"
-                              style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                              class="form-row">
                             <span style="font-size:13px;font-weight:600;">
                                 Reset password for {{ user.display_name }}:
                             </span>
@@ -139,11 +138,11 @@
                 </tr>
 
                 {# Hidden row â€” change username #}
-                <tr id="username-row-{{ user.id }}" style="display:none;">
-                    <td colspan="9" style="background:var(--color-lt-blue);padding:12px 16px;">
+                <tr id="username-row-{{ user.id }}" class="expand-row expand-row--blue" style="display:none;">
+                    <td colspan="9">
                         <form method="POST"
                               action="{{ url_for('auth.admin_change_username', user_id=user.id) }}"
-                              style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                              class="form-row">
                             <span style="font-size:13px;font-weight:600;">
                                 Change username for {{ user.display_name }} (current: {{ user.username }}):
                             </span>
@@ -172,12 +171,12 @@
                     </td>
                 </tr>
 
-                {# Hidden row â€” set PIN #}
-                <tr id="pin-row-{{ user.id }}" style="display:none;">
-                    <td colspan="9" style="background:var(--color-lt-green);padding:12px 16px;">
+                {# Hidden row — set PIN #}
+                <tr id="pin-row-{{ user.id }}" class="expand-row expand-row--green" style="display:none;">
+                    <td colspan="9">
                         <form method="POST"
                               action="{{ url_for('auth.admin_set_pin', user_id=user.id) }}"
-                              style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                              class="form-row">
                             <span style="font-size:13px;font-weight:600;">
                                 Set auto-lock PIN for {{ user.display_name }}:
                             </span>
@@ -219,13 +218,13 @@ var _deactivateUserId = null;
 function openDeactivateModal(userId, userName) {
     _deactivateUserId = userId;
     document.getElementById('deact-user-name').textContent = userName;
-    document.getElementById('deact-modal').style.display = 'flex';
+    document.getElementById('deact-modal').classList.add('cc-modal--open');
     document.getElementById('deact-mode-now').checked = true;
     document.getElementById('deact-schedule-row').style.display = 'none';
 }
 
 function closeDeactivateModal() {
-    document.getElementById('deact-modal').style.display = 'none';
+    document.getElementById('deact-modal').classList.remove('cc-modal--open');
 }
 
 function toggleScheduleRow() {
@@ -275,7 +274,7 @@ function sendNotification() {
     }).then(function(r){return r.json();}).then(function(d){
         if (d.success) {
             document.getElementById('notif-message').value = '';
-            document.getElementById('send-notif-modal').style.display = 'none';
+            document.getElementById('send-notif-modal').classList.remove('cc-modal--open');
             alert(d.message || 'Notification sent.');
         } else {
             alert(d.error || 'Failed to send.');
@@ -330,24 +329,29 @@ function loadNotifHistory() {
 </script>
 
 {# ---- Deactivation Modal ---- #}
-<div id="deact-modal" data-blocking="true" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-card,#fff);border-radius:10px;padding:24px;width:380px;max-width:90vw;box-shadow:var(--shadow-lg);">
-        <h3 style="margin:0 0 16px;">Deactivate <span id="deact-user-name"></span></h3>
-        <div style="margin-bottom:12px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
-                <input type="radio" name="deact_mode" id="deact-mode-now" value="now" checked onchange="toggleScheduleRow()">
-                <span>Deactivate immediately</span>
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="radio" name="deact_mode" id="deact-mode-schedule" value="scheduled" onchange="toggleScheduleRow()">
-                <span>Schedule deactivation</span>
-            </label>
+<div id="deact-modal" class="cc-modal" data-blocking="true">
+    <div class="cc-modal__dialog cc-modal__dialog--sm">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title">Deactivate <span id="deact-user-name"></span></h3>
+            <button class="cc-modal__close" onclick="closeDeactivateModal()">&times;</button>
         </div>
-        <div id="deact-schedule-row" style="display:none;margin-bottom:12px;">
-            <label class="form-label" style="font-size:13px;">Deactivation date:</label>
-            <input type="date" id="deact-schedule-date" class="form-input" style="max-width:200px;">
+        <div class="cc-modal__body">
+            <div style="margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px;">
+                    <input type="radio" name="deact_mode" id="deact-mode-now" value="now" checked onchange="toggleScheduleRow()">
+                    <span>Deactivate immediately</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="radio" name="deact_mode" id="deact-mode-schedule" value="scheduled" onchange="toggleScheduleRow()">
+                    <span>Schedule deactivation</span>
+                </label>
+            </div>
+            <div id="deact-schedule-row" style="display:none;margin-bottom:12px;">
+                <label class="form-label">Deactivation date:</label>
+                <input type="date" id="deact-schedule-date" class="form-input" style="max-width:200px;">
+            </div>
         </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <div class="cc-modal__footer">
             <button class="btn btn-secondary" onclick="closeDeactivateModal()">Cancel</button>
             <button class="btn btn-danger" onclick="submitDeactivation()">Confirm</button>
         </div>
@@ -355,61 +359,64 @@ function loadNotifHistory() {
 </div>
 
 {# ---- Send Notification Modal ---- #}
-<div id="send-notif-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-card,#fff);border-radius:10px;padding:24px;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow-lg);">
-        <h3 style="margin:0 0 16px;">Send Notification</h3>
+<div id="send-notif-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--md">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title">Send Notification</h3>
+            <button class="cc-modal__close" onclick="document.getElementById('send-notif-modal').classList.remove('cc-modal--open')">&times;</button>
+        </div>
+        <div class="cc-modal__body">
+            {# Recipient #}
+            <div class="form-group">
+                <label class="form-label">To:</label>
+                <div class="form-row">
+                    <select id="notif-user-select" class="form-input" style="flex:1;">
+                        <option value="">— Select user —</option>
+                        {% for user in users %}
+                        <option value="{{ user.id }}">{{ user.display_name }} ({{ user.username }})</option>
+                        {% endfor %}
+                    </select>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap;">
+                        <input type="checkbox" id="notif-send-all" onchange="toggleNotifUserSelect()"> Send to All
+                    </label>
+                </div>
+            </div>
 
-        {# Recipient #}
-        <div class="form-group">
-            <label class="form-label">To:</label>
-            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-                <select id="notif-user-select" class="form-input" style="flex:1;">
-                    <option value="">— Select user —</option>
-                    {% for user in users %}
-                    <option value="{{ user.id }}">{{ user.display_name }} ({{ user.username }})</option>
-                    {% endfor %}
+            {# Template #}
+            <div class="form-group">
+                <label class="form-label">Template:</label>
+                <select id="notif-template" class="form-input" onchange="applyTemplate()">
+                    <option value="">— Custom message —</option>
+                    <option value="meeting">Staff Meeting Reminder</option>
+                    <option value="maintenance">System Maintenance</option>
+                    <option value="policy_update">Policy Update</option>
+                    <option value="schedule_change">Schedule Change</option>
+                    <option value="training">Training Session</option>
                 </select>
-                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap;">
-                    <input type="checkbox" id="notif-send-all" onchange="toggleNotifUserSelect()"> Send to All
-                </label>
+            </div>
+
+            {# Message #}
+            <div class="form-group">
+                <label class="form-label">Message:</label>
+                <textarea id="notif-message" class="form-input" rows="3" placeholder="Enter notification message..." style="resize:vertical;"></textarea>
+            </div>
+
+            {# Schedule #}
+            <div class="form-group">
+                <label class="form-label">Schedule for later (optional):</label>
+                <input type="datetime-local" id="notif-schedule" class="form-input" style="max-width:280px;">
+            </div>
+
+            {# History toggle #}
+            <div style="margin-bottom:12px;">
+                <button class="btn btn-secondary btn-sm" onclick="loadNotifHistory()">&#128337; View History</button>
+            </div>
+            <div id="notif-history-panel" style="display:none;margin-bottom:16px;max-height:200px;overflow-y:auto;border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:8px;">
+                <div id="notif-history-list"></div>
             </div>
         </div>
-
-        {# Template #}
-        <div class="form-group">
-            <label class="form-label">Template:</label>
-            <select id="notif-template" class="form-input" onchange="applyTemplate()">
-                <option value="">— Custom message —</option>
-                <option value="meeting">Staff Meeting Reminder</option>
-                <option value="maintenance">System Maintenance</option>
-                <option value="policy_update">Policy Update</option>
-                <option value="schedule_change">Schedule Change</option>
-                <option value="training">Training Session</option>
-            </select>
-        </div>
-
-        {# Message #}
-        <div class="form-group">
-            <label class="form-label">Message:</label>
-            <textarea id="notif-message" class="form-input" rows="3" placeholder="Enter notification message..." style="resize:vertical;"></textarea>
-        </div>
-
-        {# Schedule #}
-        <div class="form-group">
-            <label class="form-label">Schedule for later (optional):</label>
-            <input type="datetime-local" id="notif-schedule" class="form-input" style="max-width:280px;">
-        </div>
-
-        {# History toggle #}
-        <div style="margin-bottom:12px;">
-            <button class="btn btn-secondary btn-sm" onclick="loadNotifHistory()">&#128337; View History</button>
-        </div>
-        <div id="notif-history-panel" style="display:none;margin-bottom:16px;max-height:200px;overflow-y:auto;border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:8px;">
-            <div id="notif-history-list"></div>
-        </div>
-
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button class="btn btn-secondary" onclick="document.getElementById('send-notif-modal').style.display='none'">Cancel</button>
+        <div class="cc-modal__footer">
+            <button class="btn btn-secondary" onclick="document.getElementById('send-notif-modal').classList.remove('cc-modal--open')">Cancel</button>
             <button class="btn btn-primary" onclick="sendNotification()">Send</button>
         </div>
     </div>

@@ -70,4 +70,4 @@ class TimeLog(db.Model):
     user = db.relationship('User', backref='time_logs', lazy=True)
 
     def __repr__(self):
-        return f'<TimeLog {self.id} user={self.user_id} mrn=...{self.mrn[-4:] if self.mrn else ""}>'
+        return f'<TimeLog {self.id} user={self.user_id} mrn={self.mrn or ""}>'

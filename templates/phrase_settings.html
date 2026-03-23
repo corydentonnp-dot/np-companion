@@ -86,27 +86,29 @@
 </div>
 
 {# Edit modal #}
-<div id="phrase-edit-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.55);padding:24px;overflow-y:auto;">
-    <div style="max-width:600px;margin:60px auto;background:var(--bg-card,#fff);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);overflow:hidden;">
-        <div style="background:linear-gradient(90deg,#27ae60 0%,#1a7a42 100%);padding:14px 20px;color:#fff;display:flex;justify-content:space-between;align-items:center;">
-            <strong>Edit Documentation Phrase</strong>
-            <button onclick="closeEditModal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">&#10005;</button>
+<div id="phrase-edit-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--md">
+        <div class="cc-modal__header" style="background:linear-gradient(90deg,#27ae60 0%,#1a7a42 100%);color:#fff;">
+            <strong class="cc-modal__title" style="color:#fff;">Edit Documentation Phrase</strong>
+            <button class="cc-modal__close" onclick="closeEditModal()" style="color:#fff;">&times;</button>
         </div>
-        <form id="phrase-edit-form" method="POST" style="padding:20px;">
-            <input type="hidden" id="edit-phrase-id" name="phrase_id">
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Title</label>
-                <input type="text" id="edit-phrase-title" name="phrase_title" style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;font-size:13px;">
-            </div>
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Phrase Text</label>
-                <textarea id="edit-phrase-text" name="phrase_text" rows="6" style="width:100%;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;font-size:12px;font-family:inherit;resize:vertical;"></textarea>
-            </div>
-            <div style="display:flex;gap:8px;justify-content:flex-end;">
-                <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
-            </div>
-        </form>
+        <div class="cc-modal__body">
+            <form id="phrase-edit-form" method="POST">
+                <input type="hidden" id="edit-phrase-id" name="phrase_id">
+                <div class="form-group">
+                    <label class="form-label">Title</label>
+                    <input type="text" id="edit-phrase-title" name="phrase_title" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phrase Text</label>
+                    <textarea id="edit-phrase-text" name="phrase_text" rows="6" class="form-input" style="resize:vertical;"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="cc-modal__footer">
+            <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" form="phrase-edit-form" class="btn btn-primary">Save Changes</button>
+        </div>
     </div>
 </div>
 
@@ -165,12 +167,12 @@ function editPhrase(id) {
             document.getElementById('edit-phrase-title').value = d.phrase_title;
             document.getElementById('edit-phrase-text').value = d.phrase_text;
             document.getElementById('phrase-edit-form').action = '/settings/phrases/' + d.id + '/edit';
-            document.getElementById('phrase-edit-modal').style.display = '';
+            document.getElementById('phrase-edit-modal').classList.add('cc-modal--open');
         });
 }
 
 function closeEditModal() {
-    document.getElementById('phrase-edit-modal').style.display = 'none';
+    document.getElementById('phrase-edit-modal').classList.remove('cc-modal--open');
 }
 </script>
 {% endblock %}

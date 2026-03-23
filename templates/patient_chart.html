@@ -24,6 +24,7 @@
     <a href="#section-allergies" class="cp-link">Allergies</a>
     <a href="#section-immunizations" class="cp-link">Immunizations</a>
     <a href="#section-notes" class="cp-link">Notes</a>
+    <a href="#section-prior-notes" class="cp-link">Prior Notes</a>
 </div>
 <div class="context-panel-section">
     <div class="cp-section-label">Actions</div>
@@ -173,19 +174,21 @@
         </div>
         <div class="widget-body">
             {% if medications %}
-            <table class="widget-table" id="med-table">
+            <table class="widget-table med-table" id="med-table">
                 <thead>
-                    <tr><th>Drug Name</th><th>Generic</th><th>Dose / Form</th><th>Frequency</th><th>Status</th><th title="Estimated monthly cost">$</th></tr>
+                    <tr><th class="med-col-name">Medication</th><th class="med-col-dose">Dose / Form</th><th class="med-col-freq">Freq</th><th class="med-col-status">Status</th><th class="med-col-price" title="Estimated monthly cost">$</th></tr>
                 </thead>
                 <tbody>
                     {% for m in medications %}
                     {% set rx = m.rx_info %}
+                    {% set gen = rx.generic_name if rx and rx.generic_name else '' %}
+                    {% set brand = rx.brand_name if rx and rx.brand_name else '' %}
+                    {% set display_name = gen if gen else m.drug_name.split()[0] %}
                     <tr data-status="{{ m.status }}" class="{% if m.status != 'active' %}row-inactive{% endif %}">
-                        <td class="fw-500 cell-clip" title="{{ m.drug_name }}"><a href="https://www.uptodate.com/contents/search?search={{ (rx.generic_name if rx and rx.generic_name else m.drug_name.split()[0])|urlencode }}+drug+information" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">{{ rx.brand_name if rx and rx.brand_name else m.drug_name.split()[0] }}</a></td>
-                        <td class="cell-clip">{{ rx.generic_name if rx and rx.generic_name else '' }}</td>
-                        <td>{{ (rx.dose_strength ~ ' ' ~ rx.dose_form) | trim if rx and rx.dose_strength else m.dosage }}</td>
-                        <td>{{ m.frequency }}</td>
-                        <td><span class="badge badge-{{ 'success' if m.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'medication', {{ m.id }})" style="cursor:pointer;" title="Click to toggle">{{ m.status }}</span></td>
+                        <td class="fw-500 cell-clip" title="{{ brand ~ ' (' ~ gen ~ ')' if brand and gen else m.drug_name }}"><a href="https://www.uptodate.com/contents/search?search={{ display_name|urlencode }}+drug+information" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">{{ display_name }}</a>{% if brand and gen %} <span class="text-muted text-sm">({{ brand }})</span>{% endif %}</td>
+                        <td class="med-dose-cell">{{ (rx.dose_strength ~ ' ' ~ rx.dose_form) | trim if rx and rx.dose_strength else m.dosage }}</td>
+                        <td title="{{ m.frequency }}">{{ m.std_frequency if m.std_frequency else m.frequency }}</td>
+                        <td><span class="badge badge-{{ 'success' if m.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'medication', {{ m.id }})" title="Click to toggle" role="button" tabindex="0">{{ m.status }}</span></td>
                         <td class="price-cell" data-med-id="{{ m.id }}"><span class="price-badge price-loading" title="Loading..."></span></td>
                     </tr>
                     {% endfor %}
@@ -236,8 +239,8 @@
                     <tr data-category="{{ d.diagnosis_category or 'chronic' }}" data-status="{{ d.status }}" data-dx-id="{{ d.id }}" class="{% if d.status != 'active' %}row-inactive{% endif %}">
                         <td class="fw-500 cell-clip" title="{{ d.diagnosis_name }}">{{ d.diagnosis_name }}</td>
                         <td class="mono">{{ d.icd10_code }}</td>
-                        <td><span class="badge badge-{{ 'warning' if d.diagnosis_category == 'acute' else 'info' }} badge-toggle" onclick="toggleDxCategory(this, '{{ mrn_display }}', {{ d.id }})" style="cursor:pointer;" title="Click to toggle">{{ d.diagnosis_category or 'chronic' }}</span></td>
-                        <td><span class="badge badge-{{ 'success' if d.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'diagnosis', {{ d.id }})" style="cursor:pointer;" title="Click to toggle">{{ d.status }}</span></td>
+                        <td><span class="badge badge-{{ 'warning' if d.diagnosis_category == 'acute' else 'info' }} badge-toggle" onclick="toggleDxCategory(this, '{{ mrn_display }}', {{ d.id }})" title="Click to toggle" role="button" tabindex="0">{{ d.diagnosis_category or 'chronic' }}</span></td>
+                        <td><span class="badge badge-{{ 'success' if d.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'diagnosis', {{ d.id }})" title="Click to toggle" role="button" tabindex="0">{{ d.status }}</span></td>
                         <td><button class="btn btn-sm" style="color:var(--color-red,#ef4444);font-size:11px;padding:1px 5px;background:none;border:none;cursor:pointer;" onclick="removeDiagnosis('{{ mrn_display }}', {{ d.id }}, this)" title="Remove diagnosis">✕</button></td>
                     </tr>
                     {% endfor %}
@@ -279,7 +282,7 @@
             <div class="lab-overdue-alert">
                 <strong>&#9888; Overdue:</strong>
                 {% for lt in overdue_labs %}
-                <span class="badge badge-danger">{{ lt.lab_name }}</span>
+                <span class="badge badge--danger">{{ lt.lab_name }}</span>
                 {% endfor %}
             </div>
             {% endif %}
@@ -502,6 +505,8 @@
                     <span>{{ g.gap_type }}</span>
                     {% if g.due_date %}<span class="text-muted text-sm">Due: {{ g.due_date.strftime('%m/%d/%Y') }}</span>{% endif %}
                 </div>
+                {% else %}
+                <p class="widget-empty" style="margin:8px 0 0;">All care gaps addressed &#10003;</p>
                 {% endfor %}
             </div>
             {% endif %}
@@ -528,7 +533,7 @@
             <div class="risk-score-grid">
                 {% if bmi %}
                 {% set bmi_color = 'var(--success,#27ae60)' if bmi.score_label == 'normal' else ('var(--warning,#e67e22)' if bmi.score_label in ('overweight','obesity_class_1') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
                     <div class="risk-card-header">
                         <span class="risk-name">BMI</span>
                         <span class="risk-badge" style="background:{{ bmi_color }}">{{ bmi.score_label|replace('_',' ')|title if bmi.score_label else '' }}</span>
@@ -542,7 +547,7 @@
                 {% endif %}
                 {% if ldl %}
                 {% set ldl_color = 'var(--success,#27ae60)' if ldl.score_label in ('optimal','near_optimal') else ('var(--warning,#e67e22)' if ldl.score_label in ('borderline_high','high') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
                     <div class="risk-card-header">
                         <span class="risk-name">LDL</span>
                         <span class="risk-badge" style="background:{{ ldl_color }}">{{ ldl.score_label|replace('_',' ')|title if ldl.score_label else '' }}</span>
@@ -556,7 +561,7 @@
                 {% endif %}
                 {% if pack_years %}
                 {% set py_color = 'var(--success,#27ae60)' if pack_years.score_label == 'never_smoker' else ('var(--warning,#e67e22)' if 'light' in (pack_years.score_label or '') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
                     <div class="risk-card-header">
                         <span class="risk-name">Pack Years</span>
                         <span class="risk-badge" style="background:{{ py_color }}">{{ pack_years.score_label|replace('_',' ')|title if pack_years.score_label else '' }}</span>
@@ -570,7 +575,7 @@
                 {% endif %}
                 {% if prevent %}
                 {% set prev_color = 'var(--success,#27ae60)' if prevent.score_label == 'low' else ('var(--warning,#e67e22)' if prevent.score_label in ('borderline','intermediate') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)">
+                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
                     <div class="risk-card-header">
                         <span class="risk-name">PREVENT</span>
                         <span class="risk-badge" style="background:{{ prev_color }}">{{ prevent.score_label|replace('_',' ')|title if prevent.score_label else '' }}</span>
@@ -643,8 +648,8 @@
             <div id="add-specialist-form" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
                 <input type="text" id="spec-specialty" placeholder="Specialty (e.g. Cardiology)" class="widget-input">
                 <input type="text" id="spec-name" placeholder="Provider name" class="widget-input">
-                <input type="text" id="spec-phone" placeholder="Phone" class="widget-input">
-                <input type="text" id="spec-fax" placeholder="Fax" class="widget-input">
+                <input type="tel" id="spec-phone" placeholder="Phone" class="widget-input">
+                <input type="tel" id="spec-fax" placeholder="Fax" class="widget-input">
                 <input type="text" id="spec-notes" placeholder="Notes" class="widget-input">
                 <div style="display:flex;gap:6px;margin-top:4px;">
                     <button class="btn btn-sm btn-primary" onclick="saveSpecialist()">Save</button>
@@ -727,18 +732,60 @@
         <div class="widget-resize-handle"></div>
     </div>
 
+    {# ---- PRIOR NOTES WIDGET ---- #}
+    <div class="widget fw-widget" data-widget="prior-notes" data-widget-id="prior-notes" data-tab-group="notes" data-col="0" data-row="2" data-w="2" data-h="1">
+        <div class="widget-header" data-drag-handle>
+            <span class="widget-title">&#128196; Prior Notes</span>
+            <div class="widget-controls">
+                <select class="widget-filter" id="notes-filter" onchange="filterPriorNotes(this.value)">
+                    <option value="all" selected>All Types</option>
+                    <option value="Progress Note">Progress Notes</option>
+                    <option value="Annual Wellness">AWV</option>
+                    <option value="Hospital Discharge">Discharge</option>
+                    <option value="Phone Call">Phone Calls</option>
+                </select>
+                <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
+            </div>
+        </div>
+        <div class="widget-body" style="max-height:500px;overflow-y:auto;">
+            {% if encounter_notes %}
+            <div class="prior-notes-list" id="prior-notes-list">
+                {% for note in encounter_notes %}
+                <div class="prior-note-card" data-note-type="{{ note.note_type }}">
+                    <div class="prior-note-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+                        <div class="prior-note-meta">
+                            <span class="badge badge-info" style="font-size:10px;">{{ note.note_type }}</span>
+                            <span class="prior-note-date">{{ note.encounter_date.strftime('%m/%d/%Y') if note.encounter_date else 'Unknown' }}</span>
+                            {% if note.provider_name %}<span class="prior-note-provider">{{ note.provider_name }}</span>{% endif %}
+                            {% if note.location %}<span class="text-muted text-sm">{{ note.location }}</span>{% endif %}
+                        </div>
+                        <span class="prior-note-expand" title="Toggle note text">&#9660;</span>
+                    </div>
+                    <div class="prior-note-body" style="display:none;">
+                        <pre class="prior-note-text">{{ note.note_text }}</pre>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="widget-empty">No prior notes loaded — notes appear after importing a clinical summary.</p>
+            {% endif %}
+        </div>
+        <div class="widget-resize-handle"></div>
+    </div>
+
     {# ---- BILLING OPPORTUNITIES WIDGET — async loaded ---- #}
     <div class="widget fw-widget" data-widget="billing" data-widget-id="billing" data-tab-group="billing" data-col="0" data-row="3" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128176; Billing Opportunities</span>
             <div class="widget-controls">
-                <span id="billing-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-green,#27ae60);color:#fff;font-weight:600;"></span>
+                <span id="billing-badge" class="widget-count-badge" style="background:var(--color-green,#27ae60);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="billing-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Checking billing opportunities...
             </div>
         </div>
@@ -750,13 +797,13 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128337; CCM Status</span>
             <div class="widget-controls">
-                <span id="ccm-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-teal,#1abc9c);color:#fff;font-weight:600;"></span>
+                <span id="ccm-badge" class="widget-count-badge" style="background:var(--color-teal,#1abc9c);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="ccm-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Checking CCM enrollment...
             </div>
         </div>
@@ -809,13 +856,13 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128300; Lab Interpretation</span>
             <div class="widget-controls">
-                <span id="lab-interp-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-red,#e74c3c);color:#fff;font-weight:600;"></span>
+                <span id="lab-interp-badge" class="widget-count-badge" style="background:var(--color-red,#e74c3c);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="lab-interp-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Analyzing lab results...
             </div>
         </div>
@@ -828,13 +875,13 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128165; Drug Safety</span>
             <div class="widget-controls">
-                <span id="safety-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-red,#e74c3c);color:#fff;font-weight:600;"></span>
+                <span id="safety-badge" class="widget-count-badge" style="background:var(--color-red,#e74c3c);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="drug-safety-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Checking recalls &amp; interactions...
             </div>
         </div>
@@ -852,8 +899,8 @@
             </div>
         </div>
         <div class="widget-body" id="guidelines-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Loading PubMed guidelines...
             </div>
         </div>
@@ -871,8 +918,8 @@
             </div>
         </div>
         <div class="widget-body" id="formulary-gaps-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Analyzing medication coverage...
             </div>
         </div>
@@ -890,8 +937,8 @@
             </div>
         </div>
         <div class="widget-body" id="education-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Loading patient education content...
             </div>
         </div>
@@ -905,13 +952,13 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128300; Clinical Trials Near You</span>
             <div class="widget-controls">
-                <span id="trials-badge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-teal,#0D7377);color:#fff;font-weight:600;"></span>
+                <span id="trials-badge" class="widget-count-badge" style="background:var(--color-teal,#0D7377);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="clinical-trials-body">
-            <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-                <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+            <div class="widget-loading">
+                <span class="loading-spinner"></span>
                 Searching recruiting trials...
             </div>
         </div>
@@ -922,20 +969,20 @@
 </div>
 
 {# ---- ICD-10 LOOKUP MODAL ---- #}
-<div id="icd10-lookup-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:600px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-lg);">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);background:var(--bg-muted,#f8fafc);">
-            <h3 style="margin:0;font-size:16px;">&#128270; ICD-10 Code Lookup (NIH)</h3>
-            <button class="btn btn-sm btn-outline" onclick="document.getElementById('icd10-lookup-modal').style.display='none'">&#10005;</button>
+<div id="icd10-lookup-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--lg" style="max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="cc-modal__header" style="background:var(--bg-muted,#f8fafc);">
+            <h3 class="cc-modal__title">&#128270; ICD-10 Code Lookup (NIH)</h3>
+            <button class="cc-modal__close" onclick="document.getElementById('icd10-lookup-modal').style.display='none'">&#10005;</button>
         </div>
         <div style="padding:14px 20px;">
-            <div style="display:flex;gap:8px;">
+            <div class="action-bar">
                 <input type="text" id="icd10-search-input" class="form-input" placeholder="Search diagnoses or codes..." style="flex:1;" onkeydown="if(event.key==='Enter')searchICD10()">
                 <button class="btn btn-primary btn-sm" onclick="searchICD10()">Search</button>
             </div>
         </div>
         <div id="icd10-results" style="flex:1;overflow-y:auto;padding:0 20px 14px;font-size:13px;">
-            <p style="text-align:center;color:var(--text-secondary);">Enter a term to search the NIH ICD-10 database.</p>
+            <p class="text-center text-muted">Enter a term to search the NIH ICD-10 database.</p>
         </div>
     </div>
 </div>
@@ -1014,7 +1061,7 @@
 .widget-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border,#f1f5f9);background:var(--bg-muted,#f8fafc);flex-shrink:0;user-select:none;}
 .widget-title{font-weight:600;font-size:14px;}
 .widget-controls{display:flex;align-items:center;gap:6px;}
-.widget-body{flex:1;overflow:auto;padding:10px 14px;font-size:13px;user-select:text;min-height:0;}
+.widget-body{flex:1;overflow-x:hidden;overflow-y:auto;padding:10px 14px;font-size:13px;user-select:text;min-height:0;}
 .widget-footer-count{margin-top:8px;font-size:11px;color:var(--text-secondary);text-align:right;}
 .widget-empty{color:var(--text-secondary,#64748b);margin:12px 0;text-align:center;font-style:italic;}
 .widget-filter{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#fff);color:var(--text-primary);}
@@ -1030,18 +1077,33 @@
 .widget-table th{padding:5px 8px;text-align:left;border-bottom:2px solid var(--border,#e2e8f0);font-weight:600;font-size:11px;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.3px;}
 .widget-table td{padding:5px 8px;border-bottom:1px solid var(--border,#f1f5f9);}
 .widget-table td.cell-clip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+
+/* Medication table — fixed layout, no horizontal scroll */
+.med-table{table-layout:fixed;width:100%;}
+.med-col-name{width:42%;}
+.med-col-dose{width:22%;}
+.med-col-freq{width:14%;}
+.med-col-status{width:14%;}
+.med-col-price{width:8%;}
+.med-table td.cell-clip{max-width:none;}
+.med-dose-cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fw-500{font-weight:500;}
 .mono{font-family:monospace;font-size:11px;}
 .text-muted{color:var(--text-secondary,#64748b)!important;}
 .text-sm{font-size:11px;}
 
-/* Badges */
+/* Badges — use main.css .badge--* classes; local overrides for chart-specific sizing */
 .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:500;}
-.badge-success{background:var(--bg-success,#dcfce7);color:var(--text-success,#166534);}
-.badge-muted{background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);}
-.badge-warning{background:var(--bg-warning,#fef3c7);color:#92400e;}
-.badge-danger{background:var(--bg-danger,#fee2e2);color:var(--color-red,#dc2626);}
-.badge-info{background:#dbeafe;color:#1e40af;}
+.badge--success{background:var(--bg-success,#dcfce7);color:var(--text-success,#166534);}
+.badge--muted{background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);}
+.badge--warning{background:var(--bg-warning,#fef3c7);color:#92400e;}
+.badge--danger{background:var(--bg-danger,#fee2e2);color:var(--color-red,#dc2626);}
+.badge--info{background:#dbeafe;color:#1e40af;}
+
+/* Dx Revenue Optimization cards */
+.dx-rev-card{padding:6px 8px;margin:4px 0;background:var(--bg-muted,#f8fafc);border-left:3px solid var(--color-gold,#f59e0b);border-radius:4px;font-size:12px;}
+.dx-rev-alt{display:flex;align-items:center;gap:6px;padding:2px 0 2px 8px;font-size:11px;border-bottom:1px dotted var(--border,#e2e8f0);}
+.dx-rev-alt:last-child{border-bottom:none;}
 
 /* Labs simple */
 .lab-simple-list{display:flex;flex-direction:column;gap:4px;}
@@ -1085,6 +1147,18 @@
 .note-gen-check input{margin:0;width:14px;height:14px;}
 .note-label{display:block;font-weight:600;font-size:12px;margin-bottom:3px;color:var(--text-primary);}
 .note-textarea{width:100%;min-height:50px;resize:vertical;font-family:monospace;font-size:12px;padding:6px 8px;border:1px solid var(--border,#e2e8f0);border-radius:4px;background:var(--bg-input,#fff);color:var(--text-primary);}
+
+/* Prior Notes */
+.prior-notes-list{display:flex;flex-direction:column;gap:6px;}
+.prior-note-card{border:1px solid var(--border,#e2e8f0);border-radius:6px;overflow:hidden;}
+.prior-note-header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-muted,#f8fafc);cursor:pointer;user-select:none;}
+.prior-note-header:hover{background:var(--bg-hover,#f1f5f9);}
+.prior-note-meta{display:flex;align-items:center;gap:8px;font-size:12px;flex-wrap:wrap;}
+.prior-note-date{font-weight:600;color:var(--text-primary);}
+.prior-note-provider{color:var(--text-secondary);}
+.prior-note-expand{font-size:10px;color:var(--text-secondary);transition:transform 0.2s;}
+.prior-note-body{padding:10px 14px;border-top:1px solid var(--border,#f1f5f9);}
+.prior-note-text{font-family:monospace;font-size:11px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;margin:0;color:var(--text-primary);background:none;border:none;padding:0;}
 
 /* ============= LAB DETAIL MODAL ============= */
 .lab-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:5000;display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -1214,9 +1288,10 @@ function toggleDxCategory(badge, mrn, dxId) {
             badge.textContent = data.new_category;
             var tr = badge.closest('tr');
             tr.setAttribute('data-category', data.new_category);
-            badge.className = 'badge badge-' + (data.new_category === 'acute' ? 'warning' : 'info') + ' badge-toggle';
+            badge.className = 'badge badge--' + (data.new_category === 'acute' ? 'warning' : 'info') + ' badge-toggle';
         }
-    });
+    })
+    .catch(function() { showError('Failed to toggle diagnosis category'); });
 }
 
 /* ---- Toggle Status (active ↔ inactive, for meds or diagnoses) ---- */
@@ -1228,14 +1303,15 @@ function toggleItemStatus(badge, mrn, itemType, itemId) {
             badge.textContent = data.new_status;
             var tr = badge.closest('tr');
             tr.setAttribute('data-status', data.new_status);
-            badge.className = 'badge badge-' + (data.new_status === 'active' ? 'success' : 'muted') + ' badge-toggle';
+            badge.className = 'badge badge--' + (data.new_status === 'active' ? 'success' : 'muted') + ' badge-toggle';
             if (data.new_status === 'active') {
                 tr.classList.remove('row-inactive');
             } else {
                 tr.classList.add('row-inactive');
             }
         }
-    });
+    })
+    .catch(function() { showError('Failed to toggle item status'); });
 }
 
 /* ---- Add Diagnosis from ICD-10 Lookup (UX-20) ---- */
@@ -1259,8 +1335,8 @@ function addDiagnosisFromLookup(code, name) {
                 tr.innerHTML =
                     '<td class="fw-500 cell-clip" title="' + escHtml(name) + '">' + escHtml(name) + '</td>' +
                     '<td class="mono">' + escHtml(code) + '</td>' +
-                    '<td><span class="badge badge-info badge-toggle" onclick="toggleDxCategory(this,\'' + mrn + '\',' + data.data.id + ')" style="cursor:pointer;" title="Click to toggle">chronic</span></td>' +
-                    '<td><span class="badge badge-success badge-toggle" onclick="toggleItemStatus(this,\'' + mrn + '\',\'diagnosis\',' + data.data.id + ')" style="cursor:pointer;" title="Click to toggle">active</span></td>' +
+                    '<td><span class="badge badge--info badge-toggle" onclick="toggleDxCategory(this,\'' + mrn + '\',' + data.data.id + ')" title="Click to toggle">chronic</span></td>' +
+                    '<td><span class="badge badge--success badge-toggle" onclick="toggleItemStatus(this,\'' + mrn + '\',\'diagnosis\',' + data.data.id + ')" title="Click to toggle">active</span></td>' +
                     '<td><button class="btn btn-sm" style="color:var(--color-red,#ef4444);font-size:11px;padding:1px 5px;background:none;border:none;cursor:pointer;" onclick="removeDiagnosis(\'' + mrn + '\',' + data.data.id + ',this)" title="Remove diagnosis">✕</button></td>';
                 tbody.appendChild(tr);
             }
@@ -1289,11 +1365,12 @@ function removeDiagnosis(mrn, dxId, btn) {
                 var statusBadge = tr.querySelector('[data-status] .badge-toggle, td:nth-child(4) .badge-toggle');
                 if (statusBadge) {
                     statusBadge.textContent = 'resolved';
-                    statusBadge.className = 'badge badge-muted badge-toggle';
+                    statusBadge.className = 'badge badge--muted badge-toggle';
                 }
             }
         }
-    });
+    })
+    .catch(function() { showError('Failed to remove diagnosis'); });
 }
 
 /* ---- Claim Patient ---- */
@@ -1313,7 +1390,8 @@ function claimPatient(mrn) {
             btn.innerHTML = '&#10003; Claimed';
             btn.className = 'btn btn-sm btn-outline';
         }
-    });
+    })
+    .catch(function() { showError('Failed to claim patient'); });
 }
 
 /* ---- Demographics Edit ---- */
@@ -1339,8 +1417,9 @@ function saveDemographics() {
     .then(function(r){return r.json();})
     .then(function(data) {
         if (data.success) { location.reload(); }
-        else { alert('Failed to update demographics.'); }
-    });
+        else { showError('Failed to update demographics'); }
+    })
+    .catch(function() { showError('Failed to save demographics'); });
 }
 
 /* ---- Edit Mode (drag/resize) ---- */
@@ -1476,7 +1555,8 @@ function saveWidgetLayout() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({layout: layout})
-    });
+    })
+    .catch(function() { showError('Failed to save widget layout'); });
 }
 
 /* ---- Restore Widget Layout ---- */
@@ -1515,6 +1595,15 @@ function filterMeds(val) {
 }
 /* Auto-filter to active on load */
 filterMeds('active');
+
+/* ---- Prior Notes Filter ---- */
+function filterPriorNotes(val) {
+    var cards = document.querySelectorAll('.prior-note-card');
+    cards.forEach(function(c) {
+        if (val === 'all') c.style.display = '';
+        else c.style.display = c.getAttribute('data-note-type') === val ? '' : 'none';
+    });
+}
 
 /* ---- Diagnosis Filter ---- */
 function filterDiagnoses(val) {
@@ -1624,7 +1713,8 @@ function saveSpecialist() {
         body: JSON.stringify(data)
     }).then(function(r){ return r.json(); }).then(function(d){
         if (d.success) location.reload();
-    });
+    })
+    .catch(function() { showError('Failed to save specialist'); });
 }
 function deleteSpecialist(id) {
     if (!confirm('Remove this specialist?')) return;
@@ -1634,7 +1724,8 @@ function deleteSpecialist(id) {
             var card = document.querySelector('.specialist-card[data-id="' + id + '"]');
             if (card) card.remove();
         }
-    });
+    })
+    .catch(function() { showError('Failed to remove specialist'); });
 }
 
 /* ---- Note Generator (Phase 18 — Preview-first workflow) ---- */
@@ -2281,6 +2372,37 @@ document.addEventListener('keydown', function(e) {
         .catch(function() {
             el.innerHTML = '<p style="color:var(--text-secondary);text-align:center;font-size:12px;">Billing data unavailable</p>';
         });
+})();
+
+/* Dx Revenue Optimization — suggests higher-revenue same-family ICD-10 codes */
+(function loadDxRevenue() {
+    var billingBody = document.getElementById('billing-body');
+    if (!billingBody) return;
+    fetch('/api/patient/' + MRN + '/dx-revenue-suggestions')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var suggs = data.suggestions || [];
+            if (suggs.length === 0) return;
+            var html = '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border,#e2e8f0);">' +
+                '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--text-secondary);margin-bottom:6px;">&#128200; Dx Code Optimization</div>';
+            suggs.forEach(function(s) {
+                html += '<div class="dx-rev-card">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                    '<span class="mono" style="font-size:11px;color:var(--text-secondary);">' + escHtml(s.current_code) + '</span>' +
+                    '<span style="font-size:10px;color:var(--text-secondary);">$' + (s.current_per_encounter || 0).toFixed(0) + '/visit</span></div>' +
+                    '<div style="font-size:11px;margin:2px 0 4px;">' + escHtml(s.current_name).substring(0, 60) + '</div>';
+                s.alternatives.forEach(function(a) {
+                    html += '<div class="dx-rev-alt" title="' + escHtml(a.description) + '">' +
+                        '<span class="mono fw-500">' + escHtml(a.code) + '</span> ' +
+                        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(a.description).substring(0, 45) + '</span>' +
+                        '<span style="color:var(--color-green,#27ae60);font-weight:600;white-space:nowrap;">+$' + a.delta.toFixed(0) + '</span></div>';
+                });
+                html += '</div>';
+            });
+            html += '<div style="font-size:10px;color:var(--text-secondary);margin-top:4px;font-style:italic;">Same-family codes only. Verify clinical appropriateness before changing.</div></div>';
+            billingBody.insertAdjacentHTML('beforeend', html);
+        })
+        .catch(function() { /* silent — supplemental data */ });
 })();
 
 /* CCM Status Widget (Phase 19.13) */

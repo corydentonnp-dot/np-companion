@@ -3,12 +3,15 @@
 {% block page_id %}timer{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Billing Audit Log</h1>
-    <div style="display:flex;gap:8px;margin-left:auto;">
-        <a href="/billing/em-calculator" style="padding:6px 14px;border-radius:6px;background:var(--color-lt-blue);color:var(--color-navy);font-size:13px;font-weight:600;text-decoration:none;">E&M Calculator</a>
-        <a href="/billing/monthly-report" style="padding:6px 14px;border-radius:6px;background:var(--color-lt-blue);color:var(--color-navy);font-size:13px;font-weight:600;text-decoration:none;">Monthly Report</a>
-        <a href="/billing/log/export?start={{ start }}&end={{ end }}" style="padding:6px 14px;border-radius:6px;background:var(--color-navy);color:#fff;font-size:13px;text-decoration:none;">Export PDF</a>
+<div class="page-header">
+    <div>
+        <a href="{{ url_for('timer.index') }}" class="page-header__back">&larr; Back to Timer</a>
+        <h1 class="page-header__title">Billing Audit Log</h1>
+    </div>
+    <div class="page-header__actions">
+        <a href="/billing/em-calculator" class="btn btn-sm btn-outline">E&M Calculator</a>
+        <a href="/billing/monthly-report" class="btn btn-sm btn-outline">Monthly Report</a>
+        <a href="/billing/log/export?start={{ start }}&end={{ end }}" class="btn btn-sm btn-primary">Export PDF</a>
     </div>
 </div>
 
@@ -63,7 +66,7 @@
     {% for e in entries %}
     <tr style="border-bottom:1px solid var(--border,#f1f5f9);{% if e.anomalies %}background:#fef3c7;{% endif %}" id="row-{{ e.session.id }}">
         <td style="padding:8px 6px;">{{ e.session.session_start.strftime('%Y-%m-%d %H:%M') if e.session.session_start else '' }}</td>
-        <td style="padding:8px 6px;">{{ e.session.mrn[-4:] if e.session.mrn and e.session.mrn|length >= 4 else e.session.mrn }}</td>
+        <td style="padding:8px 6px;">{{ e.session.mrn }}</td>
         <td style="padding:8px 6px;">{{ e.session.visit_type or '—' }}</td>
         <td style="padding:8px 6px;">{{ ((e.session.duration_seconds or 0) / 60)|round(1) }}</td>
         <td style="padding:8px 6px;">{{ ((e.session.face_to_face_seconds or 0) / 60)|round(1) }}</td>

@@ -219,6 +219,63 @@ def patient_billing_stack(mrn):
     return jsonify({'stack': stack, 'templates': builder.get_available_templates()})
 
 
+@intel_bp.route('/api/patient/<mrn>/dx-revenue-suggestions')
+@login_required
+def dx_revenue_suggestions(mrn):
+    """
+    Suggest same-family ICD-10 codes with higher historical revenue.
+
+    Compares the patient's current diagnosis codes against practice revenue
+    data and returns alternatives within the same 3-character ICD-10 family
+    that have higher per-encounter reimbursement. Never suggests codes from
+    a different diagnostic family — ensures clinical appropriateness.
+    """
+    import re as _re
+    from models.patient import PatientDiagnosis
+    from billing_engine.utils import get_icd10_revenue, find_revenue_alternatives
+
+    if not mrn or not _re.match(r'^[A-Za-z0-9\-]{1,20}$', mrn):
+        return jsonify({'suggestions': []})
+
+    diagnoses = PatientDiagnosis.query.filter_by(
+        user_id=current_user.id, mrn=mrn, status='active'
+    ).all()
+
+    suggestions = []
+    seen_codes = set()
+
+    for dx in diagnoses:
+        code = (dx.icd10_code or '').strip().upper()
+        if not code or code in seen_codes:
+            continue
+        seen_codes.add(code)
+
+        current_rev = get_icd10_revenue(code)
+        alts = find_revenue_alternatives(code)
+        if not alts:
+            continue
+
+        suggestions.append({
+            'current_code': code,
+            'current_name': dx.diagnosis_name,
+            'current_per_encounter': current_rev['per_encounter'] if current_rev else 0,
+            'alternatives': [{
+                'code': a['code'],
+                'description': a['description'],
+                'per_encounter': a['per_encounter'],
+                'delta': a['delta'],
+                'tier': a['tier'],
+            } for a in alts[:3]],  # Top 3 alternatives per diagnosis
+        })
+
+    # Sort by highest potential delta first
+    suggestions.sort(
+        key=lambda s: s['alternatives'][0]['delta'] if s['alternatives'] else 0,
+        reverse=True,
+    )
+    return jsonify({'suggestions': suggestions})
+
+
 # ======================================================================
 # Clinical Spell Check / Fuzzy Matcher
 # ======================================================================
@@ -1409,10 +1466,10 @@ def auto_draft_education_message(user_id, mrn, new_meds):
 
     if drafts_created > 0:
         # Create a notification for the provider (HIPAA-safe: MRN last 4 only)
-        mrn_tail = mrn[-4:] if len(mrn) >= 4 else mrn
+        mrn_tail = mrn
         notif = Notification(
             user_id=user_id,
-            message=f"📋 {drafts_created} new medication education draft{'s' if drafts_created != 1 else ''} created for ••{mrn_tail}",
+            message=f"📋 {drafts_created} new medication education draft{'s' if drafts_created != 1 else ''} created for {mrn_tail}",
             priority=2,
         )
         db.session.add(notif)
@@ -1702,7 +1759,7 @@ def morning_briefing():
             )
             for e in entries:
                 monitoring_due.append({
-                    'mrn_display': f'...{mrn[-4:]}' if mrn else '????',
+                    'mrn_display': mrn or '????',
                     'lab_name': e.lab_name,
                     'next_due_date': str(e.next_due_date) if e.next_due_date else '',
                     'clinical_indication': e.clinical_indication or '',
@@ -1718,7 +1775,7 @@ def morning_briefing():
             ).all()
             for r in rems:
                 monitoring_rems.append({
-                    'mrn_display': f'...{mrn[-4:]}' if mrn else '????',
+                    'mrn_display': mrn or '????',
                     'rems_program_name': r.rems_program_name,
                     'next_due_date': str(r.next_due_date) if r.next_due_date else '',
                     'escalation_level': r.escalation_level,
@@ -1749,11 +1806,11 @@ def morning_briefing():
             age = pr.age if pr and pr.age else 0
             gaps = get_series_gaps(mrn_hash, current_user.id, age, today)
             for g in gaps:
-                g['mrn_display'] = f'...{mrn[-4:]}' if mrn else '????'
+                g['mrn_display'] = mrn or '????'
                 imm_gaps.append(g)
             seasonal = get_seasonal_alerts(age, today)
             for s in seasonal:
-                s['mrn_display'] = f'...{mrn[-4:]}' if mrn else '????'
+                s['mrn_display'] = mrn or '????'
                 imm_seasonal.append(s)
     except Exception as e:
         logger.debug('Immunization briefing data failed: %s', e)
@@ -1984,7 +2041,7 @@ def viis_immunizations(mrn):
         result = asyncio.run(scraper.lookup_patient(first_name, last_name, dob))
         return jsonify(result)
     except Exception as e:
-        logger.debug('VIIS lookup failed for MRN %s: %s', mrn, e)
+        logger.debug('VIIS lookup failed for MRN ••%s: %s', mrn[-4:], e)
         return jsonify({'success': False, 'error': f'VIIS lookup failed: {e}'}), 503
 
 
@@ -2052,7 +2109,7 @@ def pdmp_lookup(mrn):
         result['flags'] = flags
         return jsonify(result)
     except Exception as e:
-        logger.debug('PDMP lookup failed for MRN %s: %s', mrn, e)
+        logger.debug('PDMP lookup failed for MRN ••%s: %s', mrn[-4:], e)
         return jsonify({'success': False, 'error': f'PDMP lookup failed: {e}'}), 503
 
 

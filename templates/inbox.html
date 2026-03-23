@@ -36,8 +36,8 @@
 {% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-    <h1 style="margin:0;">
+<div class="page-header">
+    <h1 class="page-header__title">
         {% if view is defined and view == 'held' %}Held Items
         {% elif view is defined and view == 'audit' %}Inbox Audit Log
         {% else %}Inbox Monitor{% endif %}
@@ -47,7 +47,7 @@
 {% if view is defined and view == 'digest' %}
 {# ---- Digest Report View (F5e) ---- #}
 <div class="card" style="max-width:900px;margin-bottom:24px;">
-    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="card-header action-bar" style="justify-content:space-between;">
         Inbox Digest — Past {{ digest_hours }}h
         <a href="/inbox/digest?hours={{ digest_hours }}&format=csv" class="btn btn-sm btn-outline">Export CSV</a>
     </div>
@@ -65,33 +65,33 @@
         </form>
 
         {# ---- Summary Stats ---- #}
-        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:24px;">
-            <div style="text-align:center;">
-                <div style="font-size:28px;font-weight:700;color:var(--color-green);">+{{ digest.period_new }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">New Items</div>
+        <div class="stat-grid">
+            <div class="stat-block">
+                <div class="stat-value" style="color:var(--color-green);">+{{ digest.period_new }}</div>
+                <div class="stat-label">New Items</div>
             </div>
-            <div style="text-align:center;">
-                <div style="font-size:28px;font-weight:700;color:var(--color-teal);">-{{ digest.period_resolved }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Resolved</div>
+            <div class="stat-block">
+                <div class="stat-value" style="color:var(--color-teal);">-{{ digest.period_resolved }}</div>
+                <div class="stat-label">Resolved</div>
             </div>
-            <div style="text-align:center;">
-                <div style="font-size:28px;font-weight:700;">{{ digest.still_unresolved }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Unresolved</div>
+            <div class="stat-block">
+                <div class="stat-value">{{ digest.still_unresolved }}</div>
+                <div class="stat-label">Unresolved</div>
             </div>
             {% if digest.critical_seen %}
-            <div style="text-align:center;">
-                <div style="font-size:28px;font-weight:700;color:var(--color-red);">{{ digest.critical_seen }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Critical</div>
+            <div class="stat-block">
+                <div class="stat-value" style="color:var(--color-red);">{{ digest.critical_seen }}</div>
+                <div class="stat-label">Critical</div>
             </div>
             {% endif %}
-            <div style="text-align:center;">
-                <div style="font-size:28px;font-weight:700;color:var(--color-gold);">{{ digest.held_count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Held</div>
+            <div class="stat-block">
+                <div class="stat-value" style="color:var(--color-gold);">{{ digest.held_count }}</div>
+                <div class="stat-label">Held</div>
             </div>
             {% if digest.overdue_count %}
-            <div style="text-align:center;">
-                <div style="font-size:28px;font-weight:700;color:var(--color-red);">{{ digest.overdue_count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">Overdue</div>
+            <div class="stat-block">
+                <div class="stat-value" style="color:var(--color-red);">{{ digest.overdue_count }}</div>
+                <div class="stat-label">Overdue</div>
             </div>
             {% endif %}
         </div>
@@ -111,7 +111,7 @@
         {# ---- Category Breakdown ---- #}
         {% if digest.category_breakdown %}
         <h3 style="font-size:14px;margin:16px 0 8px;">New Items by Category</h3>
-        <table class="table" style="max-width:400px;">
+        <table class="data-table data-table--compact" style="max-width:400px;">
             <thead><tr><th>Category</th><th>Count</th></tr></thead>
             <tbody>
             {% for cat, count in digest.category_breakdown.items() %}
@@ -124,11 +124,11 @@
         {# ---- Current Totals ---- #}
         {% if digest.current_totals %}
         <h3 style="font-size:14px;margin:16px 0 8px;">Current Inbox Totals (Latest Snapshot)</h3>
-        <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div class="stat-grid">
             {% for cat, count in digest.current_totals.items() %}
-            <div style="text-align:center;">
-                <div style="font-size:20px;font-weight:600;">{{ count }}</div>
-                <div style="font-size:12px;color:var(--text-secondary);">{{ cat|capitalize }}</div>
+            <div class="stat-block">
+                <div class="stat-value--sm">{{ count }}</div>
+                <div class="stat-label">{{ cat|capitalize }}</div>
             </div>
             {% endfor %}
         </div>
@@ -139,12 +139,12 @@
 {% elif view is defined and view == 'audit' %}
 {# ---- Audit Log View ---- #}
 <div class="card" style="max-width:900px;">
-    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="card-header action-bar" style="justify-content:space-between;">
         Review Timestamp Log
         <a href="/inbox/audit-log?format=csv{% if start %}&start={{ start }}{% endif %}{% if end %}&end={{ end }}{% endif %}" class="btn btn-sm btn-outline">Export CSV</a>
     </div>
     <div class="card-body" style="padding:0;">
-        <form style="padding:12px;display:flex;gap:8px;align-items:end;">
+        <form class="form-row" style="padding:12px;">
             <div>
                 <label style="font-size:12px;">Start</label>
                 <input type="date" name="start" class="form-control" value="{{ start }}" style="width:160px;">
@@ -156,7 +156,7 @@
             <button type="submit" class="btn btn-sm btn-primary">Filter</button>
         </form>
         {% if snapshots %}
-        <table class="table" style="margin:0;">
+        <table class="data-table data-table--striped" style="margin:0;">
             <thead>
                 <tr>
                     <th>Timestamp</th>
@@ -194,7 +194,7 @@
     <div class="card-header">Items on Hold</div>
     <div class="card-body" style="padding:0;">
         {% if items %}
-        <table class="table" style="margin:0;">
+        <table class="data-table data-table--striped" style="margin:0;">
             <thead>
                 <tr>
                     <th>Type</th>
@@ -234,7 +234,7 @@
     <div class="card-header">Unresolved Items ({{ items|length }})</div>
     <div class="card-body" style="padding:0;">
         {% if items %}
-        <table class="table" style="margin:0;">
+        <table class="data-table data-table--striped" style="margin:0;">
             <thead>
                 <tr>
                     <th>Age</th>

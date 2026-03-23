@@ -3,17 +3,19 @@
 {% block page_id %}cs-tracker{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Controlled Substance Tracker</h1>
-    <span class="badge badge--success">F25</span>
-    <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-modal').style.display='flex'">+ Add Entry</button>
-    <a href="/cs-tracker/calculator" class="btn btn-outline btn-sm">Refill Calculator</a>
+<div class="page-header">
+    <h1 class="page-header__title">Controlled Substance Tracker</h1>
+    <div class="page-header__actions">
+        <span class="badge badge--success">F25</span>
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('add-modal').classList.add('cc-modal--open')">+ Add Entry</button>
+        <a href="/cs-tracker/calculator" class="btn btn-outline btn-sm">Refill Calculator</a>
+    </div>
 </div>
 
 {% if entries %}
 <div class="card">
     <div class="card-body" style="padding:0;overflow-x:auto;">
-        <table class="schedule-table" style="font-size:13px;">
+        <table class="data-table" style="font-size:13px;">
             <thead>
                 <tr>
                     <th>Patient</th>
@@ -32,7 +34,7 @@
             <tbody>
                 {% for e in entries %}
                 <tr>
-                    <td style="font-weight:500;">{{ e.patient_name or ('••' ~ e.mrn[-4:]) }}</td>
+                    <td style="font-weight:500;">{{ e.patient_name or e.mrn }}</td>
                     <td style="font-weight:600;">{{ e.drug_name }}</td>
                     <td>{% if e.dea_schedule %}<span class="badge badge--danger">C-{{ e.dea_schedule }}</span>{% else %}—{% endif %}</td>
                     <td>{{ e.dose or '—' }}</td>
@@ -85,12 +87,13 @@
 {% endif %}
 
 {# ---- Add Entry Modal ---- #}
-<div id="add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:5000;align-items:center;justify-content:center;">
-    <div style="background:var(--bg-surface,#fff);border-radius:12px;width:500px;max-width:90vw;max-height:85vh;overflow:auto;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <h2 style="margin:0;font-size:18px;">Add Controlled Substance</h2>
-            <button class="btn btn-sm btn-outline" onclick="document.getElementById('add-modal').style.display='none'">&#10005;</button>
+<div id="add-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--md">
+        <div class="cc-modal__header">
+            <h2 class="cc-modal__title">Add Controlled Substance</h2>
+            <button class="cc-modal__close" onclick="document.getElementById('add-modal').classList.remove('cc-modal--open')">&times;</button>
         </div>
+        <div class="cc-modal__body">
         <form id="add-form">
             <div class="form-group"><label class="form-label">Patient Name</label><input type="text" name="patient_name" class="form-input" placeholder="Last, First"></div>
             <div class="form-group"><label class="form-label">MRN</label><input type="text" name="mrn" class="form-input"></div>
@@ -119,6 +122,7 @@
             <div class="form-group"><label class="form-label">Notes</label><textarea name="notes" class="form-input" rows="2"></textarea></div>
             <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;">Add to Tracker</button>
         </form>
+        </div>
     </div>
 </div>
 

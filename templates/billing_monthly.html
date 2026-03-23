@@ -3,16 +3,15 @@
 {% block page_id %}timer{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Monthly Billing Report</h1>
-    <div style="display:flex;gap:8px;margin-left:auto;align-items:center;">
-        <form method="GET" action="/billing/monthly-report" style="display:flex;gap:8px;align-items:center;">
-            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}"
-                   style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
-            <button type="submit" style="padding:6px 14px;border-radius:6px;background:var(--color-navy);color:#fff;border:none;font-size:13px;cursor:pointer;min-height:44px;">Go</button>
+<div class="page-header">
+    <h1 class="page-header__title">Monthly Billing Report</h1>
+    <div class="page-header__actions">
+        <form method="GET" action="/billing/monthly-report" class="form-inline">
+            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}" class="form-input form-input--auto">
+            <button type="submit" class="btn btn-sm btn-primary">Go</button>
         </form>
-        <button onclick="window.print()" style="padding:6px 14px;border-radius:6px;background:var(--color-lt-blue);color:var(--color-navy);border:none;font-size:13px;cursor:pointer;">Print</button>
-        <a href="/billing/log" style="font-size:13px;color:var(--color-navy);">Billing Log</a>
+        <button onclick="window.print()" class="btn btn-sm btn-outline">Print</button>
+        <a href="/billing/log" class="page-header__back">Billing Log</a>
     </div>
 </div>
 

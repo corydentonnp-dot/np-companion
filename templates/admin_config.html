@@ -3,9 +3,11 @@
 {% block page_id %}admin-config{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-    <a href="{{ url_for('admin_hub.admin_dashboard') }}" style="color:var(--text-secondary);text-decoration:none;">&larr; Admin</a>
-    <h1 style="margin:0;">Config Settings</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Config Settings</h1>
+    <div class="page-header__actions">
+        <a href="{{ url_for('admin_hub.admin_dashboard') }}" class="btn btn-outline btn-sm">&larr; Admin</a>
+    </div>
 </div>
 
 {# ---- Pre-live warnings ---------------------------------------------- #}

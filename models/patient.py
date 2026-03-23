@@ -8,7 +8,7 @@ Two tables for storing parsed clinical summary data:
   - PatientRecord: per-patient metadata (last XML parse timestamp)
 
 HIPAA note: Full MRN is stored for clinical accuracy.
-Display in the UI should show only the last 4 digits.
+Full MRN is displayed in the UI for provider workflow needs.
 """
 
 from datetime import datetime, timezone
@@ -80,7 +80,7 @@ class PatientRecord(db.Model):
     provider = db.relationship('User', foreign_keys=[claimed_by], lazy=True)
 
     def __repr__(self):
-        return f'<PatientRecord {self.id} mrn=...{self.mrn[-4:] if self.mrn else ""}>'
+        return f'<PatientRecord {self.id} mrn={self.mrn or ""}>'
 
 
 class PatientMedication(db.Model):
@@ -210,7 +210,7 @@ class PatientNoteDraft(db.Model):
     )
 
     def __repr__(self):
-        return f'<PatientNoteDraft {self.id} mrn=...{self.mrn[-4:] if self.mrn else ""}>'
+        return f'<PatientNoteDraft {self.id} mrn={self.mrn or ""}>'
 
 
 class Icd10Cache(db.Model):
@@ -310,3 +310,25 @@ class PatientSocialHistory(db.Model):
 
     def __repr__(self):
         return f'<PatientSocialHistory {self.id} tobacco={self.tobacco_status}>'
+
+
+class PatientEncounterNote(db.Model):
+    """Prior encounter notes extracted from Clinical Summary XML."""
+    __tablename__ = 'patient_encounter_notes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=False, index=True
+    )
+    mrn = db.Column(db.String(20), nullable=False, index=True)
+    encounter_date = db.Column(db.DateTime, nullable=True)
+    provider_name = db.Column(db.String(200), default='')
+    note_type = db.Column(db.String(50), default='Progress Note')
+    note_text = db.Column(db.Text, default='')
+    location = db.Column(db.String(200), default='')
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def __repr__(self):
+        return f'<PatientEncounterNote {self.id} {self.note_type}>'

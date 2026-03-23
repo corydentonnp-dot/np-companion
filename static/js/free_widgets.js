@@ -90,32 +90,40 @@
         _savePreferenceToServer('chart_free_widget_positions', pos);
     }
 
-    /* ---- Reflow widgets below a resized widget in same column ---- */
-    function _reflowBelow(resizedWidget, container) {
+    /* ---- Resolve overlaps — push overlapping widgets downward ---- */
+    function _resolveOverlaps(container) {
         if (_getMode() !== 'free') return;
         var GAP = 16;
-        var allWidgets = Array.from(container.querySelectorAll('.fw-widget'));
-        var resizedLeft = parseInt(resizedWidget.style.left) || 0;
+        var widgets = Array.from(container.querySelectorAll('.fw-widget'));
+        widgets = widgets.filter(function(w) { return w.style.display !== 'none'; });
 
-        // Find widgets in the same approximate column, sorted by top
-        var colWidgets = allWidgets.filter(function(w) {
-            var left = parseInt(w.style.left) || 0;
-            return Math.abs(left - resizedLeft) < 50;
-        }).sort(function(a, b) {
-            return (parseInt(a.style.top) || 0) - (parseInt(b.style.top) || 0);
-        });
-
-        // Cascade: ensure no overlaps between consecutive widgets
-        for (var i = 0; i < colWidgets.length - 1; i++) {
-            var curr = colWidgets[i];
-            var next = colWidgets[i + 1];
-            var currBottom = (parseInt(curr.style.top) || 0) + curr.offsetHeight;
-            var nextTop = parseInt(next.style.top) || 0;
-            if (currBottom + GAP > nextTop) {
-                next.style.transition = 'top 0.2s ease';
-                next.style.top = (currBottom + GAP) + 'px';
-                setTimeout((function(el) { return function() { el.style.transition = ''; }; })(next), 250);
+        var maxPasses = 3;
+        for (var pass = 0; pass < maxPasses; pass++) {
+            widgets.sort(function(a, b) {
+                return (parseInt(a.style.top) || 0) - (parseInt(b.style.top) || 0);
+            });
+            var moved = false;
+            for (var i = 0; i < widgets.length; i++) {
+                var a = widgets[i];
+                var aL = parseInt(a.style.left) || 0;
+                var aT = parseInt(a.style.top) || 0;
+                var aR = aL + a.offsetWidth;
+                var aB = aT + a.offsetHeight;
+                for (var j = i + 1; j < widgets.length; j++) {
+                    var b = widgets[j];
+                    var bL = parseInt(b.style.left) || 0;
+                    var bT = parseInt(b.style.top) || 0;
+                    var bR = bL + b.offsetWidth;
+                    if (aL < bR && aR > bL && aT < (bT + b.offsetHeight) && aB > bT) {
+                        var newTop = aB + GAP;
+                        b.style.transition = 'top 0.2s ease';
+                        b.style.top = newTop + 'px';
+                        setTimeout((function(el) { return function() { el.style.transition = ''; }; })(b), 250);
+                        moved = true;
+                    }
+                }
             }
+            if (!moved) break;
         }
     }
 
@@ -207,6 +215,7 @@
         if (_dragState) {
             var h = _dragState.el.querySelector('.fw-drag-handle');
             if (h) { h.style.opacity = '0.5'; h.style.cursor = 'grab'; }
+            _resolveOverlaps(_dragState.container);
             _savePositions(_dragState.container);
             _savePositionsToServer(_dragState.container);
             _updateMinHeight(_dragState.container);
@@ -252,7 +261,7 @@
     function _endResize() {
         if (_resizeState) {
             _resizeState.el.classList.remove('fw-resizing');
-            _reflowBelow(_resizeState.el, _resizeState.container);
+            _resolveOverlaps(_resizeState.container);
             _savePositions(_resizeState.container);
             _savePositionsToServer(_resizeState.container);
             _updateMinHeight(_resizeState.container);
@@ -317,12 +326,27 @@
                 container.style.minHeight = '';
                 widgets.forEach(function (w) { _cleanWidget(w); });
             } else {
+                /* -- Snapshot grid positions BEFORE switching to absolute -- */
+                var snapshot = {};
+                widgets.forEach(function(w) {
+                    var wid = w.getAttribute('data-widget-id') || '';
+                    if (!wid) return;
+                    var r = w.getBoundingClientRect();
+                    var cr = container.getBoundingClientRect();
+                    snapshot[wid] = {
+                        x: Math.round(r.left - cr.left),
+                        y: Math.round(r.top - cr.top),
+                        w: Math.round(r.width),
+                        h: Math.round(r.height)
+                    };
+                });
+
+                /* -- NOW switch to free mode -- */
                 container.classList.add('fw-free-mode');
                 container.style.position = 'relative';
                 container.style.minHeight = '800px';
 
                 var saved = _loadPositions();
-                // Merge server-side positions as fallback
                 if (window._fwServerPositions && typeof window._fwServerPositions === 'object') {
                     var serverPos = window._fwServerPositions;
                     for (var key in serverPos) {
@@ -330,51 +354,44 @@
                     }
                 }
 
-                var cw = container.offsetWidth || 900;
-                var defW = Math.round((cw - 40) / 3);
-                var GAP = 16;
-                var unsavedWidgets = [];
+                var hasSaved = Object.keys(saved).length > 0;
 
                 widgets.forEach(function (w, idx) {
                     var wid = w.getAttribute('data-widget-id') || ('w' + idx);
                     var pos = saved[wid];
+                    var snap = snapshot[wid];
 
                     w.style.position = 'absolute';
                     if (pos) {
                         w.style.left = pos.x + 'px';
                         w.style.top = pos.y + 'px';
                         w.style.width = pos.w + 'px';
-                        if (pos.h) w.style.height = pos.h + 'px';
+                        w.style.height = (pos.h || (snap ? snap.h : 300)) + 'px';
                         if (pos.z) w.style.zIndex = pos.z;
+                    } else if (snap) {
+                        /* Grid snapshot — zero visual change on first Free click */
+                        w.style.left = snap.x + 'px';
+                        w.style.top = snap.y + 'px';
+                        w.style.width = snap.w + 'px';
+                        w.style.height = snap.h + 'px';
                     } else {
-                        // Temporary placement for waterfall measurement
+                        /* Fallback for dynamically added widgets */
+                        var cw = container.offsetWidth || 900;
                         w.style.left = '0px';
                         w.style.top = '0px';
-                        w.style.width = defW + 'px';
-                        unsavedWidgets.push(w);
+                        w.style.width = Math.round((cw - 40) / 3) + 'px';
+                        w.style.height = '300px';
                     }
-                    w.style.zIndex = w.style.zIndex || 1;
+                    w.style.zIndex = w.style.zIndex || '1';
                     _decorateWidget(w);
                 });
 
-                // Waterfall layout for widgets without saved positions
-                if (unsavedWidgets.length > 0) {
-                    requestAnimationFrame(function() {
-                        var colHeights = [0, 0, 0];
-                        unsavedWidgets.forEach(function (w) {
-                            // Find shortest column
-                            var col = 0;
-                            for (var c = 1; c < 3; c++) {
-                                if (colHeights[c] < colHeights[col]) col = c;
-                            }
-                            w.style.left = (col * (defW + GAP)) + 'px';
-                            w.style.top = colHeights[col] + 'px';
-                            colHeights[col] += w.offsetHeight + GAP;
-                        });
-                        _savePositions(container);
-                        _updateMinHeight(container);
-                    });
+                /* Save snapshot positions so they persist across refresh */
+                if (!hasSaved) {
+                    _savePositions(container);
+                    _savePositionsToServer(container);
                 }
+
                 _updateMinHeight(container);
             }
         });
@@ -382,7 +399,10 @@
 
     function resetLayout() {
         localStorage.removeItem(_storageKey('pos'));
-        setLayout('free');
+        _savePreferenceToServer('chart_free_widget_positions', '{}');
+        /* Switch to grid first so snapshot captures clean layout */
+        setLayout('grid');
+        setTimeout(function() { setLayout('free'); }, 50);
     }
 
     function bringForward(widget) {
@@ -526,17 +546,17 @@
             case 'size-s':
                 _settingsWidget.style.width = '280px';
                 _settingsWidget.style.height = '200px';
-                if (container) _savePositions(container);
+                if (container) { _resolveOverlaps(container); _savePositions(container); }
                 break;
             case 'size-m':
                 _settingsWidget.style.width = '400px';
                 _settingsWidget.style.height = '350px';
-                if (container) _savePositions(container);
+                if (container) { _resolveOverlaps(container); _savePositions(container); }
                 break;
             case 'size-l':
                 _settingsWidget.style.width = '600px';
                 _settingsWidget.style.height = '500px';
-                if (container) _savePositions(container);
+                if (container) { _resolveOverlaps(container); _savePositions(container); }
                 break;
             case 'reset':
                 delete settings[wid];

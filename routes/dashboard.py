@@ -446,6 +446,10 @@ def index():
     except Exception:
         pass
 
+    # Schedule display hours (user-configurable)
+    schedule_start = int(current_user.get_pref('schedule_start_hour', 7))
+    schedule_end = int(current_user.get_pref('schedule_end_hour', 19))
+
     return render_template(
         'dashboard.html',
         appointments=appointments,
@@ -469,6 +473,8 @@ def index():
         pdmp_overdue=pdmp_overdue,
         education_draft_count=education_draft_count,
         tcm_urgent=tcm_urgent,
+        schedule_start_hour=schedule_start,
+        schedule_end_hour=schedule_end,
     )
 
 
@@ -555,7 +561,7 @@ def api_patient_search():
             seen_mrns.add(r.mrn)
             results.append({
                 'mrn': r.mrn,
-                'mrn_last4': r.mrn[-4:] if r.mrn and len(r.mrn) >= 4 else r.mrn,
+                'mrn_last4': r.mrn or '',
                 'name': r.patient_name or 'Unknown',
                 'dob': r.patient_dob or '',
                 'last_seen': r.last_xml_parsed.strftime('%m/%d/%Y') if r.last_xml_parsed else '',
@@ -582,7 +588,7 @@ def api_patient_search():
                 seen_mrns.add(mrn)
                 results.append({
                     'mrn': mrn,
-                    'mrn_last4': mrn[-4:] if len(mrn) >= 4 else mrn,
+                    'mrn_last4': mrn,
                     'name': s.patient_name or 'Unknown',
                     'dob': s.patient_dob or '',
                     'last_seen': s.appointment_date.isoformat() if s.appointment_date else '',
@@ -688,22 +694,37 @@ def api_schedule_add():
 
 
 # ======================================================================
-# DELETE /api/schedule/<id> — delete a manually-added appointment
+# DELETE /api/schedule/<id> — delete an appointment from the schedule
 # ======================================================================
 @dashboard_bp.route('/api/schedule/<int:schedule_id>', methods=['DELETE'])
 @login_required
 def api_schedule_delete(schedule_id):
     """
-    Delete a schedule entry. Only manual entries owned by the current user
-    can be deleted. Scraped entries cannot be removed via this endpoint.
+    Delete a schedule entry owned by the current user.
+    Optional query param ?delete_prep=true also deletes prepped billing
+    opportunities for this patient+date so a clean re-prep can happen later.
     """
     appt = Schedule.query.filter_by(
         id=schedule_id, user_id=current_user.id
     ).first()
     if not appt:
         return jsonify({'success': False, 'error': 'Appointment not found'}), 404
-    if appt.entered_by != 'manual':
-        return jsonify({'success': False, 'error': 'Cannot delete scraped appointments'}), 403
+
+    delete_prep = request.args.get('delete_prep', 'false').lower() == 'true'
+
+    # Optionally clear prepped billing opportunities for this patient+date
+    if delete_prep and appt.patient_mrn:
+        try:
+            import hashlib
+            from models.billing import BillingOpportunity
+            mrn_hash = hashlib.sha256(appt.patient_mrn.encode()).hexdigest()[:64]
+            BillingOpportunity.query.filter_by(
+                user_id=current_user.id,
+                patient_mrn_hash=mrn_hash,
+                visit_date=appt.appointment_date,
+            ).delete(synchronize_session=False)
+        except Exception:
+            pass  # Non-critical — appointment still gets removed
 
     db.session.delete(appt)
     db.session.commit()
@@ -743,6 +764,33 @@ def api_schedule_move(schedule_id):
         db.session.rollback()
         current_app.logger.error(f"Error in dashboard.api_schedule_move: {str(e)}")
         return jsonify({'success': False, 'error': 'Failed to move appointment'}), 500
+
+
+# ======================================================================
+# POST /api/schedule/preferences — save schedule display preferences
+# ======================================================================
+@dashboard_bp.route('/api/schedule/preferences', methods=['POST'])
+@login_required
+def api_schedule_preferences():
+    """Save schedule start/end hour for the current user."""
+    data = request.get_json(silent=True) or {}
+    start = data.get('start_hour')
+    end = data.get('end_hour')
+
+    if start is not None:
+        start = max(0, min(23, int(start)))
+        current_user.set_pref('schedule_start_hour', start)
+    if end is not None:
+        end = max(1, min(24, int(end)))
+        current_user.set_pref('schedule_end_hour', end)
+
+    try:
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error in dashboard.api_schedule_preferences: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to save preferences'}), 500
 
 
 # ======================================================================

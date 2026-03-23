@@ -35,6 +35,13 @@ document.addEventListener('DOMContentLoaded', function () {
     initKeyboardShortcuts();
     initWhatsNewBanner();
     initSidebarCollapse();
+    initDoubleSubmitGuard();
+    initFetchInterceptor();
+    initModalAccessibility();
+    initSortableHeaders();
+    initStatePersistence();
+    initCollapsible();
+    initQuickActions();
 });
 
 
@@ -534,10 +541,12 @@ function initAgentStatus() {
                     dot.classList.add('status-dot--unknown');
                     dot.title = 'Agent: offline (no heartbeat found)';
                 }
+                dot.setAttribute('aria-label', dot.title);
             })
             .catch(function () {
                 dot.className = 'status-dot status-dot--unknown';
                 dot.title = 'Agent: unable to check status';
+                dot.setAttribute('aria-label', dot.title);
             });
     }
 
@@ -574,10 +583,12 @@ function initAuthStatus() {
                     dot.classList.add('status-dot--unknown');
                     dot.title = 'NetPractice: status unknown';
                 }
+                dot.setAttribute('aria-label', dot.title);
             })
             .catch(function () {
                 dot.className = 'status-dot status-dot--unknown';
                 dot.title = 'NetPractice: unable to check status';
+                dot.setAttribute('aria-label', dot.title);
             });
     }
 
@@ -1843,4 +1854,341 @@ function submitDismiss() {
         if (d.success) location.reload();
     });
     closeDismissDialog();
+}
+
+
+/* ==========================================================
+   22.  DOUBLE-SUBMIT GUARD — prevents re-submitting POST forms
+   ========================================================== */
+function initDoubleSubmitGuard() {
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form || form.method.toUpperCase() !== 'POST') return;
+        var btn = form.querySelector('button[type="submit"], input[type="submit"]');
+        if (!btn) return;
+        if (btn.dataset.submitting === 'true') {
+            e.preventDefault();
+            return;
+        }
+        btn.dataset.submitting = 'true';
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        /* Re-enable after 5s as safety net (for failed submissions) */
+        setTimeout(function () {
+            btn.disabled = false;
+            btn.style.opacity = '';
+            btn.dataset.submitting = '';
+        }, 5000);
+    });
+}
+
+
+/* ==========================================================
+   23.  GLOBAL FETCH INTERCEPTOR — detects 401 session expiry
+   ========================================================== */
+function initFetchInterceptor() {
+    var _origFetch = window.fetch;
+    window.fetch = function (url, opts) {
+        return _origFetch.apply(this, arguments).then(function (response) {
+            if (response.status === 401) {
+                /* Session expired — show toast and redirect */
+                if (typeof showError === 'function') {
+                    showError('Your session has expired. Redirecting to login...');
+                }
+                setTimeout(function () { window.location.href = '/login'; }, 2000);
+            }
+            return response;
+        });
+    };
+}
+
+
+/* ==========================================================
+   24.  MODAL ACCESSIBILITY — focus trap + Escape to close
+   ========================================================== */
+function initModalAccessibility() {
+    /* Trap focus inside any visible element with [data-modal] or .modal-overlay */
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            /* Close the topmost open modal/overlay */
+            var modals = document.querySelectorAll('.modal-overlay, [data-modal]');
+            for (var i = modals.length - 1; i >= 0; i--) {
+                var m = modals[i];
+                if (m.offsetParent !== null || m.style.display === 'flex' || m.style.display === 'block' || m.classList.contains('dismiss-open')) {
+                    /* Try clicking a close button inside it */
+                    var closeBtn = m.querySelector('.modal-close, .btn-close, [data-dismiss], button[aria-label="Close"], button[aria-label="Dismiss"]');
+                    if (closeBtn) { closeBtn.click(); return; }
+                    /* Otherwise hide it */
+                    m.style.display = 'none';
+                    return;
+                }
+            }
+        }
+
+        if (e.key !== 'Tab') return;
+
+        /* Find the active modal */
+        var activeModal = null;
+        var modals = document.querySelectorAll('.modal-overlay, [data-modal]');
+        for (var i = 0; i < modals.length; i++) {
+            var m = modals[i];
+            if (m.offsetParent !== null || m.style.display === 'flex' || m.style.display === 'block' || m.classList.contains('dismiss-open')) {
+                activeModal = m;
+                break;
+            }
+        }
+        if (!activeModal) return;
+
+        /* Focus trap */
+        var focusable = activeModal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
+    });
+}
+
+
+/* ==========================================================
+   25.  SORTABLE TABLE HEADERS — click <th data-sort> to sort
+   ========================================================== */
+function initSortableHeaders() {
+    document.addEventListener('click', function (e) {
+        var th = e.target.closest('.data-table th[data-sort]');
+        if (!th) return;
+
+        var table = th.closest('table');
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+
+        var colIndex = Array.from(th.parentNode.children).indexOf(th);
+        var currentDir = th.getAttribute('data-sort');
+        var newDir = (currentDir === 'asc') ? 'desc' : 'asc';
+
+        /* Reset sibling sort indicators */
+        th.parentNode.querySelectorAll('th[data-sort]').forEach(function (s) {
+            if (s !== th) s.setAttribute('data-sort', '');
+        });
+        th.setAttribute('data-sort', newDir);
+
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        var sortType = th.dataset.sortType || 'text'; /* text | number | date */
+
+        rows.sort(function (a, b) {
+            var aCell = a.cells[colIndex];
+            var bCell = b.cells[colIndex];
+            if (!aCell || !bCell) return 0;
+            var aVal = (aCell.dataset.sortValue !== undefined ? aCell.dataset.sortValue : aCell.textContent).trim();
+            var bVal = (bCell.dataset.sortValue !== undefined ? bCell.dataset.sortValue : bCell.textContent).trim();
+
+            if (sortType === 'number') {
+                aVal = parseFloat(aVal) || 0;
+                bVal = parseFloat(bVal) || 0;
+                return (newDir === 'asc' ? 1 : -1) * (aVal - bVal);
+            }
+            if (sortType === 'date') {
+                aVal = new Date(aVal).getTime() || 0;
+                bVal = new Date(bVal).getTime() || 0;
+                return (newDir === 'asc' ? 1 : -1) * (aVal - bVal);
+            }
+            return (newDir === 'asc' ? 1 : -1) * aVal.localeCompare(bVal);
+        });
+
+        rows.forEach(function (row) { tbody.appendChild(row); });
+
+        /* Persist sort state per table */
+        var tableId = table.id;
+        if (tableId) {
+            sessionStorage.setItem('cc_sort_' + tableId, colIndex + ':' + newDir);
+        }
+    });
+
+    /* Restore saved sort state on page load */
+    document.querySelectorAll('.data-table[id]').forEach(function (table) {
+        var saved = sessionStorage.getItem('cc_sort_' + table.id);
+        if (!saved) return;
+        var parts = saved.split(':');
+        var colIndex = parseInt(parts[0], 10);
+        var dir = parts[1];
+        var th = table.querySelector('thead tr').children[colIndex];
+        if (th && th.hasAttribute('data-sort')) {
+            th.setAttribute('data-sort', dir === 'asc' ? 'desc' : 'asc');  /* pre-set opposite so click toggles to saved */
+            th.click();
+        }
+    });
+}
+
+
+/* ==========================================================
+   26.  STATE PERSISTENCE — restore filter/tab state per page
+   ========================================================== */
+function initStatePersistence() {
+    var pageKey = 'cc_state_' + location.pathname;
+
+    /* Restore form inputs marked [data-persist] */
+    document.querySelectorAll('[data-persist]').forEach(function (el) {
+        var key = pageKey + '_' + el.getAttribute('data-persist');
+        var saved = sessionStorage.getItem(key);
+        if (saved === null) return;
+
+        if (el.tagName === 'SELECT') {
+            el.value = saved;
+        } else if (el.type === 'checkbox' || el.type === 'radio') {
+            el.checked = (saved === 'true');
+        } else {
+            el.value = saved;
+        }
+        /* Trigger change so any dependent JS runs */
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    /* Save on change */
+    document.addEventListener('change', function (e) {
+        var el = e.target.closest('[data-persist]');
+        if (!el) return;
+        var key = pageKey + '_' + el.getAttribute('data-persist');
+        var val = (el.type === 'checkbox' || el.type === 'radio') ? String(el.checked) : el.value;
+        sessionStorage.setItem(key, val);
+    });
+
+    /* Restore active tab marked [data-persist-tab] */
+    document.querySelectorAll('[data-persist-tab]').forEach(function (tabGroup) {
+        var groupKey = pageKey + '_tab_' + tabGroup.getAttribute('data-persist-tab');
+        var saved = sessionStorage.getItem(groupKey);
+        if (!saved) return;
+
+        var target = tabGroup.querySelector('[data-tab="' + saved + '"]');
+        if (target) target.click();
+    });
+
+    /* Save active tab on click */
+    document.addEventListener('click', function (e) {
+        var tab = e.target.closest('[data-tab]');
+        if (!tab) return;
+        var group = tab.closest('[data-persist-tab]');
+        if (!group) return;
+        var groupKey = pageKey + '_tab_' + group.getAttribute('data-persist-tab');
+        sessionStorage.setItem(groupKey, tab.getAttribute('data-tab'));
+    });
+
+    /* Restore scroll position */
+    var scrollKey = pageKey + '_scrollY';
+    var savedScroll = sessionStorage.getItem(scrollKey);
+    if (savedScroll) {
+        requestAnimationFrame(function () {
+            window.scrollTo(0, parseInt(savedScroll, 10));
+        });
+    }
+
+    /* Save scroll position on beforeunload */
+    window.addEventListener('beforeunload', function () {
+        sessionStorage.setItem(scrollKey, String(window.scrollY));
+    });
+}
+
+
+/* ==========================================================
+   27.  COLLAPSIBLE SECTIONS — unified collapse/expand
+   ========================================================== */
+function initCollapsible() {
+    /* Restore saved collapse states */
+    document.querySelectorAll('[data-collapsible]').forEach(function (trigger) {
+        var key = trigger.getAttribute('data-collapsible');
+        var targetSel = trigger.getAttribute('data-collapsible-target');
+        var target = targetSel ? document.querySelector(targetSel) : trigger.nextElementSibling;
+        if (!target) return;
+
+        var saved = localStorage.getItem('cc_collapse_' + key);
+        if (saved === 'collapsed') {
+            target.classList.add('cc-collapsed');
+            trigger.classList.add('cc-collapsed');
+            trigger.setAttribute('aria-expanded', 'false');
+        } else {
+            trigger.setAttribute('aria-expanded', 'true');
+        }
+    });
+
+    /* Toggle on click */
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('[data-collapsible]');
+        if (!trigger) return;
+
+        var key = trigger.getAttribute('data-collapsible');
+        var targetSel = trigger.getAttribute('data-collapsible-target');
+        var target = targetSel ? document.querySelector(targetSel) : trigger.nextElementSibling;
+        if (!target) return;
+
+        var isCollapsed = target.classList.toggle('cc-collapsed');
+        trigger.classList.toggle('cc-collapsed', isCollapsed);
+        trigger.setAttribute('aria-expanded', String(!isCollapsed));
+        localStorage.setItem('cc_collapse_' + key, isCollapsed ? 'collapsed' : 'expanded');
+    });
+}
+
+
+/* ==========================================================
+   28.  QUICK ACTIONS — inline status toggle via fetch
+   ========================================================== */
+function initQuickActions() {
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-quick-action]');
+        if (!btn || btn.disabled) return;
+        e.preventDefault();
+
+        var url = btn.getAttribute('data-quick-action');
+        var method = btn.getAttribute('data-method') || 'POST';
+        var confirmMsg = btn.getAttribute('data-confirm');
+        if (confirmMsg && !confirm(confirmMsg)) return;
+
+        /* Show loading state */
+        var origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner loading-spinner--sm"></span>';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            btn.disabled = false;
+            if (data.success) {
+                /* Update badge text if data-status-target is set */
+                var targetSel = btn.getAttribute('data-status-target');
+                if (targetSel && data.data && data.data.status) {
+                    var badge = document.querySelector(targetSel);
+                    if (badge) badge.textContent = data.data.status;
+                }
+                /* Update button text if data-success-text is set */
+                var successText = btn.getAttribute('data-success-text');
+                if (successText) {
+                    btn.innerHTML = successText;
+                    setTimeout(function () { btn.innerHTML = origHtml; }, 2000);
+                } else {
+                    btn.innerHTML = origHtml;
+                }
+                /* Optionally reload */
+                if (btn.hasAttribute('data-reload')) location.reload();
+            } else {
+                btn.innerHTML = origHtml;
+                if (typeof showError === 'function') {
+                    showError(data.error || 'Action failed');
+                }
+            }
+        })
+        .catch(function () {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            if (typeof showError === 'function') {
+                showError('Network error');
+            }
+        });
+    });
 }

@@ -3,9 +3,11 @@
 {% block page_id %}admin-tools{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-    <a href="{{ url_for('admin_hub.admin_dashboard') }}" style="color:var(--text-secondary);text-decoration:none;">&larr; Admin</a>
-    <h1 style="margin:0;">Admin Tools</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Admin Tools</h1>
+    <div class="page-header__actions">
+        <a href="{{ url_for('admin_hub.admin_dashboard') }}" class="btn btn-outline btn-sm">&larr; Admin</a>
+    </div>
 </div>
 
 {# ---- Test Data Management ---- #}
@@ -35,6 +37,26 @@
             <form method="POST" action="{{ url_for('admin_hub.admin_clear_test_data') }}"
                   onsubmit="return confirm('Clear all test patient data?');">
                 <button type="submit" class="btn btn--outline" style="font-size:13px;color:var(--color-red, #e74c3c);border-color:var(--color-red, #e74c3c);">Clear Test Data</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ---- Purge & Reimport ---- #}
+<div style="margin-bottom:24px;">
+    <div class="card">
+        <div class="card-body">
+            <h3 style="margin:0 0 8px;font-size:15px;font-weight:600;">Purge &amp; Reimport XML Patients</h3>
+            <p style="margin:0 0 12px;font-size:13px;color:var(--text-secondary);">
+                Wipe <strong>all</strong> patient data from the database, then re-import every XML file
+                from the test patients folder (Documents/xml_test_patients/).
+                XML files on disk are not deleted.
+            </p>
+            <form method="POST" action="{{ url_for('admin_hub.admin_purge_reimport_xml') }}"
+                  onsubmit="return confirm('This will DELETE all patient data and reimport from XML files. Continue?');">
+                <button type="submit" class="btn btn--outline" style="font-size:13px;color:var(--color-red, #e74c3c);border-color:var(--color-red, #e74c3c);">
+                    Purge &amp; Reimport
+                </button>
             </form>
         </div>
     </div>

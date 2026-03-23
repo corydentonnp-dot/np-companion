@@ -476,8 +476,8 @@
             </nav>
 
             {# Status dots + help icon #}
-            <span class="status-dot status-dot--unknown" id="agent-status" title="Agent: checking..."></span>
-            <span class="status-dot status-dot--unknown" id="auth-status" title="NetPractice: checking..."></span>
+            <span class="status-dot status-dot--unknown" id="agent-status" title="Agent: checking..." role="status" aria-label="Agent: checking..."></span>
+            <span class="status-dot status-dot--unknown" id="auth-status" title="NetPractice: checking..." role="status" aria-label="NetPractice: checking..."></span>
             <button class="help-icon" id="page-help-icon" data-help-id="{{ self.page_id() }}" title="Help for this page" aria-label="Help" style="display:none;">?</button>
             <div class="help-popover" id="page-help-popover" role="tooltip" aria-hidden="true">
                 <div class="help-popover-title" id="page-help-title"></div>

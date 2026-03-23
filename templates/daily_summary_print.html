@@ -187,7 +187,7 @@
         <div class="pt-header">
             <span class="pt-time">{{ pt.time }}</span>
             <span class="pt-name">{{ pt.last_name }}, {{ pt.first_name }}</span>
-            <span class="pt-demo">DOB {{ pt.dob }} &bull; MRN ••{{ pt.mrn[-4:] }}{% if pt.age is not none %} &bull; {{ pt.age }}y{% endif %}</span>
+            <span class="pt-demo">DOB {{ pt.dob }} &bull; MRN {{ pt.mrn }}{% if pt.age is not none %} &bull; {{ pt.age }}y{% endif %}</span>
             <span class="pt-visit-badge{% if pt.is_new_patient %} new{% endif %}">{{ pt.visit_type or 'GV' }}{% if pt.is_new_patient %} — NEW{% endif %}</span>
         </div>
 

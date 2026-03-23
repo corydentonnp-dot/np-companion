@@ -3,9 +3,11 @@
 {% block page_id %}admin-api{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">API Intelligence Configuration</h1>
-    <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+<div class="page-header">
+    <h1 class="page-header__title">API Intelligence Configuration</h1>
+    <div class="page-header__actions">
+        <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+    </div>
 </div>
 
 <p style="margin-bottom:24px;color:var(--text-secondary);max-width:700px;">
@@ -18,7 +20,7 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">API Services Status</div>
     <div class="card-body" style="padding:0;">
-        <table class="schedule-table" style="font-size:13px;">
+        <table class="data-table" style="font-size:13px;">
             <thead>
                 <tr>
                     <th>Service</th>
@@ -85,7 +87,7 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">Intelligence Features</div>
     <div class="card-body" style="padding:0;">
-        <table class="schedule-table" style="font-size:13px;">
+        <table class="data-table" style="font-size:13px;">
             <thead>
                 <tr><th>Feature</th><th>APIs Used</th><th>Status</th><th>Location</th></tr>
             </thead>

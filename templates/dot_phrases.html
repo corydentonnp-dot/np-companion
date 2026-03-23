@@ -3,12 +3,14 @@
 {% block page_id %}dot-phrases{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Dot Phrases</h1>
-    <span class="badge badge--info">F23</span>
-    <button class="btn btn-sm btn-primary" onclick="showAddModal()">+ Add Dot Phrase</button>
-    <a href="/tools/dot-phrases/export" class="btn btn-sm btn-outline">Export as AHK</a>
-    <button class="btn btn-sm btn-outline" onclick="showImportModal()">Import</button>
+<div class="page-header">
+    <h1 class="page-header__title">Dot Phrases</h1>
+    <div class="page-header__actions">
+        <span class="badge badge--info">F23</span>
+        <button class="btn btn-sm btn-primary" onclick="showAddModal()">+ Add Dot Phrase</button>
+        <a href="/tools/dot-phrases/export" class="btn btn-sm btn-outline">Export as AHK</a>
+        <button class="btn btn-sm btn-outline" onclick="showImportModal()">Import</button>
+    </div>
 </div>
 
 {# ---- Category Tabs ---- #}
@@ -21,7 +23,7 @@
 
 {# ---- Search ---- #}
 <div style="margin-bottom:16px;">
-    <input type="text" id="search-input" class="form-input" placeholder="Search dot phrases..." style="max-width:400px;" oninput="filterPhrases()">
+    <input type="text" id="search-input" class="form-input" placeholder="Search dot phrases..." style="max-width:400px;" oninput="filterPhrases()" autofocus>
 </div>
 
 {# ---- Phrase Cards ---- #}
@@ -54,13 +56,17 @@
 {% endif %}
 
 {# ---- Add/Edit Modal ---- #}
-<div id="phrase-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
-    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:560px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-        <h2 id="modal-title" style="margin:0 0 16px;">Add Dot Phrase</h2>
+<div id="phrase-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--md">
+        <div class="cc-modal__header">
+            <h2 id="modal-title" class="cc-modal__title">Add Dot Phrase</h2>
+            <button class="cc-modal__close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="cc-modal__body">
         <input type="hidden" id="edit-id" value="">
 
         <label class="form-label">Abbreviation</label>
-        <input type="text" id="modal-abbrev" class="form-input" placeholder=".hpi" style="margin-bottom:12px;font-family:monospace;">
+        <input type="text" id="modal-abbrev" class="form-input mono" placeholder=".hpi" style="margin-bottom:12px;">
 
         <label class="form-label">Category</label>
         <select id="modal-category" class="form-input" style="margin-bottom:12px;">
@@ -75,12 +81,12 @@
             <button class="btn btn-sm btn-outline" onclick="insertPlaceholder('date')" type="button">{date}</button>
             <button class="btn btn-sm btn-outline" onclick="insertPlaceholder('provider_name')" type="button">{provider_name}</button>
         </div>
-        <textarea id="modal-expansion" class="form-input" rows="8" placeholder="Type the full expanded text here..." style="margin-bottom:12px;font-family:monospace;white-space:pre-wrap;"></textarea>
+        <textarea id="modal-expansion" class="form-input mono" rows="8" placeholder="Type the full expanded text here..." style="margin-bottom:12px;white-space:pre-wrap;"></textarea>
 
         <label class="form-label">Preview</label>
         <div id="modal-preview" style="background:var(--bg-secondary,#f5f5f5);border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;white-space:pre-wrap;max-height:150px;overflow-y:auto;color:var(--text-primary,#333);"></div>
-
-        <div style="display:flex;gap:12px;justify-content:flex-end;">
+        </div>
+        <div class="cc-modal__footer">
             <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
             <button class="btn btn-primary" onclick="savePhrase()">Save</button>
         </div>
@@ -88,12 +94,17 @@
 </div>
 
 {# ---- Import Modal ---- #}
-<div id="import-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
-    <div style="background:var(--bg-primary,#fff);border-radius:12px;padding:24px;width:500px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-        <h2 style="margin:0 0 16px;">Import Dot Phrases</h2>
+<div id="import-modal" class="cc-modal">
+    <div class="cc-modal__dialog cc-modal__dialog--sm">
+        <div class="cc-modal__header">
+            <h2 class="cc-modal__title">Import Dot Phrases</h2>
+            <button class="cc-modal__close" onclick="closeImportModal()">&times;</button>
+        </div>
+        <div class="cc-modal__body">
         <p style="font-size:13px;color:var(--text-secondary,#666);margin-bottom:12px;">Paste AHK hotstrings (::abbr::expansion format), one per line:</p>
-        <textarea id="import-text" class="form-input" rows="8" placeholder="::.hpi::Patient presents with..." style="margin-bottom:16px;font-family:monospace;"></textarea>
-        <div style="display:flex;gap:12px;justify-content:flex-end;">
+        <textarea id="import-text" class="form-input mono" rows="8" placeholder="::.hpi::Patient presents with..." style="margin-bottom:16px;"></textarea>
+        </div>
+        <div class="cc-modal__footer">
             <button class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
             <button class="btn btn-primary" onclick="doImport()">Import</button>
         </div>
@@ -119,7 +130,7 @@ function showAddModal() {
     document.getElementById('modal-category').value = 'custom';
     document.getElementById('modal-expansion').value = '';
     document.getElementById('modal-preview').textContent = '';
-    document.getElementById('phrase-modal').style.display = 'flex';
+    document.getElementById('phrase-modal').classList.add('cc-modal--open');
 }
 
 function editPhrase(id, abbrev, expansion, category) {
@@ -129,11 +140,11 @@ function editPhrase(id, abbrev, expansion, category) {
     document.getElementById('modal-category').value = category;
     document.getElementById('modal-expansion').value = expansion.replace(/\\n/g, '\n');
     updatePreview();
-    document.getElementById('phrase-modal').style.display = 'flex';
+    document.getElementById('phrase-modal').classList.add('cc-modal--open');
 }
 
 function closeModal() {
-    document.getElementById('phrase-modal').style.display = 'none';
+    document.getElementById('phrase-modal').classList.remove('cc-modal--open');
 }
 
 function insertPlaceholder(name) {
@@ -198,10 +209,10 @@ function deletePhrase(id, abbrev) {
 /* ── Import Modal ── */
 function showImportModal() {
     document.getElementById('import-text').value = '';
-    document.getElementById('import-modal').style.display = 'flex';
+    document.getElementById('import-modal').classList.add('cc-modal--open');
 }
 function closeImportModal() {
-    document.getElementById('import-modal').style.display = 'none';
+    document.getElementById('import-modal').classList.remove('cc-modal--open');
 }
 function doImport() {
     const content = document.getElementById('import-text').value.trim();

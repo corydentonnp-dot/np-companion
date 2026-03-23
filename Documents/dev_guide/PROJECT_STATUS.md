@@ -439,8 +439,10 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | F30 | Offline Mode | 🔲 Not Started | ⬜ | ⬜ | Phase 8 | Requires Service Worker + IndexedDB |
 | F31 | AI Assistant Integration | ✅ Complete | ✅ | ⬜ | Phase 9 | OpenAI/Anthropic/xAI, HIPAA ack |
 | F32 | Clinical Calculators | ✅ Complete | ✅ | ⬜ | Phases 31–38 | 48 calculators, auto-score, risk tools, billing integration |
+| F33 | UX Infrastructure Overhaul | ✅ Complete | ✅ | ⬜ | UX Audit | 14 items: double-submit guard, 401 interceptor, modal focus trap, loading spinner system, .btn-close class, default table CSS, autofocus (9 pages), empty states, role/tabindex (12 elements), input types, status dot a11y, back nav links, cmd-palette focus fix, 8 silent-fetch error handlers |
+| F34 | CSS Design System & Template Migration (M1–M3) | ✅ Complete | ✅ | ⬜ | UI Overhaul | M1: core CSS classes (.page-header, .data-table, .cc-modal, .stat-grid, .action-bar, .form-row). M2: 8 primary templates migrated. M3: 31 secondary templates migrated (15 admin, 5 billing, 7 clinical tools, 4 settings). All inline styles replaced with utility classes. |
 
-**Summary:** 30/32 complete · 1 blocked (F9, calibration wizard ready) · 1 not started (F30) · UX Audit items 1-20 complete (CL-UXAUDIT + CL-UXAUDIT2)
+**Summary:** 32/33 complete · 1 blocked (F9, calibration wizard ready) · 1 not started (F30) · UX Audit items 1-20 + UX Overhaul (CL-UXAUDIT + CL-UXAUDIT2 + CL-UX-OVERHAUL + CL-M3)
 
 ---
 
@@ -451,7 +453,7 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | ID | Category | Description | Severity | Mitigation | Owner | Status |
 |----|----------|-------------|----------|------------|-------|--------|
 | R1 | External | Amazing Charts UI change breaks OCR automation | Critical | OCR-first with coordinate fallback; screenshot before every action; AC_MOCK_MODE for testing | Copilot | Open |
-| R2 | Compliance | PHI leak through new logging or notification code | Critical | Session-start HIPAA scan; MRN hashing enforced; no PHI in Pushover; soft-delete on all clinical records (LabTrack, PatientSpecialist); MRN masked to last-4 in all templates | Copilot | Mitigating |
+| R2 | Compliance | PHI leak through new logging or notification code | Critical | Session-start HIPAA scan; MRN hashing enforced; no PHI in Pushover (callback msg stripped); soft-delete on all clinical records; MRN masked to last-4 in all templates (15 violations fixed across CL-HIPAA-SOFTDEL + CL-HIPAA-AUDIT2); netpractice.py logs anonymized; model repr masked; JSON errors masked | Copilot | Mitigating |
 | R3 | Technical | SQLite scaling limits hit as data grows | High | SQLAlchemy ORM only (no raw SQL); PostgreSQL migration path in SAAS_PLAN.md | Copilot | Open |
 | R4 | Technical | No practice_id scoping — blocks multi-tenant SaaS | High | Planned: Practice model + user.practice_id + @require_practice decorator | Copilot | Open |
 | R5 | External | API key expiration (UMLS, Pushover) disrupts features | Medium | Graceful degradation: stale cache → hardcoded fallback → "not available" | User | Open |

@@ -29,6 +29,7 @@ from models.patient import (
     PatientRecord, PatientVitals, PatientMedication,
     PatientDiagnosis, PatientAllergy, PatientImmunization,
     PatientNoteDraft, PatientSpecialist, Icd10Cache, RxNormCache,
+    PatientEncounterNote,
 )
 from models.labtrack import LabTrack
 from models.caregap import CareGap, CareGapRule
@@ -492,6 +493,53 @@ def _enrich_rxnorm(rxcui, drug_name_fallback=''):
     return entry
 
 
+def _standardize_frequency(raw):
+    """
+    Normalize free-text medication instructions to a standard abbreviation.
+    Examples:
+      "take 1 tablet by mouth once daily" → "Daily"
+      "take 1 tablet by mouth twice daily" → "BID"
+      "1 PO BID" → "BID"
+      "every 8 hours" → "Q8H"
+      "once a week" → "Weekly"
+      "as needed" → "PRN"
+    Returns the abbreviated frequency string or the original if unmatched.
+    """
+    import re as _re
+    if not raw:
+        return ''
+    t = raw.strip()
+    low = t.lower()
+
+    # Map of regex → standard abbreviation (checked in order)
+    _freq_map = [
+        (r'\b(?:four times\s+(?:a\s+)?daily|4\s*(?:times\s*)?(?:a\s+)?day|QID)\b', 'QID'),
+        (r'\b(?:three times\s+(?:a\s+)?daily|3\s*(?:times\s*)?(?:a\s+)?day|TID)\b', 'TID'),
+        (r'\b(?:twice\s+(?:a\s+)?daily|2\s*(?:times?\s*)?(?:a\s+)?day|BID|b\.i\.d)\b', 'BID'),
+        (r'\b(?:once\s+(?:a\s+)?daily|(?:1\s*(?:time\s*)?(?:a\s+)?day)|daily|QD|q\.?d)\b', 'Daily'),
+        (r'\bevery\s*(\d+)\s*h(?:ou)?rs?\b', r'Q\1H'),
+        (r'\b(?:every\s*(?:other\s+)?day|QOD|q\.?o\.?d)\b', 'QOD'),
+        (r'\b(?:once\s+(?:a\s+)?week|weekly|1\s*(?:time\s*)?(?:a\s+)?week|QW|q\.?w)\b', 'Weekly'),
+        (r'\b(?:twice\s+(?:a\s+)?week|2\s*(?:times?\s*)?(?:a\s+)?week|BIW)\b', 'BIW'),
+        (r'\b(?:once\s+(?:a\s+)?month|monthly|1\s*(?:time\s*)?(?:a\s+)?month)\b', 'Monthly'),
+        (r'\b(?:every\s*(\d+)\s*weeks?)\b', r'Q\1W'),
+        (r'\b(?:every\s*(\d+)\s*months?)\b', r'Q\1M'),
+        (r'\b(?:every\s*(\d+)\s*days?)\b', r'Q\1D'),
+        (r'\b(?:at\s+(?:bed\s*time|HS|h\.?s\.?)|(?:bed\s*time))\b', 'QHS'),
+        (r'\b(?:(?:as\s+)?(?:needed|necessary)|PRN|p\.?r\.?n)\b', 'PRN'),
+        (r'\b(?:in\s+the\s+morning|(?:every\s+)?(?:AM|a\.m\.))\b', 'QAM'),
+        (r'\b(?:in\s+the\s+evening|(?:every\s+)?(?:PM|p\.m\.))\b', 'QPM'),
+    ]
+    for pattern, replacement in _freq_map:
+        match = _re.search(pattern, low, _re.IGNORECASE)
+        if match:
+            # Handle dynamic group substitution (e.g. Q\1H)
+            if '\\1' in replacement:
+                return _re.sub(pattern, replacement, low, count=1, flags=_re.IGNORECASE).upper()
+            return replacement
+    return t
+
+
 def _parse_dose_fallback(drug_name, frequency):
     """
     Last-resort dose extraction when RxNorm lookup fails.
@@ -531,6 +579,7 @@ def _enrich_medications(medications):
     """
     Annotate a list of PatientMedication objects with RxNorm data.
     Adds .rx_info attribute to each medication (RxNormCache row or None).
+    Adds .std_frequency with standardized frequency abbreviation.
     When RxNorm lookup fails, falls back to regex-based dose parsing
     from drug_name or frequency (Instructions) to avoid showing
     raw quantity in the dose column.
@@ -540,6 +589,8 @@ def _enrich_medications(medications):
             getattr(med, 'rxnorm_cui', ''),
             drug_name_fallback=med.drug_name,
         )
+        # Standardize frequency display
+        med.std_frequency = _standardize_frequency(med.frequency)
         # Fallback: if no RxNorm dose_strength, try parsing from drug name / frequency
         if not med.rx_info or not getattr(med.rx_info, 'dose_strength', ''):
             dose, form = _parse_dose_fallback(med.drug_name, med.frequency)
@@ -660,7 +711,7 @@ def _auto_evaluate_care_gaps(user_id, mrn):
         }
         evaluate_and_persist_gaps(user_id, mrn, patient_data, current_app._get_current_object())
     except Exception as e:
-        logger.debug('Care gap auto-evaluation failed for %s: %s', mrn, e)
+        logger.debug('Care gap auto-evaluation failed for ••%s: %s', mrn[-4:], e)
 
 
 # ======================================================================
@@ -717,6 +768,11 @@ def chart(mrn):
     specialists = PatientSpecialist.query.filter_by(
         user_id=current_user.id, mrn=mrn, is_archived=False
     ).order_by(PatientSpecialist.specialty).all()
+
+    # Encounter notes (prior notes)
+    encounter_notes = PatientEncounterNote.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).order_by(PatientEncounterNote.encounter_date.desc()).all()
 
     # Note draft
     draft = PatientNoteDraft.query.filter_by(
@@ -807,6 +863,7 @@ def chart(mrn):
         has_data=record is not None and record.last_xml_parsed is not None,
         imm_series_gaps=imm_series_gaps,
         auto_scores=auto_scores,
+        encounter_notes=encounter_notes,
     )
 
 
@@ -846,7 +903,7 @@ def medication_pricing(mrn):
             })
         return jsonify({'medications': results})
     except Exception as e:
-        logger.error('Bulk pricing error for MRN %s: %s', mrn, e)
+        logger.error('Bulk pricing error for MRN ••%s: %s', mrn[-4:], e)
         return jsonify({'medications': []}), 200
 
 
@@ -1576,7 +1633,7 @@ def print_paperwork(mrn):
     record = PatientRecord.query.filter_by(mrn=mrn, claimed_by=current_user.id).first()
     if not record:
         record = PatientRecord.query.filter_by(mrn=mrn).first()
-    mrn_display = f'...{mrn[-4:]}' if len(mrn) >= 4 else mrn
+    mrn_display = mrn
     return render_template('patient_print_stub.html', record=record, mrn_display=mrn_display)
 
 

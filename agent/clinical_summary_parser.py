@@ -55,6 +55,7 @@ SECTION_LOINC = {
     'health_concerns': '75310-3',
     'patient_demographics': '10154-3',
     'insurance': '48768-6',
+    'encounter_notes': '11506-3',
 }
 
 
@@ -544,7 +545,7 @@ def store_parsed_summary(user_id, mrn, parsed):
     from models.patient import (
         PatientVitals, PatientRecord, PatientMedication,
         PatientDiagnosis, PatientAllergy, PatientImmunization,
-        PatientLabResult, PatientSocialHistory,
+        PatientLabResult, PatientSocialHistory, PatientEncounterNote,
     )
     from models.audit import AuditLog
     from billing_engine.shared import hash_mrn
@@ -580,7 +581,8 @@ def store_parsed_summary(user_id, mrn, parsed):
 
     # ---- Clear old data for this patient before re-importing ----
     for model in (PatientMedication, PatientDiagnosis, PatientAllergy,
-                  PatientImmunization, PatientVitals, PatientLabResult):
+                  PatientImmunization, PatientVitals, PatientLabResult,
+                  PatientEncounterNote):
         model.query.filter_by(user_id=user_id, mrn=mrn).delete()
 
     # ---- Medications ----
@@ -772,6 +774,22 @@ def store_parsed_summary(user_id, mrn, parsed):
                 social.substance_use_status = value[:100]
             elif 'sexual' in category:
                 social.sexual_activity = value[:100]
+
+    # ---- Encounter Notes (Prior Notes) ----
+    # Columns: Date, Provider, Note Type, Note Text, Location
+    for row in parsed.get('encounter_notes', []):
+        if 'text' in row:
+            continue
+        note = PatientEncounterNote(
+            user_id=user_id,
+            mrn=mrn,
+            encounter_date=_parse_date(row.get('Date')),
+            provider_name=(row.get('Provider') or '').strip(),
+            note_type=(row.get('Note Type') or 'Progress Note').strip(),
+            note_text=(row.get('Note Text') or '').strip(),
+            location=(row.get('Location') or '').strip(),
+        )
+        db.session.add(note)
 
     # ---- Populate last_awv_date from BillingOpportunity history (Phase 15.5) ----
     try:

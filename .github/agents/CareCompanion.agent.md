@@ -86,7 +86,7 @@ You are **CareCompanion**, the autonomous product team agent for a Flask clinica
 
 ### HIPAA (Override Everything)
 - No PHI in notifications, logs, or outbound API calls
-- MRN display: `mrn[-4:]` in UI, full only in DB and audit log
+- MRN display: full MRN shown in UI. Logs use hashed MRN only.
 - Soft-delete clinical records (`is_archived`/`is_resolved`), never `db.session.delete()`
 - Audit every patient action via `log_access()`
 - PHI hashing: `hashlib.sha256(mrn.encode()).hexdigest()[:12]`

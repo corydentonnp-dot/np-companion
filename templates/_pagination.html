@@ -1,0 +1,33 @@
+{#
+    Reusable pagination macro.
+    Usage:
+        {% from '_pagination.html' import render_pagination %}
+        {{ render_pagination(pagination, endpoint='tools.notifications', extra_args={'type': type_filter}) }}
+
+    Parameters:
+        pagination  — Flask-SQLAlchemy Pagination object (.page, .pages, .has_prev, .has_next, .prev_num, .next_num)
+        endpoint    — url_for endpoint name (string)
+        extra_args  — dict of extra query params to pass through (optional)
+#}
+
+{% macro render_pagination(pagination, endpoint, extra_args={}) %}
+{% if pagination.pages > 1 %}
+<nav class="pagination-bar" aria-label="Page navigation">
+    {% if pagination.has_prev %}
+    <a href="{{ url_for(endpoint, page=pagination.prev_num, **extra_args) }}" class="btn btn-sm btn-outline">&laquo; Prev</a>
+    {% else %}
+    <span class="btn btn-sm btn-outline" style="opacity:.4;pointer-events:none;">&laquo; Prev</span>
+    {% endif %}
+
+    <span class="pagination-bar__info">
+        Page {{ pagination.page }} of {{ pagination.pages }}
+    </span>
+
+    {% if pagination.has_next %}
+    <a href="{{ url_for(endpoint, page=pagination.next_num, **extra_args) }}" class="btn btn-sm btn-outline">Next &raquo;</a>
+    {% else %}
+    <span class="btn btn-sm btn-outline" style="opacity:.4;pointer-events:none;">Next &raquo;</span>
+    {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}

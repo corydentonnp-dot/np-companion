@@ -3,9 +3,9 @@
 {% block page_id %}admin-billing-roi{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Billing ROI Dashboard — {{ quarter_label }}</h1>
-    <div style="margin-left:auto;display:flex;gap:8px;">
+<div class="page-header">
+    <h1 class="page-header__title">Billing ROI Dashboard — {{ quarter_label }}</h1>
+    <div class="page-header__actions">
         <a href="/campaigns" class="btn btn-sm btn-outline">Campaigns</a>
         <button onclick="window.print()" class="btn btn-sm btn-outline">Print</button>
     </div>

@@ -3,9 +3,11 @@
 {% block page_id %}admin-sitemap{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-    <a href="/admin" style="color:var(--text-secondary);font-size:13px;">← Admin</a>
-    <h1 style="margin:0;">Site Map</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Site Map</h1>
+    <div class="page-header__actions">
+        <a href="/admin" class="btn btn-outline btn-sm">← Admin</a>
+    </div>
 </div>
 
 <p style="color:var(--text-secondary);font-size:14px;margin-bottom:24px;">
@@ -20,7 +22,7 @@
         <span class="badge badge--info">{{ routes|length }} route{{ 's' if routes|length != 1 }}</span>
     </div>
     <div class="card-body" style="padding:0;">
-        <table class="table" style="margin:0;">
+        <table class="data-table" style="margin:0;">
             <thead>
                 <tr>
                     <th style="width:50%;">URL</th>

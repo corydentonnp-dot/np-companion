@@ -43,5 +43,5 @@ except Exception as e:
 
 ## HIPAA
 - Never log patient names, MRNs, or DOBs. Use `hashlib.sha256(mrn.encode()).hexdigest()[:12]`.
-- MRN display in templates: `{{ mrn[-4:] }}` only.
+- MRN display in templates: full MRN shown (`{{ mrn }}`).
 - Audit patient data access via `log_access()`.

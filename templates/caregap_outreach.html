@@ -19,7 +19,7 @@
     {% if gaps %}
     <div class="card-body" style="padding:0;">
         <div class="table-wrap">
-        <table class="schedule-table" style="width:100%;">
+        <table class="data-table" style="width:100%;">
             <thead>
                 <tr>
                     <th>#</th>
@@ -34,7 +34,7 @@
                 <tr>
                     <td>{{ loop.index }}</td>
                     <td style="font-family:monospace;font-size:13px;">
-                        ••{{ g.mrn[-4:] if g.mrn|length >= 4 else g.mrn }}
+                        {{ g.mrn }}
                     </td>
                     <td>
                         <span class="badge badge--warning">{{ g.status|replace('_', ' ')|title }}</span>

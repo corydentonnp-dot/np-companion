@@ -13,6 +13,12 @@ import json
 import os
 import sys
 import traceback
+import io
+
+# Force UTF-8 stdout so Unicode arrows etc. don't crash on Windows cp1252
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -180,6 +186,9 @@ def run_tests():
         'Billing Benchmarks':   '/billing/benchmarks',
     }
 
+    # Pages where 302 is expected (e.g. onboarding redirects when already completed)
+    redirect_ok = {'/setup/onboarding'}
+
     with app.test_client() as client:
         with app.app_context():
             with client.session_transaction() as sess:
@@ -191,6 +200,9 @@ def run_tests():
                 if r.status_code == 200:
                     passed.append(f"{name} ({url})")
                     print(f"  PASS  {name} ({url})")
+                elif r.status_code == 302 and url in redirect_ok:
+                    passed.append(f"{name} ({url}) -> 302 (expected redirect)")
+                    print(f"  PASS  {name} ({url}) -> 302 (expected redirect)")
                 else:
                     msg = f"{name} ({url}) -> {r.status_code}"
                     failed.append(msg)

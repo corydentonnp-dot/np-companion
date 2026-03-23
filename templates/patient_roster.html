@@ -26,8 +26,8 @@
 {% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:8px;">
-    <h1 style="margin:0;">My Patients</h1>
+<div class="page-header">
+    <h1 class="page-header__title">My Patients</h1>
     <span class="badge badge--info">{{ patients|length }} patient{{ 's' if patients|length != 1 }}</span>
 </div>
 
@@ -36,17 +36,17 @@
     <div class="card-body" style="padding:0;">
         {# Live search input #}
         <div style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);">
-            <input type="text" id="roster-search" class="form-input" placeholder="Search patients…" autocomplete="off" style="width:100%;max-width:320px;">
+            <input type="text" id="roster-search" class="form-input" placeholder="Search patients…" autocomplete="off" style="width:100%;max-width:320px;" autofocus>
         </div>
         <div class="table-wrap">
-        <table class="schedule-table" id="roster-table">
+        <table class="data-table data-table--striped" id="roster-table">
             <thead>
                 <tr>
-                    <th>Name</th>
-                    <th>MRN</th>
-                    <th>DOB</th>
-                    <th>Last Data</th>
-                    <th>Claimed</th>
+                    <th data-sort="">Name</th>
+                    <th data-sort="">MRN</th>
+                    <th data-sort="" data-sort-type="date">DOB</th>
+                    <th data-sort="" data-sort-type="date">Last Data</th>
+                    <th data-sort="">Claimed</th>
                 </tr>
             </thead>
             <tbody>
@@ -57,7 +57,7 @@
                             {{ p.patient_name or 'Unknown' }}
                         </a>
                     </td>
-                    <td style="font-family:monospace;font-size:13px;">
+                    <td class="mono">
                         {{ p.mrn }}
                     </td>
                     <td>

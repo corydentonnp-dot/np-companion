@@ -4,7 +4,9 @@
 {% block content %}
 
 <div class="d-flex items-center justify-between mb-2">
-    <h1>Background Agent</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Background Agent</h1>
+</div>
     <form method="POST" action="/admin/agent/restart" id="restart-form" style="display:inline;">
         <button type="submit" class="btn btn-warning btn-sm" id="restart-btn">
             Restart Agent
@@ -82,7 +84,7 @@
     <div class="card-header">Recent Events</div>
     <div class="card-body" style="padding:0;">
         <div class="table-wrap">
-            <table class="table">
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>Time (UTC)</th>
@@ -126,7 +128,7 @@
     <div class="card-header">Recent Errors</div>
     <div class="card-body" style="padding:0;">
         <div class="table-wrap">
-            <table class="table">
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>Time (UTC)</th>

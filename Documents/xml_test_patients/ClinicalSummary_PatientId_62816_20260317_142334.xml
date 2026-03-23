@@ -1,0 +1,305 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603171423-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="00000000-0000-0000-0000-000000062816" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="62816" />
+      <addr use="HP">
+        <streetAddressLine>13911 St Francis Blvd</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country nullFlavor="NI" />
+        <useablePeriod xsi:type="IVL_TS"><low value="20260317" /></useablePeriod>
+      </addr>
+      <telecom use="HP" value="tel:+1(804)-555-4567" />
+      <patient>
+        <name use="L">
+          <given>Tyler</given>
+          <family>Johnson</family>
+        </name>
+        <administrativeGenderCode code="M" codeSystem="2.16.840.1.113883.5.1" displayName="Male" codeSystemName="AdministrativeGender" />
+        <birthTime value="20180315" />
+        <maritalStatusCode code="S" displayName="Never Married" codeSystem="2.16.840.1.113883.5.2" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode code="2106-3" displayName="White" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <ethnicGroupCode code="2186-5" displayName="Not Hispanic or Latino" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <languageCommunication>
+          <languageCode code="en" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="202603171423-0400" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime><low value="20180315" /><high value="20260317" /></effectiveTime>
+      <performer typeCode="PRF">
+        <time><low value="20250101" /></time>
+        <assignedEntity>
+          <id extension="1891645123" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter>
+      <id root="00000000-0000-0000-0000-000000062816" extension="1306884820" />
+      <code code="AMB" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Ambulatory" />
+      <effectiveTime><low value="202603171000-0400" /></effectiveTime>
+      <location>
+        <healthCareFacility>
+          <id root="2.16.840.1.113883.19" extension="1306884820" />
+          <location>
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </location>
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Substance</th><th>Reaction</th><th>Severity</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Amoxicillin [RxNorm: 723]</td><td>Rash (maculopapular)</td><td>mild</td><td>active</td></tr>
+                <tr><td>Peanuts</td><td>Hives, lip swelling</td><td>moderate</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Medications" />
+          <title>MEDICATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Medication</th><th>Generic Name</th><th>Instructions</th><th>Dosage</th><th>Start Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>methylphenidate 10 mg tablet [RxNorm: 1091166]</td><td>methylphenidate</td><td>Take 1 tablet by mouth every morning</td><td>10 mg</td><td>09/01/2025</td><td>active</td></tr>
+                <tr><td>albuterol 90 mcg inhaler [RxNorm: 245314]</td><td>albuterol</td><td>Inhale 2 puffs every 4-6 hours as needed for wheezing</td><td>90 mcg</td><td>03/15/2023</td><td>active</td></tr>
+                <tr><td>fluticasone 44 mcg inhaler [RxNorm: 896006]</td><td>fluticasone</td><td>Inhale 1 puff twice daily</td><td>44 mcg</td><td>03/15/2023</td><td>active</td></tr>
+                <tr><td>cetirizine 5 mg chewable tablet [RxNorm: 1014677]</td><td>cetirizine</td><td>Take 1 tablet by mouth daily</td><td>5 mg</td><td>04/01/2025</td><td>active</td></tr>
+                <tr><td>triamcinolone 0.1% cream [RxNorm: 106259]</td><td>triamcinolone</td><td>Apply thin layer to affected areas twice daily</td><td>0.1%</td><td>06/10/2024</td><td>active</td></tr>
+                <tr><td>EpiPen Jr 0.15 mg auto-injector [RxNorm: 310146]</td><td>epinephrine</td><td>Inject IM into outer thigh for anaphylaxis</td><td>0.15 mg</td><td>01/15/2025</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problems" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Problem</th><th>Problem Status</th><th>Date Started</th></tr></thead>
+              <tbody>
+                <tr><td>Mild intermittent asthma [ICD10: J45.20]</td><td>active</td><td>03/15/2023</td></tr>
+                <tr><td>Attention deficit hyperactivity disorder combined [ICD10: F90.2]</td><td>active</td><td>09/01/2025</td></tr>
+                <tr><td>Atopic dermatitis eczema [ICD10: L20.9]</td><td>active</td><td>06/10/2024</td></tr>
+                <tr><td>Peanut allergy [ICD10: Z91.010]</td><td>active</td><td>01/15/2025</td></tr>
+                <tr><td>Obesity BMI 95th percentile [ICD10: E66.01]</td><td>active</td><td>03/10/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Vital Signs" />
+          <title>VITAL SIGNS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Encounter</th><th>Height (in)</th><th>Weight (lb)</th><th>BMI (kg/m2)</th><th>BP Sys (mmHg)</th><th>BP Dias (mmHg)</th><th>Heart Rate (/min)</th><th>O2 % BldC Oximetry</th><th>Body Temperature</th><th>Respiratory Rate (/min)</th></tr></thead>
+              <tbody>
+                <tr><td>03/10/2026</td><td>50</td><td>72</td><td>20.3</td><td>102</td><td>66</td><td>88</td><td>99</td><td>98.6</td><td>20</td></tr>
+                <tr><td>09/15/2025</td><td>49</td><td>68</td><td>19.8</td><td>100</td><td>64</td><td>84</td><td>99</td><td>98.4</td><td>18</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Lab Results" />
+          <title>LAB RESULTS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Test Name</th><th>Result</th><th>Units</th><th>Flag</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>CBC WBC [LOINC: 6690-2]</td><td>8.5</td><td>10*3/uL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Hemoglobin [LOINC: 718-7]</td><td>12.8</td><td>g/dL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Lead Level [LOINC: 5671-3]</td><td>2.1</td><td>ug/dL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Glucose random [LOINC: 2345-7]</td><td>92</td><td>mg/dL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Lipid Panel Total Cholesterol [LOINC: 2093-3]</td><td>175</td><td>mg/dL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Lipid Panel LDL [LOINC: 2089-1]</td><td>105</td><td>mg/dL</td><td>normal</td><td>03/05/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Vaccine</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>DTaP dose 5</td><td>03/15/2023</td><td>completed</td></tr>
+                <tr><td>IPV dose 4</td><td>03/15/2023</td><td>completed</td></tr>
+                <tr><td>MMR dose 2</td><td>03/15/2023</td><td>completed</td></tr>
+                <tr><td>Varicella dose 2</td><td>03/15/2023</td><td>completed</td></tr>
+                <tr><td>Influenza vaccine 2025-2026</td><td>10/01/2025</td><td>completed</td></tr>
+                <tr><td>Hepatitis A dose 2</td><td>09/15/2020</td><td>completed</td></tr>
+                <tr><td>Hepatitis B dose 3</td><td>09/15/2018</td><td>completed</td></tr>
+                <tr><td>COVID-19 Vaccine 2024-2025 (Pfizer Peds)</td><td>10/15/2024</td><td>completed</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>Lives with: Both parents and older sister (age 12). Grade: 2nd grade, Robious Elementary. Academic performance: Improved since starting ADHD medication. Physical activity: Soccer team, swimming lessons. Screen time: Limited to 1 hour/day per parents. Diet: Picky eater. Avoids all nuts. Carries EpiPen to school. Development: Meeting milestones. Safety: Car booster seat, bike helmet, swim supervision.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Insurance" />
+          <title>INSURANCE</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Payer</th><th>Policy Type</th><th>Member ID</th><th>Group</th></tr></thead>
+              <tbody>
+                <tr><td>Anthem HealthKeepers</td><td>Medicaid Managed Care</td><td>MCD-880921</td><td>N/A</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11506-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Progress Notes" />
+          <title>PROGRESS NOTES</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Date</th><th>Provider</th><th>Note Type</th><th>Note Text</th><th>Location</th></tr></thead>
+              <tbody>
+                <tr><td>03/10/2026</td><td>Cory Denton, FNP</td><td>Well-Child Visit</td><td>WELL-CHILD VISIT — 8 years old
+CC: Annual checkup, ADHD medication follow-up
+HPI: 8yo male here with mother for annual well-child visit. Overall doing well. ADHD medication (Ritalin 10mg) working — teacher reports improved focus and completion of assignments. No behavioral issues. Appetite slightly reduced (common ADHD med side effect). Asthma well-controlled — using inhaler only 1x/month with exercise.
+Growth: Height 50in (50th %ile), Weight 72 lbs (85th %ile), BMI 20.3 (95th %ile — obese range).
+Development: Reading at grade level. Social skills appropriate. No behavioral concerns.
+PE: HEENT normal. Heart RRR no murmur. Lungs clear. Abdomen soft. Tanner stage 1. Neurological normal.
+Vision: 20/25 OU. Hearing: Passed bilateral.
+Assessment:
+# ADHD (F90.2): Well controlled on methylphenidate 10mg. Appetite monitoring.
+# Asthma (J45.20): Well controlled. Continue fluticasone maintenance, albuterol PRN.
+# Eczema (L20.9): Mild flare on arms. Continue triamcinolone cream.
+# Obesity (E66.01): BMI 95th %ile. Discussed nutrition, activity. Goal: no weight gain as height increases.
+# Peanut allergy (Z91.010): EpiPen not expired. Renewed prescription.
+Immunizations: All UTD. HPV series starts at age 11. Tdap booster at age 11.
+Plan: Recheck in 6 months for weight, ADHD. Annual labs. Continue current meds.</td><td>Family Practice Associates of Chesterfield</td></tr>
+                <tr><td>09/15/2025</td><td>Patricia Lavinus, NP</td><td>ADHD Evaluation</td><td>CC: Academic difficulty, inattention, hyperactivity
+HPI: 7yo male referred by teacher for ADHD evaluation. Parent reports difficulty sitting still, not completing homework, easily distracted. Symptoms present for >12 months in >2 settings (home and school).
+Vanderbilt Assessment Scales: Parent score 38 (>75th %ile inattentive + hyperactive). Teacher score 42.
+Assessment: ADHD Combined type (F90.2).
+Plan: Start methylphenidate 5mg QAM. Increase to 10mg in 2 weeks if tolerated. Weight/BP monitoring. Behavioral strategies handout. Follow-up 4 weeks.</td><td>Family Practice Associates of Chesterfield</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

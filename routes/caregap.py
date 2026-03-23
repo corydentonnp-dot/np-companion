@@ -81,7 +81,7 @@ def index():
         patient_gaps = gaps_by_mrn.get(mrn, [])
         patients.append({
             'mrn': mrn,
-            'mrn_display': '••' + mrn[-4:] if len(mrn) >= 4 else mrn,
+            'mrn_display': mrn,
             'name': appt.patient_name,
             'time': appt.appointment_time,
             'visit_type': appt.visit_type,
@@ -97,7 +97,7 @@ def index():
             name = gaps[0].patient_name if gaps else ''
             unscheduled_with_gaps.append({
                 'mrn': mrn,
-                'mrn_display': '••' + mrn[-4:] if len(mrn) >= 4 else mrn,
+                'mrn_display': mrn,
                 'name': name,
                 'time': '',
                 'visit_type': '',
@@ -148,7 +148,7 @@ def patient_gaps(mrn):
         if sched:
             patient_name = sched.patient_name
 
-    mrn_display = '••' + mrn[-4:] if len(mrn) >= 4 else mrn
+    mrn_display = mrn
 
     open_gaps = [g for g in gaps if not g.is_addressed]
     addressed_gaps = [g for g in gaps if g.is_addressed]
@@ -445,7 +445,7 @@ def panel_report():
             patient_map[g.mrn] = {
                 'mrn': g.mrn,
                 'name': g.patient_name or '',
-                'mrn_display': ('••' + g.mrn[-4:]) if len(g.mrn) >= 4 else g.mrn,
+                'mrn_display': g.mrn,
                 'cells': {},
             }
         # Pick the most significant status per gap_type for this patient

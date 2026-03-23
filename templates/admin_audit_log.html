@@ -3,13 +3,15 @@
 {% block page_id %}admin-audit-log{% endblock %}
 
 {% block content %}
-<h1>Audit Log</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Audit Log</h1>
+</div>
 
 {# ---- Filter bar ---------------------------------------------------- #}
 <div class="card" style="margin-bottom:20px;">
     <div class="card-body">
         <form method="GET" action="{{ url_for('auth.admin_audit_log') }}"
-              style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+              class="form-row" style="flex-wrap:wrap;align-items:flex-end;">
 
             {# User filter #}
             <div class="form-group" style="margin-bottom:0;min-width:160px;">
@@ -61,14 +63,14 @@
         <span>Showing {{ entries|length }} entries (max 500)</span>
     </div>
     <div class="table-wrap">
-        <table class="table table--striped" id="audit-table">
+        <table class="data-table data-table--striped" id="audit-table">
             <thead>
                 <tr>
-                    <th style="cursor:pointer;" onclick="sortTable(0)">Timestamp</th>
-                    <th style="cursor:pointer;" onclick="sortTable(1)">User</th>
-                    <th style="cursor:pointer;" onclick="sortTable(2)">Action</th>
-                    <th style="cursor:pointer;" onclick="sortTable(3)">Module</th>
-                    <th style="cursor:pointer;" onclick="sortTable(4)">IP Address</th>
+                    <th data-sort="" data-sort-type="date">Timestamp</th>
+                    <th data-sort="">User</th>
+                    <th data-sort="">Action</th>
+                    <th data-sort="">Module</th>
+                    <th data-sort="">IP Address</th>
                 </tr>
             </thead>
             <tbody>
@@ -90,7 +92,7 @@
                         —
                         {% endif %}
                     </td>
-                    <td style="font-family:monospace;font-size:13px;">{{ e.ip_address }}</td>
+                    <td class="mono" style="font-size:13px;">{{ e.ip_address }}</td>
                 </tr>
                 {% endfor %}
                 {% if not entries %}
@@ -105,29 +107,5 @@
     </div>
 </div>
 
-<script>
-/**
- * Simple client-side column sort for the audit table.
- * Clicking a column header sorts ascending; clicking again sorts descending.
- */
-var sortDir = {};
-function sortTable(colIndex) {
-    var table = document.getElementById('audit-table');
-    if (!table) return;
-    var tbody = table.querySelector('tbody');
-    var rows = Array.from(tbody.querySelectorAll('tr'));
 
-    // Toggle sort direction
-    sortDir[colIndex] = !sortDir[colIndex];
-    var dir = sortDir[colIndex] ? 1 : -1;
-
-    rows.sort(function (a, b) {
-        var aText = (a.cells[colIndex] && a.cells[colIndex].textContent.trim()) || '';
-        var bText = (b.cells[colIndex] && b.cells[colIndex].textContent.trim()) || '';
-        return aText.localeCompare(bText) * dir;
-    });
-
-    rows.forEach(function (row) { tbody.appendChild(row); });
-}
-</script>
 {% endblock %}

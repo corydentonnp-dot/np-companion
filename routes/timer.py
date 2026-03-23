@@ -271,7 +271,7 @@ def timer_status():
         if f2f_active and active.face_to_face_start:
             f2f_secs += int((now - active.face_to_face_start).total_seconds())
         return jsonify({
-            'active_mrn': '****' + active.mrn[-4:] if active.mrn and len(active.mrn) >= 4 else active.mrn,
+            'active_mrn': active.mrn or '',
             'session_start': active.session_start.isoformat(),
             'duration_seconds': duration,
             'is_idle': idle > 0 and (duration - idle) < 10,
@@ -609,14 +609,13 @@ def export_csv():
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        'MRN_Last4', 'Start', 'End', 'Duration_Min',
+        'MRN', 'Start', 'End', 'Duration_Min',
         'Visit_Type', 'F2F_Min', 'Billing_Level',
         'Complex', 'Notes',
     ])
     for s in sessions:
-        mrn4 = s.mrn[-4:] if s.mrn and len(s.mrn) >= 4 else s.mrn
         writer.writerow([
-            mrn4,
+            s.mrn or '',
             s.session_start.strftime('%H:%M') if s.session_start else '',
             s.session_end.strftime('%H:%M') if s.session_end else 'Active',
             round((s.duration_seconds or 0) / 60, 1),

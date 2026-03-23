@@ -6,7 +6,7 @@ applyTo: "agent/**/*.py"
 
 ## Desktop-Only Zone
 The `agent/` directory is the ONLY place where desktop automation packages may be imported:
-- `pyautogui`, `win32gui`, `win32con`, `pytesseract`, `pyperclip`, `pystray`, `psutil`
+- `pyautogui`, `win32gui`, `win32con`, `win32api`, `pytesseract`, `pyperclip`, `pystray`, `psutil`, `pywinauto`, `comtypes`
 - These imports MUST NEVER appear in `routes/`, `models/`, `utils/`, `billing_engine/`, or `adapters/`.
 
 ## Error Handling
@@ -15,13 +15,22 @@ The `agent/` directory is the ONLY place where desktop automation packages may b
 - No PHI in log messages — hash MRNs with `hashlib.sha256(mrn.encode()).hexdigest()[:12]`.
 
 ## Amazing Charts Automation
-- OCR-first: `find_and_click('text', fallback_xy=config.COORDINATES)` — never hardcoded coordinates alone.
-- Verify AC is the foreground window before ANY click.
+- **Preferred:** `smart_find_and_click('text', fallback_xy=config.COORDINATES)` from `agent/ac_interact.py` — tries UIA → OCR → coordinates.
+- **Legacy (still valid):** `find_and_click('text', fallback_xy=config.COORDINATES)` from `agent/ocr_helpers.py` — OCR → coordinates.
+- Never use hardcoded coordinates alone.
+- Verify AC is the foreground window before ANY click (except Win32 message clicks which don't require foreground).
 - Screenshot before executing any order set.
 - `time.sleep(0.5)` minimum between actions.
 - Stop immediately on failure — log what completed vs. what didn't.
 - Handle "Resurrect Note" dialog before proceeding.
 - Check AC state (`not_running → login_screen → home_screen → chart_open`) before automation.
+
+## UIA + Win32 Interaction (3-tier)
+- **Tier 1 (UIA):** `uia_helpers.py` finds controls by name/automation_id, `win32_actions.py` clicks via Win32 messages.
+- **Tier 2 (OCR):** `ocr_helpers.py` finds elements by visible text, `pyautogui` clicks at screen coordinates.
+- **Tier 3 (Legacy):** Fallback to hardcoded (x,y) coordinates from `config.py`.
+- Use `ac_interact.py` `smart_find_and_click()` / `smart_type_text()` / `smart_navigate_menu()` for new automation.
+- Run `uia_probe.py` against AC to discover which controls are UIA-accessible before writing automation.
 
 ## OCR
 - Always preprocess: grayscale → 2x upscale → contrast.

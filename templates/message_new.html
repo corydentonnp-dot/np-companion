@@ -33,7 +33,7 @@
         <form method="POST" action="{{ url_for('messages.create') }}">
             <div class="form-group">
                 <label class="form-label">Recipient</label>
-                <input type="text" name="recipient_identifier" class="form-input" placeholder="Patient name or identifier" required>
+                <input type="text" name="recipient_identifier" class="form-input" placeholder="Patient name or identifier" required autofocus>
             </div>
 
             <div class="form-group">

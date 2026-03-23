@@ -109,7 +109,7 @@ def index():
     for t in tracks:
         mrn = t.mrn
         if mrn not in patients:
-            patients[mrn] = {'mrn': mrn, 'display_mrn': mrn[-4:] if mrn else '????', 'tracks': []}
+            patients[mrn] = {'mrn': mrn, 'display_mrn': mrn or '????', 'tracks': []}
         patients[mrn]['tracks'].append(t)
 
     # Count stats
@@ -149,7 +149,7 @@ def patient_detail(mrn):
         flash('No tracked labs found for that patient.', 'error')
         return redirect(url_for('labtrack.index'))
 
-    display_mrn = mrn[-4:] if mrn else '????'
+    display_mrn = mrn or '????'
 
     # Group by panel
     paneled = {}
@@ -192,7 +192,7 @@ def add_tracking():
         user_id=current_user.id, mrn=mrn, lab_name=lab_name
     ).first()
     if existing:
-        flash(f'Already tracking {lab_name} for ...{mrn[-4:]}.', 'error')
+        flash(f'Already tracking {lab_name} for {mrn}.', 'error')
         return redirect(url_for('labtrack.index'))
 
     track = LabTrack(
@@ -208,7 +208,7 @@ def add_tracking():
     )
     db.session.add(track)
     db.session.commit()
-    flash(f'Now tracking {lab_name} for ...{mrn[-4:]}.', 'success')
+    flash(f'Now tracking {lab_name} for {mrn}.', 'success')
     return redirect(url_for('labtrack.index'))
 
 
@@ -250,7 +250,7 @@ def add_panel():
             db.session.add(track)
             added += 1
     db.session.commit()
-    flash(f'Added {added} lab(s) from {panel_name} panel for ...{mrn[-4:]}.', 'success')
+    flash(f'Added {added} lab(s) from {panel_name} panel for {mrn}.', 'success')
     return redirect(url_for('labtrack.index'))
 
 
@@ -295,7 +295,7 @@ def delete_tracking(track_id):
     # HIPAA: soft-delete clinical records — never hard-delete
     track.is_archived = True
     db.session.commit()
-    flash(f'Removed {name} tracking for ...{mrn[-4:]}.', 'success')
+    flash(f'Removed {name} tracking for {mrn}.', 'success')
     return redirect(url_for('labtrack.index'))
 
 

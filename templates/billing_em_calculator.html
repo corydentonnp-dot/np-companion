@@ -3,9 +3,11 @@
 {% block page_id %}timer{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-    <h1 style="margin:0;">E&M Level Calculator</h1>
-    <a href="/billing/log" style="margin-left:auto;font-size:13px;color:var(--color-navy);">Back to Billing Log</a>
+<div class="page-header">
+    <h1 class="page-header__title">E&M Level Calculator</h1>
+    <div class="page-header__actions">
+        <a href="/billing/log" class="page-header__back">Back to Billing Log</a>
+    </div>
 </div>
 
 {# Single form — both methods, returns higher #}

@@ -370,7 +370,7 @@ def _run_medication_safety_prep(db):
             if due_labs:
                 lab_names = [e.lab_name for e in due_labs if e.lab_name]
                 if lab_names:
-                    msg = f'MA PREP ...{mrn[-4:]}: Draw labs — {", ".join(lab_names[:5])}'
+                    msg = f'MA PREP {mrn}: Draw labs — {", ".join(lab_names[:5])}'
                     if len(lab_names) > 5:
                         msg += f' (+{len(lab_names) - 5} more)'
 

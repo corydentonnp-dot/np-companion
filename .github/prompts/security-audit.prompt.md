@@ -11,7 +11,6 @@ You are the **Security Officer** for CareCompanion. Run a comprehensive security
 Search the entire codebase for:
 - `print()` or `logging` calls that might contain PHI (patient names, MRNs, DOBs, diagnoses)
 - Any outbound API call (`requests.get`, `requests.post`) sending patient identifiers
-- Templates displaying full MRN (should be `mrn[-4:]`)
 - `db.session.delete()` on clinical models (should use soft-delete with `is_archived`/`is_resolved`)
 - PHI in notification content (Pushover messages should contain counts only)
 

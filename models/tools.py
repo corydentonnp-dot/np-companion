@@ -58,7 +58,7 @@ class ControlledSubstanceEntry(db.Model):
                            onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
-        return f'<CSEntry {self.drug_name} MRN={self.mrn}>'
+        return f'<CSEntry {self.drug_name} MRN={self.mrn or "?"}>'
 
     @property
     def days_until_refill(self):

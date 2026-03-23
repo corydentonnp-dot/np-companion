@@ -3,9 +3,11 @@
 {% block page_id %}admin-dismissal-audit{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Dismissal Audit Trail</h1>
-    <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+<div class="page-header">
+    <h1 class="page-header__title">Dismissal Audit Trail</h1>
+    <div class="page-header__actions">
+        <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+    </div>
 </div>
 
 {# ---- Filters ---- #}
@@ -45,7 +47,7 @@
     </div>
     <div class="card-body" style="padding:0;">
         {% if dismissals %}
-        <table class="schedule-table" style="font-size:12px;">
+        <table class="data-table data-table--compact" style="font-size:12px;">
             <thead>
                 <tr>
                     <th>Timestamp</th>

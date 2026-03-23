@@ -12,7 +12,19 @@
     var END_HOUR = 18; // 6 PM
     var SLOT_MINUTES = 15;
     var SLOT_HEIGHT = 36; // px per 15-min slot
-    var TOTAL_SLOTS = (END_HOUR - START_HOUR) * (60 / SLOT_MINUTES); // 44 slots
+
+    /* Read user-configured hours from the grid container data attributes */
+    function readHourPrefs() {
+        var el = document.getElementById('schedule-grid-view');
+        if (el) {
+            var sh = parseInt(el.getAttribute('data-start-hour'), 10);
+            var eh = parseInt(el.getAttribute('data-end-hour'), 10);
+            if (!isNaN(sh)) START_HOUR = sh;
+            if (!isNaN(eh)) END_HOUR = eh;
+        }
+    }
+
+    function totalSlots() { return (END_HOUR - START_HOUR) * (60 / SLOT_MINUTES); }
 
     /* ---- State ---- */
     var _appointments = [];
@@ -67,7 +79,8 @@
         container.className = 'sched-grid';
 
         // Time labels column + appointment column
-        for (var s = 0; s < TOTAL_SLOTS; s++) {
+        var ts = totalSlots();
+        for (var s = 0; s < ts; s++) {
             var totalMin = s * SLOT_MINUTES + START_HOUR * 60;
             var isHour = totalMin % 60 === 0;
 
@@ -226,6 +239,7 @@
     /* ---- Init ---- */
     function init(appointments) {
         _appointments = appointments || [];
+        readHourPrefs();
         var saved = localStorage.getItem('cc_sched_view') || 'table';
         toggleView(saved);
     }

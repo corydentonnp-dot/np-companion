@@ -457,6 +457,77 @@ def admin_clear_test_data():
 
 
 # ======================================================================
+# POST /admin/tools/purge-reimport-xml — Purge all patient data and
+# re-import every XML test patient from Documents/xml_test_patients/
+# ======================================================================
+@admin_bp.route('/admin/tools/purge-reimport-xml', methods=['POST'])
+@login_required
+@_require_admin
+def admin_purge_reimport_xml():
+    """Delete all patient clinical data and re-import XML test patients."""
+    import glob
+    from models import db
+    from models.patient import (
+        PatientRecord, PatientMedication, PatientDiagnosis,
+        PatientAllergy, PatientImmunization, PatientVitals,
+        PatientLabResult, PatientSocialHistory, PatientEncounterNote,
+    )
+    from agent.clinical_summary_parser import parse_clinical_summary, store_parsed_summary
+
+    uid = current_user.id
+    xml_dir = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        'Documents', 'xml_test_patients',
+    )
+
+    try:
+        # ---- Phase 1: purge all patient clinical data for this user ----
+        purged = 0
+        for model in (PatientMedication, PatientDiagnosis, PatientAllergy,
+                      PatientImmunization, PatientVitals, PatientLabResult,
+                      PatientEncounterNote, PatientSocialHistory):
+            purged += model.query.filter_by(user_id=uid).delete()
+        # Remove PatientRecord rows so they get re-created from XML
+        purged += PatientRecord.query.filter_by(user_id=uid).delete()
+        db.session.flush()
+
+        # ---- Phase 2: re-import every XML in the test patients folder ----
+        xml_files = sorted(glob.glob(os.path.join(xml_dir, '*.xml')))
+        if not xml_files:
+            db.session.commit()
+            flash('Patient data purged, but no XML files found to reimport.', 'warning')
+            return redirect(url_for('admin_hub.admin_tools'))
+
+        imported = 0
+        errors = []
+        for xml_path in xml_files:
+            try:
+                parsed = parse_clinical_summary(xml_path)
+                mrn = parsed.get('patient_mrn', '').strip()
+                if not mrn:
+                    errors.append(os.path.basename(xml_path) + ' (no MRN)')
+                    continue
+                store_parsed_summary(uid, mrn, parsed)
+                imported += 1
+            except Exception as inner:
+                errors.append(os.path.basename(xml_path) + f' ({inner})')
+
+        db.session.commit()
+
+        msg = f'Purged {purged} rows. Re-imported {imported}/{len(xml_files)} patients.'
+        if errors:
+            msg += f' Errors: {", ".join(errors)}'
+        flash(msg, 'success' if not errors else 'warning')
+    except Exception as e:
+        db.session.rollback()
+        import logging
+        logging.getLogger(__name__).error('Purge & reimport error: %s', e)
+        flash('Purge & reimport failed. Check server logs.', 'error')
+
+    return redirect(url_for('admin_hub.admin_tools'))
+
+
+# ======================================================================
 # GET /admin/caregap-rules — View/edit care gap screening rules (F15)
 # ======================================================================
 @admin_bp.route('/admin/caregap-rules')

@@ -287,7 +287,7 @@ def monitoring_due(mrn):
             meld_score = engine.compute_meld_score(mrn_hash)
             child_pugh_score = engine.compute_child_pugh_score(mrn_hash)
     except Exception as exc:
-        logger.debug("Clinical scoring skipped for %s: %s", mrn, exc)
+        logger.debug("Clinical scoring skipped for ••%s: %s", mrn[-4:], exc)
 
     return jsonify({
         'due_labs': due_labs,
@@ -422,8 +422,8 @@ def preventive_gaps():
             overdue_count += 1
             overdue_patients.append({
                 'mrn': pat.mrn,
-                'name': pat.patient_name or f'...{pat.mrn[-4:]}',
-                'mrn_display': f'...{pat.mrn[-4:]}' if pat.mrn else '????',
+                'name': pat.patient_name or pat.mrn,
+                'mrn_display': pat.mrn or '????',
                 'last_performed': str(svc_record.service_date) if svc_record else 'Never',
             })
 
@@ -478,8 +478,8 @@ def preventive_gaps():
         if pat.last_xml_parsed and pat.last_xml_parsed.date() > thirty_days_ago:
             continue
         outreach_patients.append({
-            'name': pat.patient_name or f'...{pat.mrn[-4:]}',
-            'mrn_display': f'...{pat.mrn[-4:]}' if pat.mrn else '????',
+            'name': pat.patient_name or pat.mrn,
+            'mrn_display': pat.mrn or '????',
             'overdue_count': len(entries),
             'labs': ', '.join(e.lab_name for e in entries[:3]) + (
                 f' +{len(entries) - 3} more' if len(entries) > 3 else ''
@@ -562,7 +562,7 @@ def preventive_gaps_csv():
             if not is_complete:
                 writer.writerow([
                     pat.patient_name or '',
-                    f'...{pat.mrn[-4:]}' if pat.mrn else '',
+                    pat.mrn or '',
                     rule.lab_name,
                     rule.lab_cpt_code,
                     str(svc_record.service_date) if svc_record else 'Never',

@@ -42,7 +42,7 @@
         {% for e in entries %}
             <tr>
                 <td>{{ e.session.session_start.strftime('%Y-%m-%d %H:%M') if e.session.session_start else '' }}</td>
-                <td>{{ e.session.mrn[-4:] if e.session.mrn and e.session.mrn|length >= 4 else e.session.mrn }}</td>
+                <td>{{ e.session.mrn }}</td>
                 <td>{{ e.session.visit_type or '' }}</td>
                 <td>{{ ((e.session.duration_seconds or 0) / 60)|round(1) }}</td>
                 <td>{{ ((e.session.face_to_face_seconds or 0) / 60)|round(1) }}</td>

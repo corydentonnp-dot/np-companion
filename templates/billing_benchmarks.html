@@ -3,16 +3,15 @@
 {% block page_id %}timer{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Billing Benchmarks</h1>
-    <div style="display:flex;gap:8px;margin-left:auto;align-items:center;">
-        <form method="GET" action="/billing/benchmarks" style="display:flex;gap:8px;align-items:center;">
-            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}"
-                   style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
-            <button type="submit" style="padding:6px 14px;border-radius:6px;background:var(--color-navy);color:#fff;border:none;font-size:13px;cursor:pointer;min-height:44px;">Go</button>
+<div class="page-header">
+    <h1 class="page-header__title">Billing Benchmarks</h1>
+    <div class="page-header__actions">
+        <form method="GET" action="/billing/benchmarks" class="form-inline">
+            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}" class="form-input form-input--auto">
+            <button type="submit" class="btn btn-sm btn-primary">Go</button>
         </form>
-        <a href="/billing/monthly-report" style="font-size:13px;color:var(--color-navy);">Monthly Report</a>
-        <a href="/billing/log" style="font-size:13px;color:var(--color-navy);">Billing Log</a>
+        <a href="/billing/monthly-report" class="page-header__back">Monthly Report</a>
+        <a href="/billing/log" class="page-header__back">Billing Log</a>
     </div>
 </div>
 

@@ -56,7 +56,7 @@
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label" style="font-size:11px;">Phone</label>
-                            <input type="text" id="pa-payer-phone" class="form-input" placeholder="Payer PA phone">
+                            <input type="tel" id="pa-payer-phone" class="form-input" placeholder="Payer PA phone">
                         </div>
                         <div class="form-group" style="margin:0;">
                             <label class="form-label" style="font-size:11px;">Fax</label>
@@ -106,7 +106,7 @@
             <div class="card-header">PA History ({{ history|length }})</div>
             <div class="card-body" style="padding:0;max-height:400px;overflow-y:auto;">
                 {% if history %}
-                <table class="schedule-table" style="font-size:12px;">
+                <table class="data-table data-table--compact" style="font-size:12px;">
                     <thead>
                         <tr><th>Drug</th><th>Payer</th><th>Date</th><th>Status Timeline</th><th>Actions</th></tr>
                     </thead>

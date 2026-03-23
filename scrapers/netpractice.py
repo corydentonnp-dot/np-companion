@@ -40,6 +40,7 @@ Usage:
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -1017,7 +1018,7 @@ class NetPracticeScraper:
                 link = page.get_by_text(name, exact=False).first
 
             if not await link.count():
-                logger.warning(f'Could not find clickable link for patient: {name}')
+                logger.warning(f'Could not find clickable link for patient: ••{mrn[-4:] if mrn else "??"}')
                 return details
 
             await link.click()
@@ -1029,10 +1030,10 @@ class NetPracticeScraper:
             await page.go_back(timeout=10000)
             await page.wait_for_load_state('networkidle', timeout=10000)
 
-            logger.info(f'Enriched details for: {name} (MRN: {mrn})')
+            logger.info(f'Enriched details for: ••{mrn[-4:]} (hash={hashlib.sha256(mrn.encode()).hexdigest()[:12]})')
 
         except Exception as e:
-            logger.error(f'Error enriching details for {name}: {e}')
+            logger.error(f'Error enriching details for ••{mrn[-4:]}: {e}')
             try:
                 await page.go_back(timeout=5000)
                 await page.wait_for_load_state('networkidle', timeout=5000)

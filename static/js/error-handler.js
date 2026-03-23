@@ -133,3 +133,35 @@
     window.showWarning = showWarning;
     window.showInfo    = showInfo;
 })();
+
+/**
+ * fetchWithLoading — wraps fetch() with a loading state on a button or element.
+ * Adds .btn--loading class and disables the trigger, then restores on completion.
+ *
+ * Usage:
+ *   fetchWithLoading('/api/endpoint', {method:'POST', body:...}, myButton)
+ *     .then(function(data) { ... })
+ *     .catch(function(err) { showError(err.message); });
+ *
+ * @param {string} url - The fetch URL
+ * @param {object} opts - Fetch options (method, headers, body, etc.)
+ * @param {HTMLElement} [trigger] - Button or element to show loading state on
+ * @returns {Promise} - Resolves with parsed JSON, rejects on error
+ */
+window.fetchWithLoading = function (url, opts, trigger) {
+    if (trigger) {
+        trigger.classList.add('btn--loading');
+        trigger.disabled = true;
+    }
+    return fetch(url, opts)
+        .then(function (res) {
+            if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+            return res.json();
+        })
+        .finally(function () {
+            if (trigger) {
+                trigger.classList.remove('btn--loading');
+                trigger.disabled = false;
+            }
+        });
+};

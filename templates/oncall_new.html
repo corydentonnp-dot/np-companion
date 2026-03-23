@@ -4,6 +4,7 @@
 
 {% block content %}
 <div style="max-width:640px;margin:0 auto;">
+    <a href="{{ url_for('oncall.index') }}" style="font-size:13px;color:var(--text-secondary);text-decoration:none;">&larr; Back to On-Call</a>
     <h1 style="font-size:20px;margin-bottom:20px;">&#128222; New On-Call Note</h1>
 
     <form method="POST" action="/oncall/new" id="oncall-form">
@@ -11,7 +12,7 @@
         <div style="margin-bottom:16px;">
             <label style="display:block;font-weight:600;font-size:14px;margin-bottom:4px;">Chief Complaint</label>
             <div style="display:flex;gap:8px;">
-                <input type="text" name="chief_complaint" class="form-control" style="flex:1;min-height:44px;font-size:16px;" placeholder="Reason for call..." required>
+                <input type="text" name="chief_complaint" class="form-control" style="flex:1;min-height:44px;font-size:16px;" placeholder="Reason for call..." required autofocus>
                 <button type="button" class="btn btn-outline voice-btn" data-target="chief_complaint" style="min-width:44px;min-height:44px;font-size:20px;" title="Voice input">&#127908;</button>
             </div>
         </div>

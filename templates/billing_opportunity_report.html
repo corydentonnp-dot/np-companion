@@ -3,16 +3,15 @@
 {% block page_id %}billing-opportunity-report{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Billing Opportunity Report</h1>
-    <div style="display:flex;gap:8px;margin-left:auto;align-items:center;">
-        <form method="GET" action="/billing/opportunity-report" style="display:flex;gap:8px;align-items:center;">
-            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}"
-                   style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
-            <button type="submit" class="btn btn-sm btn-primary" style="min-height:44px;">Go</button>
+<div class="page-header">
+    <h1 class="page-header__title">Billing Opportunity Report</h1>
+    <div class="page-header__actions">
+        <form method="GET" action="/billing/opportunity-report" class="form-inline">
+            <input type="month" name="month" value="{{ '%04d-%02d'|format(year, month) }}" class="form-input form-input--auto">
+            <button type="submit" class="btn btn-sm btn-primary">Go</button>
         </form>
         <button onclick="window.print()" class="btn btn-sm btn-outline">Print</button>
-        <a href="/billing/monthly-report" style="font-size:13px;">Monthly Billing</a>
+        <a href="/billing/monthly-report" class="page-header__back">Monthly Billing</a>
     </div>
 </div>
 
@@ -76,7 +75,7 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">Top 5 Categories by Revenue Opportunity</div>
     <div class="card-body" style="padding:0;">
-        <table class="table" style="width:100%;font-size:13px;">
+        <table class="data-table" style="width:100%;font-size:13px;">
             <thead>
                 <tr>
                     <th style="padding:10px 14px;">Category</th>
@@ -111,7 +110,7 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">All Categories</div>
     <div class="card-body" style="padding:0;">
-        <table class="table" style="width:100%;font-size:13px;">
+        <table class="data-table" style="width:100%;font-size:13px;">
             <thead>
                 <tr>
                     <th style="padding:10px 14px;">Category</th>

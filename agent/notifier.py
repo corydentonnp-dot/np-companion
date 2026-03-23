@@ -176,11 +176,10 @@ def check_callback_reminders(user_id):
     ).all()
 
     for note in upcoming:
-        identifier = note.patient_identifier or 'a patient'
         _send_pushover(
             user_key, api_token,
             title='Callback Due Soon',
-            message=f'Callback due in ~30 min for {identifier}',
+            message='You have a callback due in ~30 min',
             priority=0,
             sound='pushover',
         )

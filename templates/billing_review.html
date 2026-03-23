@@ -5,12 +5,14 @@
 {% block page_id %}billing-review{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Post-Visit Billing Review</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Post-Visit Billing Review</h1>
     {% if record %}
-    <span style="font-size:14px;color:var(--text-secondary);">{{ record.patient_name or 'Patient' }} (MRN: {{ mrn }})</span>
+    <span class="page-header__subtitle">{{ record.patient_name or 'Patient' }} (MRN: {{ mrn }})</span>
     {% endif %}
-    <a href="/patient/{{ mrn }}" class="btn btn-outline btn-sm">Back to Chart</a>
+    <div class="page-header__actions">
+        <a href="/patient/{{ mrn }}" class="btn btn-outline btn-sm">Back to Chart</a>
+    </div>
 </div>
 
 {% if opportunities %}
@@ -20,7 +22,7 @@
         <span class="badge badge--info" style="margin-left:8px;">{{ opportunities|length }}</span>
     </div>
     <div class="card-body" style="padding:0;">
-        <table class="schedule-table" style="font-size:13px;">
+        <table class="data-table data-table--striped" style="font-size:13px;">
             <thead>
                 <tr>
                     <th>Visit Date</th>
@@ -90,8 +92,8 @@
         <span style="font-size:11px;color:var(--text-secondary);margin-left:8px;">(CMS Medicare Open Data)</span>
     </div>
     <div class="card-body" id="benchmark-body">
-        <div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:13px;">
-            <span class="spinner" style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--color-teal);border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+        <div class="widget-loading">
+            <span class="loading-spinner"></span>
             Loading benchmark data...
         </div>
     </div>
@@ -122,7 +124,7 @@
                 el.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;text-align:center;">No CMS benchmark data available for these codes.</p>';
                 return;
             }
-            var html = '<table class="schedule-table" style="font-size:12px;"><thead><tr>' +
+            var html = '<table class="data-table data-table--compact" style="font-size:12px;"><thead><tr>' +
                 '<th>HCPCS</th><th>VA NP Providers</th><th>Avg Services/Provider</th><th>Avg Payment</th><th>Avg Allowed</th>' +
                 '</tr></thead><tbody>';
             bms.forEach(function(b) {

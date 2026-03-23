@@ -141,3 +141,135 @@ def _normalise_med_list(medications: list) -> list:
             if name:
                 names.append(name.strip())
     return names
+
+
+# ------------------------------------------------------------------
+# ICD-10 Revenue Reference Data
+# ------------------------------------------------------------------
+
+import csv
+import os
+import re as _re
+
+# Singleton loaded on first access
+_ICD10_REVENUE_DATA = None  # dict[str, dict]
+_ICD10_FAMILY_INDEX = None  # dict[str(3-char prefix), list[str]]
+
+
+def _load_icd10_revenue():
+    """Parse the practice revenue CSV into a lookup dict keyed by ICD-10 code."""
+    global _ICD10_REVENUE_DATA, _ICD10_FAMILY_INDEX
+    if _ICD10_REVENUE_DATA is not None:
+        return
+
+    _ICD10_REVENUE_DATA = {}
+    _ICD10_FAMILY_INDEX = {}
+    csv_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'Documents', 'billing_resources',
+        'calendar_year_dx_revenue_priority_icd10.csv',
+    )
+    if not os.path.isfile(csv_path):
+        return
+
+    with open(csv_path, newline='', encoding='utf-8-sig') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            raw = (row.get('ICD & Description') or '').strip()
+            if not raw:
+                continue
+            # Extract ICD-10 code (first token before space)
+            parts = raw.split(' ', 1)
+            code = parts[0].strip().upper()
+            description = parts[1].strip() if len(parts) > 1 else ''
+            if not _re.match(r'^[A-Z]\d', code):
+                continue  # skip malformed rows
+
+            # Parse dollar amounts (remove $, commas)
+            def _parse_dollar(val):
+                if not val:
+                    return 0.0
+                return float(val.replace('$', '').replace(',', '').strip() or '0')
+
+            def _parse_pct(val):
+                if not val:
+                    return 0.0
+                return float(val.replace('%', '').strip() or '0') / 100.0
+
+            per_encounter = _parse_dollar(row.get('$/ Encounter', ''))
+            tier = (row.get('Teir') or row.get('Tier') or '').strip()
+            retention = _parse_pct(row.get('Retention Score', ''))
+
+            entry = {
+                'code': code,
+                'description': description,
+                'encounters': int(row.get('Encounters', '0').strip() or '0'),
+                'billed': _parse_dollar(row.get('$ Billed ', '')),
+                'received': _parse_dollar(row.get('$ Recieved', '')),
+                'per_encounter': per_encounter,
+                'retention': retention,
+                'priority_score': float(row.get('Priority Score (V2)', '0').strip() or '0'),
+                'tier': tier,
+            }
+            _ICD10_REVENUE_DATA[code] = entry
+
+            # Index by 3-character family (e.g. "E11", "I10", "F41")
+            family = code[:3]
+            _ICD10_FAMILY_INDEX.setdefault(family, []).append(code)
+
+
+def get_icd10_revenue(code):
+    """
+    Look up revenue data for a single ICD-10 code.
+    Returns dict with per_encounter, tier, etc. or None.
+    """
+    _load_icd10_revenue()
+    return _ICD10_REVENUE_DATA.get((code or '').strip().upper())
+
+
+def find_revenue_alternatives(code):
+    """
+    Find same-family ICD-10 codes with higher per-encounter revenue.
+    Only returns codes within the same 3-character category (e.g. E11.xx)
+    to ensure clinical relevance — never suggests a code from a
+    different diagnostic family.
+
+    Returns list of dicts sorted by per_encounter descending,
+    each with: code, description, per_encounter, delta, tier.
+    Excludes the input code itself and Z-codes (screening/admin).
+    """
+    _load_icd10_revenue()
+    if not code:
+        return []
+    code = code.strip().upper()
+    family = code[:3]
+
+    # Skip Z-codes entirely — they are screening/admin, not billable diagnoses
+    if family.startswith('Z'):
+        return []
+
+    current = _ICD10_REVENUE_DATA.get(code)
+    current_rev = current['per_encounter'] if current else 0.0
+
+    siblings = _ICD10_FAMILY_INDEX.get(family, [])
+    alternatives = []
+    for sib_code in siblings:
+        if sib_code == code:
+            continue
+        sib = _ICD10_REVENUE_DATA[sib_code]
+        # Skip Z-codes and codes with no revenue
+        if sib_code.startswith('Z') or sib['per_encounter'] <= 0:
+            continue
+        # Only suggest codes that pay more
+        if sib['per_encounter'] > current_rev:
+            alternatives.append({
+                'code': sib_code,
+                'description': sib['description'],
+                'per_encounter': sib['per_encounter'],
+                'delta': round(sib['per_encounter'] - current_rev, 2),
+                'tier': sib['tier'],
+                'retention': sib['retention'],
+            })
+
+    alternatives.sort(key=lambda x: x['per_encounter'], reverse=True)
+    return alternatives

@@ -9,6 +9,83 @@
 
 ---
 
+# UI System Review — Implementation Progress
+
+> Ref: Full audit in session 03-23-26, approved plan in `UI_OVERHAUL.md`
+
+## Phase M1 — CSS Foundation ✅ COMPLETE (03-23-26)
+
+- [x] M1.1 — Add missing utility classes (`.sticky-top`)
+- [x] M1.2 — Rename `.schedule-table` → `.data-table` in CSS (16 rules, deprecated alias kept)
+- [x] M1.3 — Add table modifiers (`.data-table--striped`, `.data-table--compact`, sortable headers)
+- [x] M1.4 — Add unified status system (`.status--critical/warning/success/info/muted`, row tints, dots)
+- [x] M1.5 — Add `.page-header` + `.action-bar` primitives
+- [x] M1.6 — Add `.cc-modal` unified modal system (sm/md/lg/xl sizes, header/body/footer, dark mode)
+- [x] M1.7 — Migrate all 15 templates (29 occurrences) from `schedule-table` to `data-table`
+- [x] M1.8 — Mark single-dash badge aliases as deprecated
+- [x] Verification — 93/93 tests passing, 0 CSS errors
+
+## Phase M2 — High-Frequency Template Cleanup ✅ COMPLETE (03-24-26)
+
+- [x] M2.1 — Dashboard: `.data-table--striped`, modals→`.cc-modal`, inline cleanup (~100 styles removed)
+- [x] M2.2 — Patient chart: spinners→`.loading-spinner`, badges→`.widget-count-badge`, modal→`.cc-modal` (~40 styles removed)
+- [x] M2.3 — Inbox: stats→`.stat-grid/.stat-block/.stat-value/.stat-label`, tables→`.data-table`, header→`.page-header` (~30 styles removed)
+- [x] M2.4 — Timer: stats→`.stat-grid--auto`, kv pairs→`.kv-label/.kv-value`, table→`.data-table--striped` (~25 styles removed)
+- [x] M2.5 — Billing review: header→`.page-header`, table→striped, spinner→`.loading-spinner/.widget-loading` (~8 styles removed)
+- [x] M2.6 — Patient roster: header→`.page-header`, MRN→`.mono`, table→`.data-table--striped` (~5 styles removed)
+- [x] M2.7 — Care gaps: modal→`.cc-modal` system, header→`.page-header` (~12 styles removed)
+- [x] M2.8 — On-call: 5 inline badge patterns→`.badge--error/success/muted/warning/info`, header→`.page-header` (~15 styles removed)
+- [x] Verification — 93/93 tests passing after all changes
+
+## Phase M3 — Secondary Template Cleanup ✅ COMPLETE (06-10-25)
+
+- [x] Admin pages (15 templates) — page-header, data-table, tool card classes, modal migrations, expand rows, section headings
+- [x] Billing pages (5 templates + 1 table fix) — page-header, form-inline, data-table
+- [x] Clinical tools (7 templates + 3 modal migrations) — page-header, cc-modal
+- [x] Settings, auth, reference pages (4 templates) — page-header, section-heading
+
+## Phase M4 — JS Enhancements
+
+- [ ] `initSortableHeaders()` — client-side table column sorting
+- [ ] `initStatePersistence()` — filter/scroll/tab session memory
+- [ ] `initCollapsible()` — unified collapse/expand with localStorage
+- [ ] `initQuickActions()` — inline status toggle buttons
+- [ ] `_pagination.html` — reusable Jinja pagination macro
+
+---
+
+# AC Automation Upgrade — UIA + Win32 Messages
+
+> Ref: Plan created 03-24-26. Replaces fragile OCR/pyautogui with UIA element discovery + Win32 message injection.
+
+## Phase UIA-1 — Infrastructure ✅ COMPLETE (03-24-26)
+
+- [x] Install pywinauto==0.6.8 + add to requirements.txt
+- [x] Create `agent/uia_probe.py` — diagnostic tree dump script
+- [x] Create `agent/uia_helpers.py` — UIA element finding layer
+- [x] Create `agent/win32_actions.py` — Win32 message action layer
+- [x] Create `agent/ac_interact.py` — smart 3-tier interaction (UIA → OCR → coordinates)
+- [x] Add config flags: `AC_USE_UIA`, `AC_INTERACTION_TIER`, `AC_UIA_TIMEOUT`
+- [x] Update agent-boundary.instructions.md with UIA rules + new allowed imports
+
+## Phase UIA-2 — Feasibility Probe (BLOCKING GATE)
+
+- [ ] Run `uia_probe.py` with AC at home screen — assess tree richness
+- [ ] Run `uia_probe.py` with AC at chart open — check patient data controls
+- [ ] Run `uia_probe.py` with AC at inbox — check inbox table controls
+- [ ] Document findings: which AC states have rich UIA trees vs. sparse
+- [ ] Decision gate: proceed with migration or stay OCR-first
+
+## Phase UIA-3 — Migrate Existing Automation
+
+- [ ] Replace `find_and_click()` calls in `pyautogui_runner.py` → `smart_find_and_click()`
+- [ ] Replace inbox OCR table parsing in `inbox_reader.py` with UIA tree read (if controls available)
+- [ ] Replace chart navigation in `clinical_summary_parser.py` → `smart_navigate_menu()`
+- [ ] Update MRN reader to try UIA title bar read before OCR crop
+- [ ] Verify all agent scheduler jobs still work with UIA-first path
+
+---
+
 # Step 0 — Project Rename: CareCompanion → CareCompanion (Manual Steps)
 
 > **Status:** REQUIRED BEFORE BETA

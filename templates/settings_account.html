@@ -3,7 +3,9 @@
 {% block page_id %}settings-account{% endblock %}
 
 {% block content %}
-<h1>Account Settings</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Account Settings</h1>
+</div>
 
 <div style="display:flex;gap:12px;margin-bottom:24px;">
     <a href="{{ url_for('auth.settings_account') }}" class="btn btn-primary btn-sm">Account</a>

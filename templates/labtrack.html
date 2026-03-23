@@ -41,7 +41,7 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                     <div>
                         <label style="font-size:12px;font-weight:600;">Patient MRN</label>
-                        <input type="text" name="mrn" class="form-control" placeholder="Full MRN" required>
+                        <input type="text" name="mrn" class="form-control" placeholder="Full MRN" required autofocus>
                     </div>
                     <div>
                         <label style="font-size:12px;font-weight:600;">Lab Name</label>
@@ -139,7 +139,7 @@
             <tbody>
                 {% for mrn, pdata in patients.items() %}
                 {% for track in pdata.tracks %}
-                <tr data-filterable style="border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;" onclick="window.location='/labtrack/{{ mrn }}'">
+                <tr data-filterable style="border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;" onclick="window.location='/labtrack/{{ mrn }}'" role="link" tabindex="0">
                     {% if loop.first %}
                     <td style="padding:8px 12px;font-weight:600;" rowspan="{{ pdata.tracks|length }}">
                         …{{ pdata.display_mrn }}

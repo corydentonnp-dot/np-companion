@@ -157,8 +157,7 @@ def _try_ocr_mrn():
 
 def _show_chart_duration_warning(mrn):
     """Show a Windows toast notification for long chart open time."""
-    last4 = mrn[-4:] if len(mrn) >= 4 else mrn
-    msg = f'Chart ****{last4} has been open {getattr(config, "MAX_CHART_OPEN_MINUTES", 20)} minutes. Still working?'
+    msg = f'Chart {mrn} has been open {getattr(config, "MAX_CHART_OPEN_MINUTES", 20)} minutes. Still working?'
 
     try:
         from plyer import notification

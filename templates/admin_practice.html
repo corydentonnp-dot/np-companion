@@ -3,9 +3,11 @@
 {% block page_id %}admin-practice{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Practice Overview</h1>
-    <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+<div class="page-header">
+    <h1 class="page-header__title">Practice Overview</h1>
+    <div class="page-header__actions">
+        <a href="/admin" class="btn btn-outline btn-sm">Back to Admin</a>
+    </div>
 </div>
 
 {# ---- Summary Cards ---- #}
@@ -52,17 +54,17 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">Provider Performance</div>
     <div class="card-body" style="padding:0;">
-        <table class="schedule-table" style="font-size:13px;">
+        <table class="data-table" id="provider-perf-table" style="font-size:13px;">
             <thead>
                 <tr>
-                    <th>Provider</th>
-                    <th>Panel Size</th>
-                    <th>Open Gaps</th>
-                    <th>Gap Compliance</th>
-                    <th>Overdue Labs</th>
-                    <th>Overdue Referrals</th>
-                    <th>Billing Opps (Pending)</th>
-                    <th>CS Patients</th>
+                    <th data-sort="">Provider</th>
+                    <th data-sort="" data-sort-type="number">Panel Size</th>
+                    <th data-sort="" data-sort-type="number">Open Gaps</th>
+                    <th data-sort="">Gap Compliance</th>
+                    <th data-sort="" data-sort-type="number">Overdue Labs</th>
+                    <th data-sort="" data-sort-type="number">Overdue Referrals</th>
+                    <th data-sort="" data-sort-type="number">Billing Opps (Pending)</th>
+                    <th data-sort="" data-sort-type="number">CS Patients</th>
                 </tr>
             </thead>
             <tbody>
@@ -102,7 +104,7 @@
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">Care Gap Compliance by Type (Practice-Wide)</div>
     <div class="card-body" style="padding:0;">
-        <table class="schedule-table" style="font-size:13px;">
+        <table class="data-table" style="font-size:13px;">
             <thead>
                 <tr><th>Gap Type</th><th>Total</th><th>Addressed</th><th>Open</th><th>Compliance</th></tr>
             </thead>

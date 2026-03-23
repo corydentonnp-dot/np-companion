@@ -3,13 +3,15 @@
 {% block page_id %}setup{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-    <h1 style="margin:0;">Account Setup</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Account Setup</h1>
+    <div class="page-header__actions">
     {% if all_complete %}
-    <span class="badge badge--success" style="font-size:13px;">All tasks complete ✓</span>
+    <span class="badge badge--success">All tasks complete ✓</span>
     {% else %}
-    <span class="badge badge--warning" style="font-size:13px;">{{ incomplete_count }} task{{ 's' if incomplete_count != 1 }} remaining</span>
+    <span class="badge badge--warning">{{ incomplete_count }} task{{ 's' if incomplete_count != 1 }} remaining</span>
     {% endif %}
+    </div>
 </div>
 
 <p style="color:var(--text-secondary);font-size:14px;margin-bottom:24px;">

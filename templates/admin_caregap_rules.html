@@ -3,14 +3,16 @@
 {% block page_id %}admin{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <a href="/admin" style="color:var(--text-secondary);text-decoration:none;font-size:14px;">← Admin</a>
-    <h1 style="margin:0;">Care Gap Screening Rules</h1>
+<div class="page-header">
+    <h1 class="page-header__title">Care Gap Screening Rules</h1>
     <span class="badge badge--info">{{ rules|length }} rules</span>
-    <form method="post" action="/admin/caregap-rules/reset" style="margin-left:auto;"
-          onsubmit="return confirm('Reset ALL rules to USPSTF defaults? This cannot be undone.');">
-        <button type="submit" class="btn btn-secondary btn-sm">Reset to Defaults</button>
-    </form>
+    <div class="page-header__actions">
+        <a href="/admin" class="btn btn-outline btn-sm">← Admin</a>
+        <form method="post" action="/admin/caregap-rules/reset"
+              onsubmit="return confirm('Reset ALL rules to USPSTF defaults? This cannot be undone.');">
+            <button type="submit" class="btn btn-secondary btn-sm">Reset to Defaults</button>
+        </form>
+    </div>
 </div>
 
 <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">

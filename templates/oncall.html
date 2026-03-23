@@ -37,8 +37,8 @@
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:20px;flex-wrap:wrap;gap:8px;">
-    <h1 style="margin:0;font-size:22px;">On-Call Notes</h1>
+<div class="page-header">
+    <h1 class="page-header__title">On-Call Notes</h1>
 </div>
 
 {# ---- Callbacks Due Section (F7b) ---- #}
@@ -81,18 +81,18 @@
                             <strong style="font-size:15px;">{{ note.chief_complaint or 'No complaint' }}</strong>
                             {# Status badge #}
                             {% if note.documentation_status == 'pending' %}
-                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-danger,#fee2e2);color:var(--text-danger,#dc2626);">Pending</span>
+                            <span class="badge badge--error">Pending</span>
                             {% elif note.documentation_status == 'entered' %}
-                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-success,#dcfce7);color:var(--text-success,#166534);">Entered</span>
+                            <span class="badge badge--success">Entered</span>
                             {% else %}
-                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);">No Doc Needed</span>
+                            <span class="badge badge--muted">No Doc Needed</span>
                             {% endif %}
                             {# Callback badge #}
                             {% if note.callback_promised and not note.callback_completed %}
-                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:var(--bg-warning,#fef3c7);color:#92400e;">&#128222; Callback</span>
+                            <span class="badge badge--warning">&#128222; Callback</span>
                             {% endif %}
                             {% if note.forwarded_to %}
-                            <span style="padding:2px 8px;border-radius:12px;font-size:11px;background:#e0e7ff;color:#3730a3;">&#10132; {{ note.forwarded_user.display_name if note.forwarded_user else 'Provider' }}</span>
+                            <span class="badge badge--info">&#10132; {{ note.forwarded_user.display_name if note.forwarded_user else 'Provider' }}</span>
                             {% endif %}
                         </div>
                         <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">

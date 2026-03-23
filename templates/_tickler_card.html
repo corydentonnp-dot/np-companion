@@ -11,7 +11,7 @@
         {% endif %}
     </div>
     {% if t.mrn %}
-    <div style="font-size:11px;color:var(--text-secondary);">MRN: ••{{ t.mrn[-4:] }}</div>
+    <div style="font-size:11px;color:var(--text-secondary);">MRN: {{ t.mrn }}</div>
     {% endif %}
     <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
         Due: {{ t.due_date.strftime('%m/%d/%Y') if t.due_date else '—' }}

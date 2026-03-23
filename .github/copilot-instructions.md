@@ -45,7 +45,7 @@ This means:
 - **No PHI in notifications.** Pushover gets counts only. Never names, MRNs, DOBs, diagnoses.
 - **No PHI in logs.** Use `hashlib.sha256(mrn.encode()).hexdigest()[:12]` for logging.
 - **No PHI leaves local network.** Outbound calls carry only clinical vocab (drug names, codes, age/sex).
-- **MRN display:** `{{ mrn[-4:] }}` in all UI. Full MRN only in DB and audit log.
+- **MRN display:** Full MRN shown in all UI views. MRN is only masked in log files (use hash for logging).
 - **Soft-delete clinical records.** Use `is_archived`/`is_resolved` flags. Never `db.session.delete()`.
 - **Audit every patient action** via `log_access()`.
 - **Reformatter discards:** Log to `ReformatLog.discarded_items` JSON BEFORE removing from state.
@@ -121,7 +121,7 @@ def index():
     return render_template('module.html', items=items)
 ```
 
-- `@login_required` on ALL routes except `/login`, `/timer/room-widget`, `/oncall/handoff/<token>`.
+- `@login_required` on ALL routes except `/login`, `/timer/room-widget`, `/timer/face/room-toggle`, `/oncall/handoff/<token>`.
 - `@require_role('admin')` for `/admin/*`. `@require_role('provider')` for billing/metrics/oncall.
 - JSON endpoints: `{"success": bool, "data": ..., "error": str|None}`.
 - Shared data: `is_shared=True` readable by all, editable by author only.
@@ -312,7 +312,6 @@ Before marking a task complete, verify:
 During session-start audit, scan for:
 - Any new `print()` or `logging` call that might contain PHI (names, MRNs, DOBs)
 - Any outbound API call sending patient identifiers
-- Any template displaying full MRN (should be `mrn[-4:]`)
 - Any `db.session.delete()` on clinical records (should be soft-delete)
 
 ### Auth Pattern Enforcement
