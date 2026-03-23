@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initPinSystem();
     initKeyboardShortcuts();
     initWhatsNewBanner();
+    initSidebarCollapse();
 });
 
 
@@ -149,6 +150,13 @@ function initAutoLock() {
     if (document.body.getAttribute('data-page') === 'login') return;
     // Don't activate when there is no lock overlay in the DOM
     if (!document.getElementById('lock-overlay')) return;
+    // Don't activate if user has not set a PIN
+    if (document.body.getAttribute('data-has-pin') !== 'true') return;
+
+    // Restore lock state from sessionStorage (survives refresh)
+    if (sessionStorage.getItem('cc_screen_locked') === '1') {
+        showLockScreen();
+    }
 
     resetLockTimer();
 
@@ -174,6 +182,7 @@ function showLockScreen() {
     var overlay = document.getElementById('lock-overlay');
     if (!overlay) return;
     overlay.classList.add('visible');
+    sessionStorage.setItem('cc_screen_locked', '1');
     var input = document.getElementById('pin-input');
     if (input) { input.value = ''; input.focus(); }
     var err = document.getElementById('pin-error');
@@ -183,6 +192,7 @@ function showLockScreen() {
 function hideLockScreen() {
     var overlay = document.getElementById('lock-overlay');
     if (overlay) overlay.classList.remove('visible');
+    sessionStorage.removeItem('cc_screen_locked');
     failedPinAttempts = 0;
     resetLockTimer();
 }
@@ -650,6 +660,34 @@ function applyZoom(level) {
 
 
 /* ==========================================================
+   10b. SIDEBAR COLLAPSE — Restore state + wire collapse button
+   ========================================================== */
+
+function initSidebarCollapse() {
+    var sidebar = document.getElementById('sidebar');
+    var layout = document.querySelector('.app-layout');
+    var btn = document.getElementById('sidebar-collapse-btn');
+
+    if (!sidebar || !layout) return;
+
+    /* Restore persisted collapsed state */
+    if (localStorage.getItem('sidebar-collapsed') === 'true') {
+        sidebar.classList.add('collapsed');
+        layout.classList.add('sidebar-collapsed');
+    }
+    /* Remove the pre-paint helper class now that we've applied the real one */
+    document.documentElement.classList.remove('sidebar-will-collapse');
+
+    /* Wire the collapse button at the bottom of the sidebar */
+    if (btn) {
+        btn.addEventListener('click', function () {
+            _menuActions.toggleSidebar();
+        });
+    }
+}
+
+
+/* ==========================================================
    11.  NAV KEYS — Alt+Left / Alt+Right
    ========================================================== */
 
@@ -982,7 +1020,15 @@ function initMenuBar() {
 var _menuActions = {
     toggleSidebar: function () {
         var sidebar = document.getElementById('sidebar');
-        if (sidebar) sidebar.classList.toggle('collapsed');
+        var layout = document.querySelector('.app-layout');
+        if (sidebar) {
+            var isCollapsed = sidebar.classList.toggle('collapsed');
+            if (layout) layout.classList.toggle('sidebar-collapsed', isCollapsed);
+            /* Remove pre-paint class once user has interacted */
+            document.documentElement.classList.remove('sidebar-will-collapse');
+            /* Persist state */
+            localStorage.setItem('sidebar-collapsed', isCollapsed ? 'true' : 'false');
+        }
     },
     toggleBookmarks: function () {
         var bar = document.getElementById('bookmarks-bar');
@@ -1091,8 +1137,53 @@ function initBookmarksBar() {
             .then(function (data) {
                 renderChips(data.practice || [], practiceContainer, 'practice');
                 renderChips(data.personal || [], personalContainer, 'personal');
+                // Also populate the Bookmarks menu dropdown
+                renderBookmarkMenu(data.practice || [], data.personal || []);
             })
             .catch(function () { /* silently fail — bookmarks not critical */ });
+    }
+
+    function renderBookmarkMenu(practice, personal) {
+        var practiceWrap = document.getElementById('bm-menu-practice');
+        var practiceList = document.getElementById('bm-menu-practice-list');
+        var personalWrap = document.getElementById('bm-menu-personal');
+        var personalList = document.getElementById('bm-menu-personal-list');
+        if (!practiceList || !personalList) return;
+
+        practiceList.innerHTML = '';
+        personalList.innerHTML = '';
+
+        if (practice.length) {
+            practiceWrap.style.display = '';
+            practice.forEach(function (bm) {
+                var btn = document.createElement('button');
+                btn.className = 'menu-dd-item';
+                btn.innerHTML = '<span class="menu-dd-icon">🌐</span>' + escapeHtml(bm.label);
+                btn.addEventListener('click', function () { openInPreferredBrowser(bm.url); });
+                practiceList.appendChild(btn);
+            });
+        } else {
+            practiceWrap.style.display = 'none';
+        }
+
+        if (personal.length) {
+            personalWrap.style.display = '';
+            personal.forEach(function (bm) {
+                var btn = document.createElement('button');
+                btn.className = 'menu-dd-item';
+                btn.innerHTML = '<span class="menu-dd-icon">📌</span>' + escapeHtml(bm.label);
+                btn.addEventListener('click', function () { openInPreferredBrowser(bm.url); });
+                personalList.appendChild(btn);
+            });
+        } else {
+            personalWrap.style.display = 'none';
+        }
+    }
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 
     function removePersonalBookmark(index) {

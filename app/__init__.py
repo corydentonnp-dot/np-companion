@@ -87,6 +87,45 @@ def create_app():
 
 	_register_blueprints(app)
 
+	# ---- Jinja template filters ----
+	_GAP_DISPLAY_NAMES = {
+		'colorectal_colonoscopy': 'Colonoscopy',
+		'colorectal_fobt': 'FOBT/FIT',
+		'mammogram': 'Mammogram',
+		'cervical_pap': 'Pap Smear',
+		'cervical_pap_hpv': 'Pap + HPV Co-test',
+		'lung_ldct': 'Lung Cancer Screening (LDCT)',
+		'dexa_scan': 'DEXA Scan',
+		'hypertension_screen': 'Blood Pressure Screening',
+		'diabetes_screen': 'Diabetes Screening',
+		'lipid_screen': 'Lipid Panel',
+		'depression_screen': 'Depression Screening (PHQ-9)',
+		'aaa_screen': 'AAA Screening',
+		'fall_risk': 'Fall Risk Assessment',
+		'hiv_screen': 'HIV Screening',
+		'hep_b_screen': 'Hepatitis B Screening',
+		'hep_c_screen': 'Hepatitis C Screening',
+		'flu_vaccine': 'Flu Vaccine',
+		'covid_vaccine': 'COVID-19 Vaccine',
+		'shingrix': 'Shingles Vaccine (Shingrix)',
+		'tdap': 'Tdap Vaccine',
+		'pneumococcal': 'Pneumococcal Vaccine',
+	}
+
+	@app.template_filter('gap_display')
+	def gap_display_filter(gap_name_or_type):
+		"""Convert gap_type keys like 'colorectal_colonoscopy' to clean names."""
+		if not gap_name_or_type:
+			return 'Unknown Screening'
+		# If it's already a clean name (has spaces or parens), return as-is
+		if ' ' in gap_name_or_type:
+			return gap_name_or_type
+		# Look up in mapping, fall back to title-casing the key
+		return _GAP_DISPLAY_NAMES.get(
+			gap_name_or_type,
+			gap_name_or_type.replace('_', ' ').title()
+		)
+
 	@app.context_processor
 	def inject_helpers():
 		def user_can_access(module):
@@ -228,82 +267,90 @@ def _run_pending_migrations(app):
 	Auto-run any migrate_*.py scripts that haven't been applied yet.
 	Tracks applied migrations in the _applied_migrations table.
 	"""
+	# Recursion guard — prevent re-entry when a migration calls create_app()
+	if getattr(_run_pending_migrations, '_running', False):
+		return
+	_run_pending_migrations._running = True
+
 	import glob
 	import importlib
 	import sqlite3
 	from datetime import datetime, timezone
 
-	db_path = get_db_path()
-	conn = sqlite3.connect(db_path)
-	cur = conn.cursor()
+	try:
+		db_path = get_db_path()
+		conn = sqlite3.connect(db_path)
+		cur = conn.cursor()
 
-	# Create tracking table if missing
-	cur.execute(
-		'CREATE TABLE IF NOT EXISTS _applied_migrations '
-		'(name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)'
-	)
-	conn.commit()
+		# Create tracking table if missing
+		cur.execute(
+			'CREATE TABLE IF NOT EXISTS _applied_migrations '
+			'(name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)'
+		)
+		conn.commit()
 
-	# Already-applied set
-	cur.execute('SELECT name FROM _applied_migrations')
-	applied = {row[0] for row in cur.fetchall()}
+		# Already-applied set
+		cur.execute('SELECT name FROM _applied_migrations')
+		applied = {row[0] for row in cur.fetchall()}
 
-	# Find all migrate_*.py in project root and migrations/ subfolder
-	root = os.path.dirname(os.path.abspath(__file__))
-	project_root = os.path.dirname(root)
-	scripts = sorted(glob.glob(os.path.join(project_root, 'migrate_*.py')))
-	scripts += sorted(glob.glob(os.path.join(project_root, 'migrations', 'migrate_*.py')))
+		# Find all migrate_*.py in project root and migrations/ subfolder
+		root = os.path.dirname(os.path.abspath(__file__))
+		project_root = os.path.dirname(root)
+		scripts = sorted(glob.glob(os.path.join(project_root, 'migrate_*.py')))
+		scripts += sorted(glob.glob(os.path.join(project_root, 'migrations', 'migrate_*.py')))
 
-	for script_path in scripts:
-		name = os.path.basename(script_path)
-		if name in applied:
-			continue
+		for script_path in scripts:
+			name = os.path.basename(script_path)
+			if name in applied:
+				continue
 
-		app.logger.info('Running migration: %s', name)
-		try:
-			module_name = name[:-3]  # strip .py
-			spec = importlib.util.spec_from_file_location(module_name, script_path)
-			mod = importlib.util.module_from_spec(spec)
-			# Prevent raw-SQL scripts from executing on import
-			# by checking for run_migration first via source inspection
-			with open(script_path, 'r') as _mig_f:
-				source = _mig_f.read()
-			has_run_fn = 'def run_migration' in source
+			app.logger.info('Running migration: %s', name)
+			try:
+				module_name = name[:-3]  # strip .py
+				spec = importlib.util.spec_from_file_location(module_name, script_path)
+				mod = importlib.util.module_from_spec(spec)
+				# Prevent raw-SQL scripts from executing on import
+				# by checking for run_migration first via source inspection
+				with open(script_path, 'r') as _mig_f:
+					source = _mig_f.read()
+				has_run_fn = 'def run_migration' in source
 
-			if has_run_fn:
-				spec.loader.exec_module(mod)
-				from models import db as _db
-				mod.run_migration(app, _db)
-			else:
-				# Raw SQL scripts — run as subprocess for isolation
-				import subprocess
-				import sys
-				result = subprocess.run(
-					[sys.executable, script_path],
-					cwd=project_root,
-					capture_output=True,
-					text=True,
-					timeout=60,
-				)
-				if result.returncode != 0:
-					app.logger.error(
-						'Migration %s failed (exit %d): %s',
-						name, result.returncode, result.stderr[:500],
+				if has_run_fn:
+					spec.loader.exec_module(mod)
+					from models import db as _db
+					mod.run_migration(app, _db)
+				else:
+					# Raw SQL scripts — run as subprocess for isolation
+					import subprocess
+					import sys
+					result = subprocess.run(
+						[sys.executable, script_path],
+						cwd=project_root,
+						capture_output=True,
+						text=True,
+						timeout=60,
 					)
-					continue
+					if result.returncode != 0:
+						app.logger.error(
+							'Migration %s failed (exit %d): %s',
+							name, result.returncode, result.stderr[:500],
+						)
+						continue
 
-			# Record success
-			now_str = datetime.now(timezone.utc).isoformat()
-			cur.execute(
-				'INSERT OR IGNORE INTO _applied_migrations (name, applied_at) VALUES (?, ?)',
-				(name, now_str),
-			)
-			conn.commit()
-			app.logger.info('Migration applied: %s', name)
-		except Exception as exc:
-			app.logger.error('Migration %s error: %s', name, exc)
+				# Record success
+				now_str = datetime.now(timezone.utc).isoformat()
+				cur.execute(
+					'INSERT OR IGNORE INTO _applied_migrations (name, applied_at) VALUES (?, ?)',
+					(name, now_str),
+				)
+				conn.commit()
+				app.logger.info('Migration applied: %s', name)
+			except Exception as exc:
+				app.logger.error('Migration %s error: %s', name, exc)
 
-	conn.close()
+		conn.close()
+	finally:
+		_run_pending_migrations._running = False
 
 
 def _register_blueprints(app):

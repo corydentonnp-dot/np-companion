@@ -66,6 +66,46 @@ This means:
 
 ---
 
+## Process & Resource Management — Hard Rules (Override Everything)
+
+> **This machine has crashed repeatedly from 160+ orphaned Python processes.** These rules are non-negotiable.
+
+### Terminal Command Discipline
+- **Every terminal command MUST have a timeout.** Never use `timeout: 0` for commands that are expected to finish (tests, migrations, scripts, linters). Use a conservative timeout (e.g., 120000ms for tests, 60000ms for migrations).
+- **Never run commands as background processes (`isBackground: true`) unless they MUST stay alive** (e.g., a dev server you intend to interact with). Tests, migrations, builds, linters, and one-shot scripts are NEVER background.
+- **Before starting a Flask/Python server in a terminal, check if one is already running.** Run `Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue` first. If occupied, do NOT start another.
+- **After running tests or scripts, verify the process exited.** If a terminal command hangs, kill it — don't open a new terminal and move on.
+- **Never run more than 4 terminal commands concurrently.** Wait for one to finish before starting the next.
+- **ONE dev server at a time.** Never start Flask, agent, or any long-running process if another instance is already running.
+
+### Process Cleanup
+- **At the START of every autopilot session**, run the process audit:
+  ```powershell
+  (Get-Process python -ErrorAction SilentlyContinue).Count
+  ```
+  If count > 5, run cleanup before doing ANY other work:
+  ```powershell
+  Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CPU -gt 30 -or $_.WorkingSet64 -gt 500MB } | Stop-Process -Force
+  ```
+- **At the END of every task** (before finalizing changelog), check for orphaned processes and kill them.
+- **If you started a background terminal**, you MUST track its ID and kill it when done:
+  ```powershell
+  Stop-Process -Id <PID> -Force -ErrorAction SilentlyContinue
+  ```
+
+### What Causes the Crash (Do NOT Do These)
+- Running `python test.py` with `isBackground: true` — test processes never exit.
+- Starting Flask with `python app.py` in a new terminal without killing the old one.
+- Running `subprocess.run()` or `subprocess.Popen()` in code without timeouts.
+- Opening multiple terminals that each run Python scripts simultaneously.
+- Using `timeout: 0` on commands that should finish in seconds.
+
+### Process Limits
+- **Max 8ython processes** should exist at any time during development (Flask, Agent, and at most 2 one-shot scripts).
+- If `(Get-Process python).Count` exceeds 8, **STOP all work** and clean up before continuing.
+
+---
+
 ## Flask Patterns
 
 **App factory** in `app.py` → `create_app()`. Blueprints in `routes/`.

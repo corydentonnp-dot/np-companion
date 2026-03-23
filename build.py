@@ -110,7 +110,7 @@ def _run_pyinstaller():
     if not os.path.isfile(pyinstaller_exe):
         pyinstaller_exe = 'pyinstaller'  # fall back to PATH
     cmd = [pyinstaller_exe, '--noconfirm', SPEC_FILE]
-    result = subprocess.run(cmd, cwd=PROJECT_DIR)
+    result = subprocess.run(cmd, cwd=PROJECT_DIR, timeout=600)
     if result.returncode != 0:
         print('  [ERROR] PyInstaller failed.')
         sys.exit(1)

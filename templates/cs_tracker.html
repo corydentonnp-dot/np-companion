@@ -32,7 +32,7 @@
             <tbody>
                 {% for e in entries %}
                 <tr>
-                    <td style="font-weight:500;">{{ e.patient_name or e.mrn }}</td>
+                    <td style="font-weight:500;">{{ e.patient_name or ('••' ~ e.mrn[-4:]) }}</td>
                     <td style="font-weight:600;">{{ e.drug_name }}</td>
                     <td>{% if e.dea_schedule %}<span class="badge badge--danger">C-{{ e.dea_schedule }}</span>{% else %}—{% endif %}</td>
                     <td>{{ e.dose or '—' }}</td>

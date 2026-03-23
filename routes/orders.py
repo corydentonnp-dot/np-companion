@@ -8,6 +8,7 @@ PyAutoGUI, and partial execution recovery.
 """
 
 import json
+import os
 from datetime import datetime, timezone
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
@@ -601,3 +602,75 @@ def execution_status(exec_id):
             'error_message': i.error_message,
         } for i in execution.items],
     })
+
+
+# ======================================================================
+# GET /orders/calibrate — AC Calibration Wizard (UX-17)
+# ======================================================================
+CALIBRATION_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'data', 'ac_calibration.json'
+)
+
+CALIBRATION_POINTS = [
+    {'key': 'INBOX_FILTER_DROPDOWN_XY', 'label': 'Inbox Filter Dropdown',
+     'hint': 'Click the filter dropdown at the top of the AC Inbox.'},
+    {'key': 'PATIENT_LIST_ID_SEARCH_XY', 'label': 'Patient List ID Search',
+     'hint': 'Click the "ID" search field in the Patient List.'},
+    {'key': 'VISIT_TEMPLATE_RADIO_XY', 'label': 'Visit Template Radio Button',
+     'hint': 'Click the "Visit Template" radio button in the New Visit dialog.'},
+    {'key': 'SELECT_TEMPLATE_DROPDOWN_XY', 'label': 'Template Dropdown',
+     'hint': 'Click the template selection dropdown in the New Visit dialog.'},
+    {'key': 'EXPORT_CLIN_SUM_MENU_XY', 'label': 'Export Clinical Summary Menu',
+     'hint': 'Click Patient menu > Export Clinical Summary.'},
+    {'key': 'EXPORT_BUTTON_XY', 'label': 'Export Button',
+     'hint': 'Click the Export button in the export dialog.'},
+]
+
+
+@orders_bp.route('/orders/calibrate')
+@login_required
+def calibrate():
+    """Show the AC calibration wizard."""
+    saved = {}
+    if os.path.exists(CALIBRATION_FILE):
+        try:
+            with open(CALIBRATION_FILE, 'r') as f:
+                saved = json.load(f)
+        except Exception:
+            saved = {}
+    return render_template(
+        'ac_calibrate.html',
+        points=CALIBRATION_POINTS,
+        saved=saved,
+    )
+
+
+@orders_bp.route('/api/orders/calibrate/capture', methods=['POST'])
+@login_required
+def calibrate_capture():
+    """Capture current mouse position for a calibration point."""
+    try:
+        import pyautogui
+        x, y = pyautogui.position()
+        return jsonify({'success': True, 'data': {'x': x, 'y': y}})
+    except ImportError:
+        return jsonify({'success': False, 'error': 'pyautogui not available'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@orders_bp.route('/api/orders/calibrate/save', methods=['POST'])
+@login_required
+def calibrate_save():
+    """Save all calibration points."""
+    data = request.get_json()
+    if not data or 'points' not in data:
+        return jsonify({'success': False, 'error': 'No data provided'}), 400
+
+    try:
+        os.makedirs(os.path.dirname(CALIBRATION_FILE), exist_ok=True)
+        with open(CALIBRATION_FILE, 'w') as f:
+            json.dump(data['points'], f, indent=2)
+        return jsonify({'success': True, 'data': 'Calibration saved'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

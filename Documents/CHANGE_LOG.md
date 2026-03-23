@@ -6,6 +6,275 @@
 
 ---
 
+## CL-MIG-RECURSION — Fix Migration Infinite Recursion Bug
+**Completed:** 07-14-25 18:30:00 UTC
+- **Root cause:** `migrate_add_calculator_results.py` used `def run()` which called `create_app()` → triggered `_run_pending_migrations()` → subprocess → `create_app()` → infinite loop. Same pattern in `migrate_add_scraper_overhaul.py` (alias `run = migrate` not detected).
+- **Fix 1:** Refactored both migrations to use `def run_migration(app, db)` signature, matching what `_run_pending_migrations()` expects for in-process execution.
+- **Fix 2:** Added recursion guard to `_run_pending_migrations()` — uses `_running` sentinel attribute to prevent re-entry, with `try/finally` cleanup.
+- **Result:** Both migrations now execute in-process. 64/64 migrations applied. All 93 tests pass.
+
+### Files Modified
+- `app/__init__.py` — Added recursion guard (`_running` flag + try/finally) to `_run_pending_migrations()`
+- `migrations/migrate_add_calculator_results.py` — `def run()` → `def run_migration(app, db)`, moved `create_app()` to `__main__` guard
+- `migrations/migrate_add_scraper_overhaul.py` — `def migrate()` + `run = migrate` → `def run_migration(app, db)` + `_do_migrate()` helper
+
+---
+
+## CL-HIPAA-SOFTDEL — HIPAA Soft-Delete + MRN Masking Compliance Fix
+**Completed:** 03-23-26 23:45:00 UTC
+- **LabTrack hard-delete → soft-delete:** `routes/labtrack.py` delete_tracking() now sets `is_archived=True` instead of `db.session.delete()`
+- **PatientSpecialist hard-delete → soft-delete:** `routes/patient.py` delete_specialist() now sets `is_archived=True` instead of `db.session.delete()`
+- **Added `is_archived` column** to both `LabTrack` and `PatientSpecialist` models (Boolean, default False)
+- **All LabTrack list/count queries** now filter `is_archived=False` (14 query sites across labtrack.py, patient.py, admin.py, intelligence.py)
+- **All PatientSpecialist list queries** now filter `is_archived=False`
+- **Fixed 4 template MRN display violations** (HIPAA: UI must show only last 4 digits):
+  - `dashboard.html` — patient list table: `{{ pt.mrn }}` → `••{{ pt.mrn[-4:] }}`
+  - `_tickler_card.html` — tickler MRN display: `{{ t.mrn }}` → `••{{ t.mrn[-4:] }}`
+  - `daily_summary_print.html` — daily summary: `MRN {{ pt.mrn }}` → `MRN ••{{ pt.mrn[-4:] }}`
+  - `cs_tracker.html` — controlled substance tracker: `{{ e.mrn }}` fallback → `••{{ e.mrn[-4:] }}`
+
+### Files Modified
+- `models/labtrack.py` — Added `is_archived` column
+- `models/patient.py` — Added `is_archived` column to PatientSpecialist
+- `routes/labtrack.py` — Soft-delete + is_archived=False filters on all queries
+- `routes/patient.py` — Soft-delete + is_archived=False filters
+- `routes/admin.py` — is_archived=False filters on admin stats
+- `routes/intelligence.py` — is_archived=False filter on AI lab interpretation
+- `templates/dashboard.html` — MRN masking
+- `templates/_tickler_card.html` — MRN masking
+- `templates/daily_summary_print.html` — MRN masking
+- `templates/cs_tracker.html` — MRN masking
+
+### Migration
+- `migrations/migrate_add_is_archived.py` — Adds `is_archived BOOLEAN NOT NULL DEFAULT 0` to `lab_tracks` and `patient_specialists` tables
+
+---
+
+## CL-LABREF — Lab Reference & Abbreviation Editor
+**Completed:** 03-23-26 04:00:00 UTC
+- Added 📖 Lab Reference modal: searchable list of all 101 labs with abbreviation, panels, and range display
+- Added Lab Detail card: editable abbreviation field + 4-section clinical reference (What It Measures, Clinical Significance, ⬆ Causes of High, ⬇ Causes of Low)
+- Added `POST /api/lab-cache/update` endpoint: saves abbreviation and reference edits to `data/lab_cache.json`
+- Added `refs` section to `lab_cache.json` with 101 pre-populated clinical reference entries (biochemistry, significance, high/low causes)
+- Added ℹ info icon in autocomplete dropdown items — opens Lab Detail card directly from search
+- Added "📖 Lab Reference" button in labtrack subpanel + link in orders subpanel (navigates to `/labtrack?ref=1`)
+- Cache invalidation: saves clear both JS caches (`_labRefData` + `LabAutocomplete._clearCache`)
+
+### Files Modified
+- `routes/labtrack.py` — `/api/lab-cache/update` POST endpoint
+- `templates/labtrack.html` — Lab Reference modal, Lab Detail card, JS functions, subpanel button
+- `templates/orders.html` — Lab Reference link in subpanel
+- `static/js/labtrack.js` — ℹ icon in dropdown, `clearCache()` function
+- `data/lab_cache.json` — `refs` section with 101 clinical reference entries
+
+---
+
+## CL-CPUOPT — VS Code CPU Optimization for Autopilot Workflow
+**Completed:** 03-23-26 22:30:00 UTC
+
+Created `.vscode/settings.json` with ~60 settings to minimize CPU/memory/GPU usage. User operates purely through Copilot Chat (AI autopilot) and does not code directly, so all active-coding features are disabled.
+
+### Key Optimizations
+- **Editor:** Disabled minimap, code lens, inlay hints, bracket colorization, occurrence highlighting, folding, glyph margin, hover tooltips, parameter hints, quick suggestions, semantic highlighting, smooth scrolling/animations
+- **Workbench:** Reduced motion, disabled experiments, tips, indent guides
+- **Terminal:** GPU acceleration off, smooth scrolling off
+- **File watcher:** Excluded venv, __pycache__, build, dist, data/logs, data/backups, tesseract, .pytest_cache — stops continuous disk scanning
+- **Git:** Disabled autorefresh, autofetch, decorations — eliminates periodic `git status` polling
+- **Pylance:** Open-files-only diagnostics, indexing off, auto-import off — major CPU saver (no background whole-project analysis)
+- **Search:** Excluded large/irrelevant directories from search scope
+- **Telemetry:** Off entirely
+- **JS/TS:** Validation and suggestions disabled (Python-only project)
+- **Breadcrumbs, outline, emmet:** All disabled
+
+### Files
+- `.vscode/settings.json` (new, gitignored — local to this machine)
+
+---
+
+## CL-PROCGUARD — Process Management Hardening
+**Completed:** 03-23-26 22:15:00 UTC
+
+### Problem
+VS Code crashed repeatedly from 160+ orphaned Python processes accumulating during autopilot sessions. Terminal commands (tests, migrations, scripts) were spawned as background processes or without timeouts, never exiting.
+
+### Changes
+- **`.github/copilot-instructions.md`** — Added "Process & Resource Management — Hard Rules" section with terminal discipline, cleanup procedures, crash causes, and process limits
+- **`.github/agents/CareCompanion.agent.md`** — Added mandatory process audit at Phase 1 start and Phase 4 end; added "Process & Resource Management" to Hard Rules section
+- **`.github/prompts/keep-working.prompt.md`** — Added Phase 0 (Process Guard) that runs before any work; updated Phase 5 to include cleanup; loop now returns to Phase 0
+- **`.github/prompts/test-plan.prompt.md`** — Added Step 0 (Process Guard) before running any tests
+- **`.github/instructions/agent-boundary.instructions.md`** — Added "Process & Resource Management" section requiring timeouts on all subprocess calls, tracked Popen objects, APScheduler guards, and PID logging
+- **`build.py`** — Added `timeout=600` to PyInstaller `subprocess.run()` call (was missing)
+- **`tools/process_guard.py`** — New utility script for detecting/killing orphaned Python processes; supports `--kill` (high CPU/mem) and `--kill-all` modes; uses psutil with tasklist fallback
+
+### Rules Enforced
+- Every terminal command must have a timeout (never `timeout: 0`)
+- Tests/migrations/builds/linters are NEVER `isBackground: true`
+- Max 4 Python processes during development; hard stop at 8
+- Process audit runs at session start AND end
+- ONE dev server at a time; check port before starting
+
+---
+
+## CL-UXAUDIT2 — UX Enhancements Items 9-20
+**Completed:** 07-21-25 04:00:00 UTC
+
+### Schedule Grid (UX-9)
+- Added `PUT /api/schedule/<id>/move` endpoint for drag-and-drop time changes
+- Added `id` and `patient_mrn` fields to GET `/api/schedule` JSON response
+- Added `schedule_grid.js` script include and init block to dashboard template
+- Grid supports 44 time slots (7AM-6PM), drag-drop, table/grid toggle
+
+### Widget Drag Improvements (UX-10)
+- Replaced 6px invisible drag handle with 18px visible gripper using SVG 6-dot pattern
+- Added auto-scroll when dragging near container edges (40px threshold)
+- Hover state: opacity 0.5→1.0 with cursor:grab
+
+### Settings Sub-Sidebar (UX-11)
+- Added `.settings-layout` flex container with `.settings-nav` sticky sidebar (8 section links)
+- Added `id` attributes to all settings section headers for anchor navigation
+- Added scroll-spy JS for active link highlighting
+- Responsive: collapses to horizontal tabs at 700px
+
+### Sidebar Drag Reorder (UX-12)
+- Added `data-nav-id` attributes to all 13 sidebar nav items
+- HTML5 drag-and-drop reorder within sidebar, saves to localStorage and server
+- Persists per-user via `POST /settings/account/preference`
+
+### Lab Cache Data (UX-13)
+- Created `data/lab_cache.json`: 98 lab entries with name, abbr, LOINC, units, ranges, critical ranges, panel membership
+- 15 standard panels mapped (BMP, CMP, CBC, Lipid, Thyroid, Hepatic, Coag, etc.)
+
+### Lab Autocomplete (UX-14)
+- Created `static/js/labtrack.js`: fuzzy-match autocomplete with scoring (exact/startsWith/contains/character)
+- Dropdown shows range hints and panel badges, keyboard navigation (up/down/enter/escape)
+- Auto-fills alert threshold fields from lab cache reference data
+- Added `GET /api/lab-cache` endpoint to labtrack routes
+- Added CSS for `.lab-autocomplete-dropdown` and item classes with dark mode support
+
+### Lab Panel Component Badges (UX-15)
+- Added `data-lab-name` and `data-panel-name` attributes to lab table cells
+- JS decorates panel rows with component abbreviation badges from lab cache
+- Current lab highlighted with teal badge, other components shown in muted style
+- CSS: `.panel-comp-badges`, `.panel-comp-dot`, `.panel-comp-dot--current`
+
+### Care Gap Copy-to-Template (UX-16)
+- Added "📋 Copy Doc" button next to "Address Now" on open care gaps
+- `copyGapTemplate()` copies documentation snippet from address form textarea or gap description
+- Updated textarea to prefer `documentation_snippet` over `description` for richer templates
+
+### Order Set UI + AC Calibration Wizard (UX-17)
+- Order set builder already exists (comprehensive 2-panel UI with master order browser)
+- Added AC Calibration Wizard: `GET /orders/calibrate` route + `templates/ac_calibrate.html`
+- 6 calibration points (inbox filter, patient search, template radio, dropdown, export menu, export button)
+- 3-second countdown capture via pyautogui cursor position, saves to `data/ac_calibration.json`
+- Added "🔧 AC Calibration" link in orders subpanel
+
+### Widget Management Panel (UX-18)
+- Added "⚙ Manage Widgets" button injected at top-right of `.fw-container`
+- Modal panel lists all widgets with visibility toggles, drag-reorder, and size display
+- "Show All" and "Reset Order" buttons in panel footer
+- Widget order persists to localStorage via `widget_order` key
+- Applied on init: `_applyWidgetOrder()` reorders DOM elements per saved order
+
+### Prior Auth Intelligence (UX-19)
+- Added MRN field with patient lookup button (auto-fills name and insurance via `/api/patient/<mrn>/summary`)
+- Added PA Reference # field and collapsible Payer Contact Info section (phone/fax)
+- Added visual status timeline in PA history table: draft→submitted→decision progression with colored dots
+- Added `GET /api/patient/<mrn>/summary` endpoint to patient routes
+- Timeline CSS: `.pa-timeline`, `.pa-tl-dot` (done/active/approved/denied states)
+
+### Add/Delete Diagnosis (UX-20)
+- Added `POST /patient/<mrn>/diagnosis/add` endpoint — creates new PatientDiagnosis with user_id scoping
+- Added `POST /patient/<mrn>/diagnosis/<id>/remove` endpoint — soft-deletes by setting status='resolved'
+- Added "+ Add" button in ICD-10 lookup modal results — adds to patient table in real-time
+- Added "✕" remove button on each diagnosis row — confirms then soft-deletes
+- Added "+ Add Dx" button in diagnosis widget controls
+- New diagnosis rows appended to table dynamically without page reload
+
+### Files Created
+- `templates/ac_calibrate.html` — AC calibration wizard template
+- `static/js/labtrack.js` — Lab autocomplete + panel badge JS module
+- `data/lab_cache.json` — Lab reference data (98 labs, 15 panels)
+
+### Files Modified
+- `routes/dashboard.py` — Schedule move endpoint, API response fields
+- `routes/labtrack.py` — `/api/lab-cache` endpoint
+- `routes/orders.py` — Calibration wizard routes (capture, save)
+- `routes/patient.py` — Patient summary API, add/remove diagnosis endpoints
+- `routes/tools.py` — (no changes, PA routes already existed)
+- `templates/dashboard.html` — Schedule grid script include + init
+- `templates/labtrack.html` — Autocomplete input + dropdown + CSS + panel badge slots
+- `templates/settings.html` — Sub-sidebar layout + scroll-spy
+- `templates/orders.html` — Calibration link in subpanel
+- `templates/caregap_patient.html` — Copy Doc button + template improvement
+- `templates/pa.html` — MRN lookup, payer fields, timeline, patient summary
+- `templates/patient_chart.html` — Add diagnosis button, remove button, ICD-10 Add button
+- `templates/base.html` — Sidebar drag-reorder data attributes + JS
+- `static/css/main.css` — Settings sidebar CSS
+- `static/js/free_widgets.js` — Widget management panel, gripper handles, auto-scroll, widget order
+
+---
+
+## CL-UXAUDIT — UX Quick Fixes (Items 1-8) + Dev Guide UX Roadmap (9-20)
+**Completed:** 07-20-25 18:45:00 UTC
+
+### Quick Fixes Implemented (1-8)
+- **Fix 1 & 2: Screen lock** — Lock screen now skips if user has no PIN set (`data-has-pin` body attribute). Lock state persists across page refreshes via `sessionStorage`. Lock logo changed from "NP" to "CC".
+- **Fix 3: USPSTF clean names** — Added `|gap_display` Jinja template filter with 21-entry mapping dict. All caregap templates now show human-readable screening names instead of database keys.
+- **Fix 4: Dismiss schedule gap alert** — Added × close button to anomaly items in both Tier 1 (warning) and Tier 2 (info) dashboard sections.
+- **Fix 5: Menu bar → header consolidation** — Moved menu bar nav inside the header as inline flex child. Removed standalone menu bar grid row. Grid changed from 3-row to 2-row across all variants (default, has-subpanel, sidebar-collapsed, mobile). Removed clock element. Updated CSS class from `.app-menu-bar` to `.header-menu`. Menu font bumped to 13px matching header.
+- **Fix 6: Horizontal scroll fix** — Added `table-layout: fixed`, `text-overflow: ellipsis`, tighter padding to `.schedule-table`. Added `min-width: 0` to `.dash-widget` and `.dash-widget-body` to prevent grid overflow.
+- **Fix 7: PDMP/VIIS credentials** — Added 4 encrypted credential columns to User model (`pdmp_username_enc`, `pdmp_password_enc`, `viis_username_enc`, `viis_password_enc`). Added encrypt/decrypt/has helpers. Added settings forms and route handlers. Migration applied.
+- **Fix 8: Re-eval care gaps on gender change** — `update_demographics()` route now detects sex changes and triggers `evaluate_and_persist_gaps()` to re-run the care gap engine with the updated sex value.
+
+### Dev Guide Updates
+- Added Section 10 "UX/UI Enhancement Roadmap" with items UX-9 through UX-20 to `CARECOMPANION_DEVELOPMENT_GUIDE.md`
+
+### Files Modified
+- `templates/base.html` — Menu bar nav moved inside header, clock removed, old standalone nav deleted
+- `static/css/main.css` — Grid to 2-row, `.header-menu` class, schedule table fixes, widget min-width
+- `static/js/main.js` — Screen lock PIN check + sessionStorage persist (from prior session)
+- `app/__init__.py` — `gap_display` Jinja filter (from prior session)
+- `templates/caregap.html`, `templates/caregap_patient.html` — `|gap_display` filter usage (from prior session)
+- `templates/dashboard.html` — Anomaly dismiss buttons (from prior session)
+- `models/user.py` — PDMP/VIIS credential columns + helpers
+- `templates/settings.html` — PDMP and VIIS credential forms
+- `routes/auth.py` — PDMP/VIIS credential save handlers
+- `routes/patient.py` — Care gap re-eval on sex change
+- `migrations/migrate_add_pdmp_viis_creds.py` — New migration
+- `Documents/dev_guide/CARECOMPANION_DEVELOPMENT_GUIDE.md` — Section 10 added
+
+---
+
+## CL-UIBATCH1 — UI/UX Batch: Menu Bar, Patient Chart, Briefing Print, Pushover
+**Completed:** 07-20-25 03:30:00 UTC
+
+### Changes
+- **Menu bar grid position** — Moved menu bar out of header into its own grid row. Layout is now 3-row: `header | sidebar+menubar | sidebar+main`. Sidebar spans rows 2-3. Updated all grid variants (default, has-subpanel, sidebar-collapsed, will-collapse, responsive).
+- **Patient chart allergies in banner** — Added contrasting amber allergy badge in patient header (right side) showing comma-separated allergen names with hover tooltip for reactions. NKDA shown when empty.
+- **Patient header sticky on scroll** — `position: sticky; top: 0; z-index: 50` so it stays visible while scrolling chart content.
+- **Dismissable "no clinical summary" banner** — Added × close button to hide the banner via inline onclick.
+- **Vitals widget ordered & scrollable** — Vitals now displayed in clinical priority order (pulse, BP, SpO2, RR, temp, weight, height, BMI) with scrollable overflow for long lists.
+- **Morning briefing print buttons** — Added "Provider Summary", "MA Sheet", and "Print Briefing" buttons to morning briefing header, linking to existing daily-summary print routes plus native print.
+- **Pushover briefing notification** — Added `send_briefing_notification()` to notifier.py (counts only, no PHI). New `/briefing/push` POST route. "Push to Phone" button on briefing page.
+- **Patient print paperwork stub** — New `/patient/<mrn>/print` route + `patient_print_stub.html` template with "Coming Soon" placeholder. Print button added to patient chart header.
+
+### Files Modified
+- `templates/base.html` — Menu bar moved from header-left to own grid area child of `.app-layout`
+- `static/css/main.css` — 3-row grid layout, `.app-menu-bar` with `grid-area: menubar`, updated all responsive variants
+- `templates/patient_chart.html` — Allergy badge in header, sticky header, dismiss banner, ordered vitals, print button
+- `templates/morning_briefing.html` — Print buttons, Pushover push button, print media styles
+- `routes/intelligence.py` — `/briefing/push` POST route
+- `routes/patient.py` — `/patient/<mrn>/print` GET route
+- `agent/notifier.py` — `send_briefing_notification()` function
+- `templates/patient_print_stub.html` — New stub template (print paperwork placeholder)
+
+### Notes
+- Widget layout already uses user-level preferences (not per-patient) — confirmed no change needed.
+- No visible "CareCompanion" text on dashboard content — only in browser tab title and About dialog (appropriate).
+
+---
+
 ## CL-P7FIX — test_phase7.py Fix: CSRF + Unicode + pytest Collection
 **Completed:** 07-20-25 02:30:00 UTC
 

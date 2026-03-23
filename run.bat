@@ -14,10 +14,9 @@ setlocal enabledelayedexpansion
 ::
 :: Usage:
 ::   Double-click this file, or run from terminal:
-::     run.bat              — full sequence (default)
+::     run.bat              — full sequence (default, hot-reload)
 ::     run.bat --skip-tests — skip verification tests
 ::     run.bat --skip-git   — skip git commit/push
-::     run.bat --dev        — start in dev mode (hot-reload, no exe)
 :: ================================================================
 
 :: Use the folder this bat file lives in — works no matter where project is
@@ -32,11 +31,9 @@ set "ERRORLOG=%PROJECT%\data\launch_error.txt"
 :: Parse flags
 set SKIP_TESTS=0
 set SKIP_GIT=0
-set DEV_MODE=0
 for %%a in (%*) do (
     if "%%a"=="--skip-tests" set SKIP_TESTS=1
     if "%%a"=="--skip-git" set SKIP_GIT=1
-    if "%%a"=="--dev" set DEV_MODE=1
 )
 
 :: Ensure data directory exists
@@ -159,13 +156,8 @@ if %SKIP_GIT%==1 (
 :: ------------------------------------------------------------------
 :: STEP 6: Start server + launch app
 :: ------------------------------------------------------------------
-if %DEV_MODE%==1 (
-    echo [6/6] Starting dev server ^(hot-reload^)...
-    start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
-) else (
-    echo [6/6] Starting server...
-    start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=server
-)
+echo [6/6] Starting dev server ^(hot-reload^)...
+start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
 
 :: Wait for server to be ready — uses netstat (fast, no Python spawn)
 echo       Waiting for server to bind port 5000...
@@ -189,16 +181,8 @@ echo       Server is running on port 5000.
 
 :: Launch app
 :LAUNCH_APP
-if %DEV_MODE%==1 (
-    echo       Opening Chrome...
-    start "" "chrome" "http://127.0.0.1:5000/dashboard"
-) else if exist "%EXE%" (
-    echo       Launching desktop app...
-    start "" "%EXE%"
-) else (
-    echo       Opening Chrome...
-    start "" "chrome" "http://127.0.0.1:5000/dashboard"
-)
+echo       Opening Chrome...
+start "" "chrome" "http://127.0.0.1:5000/dashboard"
 
 echo.
 echo ============================================
@@ -206,7 +190,7 @@ echo  CareCompanion is running!
 echo  Dashboard: http://127.0.0.1:5000/dashboard
 echo ============================================
 echo.
-echo Flags:  --skip-tests  --skip-git  --dev
+echo Flags:  --skip-tests  --skip-git
 echo.
 echo Press any key to close this window.
 echo (The server keeps running in the background)

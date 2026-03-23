@@ -6,6 +6,12 @@
 <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
     <h1 style="margin:0;">&#9728; Morning Briefing</h1>
     <span style="font-size:14px;color:var(--text-secondary);">{{ today.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}</span>
+    <div style="margin-left:auto;display:flex;gap:8px;" class="no-print">
+        <button onclick="sendBriefingPush()" class="btn btn-sm btn-outline" id="push-btn" title="Send briefing summary to phone via Pushover">&#128241; Push to Phone</button>
+        <a href="/daily-summary/print" target="_blank" class="btn btn-sm btn-outline" title="Print provider summary">&#128424; Provider Summary</a>
+        <a href="/daily-summary/rooming/print" target="_blank" class="btn btn-sm btn-outline" title="Print MA rooming sheet">&#128424; MA Sheet</a>
+        <button onclick="window.print()" class="btn btn-sm btn-outline" title="Print this briefing">&#128424; Print Briefing</button>
+    </div>
 </div>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px;">
@@ -349,6 +355,22 @@
     </div>
 </div>
 <script>
+/* Send briefing summary via Pushover */
+function sendBriefingPush() {
+    var btn = document.getElementById('push-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    fetch('/briefing/push', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name=csrf-token]')?.content || ''}
+    }).then(function(r) { return r.json(); })
+      .then(function(d) {
+          btn.textContent = d.success ? '✓ Sent!' : '✗ Failed';
+          setTimeout(function() { btn.textContent = '📱 Push to Phone'; btn.disabled = false; }, 3000);
+      })
+      .catch(function() { btn.textContent = '✗ Error'; btn.disabled = false; });
+}
+
 document.getElementById('tcm-quick-add-form').addEventListener('submit', function(e) {
     e.preventDefault();
     var msg = document.getElementById('tcm-qa-msg');
@@ -433,7 +455,18 @@ document.getElementById('tcm-quick-add-form').addEventListener('submit', functio
 </div>
 {% endif %}
 
-<div style="text-align:center;margin-top:16px;">
+<div style="text-align:center;margin-top:16px;" class="no-print">
     <a href="/" class="btn btn-primary">Go to Today View</a>
 </div>
+
+<style>
+@media print {
+    .no-print { display: none !important; }
+    .sidebar, .header, .app-menu-bar, .context-panel { display: none !important; }
+    .app-layout { display: block !important; }
+    .main-content { padding: 0 !important; margin: 0 !important; overflow: visible !important; }
+    .card { break-inside: avoid; border: 1px solid #ccc !important; box-shadow: none !important; }
+    body { font-size: 10pt; }
+}
+</style>
 {% endblock %}

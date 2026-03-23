@@ -87,6 +87,14 @@ class User(UserMixin, db.Model):
     ac_username_enc = db.Column(db.Text, default='')      # Fernet-encrypted
     ac_password_enc = db.Column(db.Text, default='')      # Fernet-encrypted
 
+    # ---- PDMP credentials (encrypted at rest) ----------------------------
+    pdmp_username_enc = db.Column(db.Text, default='')    # Fernet-encrypted
+    pdmp_password_enc = db.Column(db.Text, default='')    # Fernet-encrypted
+
+    # ---- VIIS credentials (encrypted at rest) ----------------------------
+    viis_username_enc = db.Column(db.Text, default='')    # Fernet-encrypted
+    viis_password_enc = db.Column(db.Text, default='')    # Fernet-encrypted
+
     # ---- Work PC password (encrypted, optional) --------------------------
     pc_password_enc = db.Column(db.Text, default='')      # Fernet-encrypted
 
@@ -282,6 +290,64 @@ class User(UserMixin, db.Model):
     def has_ac_credentials(self):
         """Return True if both AC username and password are stored."""
         return bool(self.ac_username_enc and self.ac_password_enc)
+
+    # ------------------------------------------------------------------
+    # PDMP credential helpers (encrypt / decrypt)
+    # ------------------------------------------------------------------
+    def set_pdmp_credentials(self, username, password):
+        f = _get_fernet()
+        self.pdmp_username_enc = f.encrypt(username.encode()).decode() if username else ''
+        self.pdmp_password_enc = f.encrypt(password.encode()).decode() if password else ''
+
+    def get_pdmp_username(self):
+        if not self.pdmp_username_enc:
+            return ''
+        try:
+            f = _get_fernet()
+            return f.decrypt(self.pdmp_username_enc.encode()).decode()
+        except (InvalidToken, Exception):
+            return ''
+
+    def get_pdmp_password(self):
+        if not self.pdmp_password_enc:
+            return ''
+        try:
+            f = _get_fernet()
+            return f.decrypt(self.pdmp_password_enc.encode()).decode()
+        except (InvalidToken, Exception):
+            return ''
+
+    def has_pdmp_credentials(self):
+        return bool(self.pdmp_username_enc and self.pdmp_password_enc)
+
+    # ------------------------------------------------------------------
+    # VIIS credential helpers (encrypt / decrypt)
+    # ------------------------------------------------------------------
+    def set_viis_credentials(self, username, password):
+        f = _get_fernet()
+        self.viis_username_enc = f.encrypt(username.encode()).decode() if username else ''
+        self.viis_password_enc = f.encrypt(password.encode()).decode() if password else ''
+
+    def get_viis_username(self):
+        if not self.viis_username_enc:
+            return ''
+        try:
+            f = _get_fernet()
+            return f.decrypt(self.viis_username_enc.encode()).decode()
+        except (InvalidToken, Exception):
+            return ''
+
+    def get_viis_password(self):
+        if not self.viis_password_enc:
+            return ''
+        try:
+            f = _get_fernet()
+            return f.decrypt(self.viis_password_enc.encode()).decode()
+        except (InvalidToken, Exception):
+            return ''
+
+    def has_viis_credentials(self):
+        return bool(self.viis_username_enc and self.viis_password_enc)
 
     # ------------------------------------------------------------------
     # Work PC password helpers (encrypt / decrypt)

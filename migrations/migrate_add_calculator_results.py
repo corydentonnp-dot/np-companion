@@ -3,6 +3,10 @@ Phase 31 — Calculator Results Migration
 
 Creates the calculator_result table for storing clinical risk score computations.
 Idempotent — safe to run multiple times.
+
+Uses run_migration(app, db) so _run_pending_migrations() calls it in-process
+instead of spawning a subprocess (which would cause infinite recursion via
+create_app → _run_pending_migrations → subprocess → create_app).
 """
 
 import sys
@@ -10,12 +14,10 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def run():
-    from app import create_app
-    from models import db
+def run_migration(app, db):
+    """Called by _run_pending_migrations in app/__init__.py."""
     from sqlalchemy import inspect, text
 
-    app = create_app()
     with app.app_context():
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
@@ -56,4 +58,7 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    from app import create_app
+    from models import db
+    a = create_app()
+    run_migration(a, db)

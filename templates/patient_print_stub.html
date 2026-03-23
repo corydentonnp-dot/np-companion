@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Print Patient Paperwork — {{ mrn_display }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #111; padding: 1in; line-height: 1.4; }
+        @media print {
+            @page { margin: 0.5in; size: letter; }
+            body { padding: 0; }
+            .no-print { display: none !important; }
+        }
+        .stub-header { border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 24px; }
+        .stub-header h1 { font-size: 16pt; }
+        .stub-header .meta { font-size: 10pt; color: #666; margin-top: 4px; }
+        .stub-body { padding: 24px 0; text-align: center; color: #666; }
+        .stub-body p { margin-bottom: 12px; }
+        .btn { display: inline-block; padding: 8px 16px; background: #0d6efd; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; text-decoration: none; }
+        .btn:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="stub-header">
+        <h1>Patient Paperwork</h1>
+        <div class="meta">
+            {{ record.patient_name if record else 'Unknown Patient' }} | MRN: {{ mrn_display }}
+            {% if record and record.patient_dob %} | DOB: {{ record.patient_dob }}{% endif %}
+        </div>
+    </div>
+    <div class="stub-body">
+        <p style="font-size: 14pt; color: #333;">&#128679; Feature Coming Soon</p>
+        <p>Patient paperwork printing (visit summary, after-visit instructions, care plan) will be available in a future update.</p>
+        <div class="no-print" style="margin-top: 24px;">
+            <a href="javascript:history.back()" class="btn">&#8592; Back to Chart</a>
+        </div>
+    </div>
+</body>
+</html>

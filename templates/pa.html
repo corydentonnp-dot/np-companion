@@ -14,6 +14,19 @@
         <div class="card">
             <div class="card-header">New Prior Authorization</div>
             <div class="card-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label class="form-label">Patient MRN</label>
+                        <div style="display:flex;gap:6px;">
+                            <input type="text" id="pa-mrn" class="form-input" placeholder="MRN (optional)" style="flex:1;">
+                            <button class="btn btn-outline btn-sm" onclick="lookupPatient()" title="Auto-fill from patient data">🔍 Lookup</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Patient Name</label>
+                        <input type="text" id="pa-patient" class="form-input" placeholder="Last, First">
+                    </div>
+                </div>
                 <div class="form-group">
                     <label class="form-label">Drug Name</label>
                     <input type="text" id="pa-drug" class="form-input" placeholder="e.g., Ozempic, Eliquis..." autocomplete="off">
@@ -34,10 +47,23 @@
                         <input type="text" id="pa-payer" class="form-input" placeholder="e.g., Anthem BCBS">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Patient Name (optional)</label>
-                        <input type="text" id="pa-patient" class="form-input" placeholder="Last, First">
+                        <label class="form-label">PA Reference #</label>
+                        <input type="text" id="pa-refnum" class="form-input" placeholder="If assigned">
                     </div>
                 </div>
+                <details style="margin-bottom:12px;">
+                    <summary style="font-size:12px;cursor:pointer;color:var(--text-secondary);">Payer Contact Info</summary>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:11px;">Phone</label>
+                            <input type="text" id="pa-payer-phone" class="form-input" placeholder="Payer PA phone">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:11px;">Fax</label>
+                            <input type="text" id="pa-payer-fax" class="form-input" placeholder="Payer PA fax">
+                        </div>
+                    </div>
+                </details>
 
                 <div class="form-group">
                     <label class="form-label">Failed First-Line Alternatives</label>
@@ -82,7 +108,7 @@
                 {% if history %}
                 <table class="schedule-table" style="font-size:12px;">
                     <thead>
-                        <tr><th>Drug</th><th>Payer</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+                        <tr><th>Drug</th><th>Payer</th><th>Date</th><th>Status Timeline</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
                         {% for pa in history %}
@@ -91,17 +117,23 @@
                             <td>{{ pa.payer_name or '—' }}</td>
                             <td>{{ pa.created_at.strftime('%m/%d/%Y') if pa.created_at else '—' }}</td>
                             <td>
-                                {% if pa.status == 'approved' %}
-                                <span class="badge badge--success">Approved</span>
-                                {% elif pa.status == 'denied' %}
-                                <span class="badge badge--danger">Denied</span>
-                                {% elif pa.status == 'submitted' %}
-                                <span class="badge badge--info">Submitted</span>
-                                {% elif pa.status == 'appealed' %}
-                                <span class="badge badge--warning">Appealed</span>
-                                {% else %}
-                                <span class="badge badge--muted">Draft</span>
-                                {% endif %}
+                                <div class="pa-timeline">
+                                    <span class="pa-tl-dot {{ 'pa-tl-active' if pa.status == 'draft' else 'pa-tl-done' }}" title="Draft">●</span>
+                                    <span class="pa-tl-line {{ 'pa-tl-done' if pa.status in ('submitted','approved','denied','appealed') else '' }}"></span>
+                                    <span class="pa-tl-dot {{ 'pa-tl-active' if pa.status == 'submitted' else ('pa-tl-done' if pa.status in ('approved','denied','appealed') else '') }}" title="Submitted{{ ' ' + pa.submitted_date.strftime('%m/%d') if pa.submitted_date else '' }}">●</span>
+                                    <span class="pa-tl-line {{ 'pa-tl-done' if pa.status in ('approved','denied','appealed') else '' }}"></span>
+                                    {% if pa.status == 'denied' or pa.status == 'appealed' %}
+                                    <span class="pa-tl-dot pa-tl-denied" title="Denied{{ ' — ' + pa.denial_reason[:40] if pa.denial_reason else '' }}">●</span>
+                                    {% if pa.status == 'appealed' %}
+                                    <span class="pa-tl-line pa-tl-done"></span>
+                                    <span class="pa-tl-dot pa-tl-active" title="Appealed">●</span>
+                                    {% endif %}
+                                    {% elif pa.status == 'approved' %}
+                                    <span class="pa-tl-dot pa-tl-approved" title="Approved{{ ' ' + pa.decision_date.strftime('%m/%d') if pa.decision_date else '' }}">●</span>
+                                    {% else %}
+                                    <span class="pa-tl-dot" title="Decision pending">○</span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td style="white-space:nowrap;">
                                 {% if pa.status == 'submitted' %}
@@ -166,6 +198,7 @@ function generatePA() {
         icd10_code: document.getElementById('pa-icd10').value.trim(),
         payer_name: document.getElementById('pa-payer').value.trim(),
         patient_name: document.getElementById('pa-patient').value.trim(),
+        mrn: document.getElementById('pa-mrn').value.trim(),
         failed_alternatives: _alternatives,
         justification: document.getElementById('pa-justification').value.trim(),
     };
@@ -227,5 +260,47 @@ function appealPA(id) {
 }
 
 function escHtml(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+function lookupPatient() {
+    var mrn = document.getElementById('pa-mrn').value.trim();
+    if (!mrn) { alert('Enter an MRN first'); return; }
+    fetch('/api/patient/' + encodeURIComponent(mrn) + '/summary')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success && d.data) {
+                if (d.data.name) document.getElementById('pa-patient').value = d.data.name;
+                if (d.data.insurance) document.getElementById('pa-payer').value = d.data.insurance;
+            } else {
+                alert(d.error || 'Patient not found');
+            }
+        })
+        .catch(function() { alert('Lookup failed'); });
+}
 </script>
+
+<style>
+.pa-timeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 14px;
+    white-space: nowrap;
+}
+.pa-tl-dot {
+    color: var(--text-secondary, #ccc);
+    font-size: 12px;
+    cursor: help;
+}
+.pa-tl-dot.pa-tl-done { color: var(--color-teal, #26a69a); }
+.pa-tl-dot.pa-tl-active { color: var(--color-blue, #3b82f6); font-weight: bold; }
+.pa-tl-dot.pa-tl-approved { color: var(--color-green, #22c55e); font-weight: bold; }
+.pa-tl-dot.pa-tl-denied { color: var(--color-red, #ef4444); font-weight: bold; }
+.pa-tl-line {
+    display: inline-block;
+    width: 16px;
+    height: 2px;
+    background: var(--border, #ddd);
+}
+.pa-tl-line.pa-tl-done { background: var(--color-teal, #26a69a); }
+</style>
 {% endblock %}

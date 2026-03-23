@@ -182,6 +182,7 @@ class PatientSpecialist(db.Model):
     fax = db.Column(db.String(30), default='')
     notes = db.Column(db.Text, default='')
     last_visit = db.Column(db.DateTime, nullable=True)
+    is_archived = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc)
     )

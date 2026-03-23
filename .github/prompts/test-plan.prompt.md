@@ -12,6 +12,12 @@ The user will specify a feature, module, or recent change. Generate tests for it
 
 ## Process
 
+### 0. Process Guard (ALWAYS RUN FIRST)
+- Run `(Get-Process python -ErrorAction SilentlyContinue).Count` (timeout: 10000ms, NOT background).
+- If count > 5, clean up: `Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CPU -gt 30 -or $_.WorkingSet64 -gt 500MB } | Stop-Process -Force`
+- All test commands MUST use `isBackground: false` with `timeout: 120000`.
+- Never start a new test run if another is still running.
+
 ### 1. Understand the Target
 - Read the relevant route file(s), model(s), and template(s).
 - Read existing tests in `tests/` for this module.

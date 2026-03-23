@@ -235,3 +235,31 @@ def check_escalations():
             sound='siren',
         )
         logger.info(f'Escalated critical notification {notif.id} (count={notif.escalation_count})')
+
+
+# ======================================================================
+# Morning briefing Pushover notification (no PHI — counts only)
+# ======================================================================
+def send_briefing_notification(appointment_count, gap_count, recall_count=0, overlap_count=0):
+    """
+    Send a morning briefing summary via Pushover.
+    Only transmits aggregate counts — no patient identifiers.
+    """
+    user_key = getattr(config, 'PUSHOVER_USER_KEY', '')
+    api_token = getattr(config, 'PUSHOVER_API_TOKEN', '')
+    if not user_key or not api_token:
+        logger.debug('Pushover not configured — skipping briefing notification')
+        return
+
+    lines = [
+        f'📅 {appointment_count} appointment{"s" if appointment_count != 1 else ""} today',
+    ]
+    if gap_count > 0:
+        lines.append(f'⚠ {gap_count} open care gap{"s" if gap_count != 1 else ""}')
+    if recall_count > 0:
+        lines.append(f'🔴 {recall_count} active recall alert{"s" if recall_count != 1 else ""}')
+    if overlap_count > 0:
+        lines.append(f'⏰ {overlap_count} schedule overlap{"s" if overlap_count != 1 else ""}')
+
+    message = '\n'.join(lines)
+    _send_pushover(user_key, api_token, title='☀ Morning Briefing', message=message, priority=0)

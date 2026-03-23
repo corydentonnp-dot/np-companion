@@ -414,7 +414,7 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | F6 | Clinical Summary Parser (CDA XML) | ✅ Complete | ✅ | ⬜ | Phase 2 | Patient chart, vitals, meds, diagnoses, new-med education (RP4) |
 | F7 | On-Call Note Keeper | ✅ Complete | ✅ | ⬜ | Phase 3 | CRUD, export, callback tracking |
 | F8 | Order Set Manager | ✅ Complete | ✅ | ⬜ | Phase 3 | Sets, items, versions, execution tracking |
-| F9 | Chart Prefill (AC Automation) | ⏸️ AC-Blocked | ⬜ | ⬜ | Phase 3 | Requires Amazing Charts calibration |
+| F9 | Chart Prefill (AC Automation) | ⏸️ AC-Blocked | ⬜ | ⬜ | Phase 3 | AC Calibration Wizard built (UX-17); awaits live AC testing |
 | F10 | Medication Reference | ✅ Complete | ✅ | ⬜ | Phase 3 | Drug lookup, interactions, RxNorm, guideline review (RP4) |
 | F11 | Lab Tracker | ✅ Complete | ✅ | ⬜ | Phase 4 | Per-patient tracking, trends, panels |
 | F12 | Care Gap Tracker | ✅ Complete | ✅ | ⬜ | Phase 5 | Age/sex rules, admin editor, gap alerts |
@@ -440,7 +440,7 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | F31 | AI Assistant Integration | ✅ Complete | ✅ | ⬜ | Phase 9 | OpenAI/Anthropic/xAI, HIPAA ack |
 | F32 | Clinical Calculators | ✅ Complete | ✅ | ⬜ | Phases 31–38 | 48 calculators, auto-score, risk tools, billing integration |
 
-**Summary:** 30/32 complete · 1 blocked (F9) · 1 not started (F30)
+**Summary:** 30/32 complete · 1 blocked (F9, calibration wizard ready) · 1 not started (F30) · UX Audit items 1-20 complete (CL-UXAUDIT + CL-UXAUDIT2)
 
 ---
 
@@ -451,12 +451,12 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | ID | Category | Description | Severity | Mitigation | Owner | Status |
 |----|----------|-------------|----------|------------|-------|--------|
 | R1 | External | Amazing Charts UI change breaks OCR automation | Critical | OCR-first with coordinate fallback; screenshot before every action; AC_MOCK_MODE for testing | Copilot | Open |
-| R2 | Compliance | PHI leak through new logging or notification code | Critical | Session-start HIPAA scan; MRN hashing enforced; no PHI in Pushover | Copilot | Mitigating |
+| R2 | Compliance | PHI leak through new logging or notification code | Critical | Session-start HIPAA scan; MRN hashing enforced; no PHI in Pushover; soft-delete on all clinical records (LabTrack, PatientSpecialist); MRN masked to last-4 in all templates | Copilot | Mitigating |
 | R3 | Technical | SQLite scaling limits hit as data grows | High | SQLAlchemy ORM only (no raw SQL); PostgreSQL migration path in SAAS_PLAN.md | Copilot | Open |
 | R4 | Technical | No practice_id scoping — blocks multi-tenant SaaS | High | Planned: Practice model + user.practice_id + @require_practice decorator | Copilot | Open |
 | R5 | External | API key expiration (UMLS, Pushover) disrupts features | Medium | Graceful degradation: stale cache → hardcoded fallback → "not available" | User | Open |
 | R6 | Operational | Config drift between dev machine and work PC (FPA-D-NP-DENTON) | Medium | deploy_check.py pre-flight; DEPLOYMENT_GUIDE.md procedures | Copilot | Mitigating |
-| R7 | Technical | 40+ migration files — complexity risk on fresh installs | Low | All migrations idempotent; consolidation planned for SaaS | Copilot | Open |
+| R7 | Technical | 64 migration files — complexity risk on fresh installs; recursion risk if migrations call create_app() | Low | All migrations idempotent; recursion guard in `_run_pending_migrations`; all migrations now use `def run_migration(app, db)` pattern; consolidation planned for SaaS | Copilot | Mitigating |
 
 ### Closed Risks
 *None yet.*

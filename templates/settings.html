@@ -3,12 +3,29 @@
 {% block page_id %}settings{% endblock %}
 
 {% block content %}
+<div class="settings-layout">
+{# ---- Settings Sub-Sidebar ---- #}
+<nav class="settings-nav" id="settings-nav">
+    <ul>
+        <li><a href="#sect-profile" class="settings-nav__link settings-nav__link--active" data-section="sect-profile">Profile &amp; Security</a></li>
+        <li><a href="#sect-credentials" class="settings-nav__link" data-section="sect-credentials">Credentials</a></li>
+        <li><a href="#sect-notifications" class="settings-nav__link" data-section="sect-notifications">Notifications</a></li>
+        <li><a href="#sect-import" class="settings-nav__link" data-section="sect-import">Clinical Import</a></li>
+        <li><a href="#sect-appearance" class="settings-nav__link" data-section="sect-appearance">Appearance</a></li>
+        <li><a href="#sect-billing" class="settings-nav__link" data-section="sect-billing">Billing</a></li>
+        <li><a href="#sect-intelligence" class="settings-nav__link" data-section="sect-intelligence">Intelligence</a></li>
+        <li><a href="#sect-features" class="settings-nav__link" data-section="sect-features">Feature Level</a></li>
+    </ul>
+</nav>
+
+{# ---- Settings Main Content ---- #}
+<div class="settings-content">
 <h1 style="margin-bottom:24px;">Settings</h1>
 
 {# ================================================================
    SECTION 1: Profile & Security
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Profile &amp; Security</h2>
+<h2 id="sect-profile" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Profile &amp; Security</h2>
 
 {# ---- Display Name ----------------------------------------------- #}
 <div class="card" style="margin-bottom:16px;max-width:560px;">
@@ -95,7 +112,7 @@
 {# ================================================================
    SECTION 2: Credentials
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Credentials</h2>
+<h2 id="sect-credentials" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Credentials</h2>
 
 {# ---- NetPractice Credentials ------------------------------------ #}
 <div class="card" style="margin-bottom:16px;max-width:560px;">
@@ -156,6 +173,66 @@
                 <label class="form-label" for="ac_password">Amazing Charts Password</label>
                 <input type="password" id="ac_password" name="ac_password" class="form-input"
                        placeholder="{% if current_user.has_ac_credentials() %}••••••• (saved){% else %}Your Amazing Charts password{% endif %}" autocomplete="off">
+                <p class="form-help">Leave blank to keep the current saved password.</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Credentials</button>
+        </form>
+    </div>
+</div>
+
+{# ---- PDMP Credentials ------------------------------------------ #}
+<div class="card" style="margin-bottom:16px;max-width:560px;">
+    <div class="card-header">PDMP Login <span class="badge badge--info" style="margin-left:8px;">Optional</span></div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Prescription Drug Monitoring Program credentials. Encrypted and stored locally.
+            {% if current_user.has_pdmp_credentials() %}
+                <span class="badge badge--success" style="margin-left:6px;">Credentials saved</span>
+            {% else %}
+                <span class="badge badge--info" style="margin-left:6px;">Not set</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_pdmp_credentials">
+            <div class="form-group">
+                <label class="form-label" for="pdmp_username">PDMP Username / Email</label>
+                <input type="text" id="pdmp_username" name="pdmp_username" class="form-input"
+                       value="{{ current_user.get_pdmp_username() }}" placeholder="Your PDMP login" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="pdmp_password">PDMP Password</label>
+                <input type="password" id="pdmp_password" name="pdmp_password" class="form-input"
+                       placeholder="{% if current_user.has_pdmp_credentials() %}••••••• (saved){% else %}Your PDMP password{% endif %}" autocomplete="off">
+                <p class="form-help">Leave blank to keep the current saved password.</p>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Credentials</button>
+        </form>
+    </div>
+</div>
+
+{# ---- VIIS Credentials ------------------------------------------ #}
+<div class="card" style="margin-bottom:16px;max-width:560px;">
+    <div class="card-header">VIIS Login <span class="badge badge--info" style="margin-left:8px;">Optional</span></div>
+    <div class="card-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+            Virginia Immunization Information System credentials. Encrypted and stored locally.
+            {% if current_user.has_viis_credentials() %}
+                <span class="badge badge--success" style="margin-left:6px;">Credentials saved</span>
+            {% else %}
+                <span class="badge badge--info" style="margin-left:6px;">Not set</span>
+            {% endif %}
+        </p>
+        <form method="POST" action="{{ url_for('auth.settings_account') }}">
+            <input type="hidden" name="action" value="set_viis_credentials">
+            <div class="form-group">
+                <label class="form-label" for="viis_username">VIIS Username</label>
+                <input type="text" id="viis_username" name="viis_username" class="form-input"
+                       value="{{ current_user.get_viis_username() }}" placeholder="Your VIIS login" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="viis_password">VIIS Password</label>
+                <input type="password" id="viis_password" name="viis_password" class="form-input"
+                       placeholder="{% if current_user.has_viis_credentials() %}••••••• (saved){% else %}Your VIIS password{% endif %}" autocomplete="off">
                 <p class="form-help">Leave blank to keep the current saved password.</p>
             </div>
             <button type="submit" class="btn btn-primary">Save Credentials</button>
@@ -265,7 +342,7 @@ function testAIConnection() {
 {# ================================================================
    SECTION 3: Notifications
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Notifications</h2>
+<h2 id="sect-notifications" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Notifications</h2>
 
 <form method="POST" action="{{ url_for('auth.settings_notifications') }}">
     {# ---- General Settings ------------------------------------------ #}
@@ -380,7 +457,7 @@ function testAIConnection() {
 {# ================================================================
    SECTION 4: Clinical Summary Import
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 12px;">Clinical Summary Import</h2>
+<h2 id="sect-import" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 12px;">Clinical Summary Import</h2>
 
 <form method="POST" action="{{ url_for('auth.settings_account') }}">
     <input type="hidden" name="action" value="set_export_folder">
@@ -389,11 +466,14 @@ function testAIConnection() {
         <div class="card-body">
             <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label" for="xml_export_folder">Folder path</label>
-                <input type="text" id="xml_export_folder" name="xml_export_folder" class="form-input"
-                       value="{{ current_user.get_pref('xml_export_folder', '') }}"
-                       placeholder="data/clinical_summaries/">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="xml_export_folder" name="xml_export_folder" class="form-input" style="flex:1;"
+                           value="{{ current_user.get_pref('xml_export_folder', '') }}"
+                           placeholder="data/clinical_summaries/" readonly>
+                    <button type="button" class="btn btn-outline" id="browse-folder-btn" onclick="browseExportFolder()">Browse…</button>
+                </div>
                 <p class="form-help">
-                    Full path to the folder where Amazing Charts exports Clinical Summary XML files.
+                    Click Browse to select the folder where Amazing Charts exports Clinical Summary XML files.
                     Leave blank to use the default (<code>data/clinical_summaries/</code>).
                     CareCompanion watches this folder for new files and auto-imports them.
                 </p>
@@ -402,11 +482,30 @@ function testAIConnection() {
     </div>
     <button type="submit" class="btn btn-primary">Save Export Folder</button>
 </form>
+<script>
+function browseExportFolder() {
+    var btn = document.getElementById('browse-folder-btn');
+    btn.textContent = 'Opening…';
+    btn.disabled = true;
+    fetch('/api/settings/browse-folder', {method:'POST', headers:{'Content-Type':'application/json'}})
+    .then(function(r){return r.json();})
+    .then(function(data){
+        if (data.success && data.folder) {
+            document.getElementById('xml_export_folder').value = data.folder;
+        }
+    })
+    .catch(function(){})
+    .finally(function(){
+        btn.textContent = 'Browse…';
+        btn.disabled = false;
+    });
+}
+</script>
 
 {# ================================================================
    SECTION 5: Theme & Appearance
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 12px;">Theme &amp; Appearance</h2>
+<h2 id="sect-appearance" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 12px;">Theme &amp; Appearance</h2>
 
 <div class="card" style="margin-bottom:16px;max-width:720px;">
     <div class="card-header">Theme</div>
@@ -625,7 +724,7 @@ window._setSplitPanes = function(n) {
 {# ================================================================
    SECTION 4b: Billing Preferences
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Billing Intelligence</h2>
+<h2 id="sect-billing" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Billing Intelligence</h2>
 
 <form method="POST" action="{{ url_for('auth.settings_account') }}">
     <input type="hidden" name="action" value="set_billing_prefs">
@@ -724,7 +823,7 @@ window._setSplitPanes = function(n) {
 {# ================================================================
    SECTION 5: Clinical Intelligence Preferences
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Clinical Intelligence</h2>
+<h2 id="sect-intelligence" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Clinical Intelligence</h2>
 
 <form method="POST" action="{{ url_for('auth.settings_account') }}">
     <input type="hidden" name="action" value="set_intelligence_prefs">
@@ -831,7 +930,7 @@ window._setSplitPanes = function(n) {
 {# ================================================================
    SECTION 7: Feature Level (Phase 13)
    ================================================================ #}
-<h2 style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Feature Level</h2>
+<h2 id="sect-features" style="font-size:16px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Feature Level</h2>
 
 <div class="card" style="margin-bottom:24px;">
     <div class="card-body" style="padding:24px;">
@@ -889,5 +988,49 @@ window._setSplitPanes = function(n) {
     </div>
 </div>
 {% endif %}
+
+</div>{# /settings-content #}
+</div>{# /settings-layout #}
+
+<script>
+/* Settings sub-sidebar scroll-spy */
+(function() {
+    var links = document.querySelectorAll('.settings-nav__link');
+    var sections = [];
+    links.forEach(function(a) {
+        var id = a.getAttribute('data-section');
+        if (id) {
+            var el = document.getElementById(id);
+            if (el) sections.push({id: id, el: el, link: a});
+        }
+    });
+    if (!sections.length) return;
+
+    var main = document.querySelector('.main-content') || window;
+    var scrollEl = main === window ? document.documentElement : main;
+
+    function onScroll() {
+        var scrollTop = (main === window ? document.documentElement.scrollTop : main.scrollTop) + 80;
+        var active = sections[0];
+        for (var i = 0; i < sections.length; i++) {
+            if (sections[i].el.offsetTop <= scrollTop) active = sections[i];
+        }
+        links.forEach(function(a) { a.classList.remove('settings-nav__link--active'); });
+        if (active) active.link.classList.add('settings-nav__link--active');
+    }
+
+    (main === window ? window : main).addEventListener('scroll', onScroll);
+    onScroll();
+
+    links.forEach(function(a) {
+        a.addEventListener('click', function(e) {
+            e.preventDefault();
+            var id = a.getAttribute('data-section');
+            var el = document.getElementById(id);
+            if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+        });
+    });
+})();
+</script>
 
 {% endblock %}

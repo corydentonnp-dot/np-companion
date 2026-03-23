@@ -87,7 +87,7 @@
                         <div style="display:flex;flex-wrap:wrap;gap:8px;">
                             {% for g in p.gaps %}
                             <div style="background:var(--bg-surface,#fff);border:1px solid var(--border,#ddd);border-radius:8px;padding:10px 14px;min-width:220px;flex:1;max-width:350px;">
-                                <div style="font-weight:600;font-size:14px;margin-bottom:4px;">{{ g.gap_name or g.gap_type }}</div>
+                                <div style="font-weight:600;font-size:14px;margin-bottom:4px;">{{ (g.gap_name or g.gap_type)|gap_display }}</div>
                                 <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">{{ g.description|truncate(80) }}</div>
                                 {% if g.billing_code_suggested %}
                                 <div style="font-size:11px;color:var(--text-secondary);">Code: {{ g.billing_code_suggested }}</div>

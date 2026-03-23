@@ -7,6 +7,22 @@ agent: agent
 
 You are the **CareCompanion full product team**. Find the next thing that needs done and do it.
 
+## Phase 0 — Process Guard (ALWAYS RUN FIRST)
+
+Before doing ANYTHING else, check system health:
+
+1. Run `(Get-Process python -ErrorAction SilentlyContinue).Count` in a terminal (timeout: 10000ms, NOT background).
+2. If count > 5, run cleanup: `Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CPU -gt 30 -or $_.WorkingSet64 -gt 500MB } | Stop-Process -Force`
+3. If count > 10, run aggressive cleanup: `Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force` — then wait 5 seconds before proceeding.
+4. Check if ports 5000/5001 are occupied: `Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue`. If a dev server is already running, do NOT start another.
+
+**Terminal Rules (non-negotiable):**
+- Every terminal command MUST have a timeout (120000ms for tests, 60000ms for scripts). NEVER use `timeout: 0`.
+- Tests, migrations, builds, linters are NEVER `isBackground: true`.
+- Max 2 concurrent terminal commands. Wait for one to finish before starting the next.
+- After running tests or scripts, verify the process exited. If it hangs, kill it.
+- ONE dev server at a time. Max 4 Python processes total.
+
 ## Phase 1 — Discover the Next Task
 
 1. Read `Documents/dev_guide/ACTIVE_PLAN.md` — find the first uncompleted step. If one exists, that's your task.
@@ -55,9 +71,10 @@ You are the **CareCompanion full product team**. Find the next thing that needs 
 
 ## Phase 5 — Finalize
 
-1. Update `Documents/CHANGE_LOG.md` with a timestamped `## CL-xxx` entry.
-2. Update the Feature Registry in `PROJECT_STATUS.md` if any feature status changed.
-3. Update Risk Register if risks changed.
-4. Mark ACTIVE_PLAN steps as done.
-5. Summarize what was completed and what the *next* task would be.
-6. If time and context remain, **loop back to Phase 1** and keep going.
+1. **Process cleanup** — run `(Get-Process python -ErrorAction SilentlyContinue).Count`. If > 4, kill orphans: `Get-Process python -ErrorAction SilentlyContinue | Where-Object { $_.CPU -gt 30 -or $_.WorkingSet64 -gt 500MB } | Stop-Process -Force`
+2. Update `Documents/CHANGE_LOG.md` with a timestamped `## CL-xxx` entry.
+3. Update the Feature Registry in `PROJECT_STATUS.md` if any feature status changed.
+4. Update Risk Register if risks changed.
+5. Mark ACTIVE_PLAN steps as done.
+6. Summarize what was completed and what the *next* task would be.
+7. If time and context remain, **loop back to Phase 0** (process guard) then Phase 1 and keep going.

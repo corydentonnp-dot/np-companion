@@ -34,7 +34,7 @@
         <div class="gap-row" data-trigger-type="{{ _derive_trigger_type(g) }}" style="padding:16px;border-bottom:1px solid var(--border,#eee);{% if loop.last %}border-bottom:none;{% endif %}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                 <div style="flex:1;min-width:200px;">
-                    <div style="font-weight:600;font-size:15px;margin-bottom:4px;">{{ g.gap_name or g.gap_type }}</div>
+                    <div style="font-weight:600;font-size:15px;margin-bottom:4px;">{{ (g.gap_name or g.gap_type)|gap_display }}</div>
                     <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;">{{ g.description }}</div>
                     {% if g.billing_code_suggested %}
                     <div style="font-size:12px;color:var(--text-secondary);">
@@ -48,6 +48,9 @@
                 <div style="display:flex;gap:6px;align-items:flex-start;flex-shrink:0;">
                     <button class="btn btn-primary btn-sm" onclick="showAddressForm('{{ g.id }}')">
                         ✓ Address Now
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="copyGapTemplate(this, '{{ g.id }}')" title="Copy documentation template to clipboard">
+                        📋 Copy Doc
                     </button>
                     <form method="post" action="/caregap/{{ mrn }}/status/{{ g.id }}" style="display:inline;">
                         <input type="hidden" name="status" value="declined">
@@ -65,7 +68,7 @@
                 <form method="post" action="/caregap/{{ mrn }}/address/{{ g.id }}">
                     <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Documentation Snippet</label>
                     <textarea name="documentation_snippet" rows="4" class="form-control" style="width:100%;font-size:13px;margin-bottom:8px;"
-                              placeholder="Pre-filled template — edit as needed">{{ g.description }}</textarea>
+                              placeholder="Pre-filled template — edit as needed">{{ g.documentation_snippet or g.description }}</textarea>
                     <div style="display:flex;gap:8px;align-items:center;">
                         <button type="submit" class="btn btn-primary btn-sm">Mark Addressed & Copy</button>
                         <button type="button" class="btn btn-secondary btn-sm" onclick="hideAddressForm('{{ g.id }}')">Cancel</button>
@@ -94,7 +97,7 @@
         <div style="padding:12px 16px;border-bottom:1px solid var(--border,#eee);{% if loop.last %}border-bottom:none;{% endif %}opacity:.7;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                 <div>
-                    <span style="font-weight:600;font-size:14px;">✓ {{ g.gap_name or g.gap_type }}</span>
+                    <span style="font-weight:600;font-size:14px;">✓ {{ (g.gap_name or g.gap_type)|gap_display }}</span>
                     {% if g.status == 'declined' %}
                     <span class="badge" style="background:#fce4e4;color:#c44;font-size:11px;margin-left:6px;">Declined</span>
                     {% elif g.status == 'not_applicable' %}
@@ -172,6 +175,27 @@ function copyText(btn, text) {
         var orig = btn.textContent;
         btn.textContent = '✓ Copied!';
         setTimeout(function() { btn.textContent = orig; }, 1500);
+    });
+}
+function copyGapTemplate(btn, gapId) {
+    var form = document.getElementById('address-form-' + gapId);
+    var text = '';
+    if (form) {
+        var ta = form.querySelector('textarea');
+        if (ta) text = ta.value || ta.textContent;
+    }
+    if (!text) {
+        var row = btn.closest('.gap-row');
+        if (row) {
+            var desc = row.querySelector('[style*="font-size:13px"]');
+            if (desc) text = desc.textContent.trim();
+        }
+    }
+    if (!text) { text = 'Care gap documentation template not available.'; }
+    navigator.clipboard.writeText(text).then(function() {
+        var orig = btn.innerHTML;
+        btn.innerHTML = '✓ Copied!';
+        setTimeout(function() { btn.innerHTML = orig; }, 1500);
     });
 }
 </script>

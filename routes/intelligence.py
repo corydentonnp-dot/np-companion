@@ -667,7 +667,7 @@ def lab_interpretation(mrn):
     from models.labtrack import LabTrack
 
     tracks = LabTrack.query.filter_by(
-        user_id=current_user.id, mrn=mrn
+        user_id=current_user.id, mrn=mrn, is_archived=False
     ).all()
 
     if not tracks:
@@ -1535,6 +1535,31 @@ def clinical_trials(mrn):
 # ======================================================================
 # F22: Morning Briefing
 # ======================================================================
+@intel_bp.route('/briefing/push', methods=['POST'])
+@login_required
+def briefing_push():
+    """Send morning briefing summary to Pushover (counts only — no PHI)."""
+    try:
+        from agent.notifier import send_briefing_notification
+        from models.caregap import CareGap
+
+        today = date.today()
+        appt_count = Schedule.query.filter_by(
+            user_id=current_user.id, appointment_date=today
+        ).count()
+        gap_count = CareGap.query.filter_by(
+            user_id=current_user.id, is_addressed=False
+        ).count()
+        send_briefing_notification(
+            appointment_count=appt_count,
+            gap_count=gap_count,
+        )
+        return jsonify({'success': True, 'data': None, 'error': None})
+    except Exception as e:
+        logger.error(f'Briefing push failed: {e}')
+        return jsonify({'success': False, 'data': None, 'error': 'Failed to send notification'}), 500
+
+
 @intel_bp.route('/briefing')
 @login_required
 def morning_briefing():

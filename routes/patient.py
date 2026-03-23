@@ -700,7 +700,7 @@ def chart(mrn):
     ).order_by(PatientVitals.measured_at.desc()).all()
 
     lab_tracks = LabTrack.query.filter_by(
-        user_id=current_user.id, mrn=mrn
+        user_id=current_user.id, mrn=mrn, is_archived=False
     ).all()
 
     care_gaps = CareGap.query.filter_by(
@@ -715,7 +715,7 @@ def chart(mrn):
         ).all()
 
     specialists = PatientSpecialist.query.filter_by(
-        user_id=current_user.id, mrn=mrn
+        user_id=current_user.id, mrn=mrn, is_archived=False
     ).order_by(PatientSpecialist.specialty).all()
 
     # Note draft
@@ -851,6 +851,29 @@ def medication_pricing(mrn):
 
 
 # ======================================================================
+# GET /api/patient/<mrn>/summary — Quick patient summary for PA lookup
+# ======================================================================
+@patient_bp.route('/api/patient/<mrn>/summary')
+@login_required
+def patient_summary(mrn):
+    """Return basic patient info for auto-populating forms."""
+    record = PatientRecord.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).first()
+    if not record:
+        return jsonify({'success': False, 'error': 'Patient not found'}), 404
+    return jsonify({
+        'success': True,
+        'data': {
+            'name': record.patient_name or '',
+            'dob': record.patient_dob or '',
+            'sex': record.patient_sex or '',
+            'insurance': record.insurer_type or '',
+        }
+    })
+
+
+# ======================================================================
 # POST /patient/<mrn>/upload-xml — Manual XML upload
 # ======================================================================
 @patient_bp.route('/patient/<mrn>/upload-xml', methods=['POST'])
@@ -871,6 +894,7 @@ def upload_xml(mrn):
     export_folder = getattr(config, 'CLINICAL_SUMMARY_EXPORT_FOLDER', 'data/clinical_summaries/')
     if not os.path.isabs(export_folder):
         export_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), export_folder)
+    export_folder = os.path.normpath(export_folder)
     os.makedirs(export_folder, exist_ok=True)
 
     # Use secure filename
@@ -936,7 +960,7 @@ def upload_xml(mrn):
 def api_labs(mrn):
     """Return lab data for the Epic-style spreadsheet and graphing."""
     lab_tracks = LabTrack.query.filter_by(
-        user_id=current_user.id, mrn=mrn
+        user_id=current_user.id, mrn=mrn, is_archived=False
     ).all()
 
     data = {}
@@ -1000,7 +1024,8 @@ def delete_specialist(mrn, spec_id):
         id=spec_id, user_id=current_user.id, mrn=mrn
     ).first()
     if spec:
-        db.session.delete(spec)
+        # HIPAA: soft-delete clinical records — never hard-delete
+        spec.is_archived = True
         db.session.commit()
     return jsonify({'success': True})
 
@@ -1275,7 +1300,7 @@ def generate_note(mrn):
                     lines.append(f'  - {g.gap_type}: {g.gap_name or "due"}')
 
             overdue = LabTrack.query.filter_by(
-                user_id=current_user.id, mrn=mrn, is_overdue=True
+                user_id=current_user.id, mrn=mrn, is_overdue=True, is_archived=False
             ).all()
             if overdue:
                 lines.append('Lab orders:')
@@ -1444,12 +1469,66 @@ def toggle_item_status(mrn, item_type, item_id):
 
 
 # ======================================================================
+# POST /patient/<mrn>/diagnosis/add — Add a new diagnosis (UX-20)
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/diagnosis/add', methods=['POST'])
+@login_required
+def add_diagnosis(mrn):
+    """Add a new ICD-10 diagnosis to the patient's problem list."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('diagnosis_name') or '').strip()
+    code = (data.get('icd10_code') or '').strip()
+    category = (data.get('category') or 'chronic').strip()
+
+    if not name:
+        return jsonify({'success': False, 'error': 'Diagnosis name required'}), 400
+
+    try:
+        dx = PatientDiagnosis(
+            user_id=current_user.id,
+            mrn=mrn,
+            diagnosis_name=name,
+            icd10_code=code,
+            diagnosis_category=category,
+            status='active',
+        )
+        db.session.add(dx)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'data': {'id': dx.id, 'diagnosis_name': dx.diagnosis_name, 'icd10_code': dx.icd10_code}
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error adding diagnosis: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to add diagnosis'}), 500
+
+
+# ======================================================================
+# POST /patient/<mrn>/diagnosis/<id>/remove — Soft-delete a diagnosis (UX-20)
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/diagnosis/<int:dx_id>/remove', methods=['POST'])
+@login_required
+def remove_diagnosis(mrn, dx_id):
+    """Soft-delete a diagnosis by setting status to 'resolved'."""
+    dx = PatientDiagnosis.query.filter_by(
+        id=dx_id, user_id=current_user.id, mrn=mrn
+    ).first()
+    if not dx:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    dx.status = 'resolved'
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ======================================================================
 # POST /patient/<mrn>/update-demographics — Edit patient demographics
 # ======================================================================
 @patient_bp.route('/patient/<mrn>/update-demographics', methods=['POST'])
 @login_required
 def update_demographics(mrn):
-    """Update patient demographics (name, DOB, sex)."""
+    """Update patient demographics (name, DOB, sex). Re-evaluates care gaps on sex change."""
     data = request.get_json(silent=True) or {}
     record = PatientRecord.query.filter_by(
         user_id=current_user.id, mrn=mrn
@@ -1457,6 +1536,8 @@ def update_demographics(mrn):
     if not record:
         record = PatientRecord(user_id=current_user.id, mrn=mrn)
         db.session.add(record)
+
+    old_sex = record.patient_sex or ''
 
     if 'patient_name' in data and data['patient_name'].strip():
         record.patient_name = data['patient_name'].strip()
@@ -1466,7 +1547,37 @@ def update_demographics(mrn):
         record.patient_sex = data['patient_sex'].strip()
 
     db.session.commit()
+
+    # Re-evaluate care gaps when sex changes
+    new_sex = record.patient_sex or ''
+    if new_sex and new_sex != old_sex:
+        try:
+            from agent.caregap_engine import evaluate_and_persist_gaps
+            patient_data = {
+                'mrn': mrn,
+                'sex': new_sex,
+                'dob': record.patient_dob or '',
+                'age': None,
+            }
+            evaluate_and_persist_gaps(current_user.id, mrn, patient_data, current_app._get_current_object())
+        except Exception as e:
+            current_app.logger.error(f"Care gap re-eval on sex change failed for MRN {mrn[-4:]}: {e}")
+
     return jsonify({'success': True})
+
+
+# ======================================================================
+# GET /patient/<mrn>/print — Print patient paperwork (stub)
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/print')
+@login_required
+def print_paperwork(mrn):
+    """Stub — future patient paperwork printing (visit summary, after-visit instructions, etc.)."""
+    record = PatientRecord.query.filter_by(mrn=mrn, claimed_by=current_user.id).first()
+    if not record:
+        record = PatientRecord.query.filter_by(mrn=mrn).first()
+    mrn_display = f'...{mrn[-4:]}' if len(mrn) >= 4 else mrn
+    return render_template('patient_print_stub.html', record=record, mrn_display=mrn_display)
 
 
 # ======================================================================

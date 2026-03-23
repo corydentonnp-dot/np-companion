@@ -7,11 +7,27 @@
     <title>{% block title %}CareCompanion{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
+    <script>
+    /* Blocking theme apply — prevents flash of wrong theme on navigation.
+       Runs synchronously before first paint so CSS variables match immediately. */
+    (function(){
+        var t = localStorage.getItem('theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+        var f = localStorage.getItem('theme_font');
+        if (f) document.documentElement.setAttribute('data-font', f);
+        var a = localStorage.getItem('theme_accent');
+        if (a) document.documentElement.setAttribute('data-accent', a);
+        /* Sidebar collapsed state — restore before first paint to avoid layout flash */
+        if (localStorage.getItem('sidebar-collapsed') === 'true') {
+            document.documentElement.classList.add('sidebar-will-collapse');
+        }
+    })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500;600&family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
 </head>
-<body data-page="{% block page_id %}{% endblock %}" data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}" data-lock-timeout="{{ current_user.get_pref('lock_timeout_minutes', 5) if current_user.is_authenticated else 5 }}">
+<body data-page="{% block page_id %}{% endblock %}" data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}" data-lock-timeout="{{ current_user.get_pref('lock_timeout_minutes', 5) if current_user.is_authenticated else 5 }}" data-has-pin="{{ 'true' if current_user.is_authenticated and current_user.pin_hash else 'false' }}">
 {% if current_user.is_authenticated %}
 <script>
 /* Sync server-side preferences to localStorage on authenticated page load */
@@ -35,133 +51,6 @@
    AUTHENTICATED LAYOUT — sidebar + header + main content area
    ================================================================ #}
 <div class="app-layout">
-
-    {# ---- MENU BAR (4.1) ----------------------------------------- #}
-    <nav class="app-menu-bar" id="app-menu-bar">
-        {# Hamburger for mobile #}
-        <button class="menu-hamburger" id="menu-hamburger" aria-label="Open menu">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
-
-        {# — File — #}
-        <div class="menu-group" data-menu="file">
-            <button class="menu-btn">File</button>
-            <div class="menu-dropdown">
-                <button class="menu-dd-item" data-url="/settings/account"><span class="menu-dd-icon">⚙</span>Settings<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="/logout"><span class="menu-dd-icon">↪</span>Log Out<span class="menu-dd-shortcut"></span></button>
-            </div>
-        </div>
-
-        {# — View — #}
-        <div class="menu-group" data-menu="view">
-            <button class="menu-btn">View</button>
-            <div class="menu-dropdown">
-                <button class="menu-dd-item" data-action="toggleSidebar"><span class="menu-dd-icon">☰</span>Toggle Sidebar<span class="menu-dd-shortcut">Ctrl+B</span></button>
-                <button class="menu-dd-item" data-action="toggleBookmarks"><span class="menu-dd-icon">★</span>Toggle Bookmarks Bar<span class="menu-dd-shortcut">Ctrl+Shift+B</span></button>
-                <div class="menu-separator"></div>
-                {% if user_can_access('briefing') and feature_enabled('briefing') %}
-                <button class="menu-dd-item" data-url="/briefing"><span class="menu-dd-icon">☀</span>Morning Briefing<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/briefing/commute"><span class="menu-dd-icon">🚗</span>Commute Mode<span class="menu-dd-shortcut"></span></button>
-                {% endif %}
-                {% if user_can_access('metrics') and feature_enabled('metrics') %}
-                <button class="menu-dd-item" data-url="/metrics"><span class="menu-dd-icon">📊</span>Metrics<span class="menu-dd-shortcut"></span></button>
-                {% endif %}
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-action="toggleCompactMode"><span class="menu-dd-icon">▫</span>Compact Mode<span class="menu-dd-shortcut"></span></button>
-            </div>
-        </div>
-
-        {# — Tools — #}
-        <div class="menu-group" data-menu="tools">
-            <button class="menu-btn">Tools</button>
-            <div class="menu-dropdown">
-                {% if user_can_access('patient_gen') and feature_enabled('patient_gen') %}
-                <button class="menu-dd-item" data-url="/patient-generator"><span class="menu-dd-icon">🧪</span>Patient Generator<span class="menu-dd-shortcut"></span></button>
-                {% endif %}
-                {% if user_can_access('reformatter') and feature_enabled('reformatter') %}
-                <button class="menu-dd-item" data-url="/reformatter"><span class="menu-dd-icon">📝</span>Note Reformatter<span class="menu-dd-shortcut"></span></button>
-                {% endif %}
-                {% if user_can_access('medref') and feature_enabled('medref') %}
-                <button class="menu-dd-item" data-url="/medref"><span class="menu-dd-icon">📖</span>Med Reference<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/medref/review-needed"><span class="menu-dd-icon">⚠️</span>Guideline Review<span class="menu-dd-shortcut"></span></button>
-                {% endif %}
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="/tickler"><span class="menu-dd-icon">🔔</span>Tickler<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/cs-tracker"><span class="menu-dd-icon">📋</span>CS Tracker<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/pa"><span class="menu-dd-icon">📄</span>PA Tool<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/referral"><span class="menu-dd-icon">🔗</span>Referral Tracker<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/coding"><span class="menu-dd-icon">🏷</span>Coding Helper<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/tools/macros"><span class="menu-dd-icon">⌨️</span>Macro Library<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/tools/dot-phrases"><span class="menu-dd-icon">💬</span>Dot Phrases<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/settings/phrases"><span class="menu-dd-icon">📝</span>Billing Phrases<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/messages"><span class="menu-dd-icon">💬</span>Delayed Messages<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/tools/templates"><span class="menu-dd-icon">📑</span>Result Templates<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/tools/eod"><span class="menu-dd-icon">🌙</span>EOD Checker<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="/notifications"><span class="menu-dd-icon">🔔</span>Notifications<span class="menu-dd-shortcut"></span></button>
-            </div>
-        </div>
-
-        {# — References — #}
-        <div class="menu-group" data-menu="references">
-            <button class="menu-btn">References</button>
-            <div class="menu-dropdown">
-                <button class="menu-dd-item" data-url="https://www.uptodate.com" data-external="true"><span class="menu-dd-icon">📚</span>UpToDate<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="https://www.mdcalc.com" data-external="true"><span class="menu-dd-icon">🧮</span>MDCalc<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="https://www.dynamed.com" data-external="true"><span class="menu-dd-icon">📘</span>DynaMed<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="https://www.epocrates.com" data-external="true"><span class="menu-dd-icon">💊</span>Epocrates<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/medref"><span class="menu-dd-icon">📖</span>Med Reference (local)<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="https://pubmed.ncbi.nlm.nih.gov" data-external="true"><span class="menu-dd-icon">🔬</span>PubMed<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="https://www.uspreventiveservicestaskforce.org" data-external="true"><span class="menu-dd-icon">✅</span>USPSTF<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="https://www.cdc.gov/guidelines" data-external="true"><span class="menu-dd-icon">🏛</span>CDC Guidelines<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="https://www.acc.org/guidelines" data-external="true"><span class="menu-dd-icon">❤</span>AHA/ACC<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="https://medlineplus.gov" data-external="true"><span class="menu-dd-icon">🌐</span>MedlinePlus<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="https://medlineplus.gov/spanish" data-external="true"><span class="menu-dd-icon">🌐</span>MedlinePlus (Español)<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="/icd10"><span class="menu-dd-icon">🔍</span>ICD-10 Lookup (local)<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="https://www.cms.gov/medicare/payment/physician-fee-schedule" data-external="true"><span class="menu-dd-icon">💰</span>CMS Fee Schedule<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="/calculators"><span class="menu-dd-icon">🧮</span>Clinical Calculators<span class="menu-dd-shortcut">⌃⇧K</span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-action="openManageReferences"><span class="menu-dd-icon">⚙</span>Manage References…<span class="menu-dd-shortcut"></span></button>
-            </div>
-        </div>
-
-        {# — Admin (admin only) — #}
-        {% if current_user.is_authenticated and current_user.role == 'admin' %}
-        <div class="menu-group" data-menu="admin">
-            <button class="menu-btn">Admin</button>
-            <div class="menu-dropdown">
-                <button class="menu-dd-item" data-url="/admin/users"><span class="menu-dd-icon">👥</span>User Management<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="/admin"><span class="menu-dd-icon">📊</span>Practice Overview<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/admin/config"><span class="menu-dd-icon">⚙</span>Configuration<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/caregap/rules"><span class="menu-dd-icon">📋</span>Care Gap Rules<span class="menu-dd-shortcut"></span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-url="/admin/updates"><span class="menu-dd-icon">⬆</span>Updates<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/admin/sitemap"><span class="menu-dd-icon">🗺</span>Site Map<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-action="restartServer" onclick="restartServer(event)"><span class="menu-dd-icon">🔄</span>Server Restart<span class="menu-dd-shortcut"></span></button>
-            </div>
-        </div>
-        {% endif %}
-
-        {# — Help — #}
-        <div class="menu-group" data-menu="help">
-            <button class="menu-btn">Help</button>
-            <div class="menu-dropdown">
-                <button class="menu-dd-item" data-url="/help"><span class="menu-dd-icon">📖</span>Feature Guide<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-url="/setup"><span class="menu-dd-icon">📘</span>API Setup Guide<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-action="openKeyboardShortcuts"><span class="menu-dd-icon">⌨</span>Keyboard Shortcuts<span class="menu-dd-shortcut">?</span></button>
-                <div class="menu-separator"></div>
-                <button class="menu-dd-item" data-action="openWhatsNew"><span class="menu-dd-icon">🆕</span>What's New<span class="menu-dd-shortcut"></span></button>
-                <button class="menu-dd-item" data-action="openAbout"><span class="menu-dd-icon">ℹ</span>About<span class="menu-dd-shortcut"></span></button>
-            </div>
-        </div>
-    </nav>
 
     {# ---- BOOKMARKS BAR (4.2) ------------------------------------ #}
     <div class="bookmarks-bar" id="bookmarks-bar">
@@ -189,17 +78,13 @@
 
     {# ---- SIDEBAR ------------------------------------------------ #}
     <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-logo">NP</div>
-            <span class="sidebar-title">CareCompanion</span>
-        </div>
 
         <nav class="sidebar-nav">
             <ul class="nav-list">
 
                 {# Dashboard — visible to all roles #}
                 {% if user_can_access('dashboard') %}
-                <li class="nav-item {% if request.path == '/' or request.path.startswith('/dashboard') %}active{% endif %}">
+                <li class="nav-item {% if request.path == '/' or request.path.startswith('/dashboard') %}active{% endif %}" data-nav-id="dashboard">
                     <a href="/dashboard" class="nav-link" title="Dashboard">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -212,7 +97,7 @@
 
                 {# My Patients #}
                 {% if user_can_access('dashboard') %}
-                <li class="nav-item {% if request.path.startswith('/patients') or request.path.startswith('/patient/') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/patients') or request.path.startswith('/patient/') %}active{% endif %}" data-nav-id="patients">
                     <a href="/patients" class="nav-link" title="My Patients">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -227,7 +112,7 @@
 
                 {# Timer #}
                 {% if user_can_access('timer') %}
-                <li class="nav-item {% if request.path.startswith('/timer') or request.path.startswith('/billing') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/timer') or request.path.startswith('/billing') %}active{% endif %}" data-nav-id="timer">
                     <a href="/timer" class="nav-link" title="Timer">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"/>
@@ -240,7 +125,7 @@
 
                 {# Inbox #}
                 {% if user_can_access('inbox') %}
-                <li class="nav-item {% if request.path.startswith('/inbox') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/inbox') %}active{% endif %}" data-nav-id="inbox">
                     <a href="/inbox" class="nav-link" title="Inbox">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
@@ -253,7 +138,7 @@
 
                 {# On-Call #}
                 {% if user_can_access('oncall') %}
-                <li class="nav-item {% if request.path.startswith('/oncall') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/oncall') %}active{% endif %}" data-nav-id="oncall">
                     <a href="/oncall" class="nav-link" title="On-Call" style="position:relative;">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -266,7 +151,7 @@
 
                 {# Orders (Advanced tier) #}
                 {% if user_can_access('orders') and feature_enabled('orders') %}
-                <li class="nav-item {% if request.path.startswith('/orders') or request.path.startswith('/prep') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/orders') or request.path.startswith('/prep') %}active{% endif %}" data-nav-id="orders">
                     <a href="/orders" class="nav-link" title="Orders">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -281,7 +166,7 @@
 
                 {# Lab Track (Standard tier) #}
                 {% if user_can_access('labtrack') and feature_enabled('labtrack') %}
-                <li class="nav-item {% if request.path.startswith('/labtrack') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/labtrack') %}active{% endif %}" data-nav-id="labtrack">
                     <a href="/labtrack" class="nav-link" title="Lab Tracker">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
@@ -293,7 +178,7 @@
 
                 {# Care Gaps (Standard tier) #}
                 {% if user_can_access('caregap') and feature_enabled('caregap') %}
-                <li class="nav-item {% if request.path.startswith('/caregap') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/caregap') %}active{% endif %}" data-nav-id="caregap">
                     <a href="/caregap" class="nav-link" title="Care Gaps">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="9 11 12 14 22 4"/>
@@ -306,7 +191,7 @@
 
                 {# Bonus Tracker #}
                 {% if user_can_access('bonus') %}
-                <li class="nav-item {% if request.path.startswith('/bonus') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/bonus') %}active{% endif %}" data-nav-id="bonus">
                     <a href="/bonus" class="nav-link" title="Bonus Tracker">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="12" y1="1" x2="12" y2="23"/>
@@ -319,7 +204,7 @@
 
                 {# TCM Watch #}
                 {% if user_can_access('intelligence') %}
-                <li class="nav-item {% if request.path.startswith('/tcm') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/tcm') %}active{% endif %}" data-nav-id="tcm">
                     <a href="/tcm/watch-list" class="nav-link" title="TCM Watch">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -332,7 +217,7 @@
 
                 {# CCM Registry #}
                 {% if user_can_access('ccm') %}
-                <li class="nav-item {% if request.path.startswith('/ccm') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/ccm') %}active{% endif %}" data-nav-id="ccm">
                     <a href="/ccm/registry" class="nav-link" title="CCM Registry">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"/>
@@ -344,7 +229,7 @@
                 {% endif %}
 
                 {# Monitoring Calendar (Phase 23.D1) #}
-                <li class="nav-item {% if request.path.startswith('/monitoring') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/monitoring') %}active{% endif %}" data-nav-id="monitoring">
                     <a href="/monitoring/calendar" class="nav-link" title="Monitoring Calendar">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -357,7 +242,7 @@
                 </li>
 
                 {# Preventive Gaps (Phase 23.D6) #}
-                <li class="nav-item {% if request.path.startswith('/care-gaps/preventive') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/care-gaps/preventive') %}active{% endif %}" data-nav-id="preventive">
                     <a href="/care-gaps/preventive" class="nav-link" title="Preventive Gaps">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
@@ -368,7 +253,7 @@
 
                 {# Staff Billing Tasks (Phase 20.6) #}
                 {% if user_can_access('intelligence') %}
-                <li class="nav-item {% if request.path.startswith('/staff') %}active{% endif %}">
+                <li class="nav-item {% if request.path.startswith('/staff') %}active{% endif %}" data-nav-id="staff">
                     <a href="/staff/billing-tasks" class="nav-link" title="Staff Tasks">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 11l3 3L22 4"/>
@@ -424,6 +309,13 @@
                 <span class="nav-label">Log Out</span>
             </a>
         </div>
+
+        {# Collapse toggle — always visible at bottom of sidebar #}
+        <button class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Toggle sidebar" aria-label="Toggle sidebar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+        </button>
     </aside>
 
     {# ---- CONTEXT SUB-PANEL (PH44-1) ----------------------------- #}
@@ -443,11 +335,149 @@
         </button>
 
         <div class="header-left">
-            {# Agent health dot — green/yellow/red updated by JS #}
+            {# CC Home icon — replaces old NP sidebar logo #}
+            <a href="/dashboard" class="header-logo" title="Home — Dashboard">CC</a>
+
+            {# Menu items inline in header #}
+            <nav class="header-menu" id="app-menu-bar">
+                {# Hamburger for mobile #}
+                <button class="menu-hamburger" id="menu-hamburger" aria-label="Open menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                {# — File — #}
+                <div class="menu-group" data-menu="file">
+                    <button class="menu-btn">File</button>
+                    <div class="menu-dropdown">
+                        <button class="menu-dd-item" data-url="/settings/account"><span class="menu-dd-icon">⚙</span>Settings<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="/logout"><span class="menu-dd-icon">↪</span>Log Out<span class="menu-dd-shortcut"></span></button>
+                    </div>
+                </div>
+                {# — View — #}
+                <div class="menu-group" data-menu="view">
+                    <button class="menu-btn">View</button>
+                    <div class="menu-dropdown">
+                        <button class="menu-dd-item" data-action="toggleSidebar"><span class="menu-dd-icon">☰</span>Toggle Sidebar<span class="menu-dd-shortcut">Ctrl+B</span></button>
+                        <div class="menu-separator"></div>
+                        {% if user_can_access('briefing') and feature_enabled('briefing') %}
+                        <button class="menu-dd-item" data-url="/briefing"><span class="menu-dd-icon">☀</span>Morning Briefing<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/briefing/commute"><span class="menu-dd-icon">🚗</span>Commute Mode<span class="menu-dd-shortcut"></span></button>
+                        {% endif %}
+                        {% if user_can_access('metrics') and feature_enabled('metrics') %}
+                        <button class="menu-dd-item" data-url="/metrics"><span class="menu-dd-icon">📊</span>Metrics<span class="menu-dd-shortcut"></span></button>
+                        {% endif %}
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-action="toggleCompactMode"><span class="menu-dd-icon">▫</span>Compact Mode<span class="menu-dd-shortcut"></span></button>
+                    </div>
+                </div>
+                {# — Bookmarks — #}
+                <div class="menu-group" data-menu="bookmarks">
+                    <button class="menu-btn">Bookmarks</button>
+                    <div class="menu-dropdown" style="min-width:240px;">
+                        <div id="bm-menu-practice" style="display:none;">
+                            <div class="menu-dd-item" style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;opacity:.6;cursor:default;pointer-events:none;">Practice</div>
+                            <div id="bm-menu-practice-list"></div>
+                            <div class="menu-separator"></div>
+                        </div>
+                        <div id="bm-menu-personal" style="display:none;">
+                            <div class="menu-dd-item" style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;opacity:.6;cursor:default;pointer-events:none;">Personal</div>
+                            <div id="bm-menu-personal-list"></div>
+                            <div class="menu-separator"></div>
+                        </div>
+                        <button class="menu-dd-item" data-action="openManageReferences"><span class="menu-dd-icon">⚙</span>Manage Bookmarks…<span class="menu-dd-shortcut"></span></button>
+                    </div>
+                </div>
+                {# — Tools — #}
+                <div class="menu-group" data-menu="tools">
+                    <button class="menu-btn">Tools</button>
+                    <div class="menu-dropdown">
+                        {% if user_can_access('patient_gen') and feature_enabled('patient_gen') %}
+                        <button class="menu-dd-item" data-url="/patient-generator"><span class="menu-dd-icon">🧪</span>Patient Generator<span class="menu-dd-shortcut"></span></button>
+                        {% endif %}
+                        {% if user_can_access('reformatter') and feature_enabled('reformatter') %}
+                        <button class="menu-dd-item" data-url="/reformatter"><span class="menu-dd-icon">📝</span>Note Reformatter<span class="menu-dd-shortcut"></span></button>
+                        {% endif %}
+                        {% if user_can_access('medref') and feature_enabled('medref') %}
+                        <button class="menu-dd-item" data-url="/medref"><span class="menu-dd-icon">📖</span>Med Reference<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/medref/review-needed"><span class="menu-dd-icon">⚠️</span>Guideline Review<span class="menu-dd-shortcut"></span></button>
+                        {% endif %}
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="/tickler"><span class="menu-dd-icon">🔔</span>Tickler<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/cs-tracker"><span class="menu-dd-icon">📋</span>CS Tracker<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/pa"><span class="menu-dd-icon">📄</span>PA Tool<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/referral"><span class="menu-dd-icon">🔗</span>Referral Tracker<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/coding"><span class="menu-dd-icon">🏷</span>Coding Helper<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/tools/macros"><span class="menu-dd-icon">⌨️</span>Macro Library<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/tools/dot-phrases"><span class="menu-dd-icon">💬</span>Dot Phrases<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/settings/phrases"><span class="menu-dd-icon">📝</span>Billing Phrases<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/messages"><span class="menu-dd-icon">💬</span>Delayed Messages<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/tools/templates"><span class="menu-dd-icon">📑</span>Result Templates<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/tools/eod"><span class="menu-dd-icon">🌙</span>EOD Checker<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="/notifications"><span class="menu-dd-icon">🔔</span>Notifications<span class="menu-dd-shortcut"></span></button>
+                    </div>
+                </div>
+                {# — References — #}
+                <div class="menu-group" data-menu="references">
+                    <button class="menu-btn">References</button>
+                    <div class="menu-dropdown">
+                        <button class="menu-dd-item" data-url="https://www.uptodate.com" data-external="true"><span class="menu-dd-icon">📚</span>UpToDate<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="https://www.mdcalc.com" data-external="true"><span class="menu-dd-icon">🧮</span>MDCalc<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="https://www.dynamed.com" data-external="true"><span class="menu-dd-icon">📘</span>DynaMed<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="https://www.epocrates.com" data-external="true"><span class="menu-dd-icon">💊</span>Epocrates<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/medref"><span class="menu-dd-icon">📖</span>Med Reference (local)<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="https://pubmed.ncbi.nlm.nih.gov" data-external="true"><span class="menu-dd-icon">🔬</span>PubMed<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="https://www.uspreventiveservicestaskforce.org" data-external="true"><span class="menu-dd-icon">✅</span>USPSTF<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="https://www.cdc.gov/guidelines" data-external="true"><span class="menu-dd-icon">🏛</span>CDC Guidelines<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="https://www.acc.org/guidelines" data-external="true"><span class="menu-dd-icon">❤</span>AHA/ACC<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="https://medlineplus.gov" data-external="true"><span class="menu-dd-icon">🌐</span>MedlinePlus<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="https://medlineplus.gov/spanish" data-external="true"><span class="menu-dd-icon">🌐</span>MedlinePlus (Español)<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="/icd10"><span class="menu-dd-icon">🔍</span>ICD-10 Lookup (local)<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="https://www.cms.gov/medicare/payment/physician-fee-schedule" data-external="true"><span class="menu-dd-icon">💰</span>CMS Fee Schedule<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="/calculators"><span class="menu-dd-icon">🧮</span>Clinical Calculators<span class="menu-dd-shortcut">⌃⇧K</span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-action="openManageReferences"><span class="menu-dd-icon">⚙</span>Manage References…<span class="menu-dd-shortcut"></span></button>
+                    </div>
+                </div>
+                {# — Admin (admin only) — #}
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <div class="menu-group" data-menu="admin">
+                    <button class="menu-btn">Admin</button>
+                    <div class="menu-dropdown">
+                        <button class="menu-dd-item" data-url="/admin/users"><span class="menu-dd-icon">👥</span>User Management<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="/admin"><span class="menu-dd-icon">📊</span>Practice Overview<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/admin/config"><span class="menu-dd-icon">⚙</span>Configuration<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/caregap/rules"><span class="menu-dd-icon">📋</span>Care Gap Rules<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-url="/admin/updates"><span class="menu-dd-icon">⬆</span>Updates<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/admin/sitemap"><span class="menu-dd-icon">🗺</span>Site Map<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-action="restartServer" onclick="restartServer(event)"><span class="menu-dd-icon">🔄</span>Server Restart<span class="menu-dd-shortcut"></span></button>
+                    </div>
+                </div>
+                {% endif %}
+                {# — Help — #}
+                <div class="menu-group" data-menu="help">
+                    <button class="menu-btn">Help</button>
+                    <div class="menu-dropdown">
+                        <button class="menu-dd-item" data-url="/help"><span class="menu-dd-icon">📖</span>Feature Guide<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/setup"><span class="menu-dd-icon">📘</span>API Setup Guide<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-action="openKeyboardShortcuts"><span class="menu-dd-icon">⌨</span>Keyboard Shortcuts<span class="menu-dd-shortcut">?</span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-action="openWhatsNew"><span class="menu-dd-icon">🆕</span>What's New<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-action="openAbout"><span class="menu-dd-icon">ℹ</span>About<span class="menu-dd-shortcut"></span></button>
+                    </div>
+                </div>
+            </nav>
+
+            {# Status dots + help icon #}
             <span class="status-dot status-dot--unknown" id="agent-status" title="Agent: checking..."></span>
-            {# NetPractice auth dot — green/yellow/red updated by JS #}
             <span class="status-dot status-dot--unknown" id="auth-status" title="NetPractice: checking..."></span>
-            {# Page help icon (PH44-9D) #}
             <button class="help-icon" id="page-help-icon" data-help-id="{{ self.page_id() }}" title="Help for this page" aria-label="Help" style="display:none;">?</button>
             <div class="help-popover" id="page-help-popover" role="tooltip" aria-hidden="true">
                 <div class="help-popover-title" id="page-help-title"></div>
@@ -462,9 +492,6 @@
                 <input type="text" id="patient-search" class="form-control" placeholder="Search patients..." style="width:200px;font-size:13px;padding:4px 8px;" autocomplete="off">
                 <div id="patient-search-results" style="display:none;position:absolute;top:100%;right:0;width:300px;background:var(--bg-surface,#fff);border:1px solid var(--border,#ddd);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:1000;max-height:300px;overflow-y:auto;"></div>
             </div>
-
-            {# Real-time clock #}
-            <span class="header-clock" id="header-clock"></span>
 
             {# Setup button — shown when setup tasks are incomplete #}
             <a href="/setup" class="setup-btn" id="setup-btn" title="Setup tasks remaining" style="display:none;">
@@ -876,7 +903,7 @@
 {# ---- AUTO-LOCK OVERLAY ----------------------------------------- #}
 <div class="lock-overlay" id="lock-overlay" data-blocking="true">
     <div class="lock-dialog">
-        <div class="lock-logo">NP</div>
+        <div class="lock-logo">CC</div>
         <h2 class="lock-title">Session Locked</h2>
         <p class="lock-subtitle">Enter your 4-digit PIN to continue</p>
         <form id="pin-form" autocomplete="off">
@@ -1131,11 +1158,12 @@ function restartServer(e) {
 
     if (panel && layout) {
         /* If the panel has content (a child template filled the subpanel block),
-           activate the has-subpanel layout.  Dashboard is excluded. */
+           activate the has-subpanel layout.  Dashboard and login are excluded. */
         var hasContent = panel.innerHTML.trim().length > 0;
         var isDashboard = (pageId === 'dashboard');
+        var isLogin = (pageId === 'login');
 
-        if (hasContent && !isDashboard) {
+        if (hasContent && !isDashboard && !isLogin) {
             layout.classList.add('has-subpanel');
 
             /* Insert toggle button */
@@ -1164,8 +1192,7 @@ function restartServer(e) {
                 });
             }
         } else {
-            /* No sub-panel content — hide the container entirely */
-            panel.style.display = 'none';
+            /* No sub-panel content — CSS display:none handles hiding */
         }
     }
 
@@ -2022,6 +2049,94 @@ function restartServer(e) {
     })();
 
 })();
+
+{# ---- Sidebar Drag-Reorder (UX-12) ---- #}
+<script>
+(function() {
+    var navList = document.querySelector('.sidebar-nav .nav-list');
+    if (!navList) return;
+
+    var _dragItem = null;
+    var _placeholder = null;
+    var userId = document.body.getAttribute('data-user-id') || '0';
+    var STORAGE_KEY = 'cc_nav_order_u' + userId;
+
+    /* Load saved order and reorder DOM */
+    function applySavedOrder() {
+        var saved;
+        try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch(e) { return; }
+        if (!saved || !Array.isArray(saved)) return;
+        var items = {};
+        navList.querySelectorAll('li[data-nav-id]').forEach(function(li) {
+            items[li.getAttribute('data-nav-id')] = li;
+        });
+        saved.forEach(function(id) {
+            if (items[id]) navList.appendChild(items[id]);
+        });
+    }
+
+    function saveOrder() {
+        var order = [];
+        navList.querySelectorAll('li[data-nav-id]').forEach(function(li) {
+            order.push(li.getAttribute('data-nav-id'));
+        });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(order));
+        /* Persist to server */
+        fetch('/settings/account/preference', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key: 'sidebar_nav_order', value: order})
+        }).catch(function(){});
+    }
+
+    /* Make items draggable */
+    function initDrag() {
+        navList.querySelectorAll('li[data-nav-id]').forEach(function(li) {
+            li.setAttribute('draggable', 'true');
+            li.addEventListener('dragstart', onDragStart);
+            li.addEventListener('dragend', onDragEnd);
+            li.addEventListener('dragover', onDragOver);
+            li.addEventListener('drop', onDrop);
+        });
+    }
+
+    function onDragStart(e) {
+        _dragItem = e.currentTarget;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', _dragItem.getAttribute('data-nav-id'));
+        requestAnimationFrame(function() { if (_dragItem) _dragItem.style.opacity = '0.4'; });
+    }
+
+    function onDragEnd(e) {
+        if (_dragItem) _dragItem.style.opacity = '';
+        if (_placeholder && _placeholder.parentNode) _placeholder.parentNode.removeChild(_placeholder);
+        _dragItem = null;
+        _placeholder = null;
+    }
+
+    function onDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var target = e.currentTarget;
+        if (target === _dragItem) return;
+        var rect = target.getBoundingClientRect();
+        var mid = rect.top + rect.height / 2;
+        if (e.clientY < mid) {
+            navList.insertBefore(_dragItem, target);
+        } else {
+            navList.insertBefore(_dragItem, target.nextSibling);
+        }
+    }
+
+    function onDrop(e) {
+        e.preventDefault();
+        saveOrder();
+    }
+
+    applySavedOrder();
+    initDrag();
+})();
+</script>
 
 </body>
 </html>

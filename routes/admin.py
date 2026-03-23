@@ -84,7 +84,7 @@ def practice_overview():
     gap_compliance_pct = round(total_addressed / total_gaps * 100) if total_gaps > 0 else 100
 
     overdue_labs = sum(
-        1 for lt in LabTrack.query.all()
+        1 for lt in LabTrack.query.filter_by(is_archived=False).all()
         if lt.status in ('overdue', 'critical')
     )
 
@@ -110,7 +110,7 @@ def practice_overview():
         p_compliance = round((p_total - p_open) / p_total * 100) if p_total > 0 else 100
 
         p_overdue_labs = sum(
-            1 for lt in LabTrack.query.filter_by(user_id=prov.id).all()
+            1 for lt in LabTrack.query.filter_by(user_id=prov.id, is_archived=False).all()
             if lt.status in ('overdue', 'critical')
         )
 

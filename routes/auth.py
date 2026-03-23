@@ -351,6 +351,32 @@ def settings_account():
             db.session.commit()
             flash('Amazing Charts credentials saved.', 'success')
 
+        # ---- Set PDMP credentials ----------------------------------------
+        elif action == 'set_pdmp_credentials':
+            pdmp_user = request.form.get('pdmp_username', '').strip()
+            pdmp_pass = request.form.get('pdmp_password', '')
+
+            if pdmp_pass:
+                current_user.set_pdmp_credentials(pdmp_user, pdmp_pass)
+            elif pdmp_user:
+                current_user.set_pdmp_credentials(pdmp_user, current_user.get_pdmp_password())
+
+            db.session.commit()
+            flash('PDMP credentials saved.', 'success')
+
+        # ---- Set VIIS credentials ----------------------------------------
+        elif action == 'set_viis_credentials':
+            viis_user = request.form.get('viis_username', '').strip()
+            viis_pass = request.form.get('viis_password', '')
+
+            if viis_pass:
+                current_user.set_viis_credentials(viis_user, viis_pass)
+            elif viis_user:
+                current_user.set_viis_credentials(viis_user, current_user.get_viis_password())
+
+            db.session.commit()
+            flash('VIIS credentials saved.', 'success')
+
         # ---- Set work PC password ----------------------------------------
         elif action == 'set_pc_password':
             pc_pass = request.form.get('pc_password', '')
@@ -823,6 +849,45 @@ VALID_THEMES = {'light', 'dark', 'modern', 'fancy', 'retro', 'minimalist',
 VALID_FONTS  = {'system', 'inter', 'roboto', 'poppins', 'source-code',
                 'merriweather', 'comic'}
 VALID_ACCENTS = {'', 'blue', 'teal', 'purple', 'rose', 'amber', 'emerald'}
+
+
+@auth_bp.route('/api/settings/browse-folder', methods=['POST'])
+@login_required
+def api_browse_folder():
+    """Open a native Windows folder picker dialog and return the selected path."""
+    import sys
+    if sys.platform != 'win32':
+        return jsonify({'success': False, 'error': 'Folder picker only available on Windows'}), 400
+
+    import threading
+
+    result = [None]
+
+    def _pick():
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            folder = filedialog.askdirectory(
+                title='Select Clinical Summary Export Folder',
+                mustexist=True
+            )
+            root.destroy()
+            result[0] = folder if folder else None
+        except Exception:
+            result[0] = None
+
+    # tkinter must run on its own thread when called from Flask
+    t = threading.Thread(target=_pick)
+    t.start()
+    t.join(timeout=120)
+
+    if result[0]:
+        return jsonify({'success': True, 'folder': result[0]})
+    return jsonify({'success': False, 'error': 'No folder selected'})
+
 
 @auth_bp.route('/api/settings/theme', methods=['POST'])
 @login_required

@@ -1197,6 +1197,87 @@ Exportable monthly productivity report for practice management discussions.
 | âœ…  CHECKPOINT â€” Test Before Moving On: The Billing Audit Log shows time log entries with billing level selectors The E\&M calculator suggests the correct level for a given time and MDM input A session with too-short time for the selected level shows a caution flag PDF export generates a formatted document Adding a rationale note saves and appears in the PDF |
 | :---- |
 
+---
+
+# **Section 10: UX/UI Enhancement Roadmap**
+
+> Larger features identified during UI/UX audit. These improve workflow efficiency
+> and are candidates for incremental implementation. Remove each item from this
+> section once fully shipped and logged in the Feature Registry + CHANGE_LOG.
+
+## **UX-9: 15-Minute Schedule Grid + Drag-Drop Scheduling**
+Replace the flat schedule table on the dashboard with a time-block grid (15-min
+slots, 7 AM - 6 PM). Allow drag-and-drop to move appointments between slots.
+- Files: `templates/dashboard.html`, `static/js/schedule_grid.js`, `static/css/main.css`
+- Route: new PUT `/api/schedule/<id>/move` to persist time changes
+- Tier: **Standard**
+
+## **UX-10: Widget Drag-Anywhere + Auto-Scroll in Edit Mode**
+Improve the free-form widget system: larger drag handle (visible gripper icon),
+auto-scroll when dragging near edges, snap-to-grid while dragging.
+- Files: `static/js/free_widgets.js`, `static/css/main.css`
+- Tier: **Essential**
+
+## **UX-11: Settings Sub-Sidebar Redesign**
+Replace the single-scroll settings page with a left sub-sidebar (`settings_nav`)
+that links to anchored sections: Account, Credentials, Preferences, AI, Notifications.
+- Files: `templates/settings.html`, `static/css/main.css`
+- Tier: **Essential**
+
+## **UX-12: Sidebar Drag-and-Drop Reordering**
+Allow users to reorder sidebar navigation items via drag-and-drop. Persist order
+in user preferences JSON.
+- Files: `templates/base.html`, `static/js/main.js`, `models/user.py` (prefs)
+- Tier: **Standard**
+
+## **UX-13: Lab Cache (Top 100 Meds, Common Labs with Ranges)**
+Pre-populate a local cache of the 100 most common medications and lab test names
+with normal ranges, so autocomplete and range badges work offline.
+- Files: `data/lab_cache.json`, `utils/lab_helpers.py`
+- Tier: **Essential**
+
+## **UX-14: Lab Tracker Autocomplete with Fuzzy Search**
+Add fuzzy-match autocomplete to the lab tracker entry form using the lab cache
+from UX-13. Match on test name, abbreviation, and LOINC code.
+- Files: `templates/labtrack.html`, `static/js/labtrack.js`
+- Tier: **Standard**
+
+## **UX-15: Lab Panel Component Badges**
+When a lab panel is tracked (e.g., CMP), show inline badges for each component
+(Glucose, BUN, Cr, etc.) with normal range indicators (green/yellow/red).
+- Files: `templates/labtrack.html`, `static/css/main.css`, `data/lab_cache.json`
+- Tier: **Standard**
+
+## **UX-16: Care Gap "Copy to Visit Template"**
+Add a button on each care gap item that copies the gap's documentation template
+into the clipboard (or into a visit note draft) for quick pasting during a visit.
+- Files: `templates/caregap_patient.html`, `static/js/caregap.js`
+- Tier: **Standard**
+
+## **UX-17: Order Set Creation UI + AC Calibration Wizard**
+Build a GUI for creating/editing order sets (currently code-only) and a step-by-step
+wizard for calibrating AC screen coordinates for automation.
+- Files: `templates/orders.html`, new `templates/ac_calibrate.html`, `routes/orders.py`
+- Tier: **Advanced**
+
+## **UX-18: Dashboard/Patient Chart Widget Add/Edit/Remove**
+Provide a widget management panel (gear icon) to add, remove, reorder, and resize
+dashboard and patient chart widgets. Persist per-user via preferences.
+- Files: `static/js/free_widgets.js`, `templates/dashboard.html`, `templates/patient_chart.html`
+- Tier: **Essential**
+
+## **UX-19: Prior Auth Intelligence (Dynamic Form)**
+Enhance the PA tool with payer-specific dynamic form fields, auto-populate from
+patient data, and status tracking with timeline view.
+- Files: `templates/pa.html`, `routes/pa.py`, `models/pa.py`
+- Tier: **Advanced**
+
+## **UX-20: Add/Delete Diagnosis from Patient Chart**
+Allow adding new ICD-10 diagnoses (with autocomplete search) and soft-deleting
+existing ones directly from the patient chart diagnosis panel.
+- Files: `templates/patient_chart.html`, `routes/patient.py`, `models/patient.py`
+- Tier: **Essential**
+
 | PHASE 5: Clinical Decision Support | \~18-22 hours |
 | :---- | :---: |
 

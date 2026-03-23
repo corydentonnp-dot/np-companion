@@ -1007,3 +1007,22 @@ Calculator slots (ASCVD, Gail, Peak Flow main-group, AAP Peds HTN <13) Ã¢â‚
 ---
 
 *This plan addresses all three remaining Medium-priority audit items (K2 USPSTF print, K2 USPSTF toggle, A4 WebPractice placeholder), builds the five deferred E2E test suites from Tier 5, hardens infrastructure with three deployment utility scripts, automates `PRODUCTION_CHECKLIST.md` via `deploy_check.py`, and closes with a mandatory human-guided verification session orchestrated by `verify_all.py` that generates a signed go/no-go artifact. All 7 phases are buildable without work-PC access. The Phase 6 verification execution requires physical access to FPA-D-NP-DENTON.*
+
+---
+
+## HIPAA Compliance — Soft-Delete + MRN Masking (ad-hoc)
+
+> **Completed:** 03-23-26 23:45:00 UTC
+> **Triggered by:** Session-start HIPAA audit found 2 hard-deletes on clinical records + 4 full-MRN template displays.
+
+- [x] Add `is_archived` column to `LabTrack` and `PatientSpecialist` models
+- [x] Convert `LabTrack` delete route to soft-delete (`is_archived=True`)
+- [x] Convert `PatientSpecialist` delete route to soft-delete (`is_archived=True`)
+- [x] Add `is_archived=False` filter to all LabTrack list/count queries (14 sites)
+- [x] Add `is_archived=False` filter to PatientSpecialist list query
+- [x] Fix MRN display in `dashboard.html` → `••{{ pt.mrn[-4:] }}`
+- [x] Fix MRN display in `_tickler_card.html` → `••{{ t.mrn[-4:] }}`
+- [x] Fix MRN display in `daily_summary_print.html` → `MRN ••{{ pt.mrn[-4:] }}`
+- [x] Fix MRN fallback in `cs_tracker.html` → `••{{ e.mrn[-4:] }}`
+- [x] Create + run migration `migrate_add_is_archived.py`
+- [x] Update CHANGE_LOG (CL-HIPAA-SOFTDEL) + Risk Register (R2)

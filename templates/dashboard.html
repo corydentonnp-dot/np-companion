@@ -89,6 +89,7 @@
                         <span class="anomaly-type">{{ anomaly.type|replace('_', ' ')|title }}</span>
                         <span class="anomaly-message">{{ anomaly.message }}</span>
                         <span class="why-link" tabindex="0" role="button">Why?<span class="why-popover"><span class="why-popover-reason">{{ anomaly.message }}</span><span class="why-popover-source">Source: Schedule analysis engine</span></span></span>
+                        <button type="button" class="anomaly-dismiss" onclick="this.closest('li').remove()" title="Dismiss">&times;</button>
                     </li>
                     {% endfor %}
                 </ul>
@@ -251,6 +252,7 @@
                         <span class="anomaly-type">{{ anomaly.type|replace('_', ' ')|title }}</span>
                         <span class="anomaly-message">{{ anomaly.message }}</span>
                         <span class="why-link" tabindex="0" role="button">Why?<span class="why-popover"><span class="why-popover-reason">{{ anomaly.message }}</span><span class="why-popover-source">Source: Schedule analysis engine</span></span></span>
+                        <button type="button" class="anomaly-dismiss" onclick="this.closest('li').remove()" title="Dismiss">&times;</button>
                     </li>
                     {% endfor %}
                 </ul>
@@ -372,6 +374,10 @@
                 <span class="badge badge--info">{{ appointments|length }} patient{{ 's' if appointments|length != 1 }}</span>
             </div>
             <div style="display:flex;align-items:center;gap:4px;">
+                <div style="display:flex;gap:2px;margin-right:8px;border:1px solid var(--border-color,#e2e8f0);border-radius:4px;overflow:hidden;">
+                    <button id="sched-view-table" class="btn btn-sm btn-primary" onclick="ScheduleGrid.toggleView('table')" title="Table view" style="border-radius:0;border:none;padding:3px 8px;font-size:11px;">&#9776; Table</button>
+                    <button id="sched-view-grid" class="btn btn-sm btn-secondary" onclick="ScheduleGrid.toggleView('grid')" title="Grid view" style="border-radius:0;border:none;padding:3px 8px;font-size:11px;">&#9638; Grid</button>
+                </div>
                 {% if is_today %}
                 <button class="btn btn-sm btn-primary" onclick="openAddPatientModal()" title="Add patient to schedule" style="margin-right:4px;">+ Add</button>
                 <button class="btn btn-sm btn-secondary" onclick="openPasteScheduleModal()" title="Paste schedule from clipboard" style="margin-right:8px;">&#128203; Paste</button>
@@ -395,6 +401,7 @@
         </div>
         <div class="dash-widget-body" style="padding:0;">
             {% if appointments %}
+            <div id="schedule-table-view">
             <div class="table-wrap">
             <table class="schedule-table">
                 <thead>
@@ -478,7 +485,9 @@
                     {% endfor %}
                 </tbody>
             </table>
-            </div>
+            </div>{# /table-wrap #}
+            </div>{# /schedule-table-view #}
+            <div id="schedule-grid-view" style="display:none;"></div>
             {% else %}
             {{ empty_state('📅', 'No appointments for ' + view_date.strftime('%A, %B %d').replace(' 0', ' '), 'Import an XML schedule or check a different date.') }}
             {% endif %}
@@ -522,7 +531,7 @@
                                 {{ pt.patient_name or '(unknown)' }}
                             </a>
                         </td>
-                        <td style="font-family:monospace;font-size:13px;">{{ pt.mrn }}</td>
+                        <td style="font-family:monospace;font-size:13px;">••{{ pt.mrn[-4:] }}</td>
                         <td style="font-size:13px;">
                             {% if pt.patient_dob and pt.patient_dob|length >= 8 %}
                                 {{ pt.patient_dob[4:6] }}-{{ pt.patient_dob[6:8] }}-{{ pt.patient_dob[:4] }}
@@ -1342,5 +1351,18 @@ function pollScrapeProgress() {
             });
     }, 2000);
 }
+</script>
+
+{# ---- Schedule Grid View ---- #}
+<script src="{{ url_for('static', filename='js/schedule_grid.js') }}"></script>
+<script>
+(function() {
+    var appts = [
+        {% for a in appointments %}
+        { id: {{ a.id }}, time: {{ a.appointment_time|tojson }}, patient_name: {{ a.patient_name|tojson }}, patient_mrn: {{ (a.patient_mrn or '')|tojson }}, visit_type: {{ (a.visit_type or '')|tojson }}, reason: {{ (a.reason or '')|tojson }}, duration_minutes: {{ a.duration_minutes or 15 }}, is_new_patient: {{ 'true' if a.is_new_patient else 'false' }} }{{ ',' if not loop.last }}
+        {% endfor %}
+    ];
+    if (window.ScheduleGrid) ScheduleGrid.init(appts);
+})();
 </script>
 {% endblock %}

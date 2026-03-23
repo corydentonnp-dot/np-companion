@@ -38,3 +38,13 @@ The `agent/` directory is the ONLY place where desktop automation packages may b
 - Agent code will NOT exist in the SaaS version — it is desktop-only.
 - All data the agent produces must flow through `adapters/` to be SaaS-portable.
 - Never put business logic in agent code that should live in routes or utils.
+
+## Process & Resource Management
+- **Every `subprocess.run()` call MUST include `timeout=60`** (or an appropriate value). Never omit the timeout arg.
+- **Every `subprocess.Popen()` call MUST be tracked** — store the `Popen` object and call `.wait(timeout=N)` or `.terminate()` when done.
+- **Never use `os.system()` or `os.popen()`** — use `subprocess.run()` with timeout instead.
+- **APScheduler jobs MUST use `max_instances=1` and `coalesce=True`** to prevent overlapping runs.
+- **Every agent job wrapped in `safe_job()` MUST catch and log exceptions** — never let a failed job spawn retries that pile up.
+- **Thread cleanup:** All daemon threads must be joined or cleaned up on agent shutdown via `AgentService.stop()`.
+- **If a subprocess hangs past its timeout, `.kill()` it** — never leave zombie processes running.
+- **Log process creation/destruction:** When spawning any subprocess, log the PID so it can be cleaned up on crash recovery.

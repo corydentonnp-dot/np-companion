@@ -27,7 +27,6 @@
 </div>
 <div class="context-panel-section">
     <div class="cp-section-label">Actions</div>
-    <button class="cp-action" onclick="document.getElementById('xml-upload').click()">Upload XML</button>
 </div>
 {% if care_gaps %}
 <div class="context-panel-section">
@@ -84,6 +83,17 @@
         </div>
     </div>
     <div class="pt-header-right">
+        {# Allergies banner — contrasting cell with hover details #}
+        <div class="pt-allergy-badge" title="{% if allergies %}{% for a in allergies %}{{ a.allergen }}{% if a.reaction %} ({{ a.reaction }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}{% else %}No Known Drug Allergies{% endif %}">
+            <span class="pt-allergy-icon">&#9888;&#65039;</span>
+            {% if allergies %}
+                <span class="pt-allergy-list">{{ allergies|map(attribute='allergen')|join(', ') }}</span>
+            {% else %}
+                <span class="pt-allergy-nkda">NKDA</span>
+            {% endif %}
+        </div>
+        {# Print paperwork stub #}
+        <a href="/patient/{{ mrn_display }}/print" target="_blank" class="btn btn-sm btn-outline" title="Print patient paperwork">&#128424; Print</a>
         {# Claim button #}
         <button class="btn btn-sm {% if record and record.claimed_by == current_user.id %}btn-outline{% else %}btn-primary{% endif %}" id="claim-btn" onclick="claimPatient('{{ mrn_display }}')">
             {% if record and record.claimed_by == current_user.id %}
@@ -100,10 +110,6 @@
                 Never
             {% endif %}
         </span>
-        <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0;">
-            &#128194; Upload XML
-            <input type="file" id="xml-upload" accept=".xml" style="display:none;">
-        </label>
         <button class="btn btn-sm btn-outline" onclick="toggleEditMode()">&#9881; Edit Layout</button>
         <div class="chart-view-toggle" style="display:inline-flex;gap:2px;align-items:center;margin-left:4px;">
             <span style="font-size:12px;color:var(--text-secondary);">View:</span>
@@ -117,11 +123,11 @@
 {% include '_billing_alert_bar.html' %}
 
 {% if not has_data %}
-<div class="pt-no-data-banner">
+<div class="pt-no-data-banner" id="no-data-banner">
     <span style="font-size:20px;">&#9888;&#65039;</span>
-    <div>
+    <div style="flex:1;">
         <strong>No clinical summary loaded</strong>
-        <p style="margin:4px 0 0;font-size:13px;opacity:0.7;">Export a Clinical Summary XML from Amazing Charts (Alt+P &rarr; Export Clinical Summary) and upload it above.</p>
+        <p style="margin:4px 0 0;font-size:13px;opacity:0.7;">Export a Clinical Summary XML from Amazing Charts and configure the import folder in <a href="/settings/account">Settings &rarr; Clinical Summary Import</a>.</p>
         {% if schedule_context and (schedule_context.appointment_time or schedule_context.visit_type or schedule_context.reason) %}
         <p style="margin:8px 0 0;font-size:13px;opacity:0.85;">
             Schedule context:
@@ -131,6 +137,7 @@
         </p>
         {% endif %}
     </div>
+    <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;opacity:0.5;padding:4px 8px;line-height:1;" title="Dismiss">&times;</button>
 </div>
 {% endif %}
 
@@ -200,6 +207,7 @@
                 <button class="btn btn-sm btn-outline" onclick="copyDiagnoses()" title="Copy all diagnoses">&#128203; Copy</button>
                 <button class="btn btn-sm btn-outline" onclick="document.getElementById('dx-col-picker').style.display=document.getElementById('dx-col-picker').style.display==='block'?'none':'block'" title="Choose columns to copy">&#9881;</button>
                 <button class="btn btn-sm btn-outline" onclick="document.getElementById('icd10-lookup-modal').style.display='flex'" title="ICD-10 Lookup">&#128270; ICD-10</button>
+                <button class="btn btn-sm btn-primary" onclick="document.getElementById('icd10-lookup-modal').style.display='flex'" title="Add a new diagnosis">+ Add Dx</button>
                 <select class="widget-filter" id="diag-filter" onchange="filterDiagnoses(this.value)">
                     <option value="all" selected>All</option>
                     <option value="chronic">Chronic</option>
@@ -221,15 +229,16 @@
             {% if diagnoses %}
             <table class="widget-table" id="diag-table">
                 <thead>
-                    <tr><th>Diagnosis</th><th>ICD-10</th><th>Type</th><th>Status</th></tr>
+                    <tr><th>Diagnosis</th><th>ICD-10</th><th>Type</th><th>Status</th><th style="width:30px;"></th></tr>
                 </thead>
                 <tbody>
                     {% for d in diagnoses %}
-                    <tr data-category="{{ d.diagnosis_category or 'chronic' }}" data-status="{{ d.status }}" class="{% if d.status != 'active' %}row-inactive{% endif %}">
+                    <tr data-category="{{ d.diagnosis_category or 'chronic' }}" data-status="{{ d.status }}" data-dx-id="{{ d.id }}" class="{% if d.status != 'active' %}row-inactive{% endif %}">
                         <td class="fw-500 cell-clip" title="{{ d.diagnosis_name }}">{{ d.diagnosis_name }}</td>
                         <td class="mono">{{ d.icd10_code }}</td>
                         <td><span class="badge badge-{{ 'warning' if d.diagnosis_category == 'acute' else 'info' }} badge-toggle" onclick="toggleDxCategory(this, '{{ mrn_display }}', {{ d.id }})" style="cursor:pointer;" title="Click to toggle">{{ d.diagnosis_category or 'chronic' }}</span></td>
                         <td><span class="badge badge-{{ 'success' if d.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'diagnosis', {{ d.id }})" style="cursor:pointer;" title="Click to toggle">{{ d.status }}</span></td>
+                        <td><button class="btn btn-sm" style="color:var(--color-red,#ef4444);font-size:11px;padding:1px 5px;background:none;border:none;cursor:pointer;" onclick="removeDiagnosis('{{ mrn_display }}', {{ d.id }}, this)" title="Remove diagnosis">✕</button></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -281,7 +290,7 @@
         <div class="widget-resize-handle"></div>
     </div>
 
-    {# ---- VITALS WIDGET ---- #}
+    {# ---- VITALS WIDGET (scrollable table, ordered) ---- #}
     <div class="widget fw-widget" data-widget="vitals" data-widget-id="vitals" data-tab-group="overview" data-col="0" data-row="1" data-w="1" data-h="1">
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128200; Vitals</span>
@@ -289,15 +298,35 @@
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
-        <div class="widget-body">
+        <div class="widget-body" style="overflow-x:auto;max-height:320px;overflow-y:auto;">
             {% if vitals %}
+            {% set vital_order = ['pulse', 'bp', 'blood pressure', 'spo2', 'oxygen saturation', 'rr', 'respiratory rate', 'temp', 'temperature', 'weight', 'height', 'bmi'] %}
+            {% set vitals_by_name = {} %}
+            {% for v in vitals %}
+                {% if v.vital_name and v.vital_name.lower() not in vitals_by_name %}
+                    {% if vitals_by_name.update({v.vital_name.lower(): v}) %}{% endif %}
+                {% endif %}
+            {% endfor %}
             <table class="widget-table">
                 <thead><tr><th>Vital</th><th>Value</th><th>Unit</th><th>Date</th></tr></thead>
                 <tbody>
-                    {% set seen_vitals = [] %}
-                    {% for v in vitals %}
-                        {% if v.vital_name not in seen_vitals %}
-                            {% if seen_vitals.append(v.vital_name) %}{% endif %}
+                    {# Ordered vitals first #}
+                    {% set rendered = [] %}
+                    {% for key in vital_order %}
+                        {% if key in vitals_by_name %}
+                            {% set v = vitals_by_name[key] %}
+                            {% if rendered.append(key) %}{% endif %}
+                            <tr>
+                                <td>{{ v.vital_name }}</td>
+                                <td class="fw-500">{{ v.vital_value }}</td>
+                                <td class="text-muted">{{ v.vital_unit }}</td>
+                                <td class="text-sm">{{ v.measured_at.strftime('%m/%d/%Y') if v.measured_at else '' }}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                    {# Remaining vitals not in order list #}
+                    {% for name, v in vitals_by_name.items() %}
+                        {% if name not in rendered %}
                             <tr>
                                 <td>{{ v.vital_name }}</td>
                                 <td class="fw-500">{{ v.vital_value }}</td>
@@ -946,11 +975,16 @@
 
 <style>
 /* ============= PATIENT CHART STYLES ============= */
-.pt-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border,#e2e8f0);margin:-20px -20px 16px;flex-wrap:wrap;gap:8px;}
+.pt-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border,#e2e8f0);margin:-20px -20px 16px;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:50;}
 .pt-header-left{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .pt-name{margin:0;font-size:20px;}
 .pt-meta{display:flex;gap:12px;font-size:13px;color:var(--text-secondary,#64748b);}
 .pt-header-right{display:flex;align-items:center;gap:10px;font-size:12px;}
+.pt-allergy-badge{display:flex;align-items:center;gap:6px;padding:4px 12px;background:var(--color-amber,#f59e0b);color:#000;border-radius:6px;font-size:12px;font-weight:600;cursor:default;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;}
+.pt-allergy-badge:hover{opacity:0.9;}
+.pt-allergy-icon{flex-shrink:0;}
+.pt-allergy-list{overflow:hidden;text-overflow:ellipsis;}
+.pt-allergy-nkda{color:#000;font-weight:500;opacity:0.7;}
 .pt-sync-label{color:var(--text-secondary,#64748b);}
 .pt-no-data-banner{margin:0 0 16px;padding:14px 20px;background:var(--bg-warning,#fef3c7);border:1px solid var(--border-warning,#fbbf24);border-radius:8px;display:flex;align-items:center;gap:12px;}
 .pt-status-bar{padding:8px 16px;border-radius:6px;font-size:13px;margin-bottom:12px;}
@@ -1131,31 +1165,7 @@ var labColors = ['#0D7377','#E8A020','#C0392B','#1B3A6B','#8B5CF6','#059669','#D
         });
 })();
 
-/* ---- XML Upload ---- */
-document.getElementById('xml-upload').addEventListener('change', function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    var fd = new FormData();
-    fd.append('xml_file', file);
-    var status = document.getElementById('upload-status');
-    status.style.display = 'block';
-    status.style.background = 'var(--bg-warning,#fef3c7)';
-    status.textContent = 'Uploading and parsing XML...';
-    fetch('/patient/' + MRN + '/upload-xml', {method:'POST', body:fd})
-    .then(function(r){return r.json();})
-    .then(function(data){
-        status.style.background = data.success ? 'var(--bg-success,#dcfce7)' : 'var(--bg-danger,#fee2e2)';
-        status.textContent = data.message;
-        if (data.success) {
-            setTimeout(function(){ location.reload(); }, 1500);
-        }
-    })
-    .catch(function(){
-        status.style.background = 'var(--bg-danger,#fee2e2)';
-        status.textContent = 'Upload failed — check your connection.';
-    });
-    e.target.value = '';
-});
+/* ---- XML Upload removed — imports handled via Settings > Clinical Summary Import ---- */
 
 /* ---- Widget Collapse ---- */
 function toggleWidgetCollapse(btn) {
@@ -1223,6 +1233,64 @@ function toggleItemStatus(badge, mrn, itemType, itemId) {
                 tr.classList.remove('row-inactive');
             } else {
                 tr.classList.add('row-inactive');
+            }
+        }
+    });
+}
+
+/* ---- Add Diagnosis from ICD-10 Lookup (UX-20) ---- */
+function addDiagnosisFromLookup(code, name) {
+    var mrn = '{{ mrn_display }}';
+    fetch('/patient/' + mrn + '/diagnosis/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({diagnosis_name: name, icd10_code: code, category: 'chronic'})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            // Add row to diagnoses table
+            var tbody = document.querySelector('#diag-table tbody');
+            if (tbody) {
+                var tr = document.createElement('tr');
+                tr.setAttribute('data-category', 'chronic');
+                tr.setAttribute('data-status', 'active');
+                tr.setAttribute('data-dx-id', data.data.id);
+                tr.innerHTML =
+                    '<td class="fw-500 cell-clip" title="' + escHtml(name) + '">' + escHtml(name) + '</td>' +
+                    '<td class="mono">' + escHtml(code) + '</td>' +
+                    '<td><span class="badge badge-info badge-toggle" onclick="toggleDxCategory(this,\'' + mrn + '\',' + data.data.id + ')" style="cursor:pointer;" title="Click to toggle">chronic</span></td>' +
+                    '<td><span class="badge badge-success badge-toggle" onclick="toggleItemStatus(this,\'' + mrn + '\',\'diagnosis\',' + data.data.id + ')" style="cursor:pointer;" title="Click to toggle">active</span></td>' +
+                    '<td><button class="btn btn-sm" style="color:var(--color-red,#ef4444);font-size:11px;padding:1px 5px;background:none;border:none;cursor:pointer;" onclick="removeDiagnosis(\'' + mrn + '\',' + data.data.id + ',this)" title="Remove diagnosis">✕</button></td>';
+                tbody.appendChild(tr);
+            }
+            // Flash the button that was clicked
+            event.target.textContent = '✓ Added';
+            event.target.disabled = true;
+            setTimeout(function() { event.target.textContent = '+ Add'; event.target.disabled = false; }, 1500);
+        } else {
+            alert(data.error || 'Failed to add diagnosis');
+        }
+    })
+    .catch(function() { alert('Failed to add diagnosis'); });
+}
+
+/* ---- Remove (soft-delete) Diagnosis (UX-20) ---- */
+function removeDiagnosis(mrn, dxId, btn) {
+    if (!confirm('Remove this diagnosis? (Sets status to resolved)')) return;
+    fetch('/patient/' + mrn + '/diagnosis/' + dxId + '/remove', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            var tr = btn.closest('tr');
+            if (tr) {
+                tr.classList.add('row-inactive');
+                tr.setAttribute('data-status', 'resolved');
+                var statusBadge = tr.querySelector('[data-status] .badge-toggle, td:nth-child(4) .badge-toggle');
+                if (statusBadge) {
+                    statusBadge.textContent = 'resolved';
+                    statusBadge.className = 'badge badge-muted badge-toggle';
+                }
             }
         }
     });
@@ -1498,8 +1566,14 @@ function searchICD10() {
             }
             var html = '<table class="widget-table"><thead><tr><th>Code</th><th>Description</th><th></th></tr></thead><tbody>';
             results.forEach(function(r) {
-                html += '<tr><td class="mono fw-500">' + escHtml(r.code) + '</td><td>' + escHtml(r.name) + '</td>' +
-                    '<td><button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(\'' + escHtml(r.code) + ' - ' + escHtml(r.name).replace(/'/g, "\\'") + '\')">Copy</button></td></tr>';
+                var escapedCode = escHtml(r.code);
+                var escapedName = escHtml(r.name);
+                var copyText = escapedCode + ' - ' + escapedName.replace(/'/g, "\\'");
+                html += '<tr><td class="mono fw-500">' + escapedCode + '</td><td>' + escapedName + '</td>' +
+                    '<td style="white-space:nowrap;">' +
+                    '<button class="btn btn-sm btn-primary" onclick="addDiagnosisFromLookup(\'' + escapedCode.replace(/'/g, "\\'") + '\',\'' + escapedName.replace(/'/g, "\\'") + '\')" title="Add to patient">+ Add</button> ' +
+                    '<button class="btn btn-sm btn-outline" onclick="navigator.clipboard.writeText(\'' + copyText + '\')">Copy</button>' +
+                    '</td></tr>';
             });
             html += '</tbody></table>';
             container.innerHTML = html;

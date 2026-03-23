@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}AC Calibration Wizard — CareCompanion{% endblock %}
+{% block page_id %}ac-calibrate{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+        <h1 style="margin:0;font-size:22px;">AC Calibration Wizard</h1>
+        <a href="/orders" class="btn btn-outline btn-sm">&larr; Back to Orders</a>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+        <div class="card-body" style="font-size:13px;color:var(--text-secondary);">
+            <strong>How it works:</strong> For each calibration point below, position your mouse
+            over the target element in Amazing Charts, then click <strong>Capture</strong>.
+            The wizard will record the cursor coordinates. After capturing all points,
+            click <strong>Save All</strong> to persist them. These fallback coordinates are used
+            only when OCR cannot find the element.
+        </div>
+    </div>
+
+    <div id="cal-points" style="display:flex;flex-direction:column;gap:12px;">
+        {% for pt in points %}
+        <div class="card cal-point" data-key="{{ pt.key }}">
+            <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div style="flex:1;min-width:200px;">
+                    <div style="font-weight:600;font-size:14px;">{{ loop.index }}. {{ pt.label }}</div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">{{ pt.hint }}</div>
+                    <div class="cal-coord" style="font-size:12px;margin-top:4px;font-family:monospace;">
+                        {% if saved.get(pt.key) %}
+                        <span style="color:var(--color-teal);">✓ ({{ saved[pt.key][0] }}, {{ saved[pt.key][1] }})</span>
+                        {% else %}
+                        <span style="color:var(--text-secondary);">Not set</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-sm cal-capture-btn" onclick="capturePoint('{{ pt.key }}', this)" style="min-width:100px;">
+                    Capture
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="margin-top:20px;display:flex;gap:12px;align-items:center;">
+        <button class="btn btn-primary" onclick="saveAll()" id="save-all-btn">Save All</button>
+        <button class="btn btn-outline" onclick="resetAll()">Reset All</button>
+        <span id="save-status" style="font-size:13px;color:var(--text-secondary);"></span>
+    </div>
+</div>
+
+<script>
+var calData = {{ saved | tojson }};
+
+function capturePoint(key, btn) {
+    var origText = btn.textContent;
+    btn.textContent = 'Move mouse to target...';
+    btn.disabled = true;
+
+    // 3-second countdown so user can position mouse
+    var countdown = 3;
+    var interval = setInterval(function() {
+        countdown--;
+        if (countdown > 0) {
+            btn.textContent = 'Capturing in ' + countdown + 's...';
+        } else {
+            clearInterval(interval);
+            btn.textContent = 'Capturing...';
+            fetch('/api/orders/calibrate/capture', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    if (resp.success) {
+                        calData[key] = [resp.data.x, resp.data.y];
+                        var coordEl = btn.closest('.cal-point').querySelector('.cal-coord');
+                        coordEl.innerHTML = '<span style="color:var(--color-teal);">✓ (' + resp.data.x + ', ' + resp.data.y + ')</span>';
+                        btn.textContent = '✓ Captured';
+                        setTimeout(function() { btn.textContent = 'Recapture'; btn.disabled = false; }, 1500);
+                    } else {
+                        btn.textContent = 'Error';
+                        setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2000);
+                    }
+                })
+                .catch(function() {
+                    btn.textContent = 'Error';
+                    setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2000);
+                });
+        }
+    }, 1000);
+}
+
+function saveAll() {
+    var statusEl = document.getElementById('save-status');
+    statusEl.textContent = 'Saving...';
+    fetch('/api/orders/calibrate/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: calData })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(resp) {
+        if (resp.success) {
+            statusEl.innerHTML = '<span style="color:var(--color-teal);">✓ Saved successfully</span>';
+        } else {
+            statusEl.innerHTML = '<span style="color:var(--color-red);">Error: ' + (resp.error || 'Unknown') + '</span>';
+        }
+    })
+    .catch(function() {
+        statusEl.innerHTML = '<span style="color:var(--color-red);">Network error</span>';
+    });
+}
+
+function resetAll() {
+    if (!confirm('Reset all calibration points?')) return;
+    calData = {};
+    document.querySelectorAll('.cal-coord').forEach(function(el) {
+        el.innerHTML = '<span style="color:var(--text-secondary);">Not set</span>';
+    });
+    document.querySelectorAll('.cal-capture-btn').forEach(function(btn) {
+        btn.textContent = 'Capture';
+        btn.disabled = false;
+    });
+}
+</script>
+{% endblock %}

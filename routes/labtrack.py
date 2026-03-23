@@ -22,6 +22,74 @@ labtrack_bp = Blueprint('labtrack', __name__)
 
 
 # ======================================================================
+# GET /api/lab-cache — Return lab reference data for autocomplete
+# ======================================================================
+@labtrack_bp.route('/api/lab-cache')
+@login_required
+def lab_cache():
+    import os
+    cache_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'lab_cache.json')
+    try:
+        with open(cache_path, 'r') as f:
+            data = json.load(f)
+        return jsonify(data)
+    except Exception:
+        return jsonify({'labs': [], 'panels': {}, 'refs': {}})
+
+
+# ======================================================================
+# POST /api/lab-cache/update — Update a lab's abbreviation and/or ref
+# ======================================================================
+@labtrack_bp.route('/api/lab-cache/update', methods=['POST'])
+@login_required
+def lab_cache_update():
+    import os
+    cache_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'lab_cache.json')
+    try:
+        lab_name = request.form.get('lab_name', '').strip()
+        if not lab_name:
+            return jsonify({'success': False, 'error': 'Lab name required'}), 400
+
+        with open(cache_path, 'r') as f:
+            data = json.load(f)
+
+        # Update abbreviation in labs array
+        new_abbr = request.form.get('abbr', '').strip()
+        if new_abbr:
+            for lab in data.get('labs', []):
+                if lab['name'] == lab_name:
+                    lab['abbr'] = new_abbr
+                    break
+
+        # Update reference fields
+        refs = data.setdefault('refs', {})
+        ref_what = request.form.get('ref_what')
+        ref_why = request.form.get('ref_why')
+        ref_high = request.form.get('ref_high')
+        ref_low = request.form.get('ref_low')
+
+        if any(v is not None for v in [ref_what, ref_why, ref_high, ref_low]):
+            ref = refs.setdefault(lab_name, {})
+            if ref_what is not None:
+                ref['what'] = ref_what.strip()
+            if ref_why is not None:
+                ref['why'] = ref_why.strip()
+            if ref_high is not None:
+                ref['high'] = ref_high.strip()
+            if ref_low is not None:
+                ref['low'] = ref_low.strip()
+
+        with open(cache_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(f"Error updating lab cache: {str(e)}")
+        return jsonify({'success': False, 'error': 'Update failed'}), 500
+
+
+# ======================================================================
 # GET /labtrack — Dashboard: all tracked patients with status
 # ======================================================================
 @labtrack_bp.route('/labtrack')
@@ -31,7 +99,7 @@ def index():
     """Lab value tracker dashboard showing all tracked labs."""
     tracks = (
         LabTrack.query
-        .filter_by(user_id=current_user.id)
+        .filter_by(user_id=current_user.id, is_archived=False)
         .order_by(LabTrack.mrn, LabTrack.lab_name)
         .all()
     )
@@ -73,7 +141,7 @@ def patient_detail(mrn):
     """All tracked labs for one patient with sparklines and trend data."""
     tracks = (
         LabTrack.query
-        .filter_by(user_id=current_user.id, mrn=mrn)
+        .filter_by(user_id=current_user.id, mrn=mrn, is_archived=False)
         .order_by(LabTrack.lab_name)
         .all()
     )
@@ -224,7 +292,8 @@ def delete_tracking(track_id):
 
     mrn = track.mrn
     name = track.lab_name
-    db.session.delete(track)
+    # HIPAA: soft-delete clinical records — never hard-delete
+    track.is_archived = True
     db.session.commit()
     flash(f'Removed {name} tracking for ...{mrn[-4:]}.', 'success')
     return redirect(url_for('labtrack.index'))
@@ -386,7 +455,7 @@ def trend_data(mrn, lab_name):
 def overdue_count():
     """Return JSON with overdue lab count for the current user."""
     count = LabTrack.query.filter_by(
-        user_id=current_user.id, is_overdue=True
+        user_id=current_user.id, is_overdue=True, is_archived=False
     ).count()
     return jsonify({'overdue_count': count})
 
@@ -457,7 +526,7 @@ def check_overdue_labs(user_id):
     now = datetime.now(timezone.utc)
     count = 0
 
-    tracks = LabTrack.query.filter_by(user_id=user_id).all()
+    tracks = LabTrack.query.filter_by(user_id=user_id, is_archived=False).all()
     for t in tracks:
         was_overdue = t.is_overdue
         if t.last_checked and t.interval_days:
@@ -476,4 +545,4 @@ def check_overdue_labs(user_id):
 
 def get_overdue_lab_count(user_id):
     """Return count of overdue lab tracks for morning briefing integration."""
-    return LabTrack.query.filter_by(user_id=user_id, is_overdue=True).count()
+    return LabTrack.query.filter_by(user_id=user_id, is_overdue=True, is_archived=False).count()

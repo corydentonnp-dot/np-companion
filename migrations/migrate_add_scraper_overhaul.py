@@ -6,13 +6,21 @@ Adds:
   schedules.insurer         TEXT  — active insurer at appointment time
 
 Idempotent — safe to re-run.
+
+Uses run_migration(app, db) so _run_pending_migrations() calls it in-process
+instead of spawning a subprocess.
 """
 import sqlite3
 import os
 from utils.paths import get_db_path
 
 
-def migrate():
+def run_migration(app, db):
+    """Called by _run_pending_migrations in app/__init__.py."""
+    _do_migrate()
+
+
+def _do_migrate():
     db_path = get_db_path()
     if not os.path.isfile(db_path):
         print(f"Database not found at {db_path}")
@@ -46,7 +54,5 @@ def migrate():
     print("Migration complete: scraper overhaul columns added.")
 
 
-run = migrate
-
 if __name__ == '__main__':
-    migrate()
+    _do_migrate()

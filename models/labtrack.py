@@ -49,6 +49,7 @@ class LabTrack(db.Model):
 
     # ---- Status tracking -------------------------------------------------
     is_overdue = db.Column(db.Boolean, default=False)
+    is_archived = db.Column(db.Boolean, default=False, nullable=False)
     last_checked = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.Text, default='')
     source = db.Column(db.String(20), default='manual')  # 'manual' or 'inbox'

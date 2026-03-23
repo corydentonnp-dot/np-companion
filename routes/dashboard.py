@@ -501,8 +501,10 @@ def api_schedule():
         'count': len(appointments),
         'appointments': [
             {
+                'id': a.id,
                 'time': a.appointment_time,
                 'patient_name': a.patient_name,
+                'patient_mrn': a.patient_mrn or '',
                 'patient_mrn_last4': (a.patient_mrn or '')[-4:] if a.patient_mrn else '',
                 'visit_type': a.visit_type,
                 'reason': a.reason or '',
@@ -706,6 +708,41 @@ def api_schedule_delete(schedule_id):
     db.session.delete(appt)
     db.session.commit()
     return jsonify({'success': True})
+
+
+# ======================================================================
+# PUT /api/schedule/<id>/move — move an appointment to a new time slot
+# ======================================================================
+@dashboard_bp.route('/api/schedule/<int:schedule_id>/move', methods=['PUT'])
+@login_required
+def api_schedule_move(schedule_id):
+    """
+    Move an appointment to a new time slot (drag-drop from schedule grid).
+    Accepts JSON: {"new_time": "HH:MM"} in 24-hour format.
+    """
+    import re as _re
+
+    appt = Schedule.query.filter_by(
+        id=schedule_id, user_id=current_user.id
+    ).first()
+    if not appt:
+        return jsonify({'success': False, 'error': 'Appointment not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    new_time = (data.get('new_time') or '').strip()
+
+    # Validate HH:MM format
+    if not _re.match(r'^\d{2}:\d{2}$', new_time):
+        return jsonify({'success': False, 'error': 'Invalid time format'}), 400
+
+    try:
+        appt.appointment_time = new_time
+        db.session.commit()
+        return jsonify({'success': True, 'new_time': new_time})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error in dashboard.api_schedule_move: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to move appointment'}), 500
 
 
 # ======================================================================

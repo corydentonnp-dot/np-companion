@@ -191,12 +191,22 @@
         if (e.shiftKey) { x = _snap(x); y = _snap(y); }
         _dragState.el.style.left = x + 'px';
         _dragState.el.style.top = y + 'px';
+
+        // Auto-scroll when dragging near container edges
+        var container = _dragState.container;
+        var main = container.closest('.main-content') || container.parentElement;
+        if (main) {
+            var rect = main.getBoundingClientRect();
+            var scrollSpeed = 12;
+            if (e.clientY > rect.bottom - 40) main.scrollTop += scrollSpeed;
+            else if (e.clientY < rect.top + 40) main.scrollTop -= scrollSpeed;
+        }
     }
 
     function _endDrag() {
         if (_dragState) {
             var h = _dragState.el.querySelector('.fw-drag-handle');
-            if (h) { h.style.opacity = '0.3'; h.style.height = '6px'; }
+            if (h) { h.style.opacity = '0.5'; h.style.cursor = 'grab'; }
             _savePositions(_dragState.container);
             _savePositionsToServer(_dragState.container);
             _updateMinHeight(_dragState.container);
@@ -258,14 +268,14 @@
         if (!w.querySelector('.fw-drag-handle')) {
             var handle = document.createElement('div');
             handle.className = 'fw-drag-handle';
-            handle.title = 'Drag to move';
-            handle.innerHTML = '&#9776;';
-            handle.style.cssText = 'position:absolute;top:0;left:0;right:0;height:6px;cursor:move;' +
-                'background:var(--color-teal);opacity:0.3;transition:opacity .15s,height .15s;z-index:5;' +
+            handle.title = 'Drag to move (Shift+drag to snap)';
+            handle.innerHTML = '<svg width="20" height="8" viewBox="0 0 20 8" style="pointer-events:none;"><circle cx="4" cy="2" r="1.5" fill="currentColor"/><circle cx="10" cy="2" r="1.5" fill="currentColor"/><circle cx="16" cy="2" r="1.5" fill="currentColor"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><circle cx="16" cy="6" r="1.5" fill="currentColor"/></svg>';
+            handle.style.cssText = 'position:absolute;top:0;left:0;right:0;height:18px;cursor:grab;' +
+                'background:var(--color-teal);opacity:0.5;transition:opacity .15s;z-index:5;' +
                 'border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:center;' +
-                'font-size:10px;color:#fff;';
-            handle.addEventListener('mouseenter', function () { handle.style.opacity = '1'; handle.style.height = '14px'; });
-            handle.addEventListener('mouseleave', function () { if (!_dragState) { handle.style.opacity = '0.3'; handle.style.height = '6px'; } });
+                'color:rgba(255,255,255,.8);';
+            handle.addEventListener('mouseenter', function () { handle.style.opacity = '1'; });
+            handle.addEventListener('mouseleave', function () { if (!_dragState) { handle.style.opacity = '0.5'; } });
             handle.addEventListener('mousedown', _startDrag);
             w.style.overflow = 'visible';
             w.insertBefore(handle, w.firstChild);
@@ -588,6 +598,166 @@
         });
     }
 
+    /* ---- Widget Management Panel (UX-18) ---- */
+    var _mgmtPanel = null;
+
+    function _createMgmtPanel() {
+        var panel = document.createElement('div');
+        panel.className = 'fw-mgmt-panel';
+        panel.style.cssText = 'display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:7000;' +
+            'background:var(--bg-surface,#fff);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.25);' +
+            'width:400px;max-width:95vw;max-height:80vh;display:none;flex-direction:column;overflow:hidden;';
+        panel.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);">' +
+            '<h3 style="margin:0;font-size:16px;">Manage Widgets</h3>' +
+            '<button class="btn btn-outline btn-sm fw-mgmt-close" style="padding:2px 8px;">✕</button></div>' +
+            '<div class="fw-mgmt-list" style="flex:1;overflow-y:auto;padding:8px 0;"></div>' +
+            '<div style="padding:12px 20px;border-top:1px solid var(--border,#e2e8f0);display:flex;gap:8px;">' +
+            '<button class="btn btn-outline btn-sm fw-mgmt-show-all">Show All</button>' +
+            '<button class="btn btn-outline btn-sm fw-mgmt-reset-order">Reset Order</button></div>';
+        document.body.appendChild(panel);
+
+        panel.querySelector('.fw-mgmt-close').addEventListener('click', function () {
+            panel.style.display = 'none';
+            _mgmtBackdrop.style.display = 'none';
+        });
+        panel.querySelector('.fw-mgmt-show-all').addEventListener('click', function () {
+            var settings = _loadSettings();
+            var container = document.querySelector('.fw-container');
+            if (!container) return;
+            container.querySelectorAll('.fw-widget').forEach(function (w) {
+                var wid = _getWidgetId(w);
+                w.style.display = '';
+                if (settings[wid]) settings[wid].hidden = false;
+            });
+            _saveWidgetSettings(settings);
+            if (container) _updateHiddenBar(container);
+            _populateMgmtList(container);
+        });
+        panel.querySelector('.fw-mgmt-reset-order').addEventListener('click', function () {
+            var container = document.querySelector('.fw-container');
+            if (!container) return;
+            localStorage.removeItem(_storageKey('widget_order'));
+            _populateMgmtList(container);
+        });
+        return panel;
+    }
+
+    var _mgmtBackdrop = null;
+
+    function _ensureBackdrop() {
+        if (!_mgmtBackdrop) {
+            _mgmtBackdrop = document.createElement('div');
+            _mgmtBackdrop.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:6500;';
+            document.body.appendChild(_mgmtBackdrop);
+            _mgmtBackdrop.addEventListener('click', function () {
+                if (_mgmtPanel) _mgmtPanel.style.display = 'none';
+                _mgmtBackdrop.style.display = 'none';
+            });
+        }
+        return _mgmtBackdrop;
+    }
+
+    function _populateMgmtList(container) {
+        if (!_mgmtPanel) return;
+        var list = _mgmtPanel.querySelector('.fw-mgmt-list');
+        list.innerHTML = '';
+        var settings = _loadSettings();
+        var widgets = container.querySelectorAll('.fw-widget');
+        widgets.forEach(function (w) {
+            var wid = _getWidgetId(w);
+            var titleEl = w.querySelector('.widget-title');
+            var title = (titleEl ? titleEl.textContent : wid) || wid;
+            var isHidden = !!(settings[wid] && settings[wid].hidden);
+            var row = document.createElement('div');
+            row.className = 'fw-mgmt-row';
+            row.setAttribute('data-wid', wid);
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 20px;border-bottom:1px solid var(--border-color-light,#f1f5f9);cursor:grab;';
+            row.draggable = true;
+            row.innerHTML =
+                '<span style="color:var(--text-secondary);cursor:grab;">⠿</span>' +
+                '<label style="flex:1;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">' +
+                '<input type="checkbox" class="fw-mgmt-vis" ' + (isHidden ? '' : 'checked') + ' style="width:16px;height:16px;">' +
+                '<span>' + title + '</span></label>' +
+                '<span style="font-size:11px;color:var(--text-secondary);">' + Math.round(w.offsetWidth) + '×' + Math.round(w.offsetHeight) + '</span>';
+
+            // Toggle visibility
+            row.querySelector('.fw-mgmt-vis').addEventListener('change', function (ev) {
+                var vis = ev.target.checked;
+                if (!settings[wid]) settings[wid] = {};
+                settings[wid].hidden = !vis;
+                w.style.display = vis ? '' : 'none';
+                _saveWidgetSettings(settings);
+                _updateHiddenBar(container);
+            });
+
+            // Drag reorder within list
+            row.addEventListener('dragstart', function (ev) {
+                ev.dataTransfer.setData('text/plain', wid);
+                row.style.opacity = '0.5';
+            });
+            row.addEventListener('dragend', function () { row.style.opacity = '1'; });
+            row.addEventListener('dragover', function (ev) { ev.preventDefault(); });
+            row.addEventListener('drop', function (ev) {
+                ev.preventDefault();
+                var fromWid = ev.dataTransfer.getData('text/plain');
+                if (fromWid === wid) return;
+                var fromRow = list.querySelector('[data-wid="' + fromWid + '"]');
+                if (!fromRow) return;
+                list.insertBefore(fromRow, row);
+                _saveMgmtOrder(list, container);
+            });
+            list.appendChild(row);
+        });
+    }
+
+    function _saveMgmtOrder(list, container) {
+        var order = [];
+        list.querySelectorAll('.fw-mgmt-row').forEach(function (r) {
+            order.push(r.getAttribute('data-wid'));
+        });
+        localStorage.setItem(_storageKey('widget_order'), JSON.stringify(order));
+        // Reorder actual widgets in DOM
+        order.forEach(function (wid) {
+            var w = container.querySelector('[data-widget-id="' + wid + '"]');
+            if (w) container.appendChild(w);
+        });
+    }
+
+    function _applyWidgetOrder(container) {
+        var orderStr = localStorage.getItem(_storageKey('widget_order'));
+        if (!orderStr) return;
+        try {
+            var order = JSON.parse(orderStr);
+            order.forEach(function (wid) {
+                var w = container.querySelector('[data-widget-id="' + wid + '"]');
+                if (w) container.appendChild(w);
+            });
+        } catch (e) { /* ignore */ }
+    }
+
+    function openMgmtPanel() {
+        var container = document.querySelector('.fw-container');
+        if (!container) return;
+        if (!_mgmtPanel) _mgmtPanel = _createMgmtPanel();
+        _ensureBackdrop();
+        _populateMgmtList(container);
+        _mgmtBackdrop.style.display = 'block';
+        _mgmtPanel.style.display = 'flex';
+    }
+
+    function _injectMgmtButton(container) {
+        var existing = container.querySelector('.fw-mgmt-btn');
+        if (existing) return;
+        var btn = document.createElement('button');
+        btn.className = 'btn btn-outline btn-sm fw-mgmt-btn';
+        btn.innerHTML = '⚙ Manage Widgets';
+        btn.style.cssText = 'position:absolute;top:8px;right:8px;z-index:50;font-size:12px;';
+        btn.addEventListener('click', openMgmtPanel);
+        container.style.position = 'relative';
+        container.insertBefore(btn, container.firstChild);
+    }
+
     /* ---- Auto-initialise ---- */
     document.addEventListener('DOMContentLoaded', function () {
         var containers = document.querySelectorAll('.fw-container');
@@ -595,6 +765,8 @@
         containers.forEach(function (c) {
             _injectGearIcons(c);
             _applySettings(c);
+            _applyWidgetOrder(c);
+            _injectMgmtButton(c);
         });
         var mode = _getMode();
         setTimeout(function () { setLayout(mode); }, 0);
@@ -605,6 +777,7 @@
         setLayout: setLayout,
         resetLayout: resetLayout,
         bringForward: bringForward,
-        sendBackward: sendBackward
+        sendBackward: sendBackward,
+        openManagePanel: openMgmtPanel
     };
 })();

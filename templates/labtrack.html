@@ -14,6 +14,11 @@
     <div class="cp-stat"><span>Due Soon</span><span class="cp-stat-value" style="{{ 'color:var(--color-warning,#f59e0b);' if due_soon_count > 0 else '' }}">{{ due_soon_count }}</span></div>
 </div>
 
+<div class="context-panel-section">
+    <div class="cp-section-label">Tools</div>
+    <button class="cp-action" onclick="openLabReference()">📖 Lab Reference</button>
+</div>
+
 <div class="cp-quick-nav">
     <div class="cp-section-label">Quick Nav</div>
     <a href="/caregap" class="cp-link">Care Gaps</a>
@@ -40,7 +45,10 @@
                     </div>
                     <div>
                         <label style="font-size:12px;font-weight:600;">Lab Name</label>
-                        <input type="text" name="lab_name" class="form-control" placeholder="e.g., HbA1c" required>
+                        <div style="position:relative;">
+                            <input type="text" name="lab_name" id="lab-name-input" class="form-control" placeholder="e.g., HbA1c" required autocomplete="off">
+                            <div id="lab-name-dropdown" class="lab-autocomplete-dropdown" style="display:none;"></div>
+                        </div>
                     </div>
                     <div>
                         <label style="font-size:12px;font-weight:600;">Check Every (days)</label>
@@ -137,9 +145,10 @@
                         …{{ pdata.display_mrn }}
                     </td>
                     {% endif %}
-                    <td style="padding:8px 12px;">
+                    <td style="padding:8px 12px;" data-lab-name="{{ track.lab_name }}" data-panel-name="{{ track.panel_name or '' }}">
                         {{ track.lab_name }}
                         {% if track.panel_name %}<span style="font-size:11px;color:var(--text-secondary);">({{ track.panel_name }})</span>{% endif %}
+                        <span class="panel-badges-slot"></span>
                     </td>
                     <td style="padding:8px 12px;">
                         {% if track.results %}
@@ -200,9 +209,308 @@
 </div>
 {% endif %}
 
+{# ======== Lab Reference Modal ======== #}
+<div id="lab-ref-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:5000;overflow-y:auto;">
+    <div style="margin:40px auto;max-width:860px;width:95%;background:var(--bg-surface,#fff);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.25);display:flex;flex-direction:column;max-height:calc(100vh - 80px);">
+        {# Header #}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border,#e2e8f0);background:var(--bg-muted,#f8fafc);border-radius:12px 12px 0 0;">
+            <h2 style="margin:0;font-size:18px;">📖 Lab Reference &amp; Abbreviations</h2>
+            <button class="btn btn-outline btn-sm" onclick="closeLabReference()">✕</button>
+        </div>
+        {# Search bar #}
+        <div style="padding:12px 24px;border-bottom:1px solid var(--border,#f1f5f9);">
+            <input type="text" id="lab-ref-search" class="form-control" placeholder="Search labs by name, abbreviation, or panel..." style="font-size:14px;" oninput="filterLabRef()">
+        </div>
+        {# Lab list #}
+        <div id="lab-ref-list" style="flex:1;overflow-y:auto;padding:0;"></div>
+    </div>
+</div>
+
+{# ======== Lab Detail Card (shown when clicking a lab) ======== #}
+<div id="lab-detail-card" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:5100;overflow-y:auto;">
+    <div style="margin:60px auto;max-width:560px;width:95%;background:var(--bg-surface,#fff);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border,#e2e8f0);background:var(--bg-muted,#f8fafc);border-radius:12px 12px 0 0;">
+            <h3 id="lab-detail-title" style="margin:0;font-size:17px;"></h3>
+            <button class="btn btn-outline btn-sm" onclick="closeLabDetail()">✕</button>
+        </div>
+        <div id="lab-detail-body" style="padding:20px 24px;"></div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/labtrack.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.LabAutocomplete) {
+            window.LabAutocomplete.init();
+        }
+        /* Auto-open Lab Reference if ?ref=1 in URL */
+        if (new URLSearchParams(window.location.search).get('ref') === '1') {
+            openLabReference();
+        }
+    });
+
+var _labRefData = null;
+
+function openLabReference(searchTerm) {
+    document.getElementById('lab-ref-modal').style.display = 'block';
+    var searchInput = document.getElementById('lab-ref-search');
+    if (searchTerm) { searchInput.value = searchTerm; }
+    else { searchInput.value = ''; }
+    fetchLabRefData(function() { filterLabRef(); });
+    searchInput.focus();
+}
+
+function closeLabReference() {
+    document.getElementById('lab-ref-modal').style.display = 'none';
+}
+
+function fetchLabRefData(cb) {
+    if (_labRefData) return cb();
+    fetch('/api/lab-cache')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { _labRefData = data; cb(); })
+        .catch(function() { _labRefData = {labs:[], panels:{}, refs:{}}; cb(); });
+}
+
+function filterLabRef() {
+    if (!_labRefData) return;
+    var q = (document.getElementById('lab-ref-search').value || '').toLowerCase();
+    var labs = _labRefData.labs.filter(function(lab) {
+        if (!q) return true;
+        return lab.name.toLowerCase().indexOf(q) >= 0
+            || (lab.abbr && lab.abbr.toLowerCase().indexOf(q) >= 0)
+            || (lab.panels && lab.panels.join(' ').toLowerCase().indexOf(q) >= 0)
+            || (lab.loinc && lab.loinc.indexOf(q) >= 0);
+    });
+    renderLabRefList(labs);
+}
+
+function _esc(s) {
+    if (!s) return '';
+    var d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function renderLabRefList(labs) {
+    var el = document.getElementById('lab-ref-list');
+    if (!labs.length) {
+        el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary);font-size:14px;">No labs match your search.</div>';
+        return;
+    }
+    var refs = _labRefData.refs || {};
+    var html = '';
+    labs.forEach(function(lab) {
+        var ref = refs[lab.name] || {};
+        var rangeStr = '';
+        if (lab.low != null && lab.high != null) rangeStr = lab.low + ' – ' + lab.high + ' ' + (lab.unit || '');
+        var panelBadges = '';
+        if (lab.panels && lab.panels.length) {
+            lab.panels.forEach(function(p) {
+                panelBadges += '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--color-teal,#26a69a);color:#fff;margin-left:3px;">' + _esc(p) + '</span>';
+            });
+        }
+        html += '<div class="lab-ref-row" onclick="openLabDetail(\'' + _esc(lab.name).replace(/'/g, "\\'") + '\')" style="display:flex;align-items:center;gap:12px;padding:10px 24px;border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;transition:background 0.1s;" onmouseenter="this.style.background=\'var(--bg-muted)\'" onmouseleave="this.style.background=\'\'">';
+        html += '<div style="flex:1;min-width:0;">';
+        html += '<div style="font-weight:600;font-size:14px;">' + _esc(lab.name) + ' <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">(' + _esc(lab.abbr) + ')</span>' + panelBadges + '</div>';
+        if (ref.what) html += '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">' + _esc(ref.what) + '</div>';
+        html += '</div>';
+        if (rangeStr) html += '<div style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">' + _esc(rangeStr) + '</div>';
+        html += '<div style="font-size:14px;color:var(--text-secondary);">›</div>';
+        html += '</div>';
+    });
+    el.innerHTML = html;
+}
+
+function openLabDetail(labName) {
+    fetchLabRefData(function() {
+        var lab = null;
+        _labRefData.labs.forEach(function(l) { if (l.name === labName) lab = l; });
+        if (!lab) return;
+        var ref = (_labRefData.refs || {})[labName] || {};
+
+        document.getElementById('lab-detail-title').textContent = lab.name;
+
+        var rangeStr = '';
+        if (lab.low != null && lab.high != null) rangeStr = lab.low + ' – ' + lab.high + ' ' + (lab.unit || '');
+        var critStr = '';
+        if (lab.critical_low != null) critStr += 'Critical Low: ' + lab.critical_low + ' ';
+        if (lab.critical_high != null) critStr += 'Critical High: ' + lab.critical_high;
+
+        var html = '';
+
+        /* Top info grid */
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px;font-size:13px;">';
+        html += '<div><span style="font-weight:600;color:var(--text-secondary);">Abbreviation</span><br>';
+        html += '<input type="text" id="lab-detail-abbr" class="form-control" value="' + _esc(lab.abbr) + '" style="font-size:14px;font-weight:600;max-width:120px;margin-top:4px;"></div>';
+        html += '<div><span style="font-weight:600;color:var(--text-secondary);">LOINC</span><br><span style="margin-top:4px;display:inline-block;">' + _esc(lab.loinc || '—') + '</span></div>';
+        if (rangeStr) html += '<div><span style="font-weight:600;color:var(--text-secondary);">Normal Range</span><br><span style="color:var(--color-teal,#26a69a);font-weight:500;">' + _esc(rangeStr) + '</span></div>';
+        if (critStr.trim()) html += '<div><span style="font-weight:600;color:var(--text-secondary);">Critical</span><br><span style="color:var(--color-red,#ef4444);">' + _esc(critStr.trim()) + '</span></div>';
+        if (lab.panels && lab.panels.length) {
+            html += '<div style="grid-column:span 2;"><span style="font-weight:600;color:var(--text-secondary);">Panels</span><br>';
+            lab.panels.forEach(function(p) { html += '<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:4px;background:var(--color-teal,#26a69a);color:#fff;margin:3px 3px 0 0;">' + _esc(p) + '</span>'; });
+            html += '</div>';
+        }
+        html += '</div>';
+
+        /* Reference card */
+        html += '<div style="border:1px solid var(--border,#e2e8f0);border-radius:8px;overflow:hidden;margin-bottom:16px;">';
+        html += '<div style="background:var(--bg-muted,#f8fafc);padding:8px 14px;font-weight:600;font-size:13px;border-bottom:1px solid var(--border,#e2e8f0);">Clinical Reference</div>';
+
+        /* What it measures */
+        html += '<div style="padding:10px 14px;border-bottom:1px solid var(--border,#f1f5f9);">';
+        html += '<div style="font-weight:600;font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">What It Measures</div>';
+        html += '<textarea id="lab-ref-what" rows="2" class="form-control" style="font-size:13px;resize:vertical;">' + _esc(ref.what || '') + '</textarea>';
+        html += '</div>';
+
+        /* Clinical significance */
+        html += '<div style="padding:10px 14px;border-bottom:1px solid var(--border,#f1f5f9);">';
+        html += '<div style="font-weight:600;font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Clinical Significance</div>';
+        html += '<textarea id="lab-ref-why" rows="2" class="form-control" style="font-size:13px;resize:vertical;">' + _esc(ref.why || '') + '</textarea>';
+        html += '</div>';
+
+        /* Causes of High */
+        html += '<div style="padding:10px 14px;border-bottom:1px solid var(--border,#f1f5f9);">';
+        html += '<div style="font-weight:600;font-size:11px;color:var(--color-red,#ef4444);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">⬆ Common Causes of High Values</div>';
+        html += '<textarea id="lab-ref-high" rows="2" class="form-control" style="font-size:13px;resize:vertical;">' + _esc(ref.high || '') + '</textarea>';
+        html += '</div>';
+
+        /* Causes of Low */
+        html += '<div style="padding:10px 14px;">';
+        html += '<div style="font-weight:600;font-size:11px;color:var(--color-blue,#3b82f6);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">⬇ Common Causes of Low Values</div>';
+        html += '<textarea id="lab-ref-low" rows="2" class="form-control" style="font-size:13px;resize:vertical;">' + _esc(ref.low || '') + '</textarea>';
+        html += '</div>';
+
+        html += '</div>';
+
+        /* Save button */
+        html += '<div style="display:flex;gap:8px;justify-content:flex-end;">';
+        html += '<button class="btn btn-outline btn-sm" onclick="closeLabDetail()">Cancel</button>';
+        html += '<button class="btn btn-sm" id="lab-detail-save" style="background:var(--color-teal,#26a69a);color:#fff;border:none;" onclick="saveLabDetail(\'' + _esc(labName).replace(/'/g, "\\'") + '\')">Save Changes</button>';
+        html += '</div>';
+
+        document.getElementById('lab-detail-body').innerHTML = html;
+        document.getElementById('lab-detail-card').style.display = 'block';
+    });
+}
+
+function closeLabDetail() {
+    document.getElementById('lab-detail-card').style.display = 'none';
+}
+
+function saveLabDetail(labName) {
+    var btn = document.getElementById('lab-detail-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    var form = new FormData();
+    form.append('lab_name', labName);
+    form.append('abbr', document.getElementById('lab-detail-abbr').value);
+    form.append('ref_what', document.getElementById('lab-ref-what').value);
+    form.append('ref_why', document.getElementById('lab-ref-why').value);
+    form.append('ref_high', document.getElementById('lab-ref-high').value);
+    form.append('ref_low', document.getElementById('lab-ref-low').value);
+
+    fetch('/api/lab-cache/update', { method: 'POST', body: form })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                btn.textContent = '✓ Saved';
+                btn.style.background = 'var(--color-green,#22c55e)';
+                /* Update local cache */
+                _labRefData = null;
+                if (window.LabAutocomplete) window.LabAutocomplete._clearCache && window.LabAutocomplete._clearCache();
+                setTimeout(function() {
+                    btn.disabled = false;
+                    btn.textContent = 'Save Changes';
+                    btn.style.background = 'var(--color-teal,#26a69a)';
+                }, 1500);
+            } else {
+                btn.textContent = 'Error';
+                btn.style.background = 'var(--color-red,#ef4444)';
+                setTimeout(function() {
+                    btn.disabled = false;
+                    btn.textContent = 'Save Changes';
+                    btn.style.background = 'var(--color-teal,#26a69a)';
+                }, 2000);
+            }
+        });
+}
+</script>
+
 <style>
 @media (max-width: 768px) {
     div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+}
+
+/* Lab autocomplete dropdown */
+.lab-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    background: var(--bg-primary, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-height: 240px;
+    overflow-y: auto;
+}
+.lab-autocomplete-item {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color-light, #eee);
+}
+.lab-autocomplete-item:last-child { border-bottom: none; }
+.lab-autocomplete-item:hover,
+.lab-autocomplete-item--active {
+    background: var(--color-teal-light, #e0f2f1);
+}
+[data-theme="dark"] .lab-autocomplete-item:hover,
+[data-theme="dark"] .lab-autocomplete-item--active {
+    background: rgba(38,166,154,0.2);
+}
+.lab-ac-range {
+    font-size: 11px;
+    color: var(--text-secondary, #888);
+    white-space: nowrap;
+}
+.lab-ac-panel-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--color-teal, #26a69a);
+    color: #fff;
+    margin-left: 4px;
+}
+
+/* UX-15: Panel component badges */
+.panel-comp-badges {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.panel-comp-dot {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: var(--bg-secondary, #f1f5f9);
+    color: var(--text-secondary, #888);
+    border: 1px solid var(--border-color, #ddd);
+    white-space: nowrap;
+}
+.panel-comp-dot--current {
+    background: var(--color-teal, #26a69a);
+    color: #fff;
+    border-color: var(--color-teal, #26a69a);
+    font-weight: 600;
 }
 </style>
 {% endblock %}
