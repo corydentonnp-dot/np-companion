@@ -44,13 +44,13 @@
 - [x] Clinical tools (7 templates + 3 modal migrations) — page-header, cc-modal
 - [x] Settings, auth, reference pages (4 templates) — page-header, section-heading
 
-## Phase M4 — JS Enhancements
+## Phase M4 — JS Enhancements ✅ COMPLETE (03-23-26)
 
-- [ ] `initSortableHeaders()` — client-side table column sorting
-- [ ] `initStatePersistence()` — filter/scroll/tab session memory
-- [ ] `initCollapsible()` — unified collapse/expand with localStorage
-- [ ] `initQuickActions()` — inline status toggle buttons
-- [ ] `_pagination.html` — reusable Jinja pagination macro
+- [x] `initSortableHeaders()` — client-side table column sorting (main.js L1962). Wired to 6 tables: admin_audit_log, admin_practice, billing_log, cs_tracker, labtrack, patient_roster.
+- [x] `initStatePersistence()` — filter/scroll/tab session memory (main.js L2032). Wired to billing_log 2 filter selects (level, anomaly).
+- [x] `initCollapsible()` — unified collapse/expand with localStorage (main.js L2100). Wired to admin_dashboard (1 section) + settings.html (8 sections with `cc-collapsible-body` wrappers).
+- [x] `initQuickActions()` — inline POST buttons (main.js L2139). Wired to notifications "Mark All Read" button. Supports `success` and `ok` response patterns.
+- [x] `_pagination.html` — reusable Jinja pagination macro (templates/_pagination.html).
 
 ---
 

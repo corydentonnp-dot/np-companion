@@ -10,7 +10,7 @@ import logging
 import os
 import traceback
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, session
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
@@ -188,6 +188,10 @@ def create_app():
 		if response.status_code >= 400:
 			log_http_error(response, request)
 		return response
+
+	@app.before_request
+	def make_session_permanent():
+		session.permanent = True
 
 	# -- Structured JSON logging with daily rotation --
 	log_dir = os.path.join(get_data_dir(), 'logs')

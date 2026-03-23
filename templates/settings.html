@@ -25,7 +25,8 @@
 {# ================================================================
    SECTION 1: Profile & Security
    ================================================================ #}
-<h2 id="sect-profile" class="section-heading">Profile &amp; Security</h2>
+<h2 id="sect-profile" class="section-heading" data-collapsible="settings-profile" aria-expanded="true">Profile &amp; Security</h2>
+<div class="cc-collapsible-body">
 
 {# ---- Display Name ----------------------------------------------- #}
 <div class="card" style="margin-bottom:16px;max-width:560px;">
@@ -108,11 +109,13 @@
         </form>
     </div>
 </div>
+</div>{# /cc-collapsible-body: Profile & Security #}
 
 {# ================================================================
    SECTION 2: Credentials
    ================================================================ #}
-<h2 id="sect-credentials" class="section-heading">Credentials</h2>
+<h2 id="sect-credentials" class="section-heading" data-collapsible="settings-credentials" aria-expanded="true">Credentials</h2>
+<div class="cc-collapsible-body">
 
 {# ---- NetPractice Credentials ------------------------------------ #}
 <div class="card" style="margin-bottom:16px;max-width:560px;">
@@ -338,11 +341,13 @@ function testAIConnection() {
 }
 </script>
 {% endif %}
+</div>{# /cc-collapsible-body: Credentials #}
 
 {# ================================================================
    SECTION 3: Notifications
    ================================================================ #}
-<h2 id="sect-notifications" class="section-heading">Notifications</h2>
+<h2 id="sect-notifications" class="section-heading" data-collapsible="settings-notifications" aria-expanded="true">Notifications</h2>
+<div class="cc-collapsible-body">
 
 <form method="POST" action="{{ url_for('auth.settings_notifications') }}">
     {# ---- General Settings ------------------------------------------ #}
@@ -453,11 +458,13 @@ function testAIConnection() {
 
     <button type="submit" class="btn btn-primary btn-lg">Save Notification Preferences</button>
 </form>
+</div>{# /cc-collapsible-body: Notifications #}
 
 {# ================================================================
    SECTION 4: Clinical Summary Import
    ================================================================ #}
-<h2 id="sect-import" class="section-heading" style="margin-top:24px;">Clinical Summary Import</h2>
+<h2 id="sect-import" class="section-heading" data-collapsible="settings-import" aria-expanded="true" style="margin-top:24px;">Clinical Summary Import</h2>
+<div class="cc-collapsible-body">
 
 <form method="POST" action="{{ url_for('auth.settings_account') }}">
     <input type="hidden" name="action" value="set_export_folder">
@@ -501,11 +508,13 @@ function browseExportFolder() {
     });
 }
 </script>
+</div>{# /cc-collapsible-body: Clinical Summary Import #}
 
 {# ================================================================
    SECTION 5: Theme & Appearance
    ================================================================ #}
-<h2 id="sect-appearance" class="section-heading" style="margin-top:24px;">Theme &amp; Appearance</h2>
+<h2 id="sect-appearance" class="section-heading" data-collapsible="settings-appearance" aria-expanded="true" style="margin-top:24px;">Theme &amp; Appearance</h2>
+<div class="cc-collapsible-body">
 
 <div class="card" style="margin-bottom:16px;max-width:720px;">
     <div class="card-header">Theme</div>
@@ -720,11 +729,13 @@ window._setSplitPanes = function(n) {
 
 {# dummy script tag removed — JS moved inline above #}
 <script>/* placeholder */
+</div>{# /cc-collapsible-body: Theme & Appearance #}
 
 {# ================================================================
    SECTION 4b: Billing Preferences
    ================================================================ #}
-<h2 id="sect-billing" class="section-heading">Billing Intelligence</h2>
+<h2 id="sect-billing" class="section-heading" data-collapsible="settings-billing" aria-expanded="true">Billing Intelligence</h2>
+<div class="cc-collapsible-body">
 
 <form method="POST" action="{{ url_for('auth.settings_account') }}">
     <input type="hidden" name="action" value="set_billing_prefs">
@@ -819,11 +830,13 @@ window._setSplitPanes = function(n) {
         <a href="{{ url_for('auth.starter_pack_page') }}" class="btn btn-primary">📦 Browse Shared Resources</a>
     </div>
 </div>
+</div>{# /cc-collapsible-body: Billing Intelligence #}
 
 {# ================================================================
    SECTION 5: Clinical Intelligence Preferences
    ================================================================ #}
-<h2 id="sect-intelligence" class="section-heading">Clinical Intelligence</h2>
+<h2 id="sect-intelligence" class="section-heading" data-collapsible="settings-intelligence" aria-expanded="true">Clinical Intelligence</h2>
+<div class="cc-collapsible-body">
 
 <form method="POST" action="{{ url_for('auth.settings_account') }}">
     <input type="hidden" name="action" value="set_intelligence_prefs">
@@ -926,11 +939,13 @@ window._setSplitPanes = function(n) {
 .accent-btn--active          { border-color: var(--text-primary) !important;
                                box-shadow: 0 0 0 2px var(--text-primary); }
 </style>
+</div>{# /cc-collapsible-body: Clinical Intelligence #}
 
 {# ================================================================
    SECTION 7: Feature Level (Phase 13)
    ================================================================ #}
-<h2 id="sect-features" class="section-heading">Feature Level</h2>
+<h2 id="sect-features" class="section-heading" data-collapsible="settings-features" aria-expanded="true">Feature Level</h2>
+<div class="cc-collapsible-body">
 
 <div class="card" style="margin-bottom:24px;">
     <div class="card-body" style="padding:24px;">
@@ -1032,5 +1047,6 @@ window._setSplitPanes = function(n) {
     });
 })();
 </script>
+</div>{# /cc-collapsible-body: Feature Level #}
 
 {% endblock %}

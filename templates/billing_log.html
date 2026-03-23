@@ -27,7 +27,7 @@
     </div>
     <div>
         <label style="font-size:12px;color:var(--text-secondary);display:block;">Billing Level</label>
-        <select name="level" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+        <select name="level" data-persist="level" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
             <option value="">All</option>
             {% for lvl in all_levels %}
             <option value="{{ lvl }}" {{ 'selected' if level_filter == lvl else '' }}>{{ lvl }}</option>
@@ -36,7 +36,7 @@
     </div>
     <div>
         <label style="font-size:12px;color:var(--text-secondary);display:block;">Status</label>
-        <select name="anomaly" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+        <select name="anomaly" data-persist="anomaly" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
             <option value="">All</option>
             <option value="flagged" {{ 'selected' if anomaly_filter == 'flagged' else '' }}>Flagged</option>
             <option value="clean" {{ 'selected' if anomaly_filter == 'clean' else '' }}>Clean</option>
@@ -48,18 +48,18 @@
 {# Results #}
 {% if entries %}
 <div style="overflow-x:auto;">
-<table style="width:100%;font-size:13px;border-collapse:collapse;">
+<table class="data-table" id="billing-log-table" style="font-size:13px;">
     <thead>
-        <tr style="border-bottom:2px solid var(--border,#e2e8f0);text-align:left;">
-            <th style="padding:8px 6px;">Date</th>
-            <th style="padding:8px 6px;">MRN</th>
-            <th style="padding:8px 6px;">Visit Type</th>
-            <th style="padding:8px 6px;">Chart Min</th>
-            <th style="padding:8px 6px;">F2F Min</th>
-            <th style="padding:8px 6px;">Level</th>
-            <th style="padding:8px 6px;">RVU</th>
-            <th style="padding:8px 6px;">Status</th>
-            <th style="padding:8px 6px;">Actions</th>
+        <tr>
+            <th data-sort="" data-sort-type="date">Date</th>
+            <th data-sort="">MRN</th>
+            <th data-sort="">Visit Type</th>
+            <th data-sort="" data-sort-type="number">Chart Min</th>
+            <th data-sort="" data-sort-type="number">F2F Min</th>
+            <th data-sort="">Level</th>
+            <th data-sort="" data-sort-type="number">RVU</th>
+            <th data-sort="">Status</th>
+            <th>Actions</th>
         </tr>
     </thead>
     <tbody>

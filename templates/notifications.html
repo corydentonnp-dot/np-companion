@@ -17,7 +17,7 @@
 </div>
 <div class="context-panel-section">
     <div class="cp-section-label">Actions</div>
-    <button class="cp-action" onclick="markAllRead()">Mark All Read</button>
+    <button class="cp-action" data-quick-action="/api/notifications/read-all" data-reload>Mark All Read</button>
 </div>
 <div class="cp-quick-nav">
     <div class="cp-section-label">Quick Nav</div>
@@ -105,11 +105,6 @@ function markRead(id) {
                 if (btn) btn.outerHTML = '<span style="color:var(--text-secondary);font-size:12px;">Read</span>';
             }
         });
-}
-
-function markAllRead() {
-    fetch('/api/notifications/read-all', { method: 'POST' })
-        .then(function() { location.reload(); });
 }
 </script>
 {% endblock %}

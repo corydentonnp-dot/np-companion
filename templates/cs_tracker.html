@@ -15,17 +15,17 @@
 {% if entries %}
 <div class="card">
     <div class="card-body" style="padding:0;overflow-x:auto;">
-        <table class="data-table" style="font-size:13px;">
+        <table class="data-table" id="cs-tracker-table" style="font-size:13px;">
             <thead>
                 <tr>
-                    <th>Patient</th>
-                    <th>Drug</th>
-                    <th>Schedule</th>
+                    <th data-sort="">Patient</th>
+                    <th data-sort="">Drug</th>
+                    <th data-sort="">Schedule</th>
                     <th>Dose</th>
-                    <th>Days Supply</th>
-                    <th>Last Fill</th>
-                    <th>Next Fill</th>
-                    <th>Refill Status</th>
+                    <th data-sort="" data-sort-type="number">Days Supply</th>
+                    <th data-sort="" data-sort-type="date">Last Fill</th>
+                    <th data-sort="" data-sort-type="date">Next Fill</th>
+                    <th data-sort="">Refill Status</th>
                     <th>PDMP</th>
                     <th>UDS</th>
                     <th>Actions</th>

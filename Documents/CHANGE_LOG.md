@@ -6,6 +6,43 @@
 
 ---
 
+## CL-M4 — JS Enhancement System (Phase M4)
+**Completed:** 03-23-26 04:00:00 UTC
+
+### 4 Init Functions Added to `static/js/main.js`
+- **`initSortableHeaders()`** (L1962) — Click-to-sort on any `<th data-sort>`. Supports `data-sort-type="number"` and `data-sort-type="date"`. Shows `▲`/`▼` indicator. Replaces per-page inline `sortTable()` functions.
+- **`initStatePersistence()`** (L2032) — `data-persist="key"` on `<select>` / `<input>` saves to sessionStorage scoped by page path. Restores on load + auto-submits forms.
+- **`initCollapsible()`** (L2100) — `data-collapsible="id"` on heading toggles next sibling `.cc-collapsible-body` visibility. State stored in localStorage. Shows `▸`/`▾` prefix. Adds ARIA `aria-expanded`.
+- **`initQuickActions()`** (L2139) — `data-quick-action="/url"` on buttons. POSTs to URL, accepts both `{success:true}` and `{ok:true}` response patterns. Supports `data-reload` (page refresh), `data-remove` (nearest `<tr>` removal), `data-confirm="msg"` (confirmation dialog).
+
+### Pagination Macro
+- Created `templates/_pagination.html` — `{% from '_pagination.html' import pagination %}` → `{{ pagination(page, total_pages) }}`. Outputs `.pagination` nav with first/prev/numbered/next/last links.
+
+### CSS Additions (`static/css/main.css`)
+- `.cc-collapsed + .cc-collapsible-body` / `.cc-collapsible-body.cc-collapsed` — hide collapsed sections.
+- `.th[data-sort]` cursor + hover styles already existed from M2.
+
+### Templates Wired
+- **data-sort** on 6 tables: admin_audit_log, admin_practice, billing_log (8 cols), cs_tracker (8 cols), labtrack (5 cols), patient_roster (already had from prior work).
+- **data-persist** on billing_log: 2 filter selects (level, anomaly).
+- **data-collapsible**: admin_dashboard "Admin Tools" heading + all 8 settings.html sections (Profile, Credentials, Notifications, CS Import, Appearance, Billing Intelligence, Clinical Intelligence, Feature Level) — each wrapped in `<div class="cc-collapsible-body">`.
+- **data-quick-action**: notifications.html "Mark All Read" button (replaced inline `markAllRead()` function).
+
+### Files Modified
+- `static/js/main.js` — 4 new init functions + DOMContentLoaded calls
+- `static/css/main.css` — collapsible CSS
+- `templates/_pagination.html` — NEW (Jinja macro)
+- `templates/admin_audit_log.html` — data-sort on 5 columns
+- `templates/admin_practice.html` — data-sort on 7 columns
+- `templates/admin_dashboard.html` — data-collapsible on section heading
+- `templates/billing_log.html` — data-sort on 8 columns + data-persist on 2 selects
+- `templates/cs_tracker.html` — data-sort on 8 columns
+- `templates/labtrack.html` — data-sort on 5 columns
+- `templates/settings.html` — data-collapsible on 8 sections + 16 cc-collapsible-body wrappers
+- `templates/notifications.html` — data-quick-action on Mark All Read button
+
+---
+
 ## CL-M3 — Secondary Template CSS Cleanup (Phase M3)
 **Completed:** 06-10-25 02:30:00 UTC
 

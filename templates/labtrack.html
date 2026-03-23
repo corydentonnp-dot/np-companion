@@ -123,17 +123,17 @@
 {% if patients %}
 <div class="card" data-pip="true" data-pip-title="Lab Tracking Table">
     <div class="card-body" style="padding:0;overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <table class="data-table" id="lab-tracking-table" style="font-size:13px;">
             <thead>
-                <tr style="border-bottom:2px solid var(--border,#eee);text-align:left;">
-                    <th style="padding:10px 12px;">Patient</th>
-                    <th style="padding:10px 12px;">Lab</th>
-                    <th style="padding:10px 12px;">Last Value</th>
-                    <th style="padding:10px 12px;">Last Date</th>
-                    <th style="padding:10px 12px;">Next Due</th>
-                    <th style="padding:10px 12px;">Trend</th>
-                    <th style="padding:10px 12px;">Status</th>
-                    <th style="padding:10px 12px;width:80px;"></th>
+                <tr>
+                    <th data-sort="">Patient</th>
+                    <th data-sort="">Lab</th>
+                    <th data-sort="">Last Value</th>
+                    <th data-sort="" data-sort-type="date">Last Date</th>
+                    <th data-sort="" data-sort-type="date">Next Due</th>
+                    <th>Trend</th>
+                    <th data-sort="">Status</th>
+                    <th style="width:80px;"></th>
                 </tr>
             </thead>
             <tbody>

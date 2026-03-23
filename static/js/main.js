@@ -2159,7 +2159,7 @@ function initQuickActions() {
         .then(function (r) { return r.json(); })
         .then(function (data) {
             btn.disabled = false;
-            if (data.success) {
+            if (data.success || data.ok) {
                 /* Update badge text if data-status-target is set */
                 var targetSel = btn.getAttribute('data-status-target');
                 if (targetSel && data.data && data.data.status) {
