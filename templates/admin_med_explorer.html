@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Med Explorer — Admin — CareCompanion{% endblock %}
+{% block page_id %}admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-header__title">Medication Explorer</h1>
+    <div class="page-header__actions">
+        <a href="/admin/med-catalog" class="btn btn-outline btn-sm">← Catalog</a>
+    </div>
+</div>
+
+<p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">
+    Enter a medication name to trace the full normalization chain:
+    Raw Input → RxCUI → Ingredient → Drug Classes → Monitoring Rules → Catalog Entry
+</p>
+
+<!-- Search -->
+<div style="display:flex;gap:8px;margin-bottom:24px;">
+    <input type="text" id="drugInput" placeholder="e.g. metformin, lisinopril, warfarin..." class="form-control" style="width:400px;">
+    <button class="btn btn-primary btn-sm" onclick="explore()">Explore</button>
+</div>
+
+<!-- Results -->
+<div id="results" style="display:none;">
+    <!-- Normalization chain -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div class="card">
+            <div class="card-header"><strong>RxNorm Normalization</strong></div>
+            <div class="card-body" id="rxnormPanel" style="font-size:13px;">-</div>
+        </div>
+        <div class="card">
+            <div class="card-header"><strong>Drug Classes</strong></div>
+            <div class="card-body" id="classPanel" style="font-size:13px;">-</div>
+        </div>
+    </div>
+
+    <!-- Rules + Catalog -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+        <div class="card">
+            <div class="card-header"><strong>Monitoring Rules</strong></div>
+            <div class="card-body" style="overflow-x:auto;">
+                <table class="data-table" id="rulesTable">
+                    <thead>
+                        <tr>
+                            <th>Lab</th>
+                            <th>LOINC</th>
+                            <th>Interval</th>
+                            <th>Priority</th>
+                            <th>Source</th>
+                            <th>Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rulesBody">
+                        <tr><td colspan="6" style="text-align:center;">-</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><strong>Catalog Entry</strong></div>
+            <div class="card-body" id="catalogPanel" style="font-size:13px;">-</div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('drugInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') explore();
+});
+
+async function explore() {
+    const drug = document.getElementById('drugInput').value.trim();
+    if (!drug) return;
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('rxnormPanel').innerHTML = '<em>Loading...</em>';
+    document.getElementById('classPanel').innerHTML = '<em>Loading...</em>';
+    document.getElementById('rulesBody').innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+    document.getElementById('catalogPanel').innerHTML = '<em>Loading...</em>';
+
+    try {
+        const resp = await fetch('/admin/med-catalog/api/explore?drug_name=' + encodeURIComponent(drug));
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.error);
+        const d = result.data;
+
+        /* RxNorm */
+        if (d.rxnorm) {
+            const r = d.rxnorm;
+            document.getElementById('rxnormPanel').innerHTML = `
+                <div><strong>Input:</strong> ${esc(d.input)}</div>
+                <div><strong>Normalized:</strong> ${esc(d.normalized)}</div>
+                <div><strong>RxCUI:</strong> ${esc(r.rxcui || '-')}</div>
+                <div><strong>Ingredient:</strong> ${esc(r.ingredient || '-')}</div>
+                <div><strong>Ingredient RxCUI:</strong> ${esc(r.ingredient_rxcui || '-')}</div>
+                <div><strong>TTY:</strong> ${esc(r.tty || '-')}</div>
+            `;
+        } else {
+            document.getElementById('rxnormPanel').innerHTML = '<em style="color:var(--warning);">No RxNorm data found</em>';
+        }
+
+        /* Classes */
+        if (d.classes && d.classes.length) {
+            document.getElementById('classPanel').innerHTML = d.classes.map(c => {
+                const name = c.className || c.rxclassMinConceptItem?.className || '-';
+                const type = c.classType || c.rxclassMinConceptItem?.classType || '';
+                return `<div style="margin-bottom:4px;">• <strong>${esc(name)}</strong> <span style="color:var(--text-secondary);font-size:11px;">${esc(type)}</span></div>`;
+            }).join('');
+        } else {
+            document.getElementById('classPanel').innerHTML = '<em style="color:var(--text-secondary);">No drug classes found</em>';
+        }
+
+        /* Rules */
+        if (d.monitoring_rules && d.monitoring_rules.length) {
+            document.getElementById('rulesBody').innerHTML = d.monitoring_rules.map(r => `
+                <tr>
+                    <td>${esc(r.lab_name)}</td>
+                    <td style="font-size:11px;">${esc(r.lab_loinc_code)}</td>
+                    <td>${r.interval_days}d</td>
+                    <td>${esc(r.priority)}</td>
+                    <td style="font-size:11px;">${esc(r.source)}</td>
+                    <td>${Math.round((r.confidence||0)*100)}%</td>
+                </tr>
+            `).join('');
+        } else {
+            document.getElementById('rulesBody').innerHTML = '<tr><td colspan="6" style="color:var(--warning);">No monitoring rules found</td></tr>';
+        }
+
+        /* Catalog */
+        if (d.catalog_entry) {
+            const c = d.catalog_entry;
+            document.getElementById('catalogPanel').innerHTML = `
+                <div><strong>Status:</strong> ${esc(c.status)}</div>
+                <div><strong>Source:</strong> ${esc(c.source_origin)}</div>
+                <div><strong>Confidence:</strong> ${Math.round((c.source_confidence||0)*100)}%</div>
+                <div><strong>Patients:</strong> ${c.local_patient_count || 0}</div>
+            `;
+        } else {
+            document.getElementById('catalogPanel').innerHTML = '<em style="color:var(--text-secondary);">Not in catalog</em>';
+        }
+
+    } catch (e) {
+        document.getElementById('rxnormPanel').innerHTML = '<em style="color:var(--danger);">Error: ' + esc(e.message) + '</em>';
+    }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+</script>
+{% endblock %}

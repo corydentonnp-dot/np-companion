@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Medication Catalog — Admin — CareCompanion{% endblock %}
+{% block page_id %}admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-header__title">Medication Monitoring Catalog</h1>
+    <span class="badge badge--info" id="totalBadge">Loading...</span>
+    <div class="page-header__actions">
+        <a href="/admin" class="btn btn-outline btn-sm">← Admin</a>
+        <a href="/admin/med-catalog/explorer" class="btn btn-outline btn-sm">Med Explorer</a>
+        <a href="/admin/med-catalog/coverage" class="btn btn-outline btn-sm">Coverage</a>
+        <a href="/admin/med-catalog/testing" class="btn btn-outline btn-sm">Testing</a>
+        <a href="/admin/med-catalog/diffs" class="btn btn-outline btn-sm">Diffs</a>
+    </div>
+</div>
+
+<!-- Stats row -->
+<div id="statsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;" id="statTotal">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Total Meds</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--success,#28a745);" id="statWithRules">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">With Rules</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--danger,#dc3545);" id="statWithoutRules">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">No Rules</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--primary,#0d6efd);" id="statOverridden">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Overridden</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--warning,#ffc107);" id="statLowConf">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Low Confidence</div>
+    </div>
+</div>
+
+<!-- Action bar -->
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+    <input type="text" id="searchInput" placeholder="Search medications..." class="form-control" style="width:240px;">
+    <select id="statusFilter" class="form-control" style="width:160px;">
+        <option value="">All Statuses</option>
+        <option value="active">Active</option>
+        <option value="pending_review">Pending Review</option>
+        <option value="unmapped">Unmapped</option>
+        <option value="inactive">Inactive</option>
+        <option value="suppressed">Suppressed</option>
+    </select>
+    <select id="sourceFilter" class="form-control" style="width:160px;">
+        <option value="">All Sources</option>
+        <option value="seeded">Seeded</option>
+        <option value="local_patient">Local Patient</option>
+        <option value="api_discovered">API Discovered</option>
+        <option value="manual">Manual</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="loadCatalog()">Search</button>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="seedCommon()">Seed Common Meds</button>
+        <button class="btn btn-secondary btn-sm" onclick="seedLocal()">Import Local Data</button>
+    </div>
+</div>
+
+<!-- Catalog table -->
+<div class="card">
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table" id="catalogTable">
+            <thead>
+                <tr>
+                    <th style="width:30px;"><input type="checkbox" id="selectAll"></th>
+                    <th>Medication</th>
+                    <th>Ingredient</th>
+                    <th>Class</th>
+                    <th>RxCUI</th>
+                    <th>Rules</th>
+                    <th>Overrides</th>
+                    <th>Patients</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                    <th>Source</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="catalogBody">
+                <tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-secondary);">Loading catalog...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div id="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:16px;"></div>
+
+<!-- Override modal -->
+<div id="overrideModal" class="cc-modal" style="display:none;">
+    <div class="cc-modal__backdrop" onclick="closeOverrideModal()"></div>
+    <div class="cc-modal__content" style="max-width:480px;">
+        <h3 style="margin-top:0;">Set Override</h3>
+        <input type="hidden" id="overrideRuleId">
+        <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Scope</label>
+            <select id="overrideScope" class="form-control" style="width:100%;">
+                <option value="user">User Override</option>
+                <option value="practice">Practice Override</option>
+            </select>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Interval (days)</label>
+            <input type="number" id="overrideInterval" class="form-control" style="width:100%;" min="1" max="730">
+        </div>
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Reason</label>
+            <textarea id="overrideReason" class="form-control" style="width:100%;height:60px;" placeholder="Clinical rationale for override..."></textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline btn-sm" onclick="closeOverrideModal()">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="submitOverride()">Save Override</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+const perPage = 50;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadCatalog();
+    document.getElementById('selectAll').addEventListener('change', (e) => {
+        document.querySelectorAll('.row-select').forEach(cb => cb.checked = e.target.checked);
+    });
+    document.getElementById('searchInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') loadCatalog();
+    });
+});
+
+async function loadStats() {
+    try {
+        const resp = await fetch('/admin/med-catalog/api/stats');
+        const data = await resp.json();
+        if (data.success) {
+            const s = data.data;
+            document.getElementById('statTotal').textContent = s.total;
+            document.getElementById('statWithRules').textContent = s.with_rules;
+            document.getElementById('statWithoutRules').textContent = s.without_rules;
+            document.getElementById('statOverridden').textContent = s.overridden;
+            document.getElementById('statLowConf').textContent = s.low_confidence;
+            document.getElementById('totalBadge').textContent = s.total + ' medications';
+        }
+    } catch (e) { console.error('Stats load failed:', e); }
+}
+
+async function loadCatalog(page) {
+    currentPage = page || 1;
+    const params = new URLSearchParams({
+        page: currentPage,
+        per_page: perPage,
+        search: document.getElementById('searchInput').value,
+        status: document.getElementById('statusFilter').value,
+        source: document.getElementById('sourceFilter').value,
+    });
+
+    const body = document.getElementById('catalogBody');
+    body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch('/admin/med-catalog/api/list?' + params);
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.error);
+
+        const items = result.data.items;
+        if (!items.length) {
+            body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-secondary);">No medications found. Use "Seed Common Meds" to get started.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = items.map(item => `
+            <tr>
+                <td><input type="checkbox" class="row-select" value="${item.id}"></td>
+                <td><strong>${escHtml(item.display_name)}</strong></td>
+                <td>${escHtml(item.ingredient_name || '')}</td>
+                <td>${escHtml(item.drug_class || '')}</td>
+                <td style="font-size:11px;">${escHtml(item.rxcui || '-')}</td>
+                <td style="text-align:center;">${item.rule_count > 0 ? '<span style="color:var(--success);">' + item.rule_count + '</span>' : '<span style="color:var(--danger);">0</span>'}</td>
+                <td style="text-align:center;">${item.override_count > 0 ? '<span style="color:var(--primary);">' + item.override_count + '</span>' : '-'}</td>
+                <td style="text-align:center;">${item.local_patient_count || 0}</td>
+                <td>${confidenceBadge(item.source_confidence)}</td>
+                <td>${statusBadge(item.status)}</td>
+                <td style="font-size:11px;">${escHtml(item.source_origin)}</td>
+                <td>
+                    <div style="display:flex;gap:4px;">
+                        <button class="btn btn-outline btn-sm" style="padding:2px 6px;font-size:11px;" onclick="refreshEntry(${item.id})" title="Refresh from API">↻</button>
+                        ${item.status === 'pending_review' ? '<button class="btn btn-primary btn-sm" style="padding:2px 6px;font-size:11px;" onclick="acceptEntry(' + item.id + ')">Accept</button>' : ''}
+                        ${item.status !== 'suppressed' ? '<button class="btn btn-outline btn-sm" style="padding:2px 6px;font-size:11px;" onclick="suppressEntry(' + item.id + ')" title="Suppress">✕</button>' : ''}
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        renderPagination(result.data.total, result.data.page, result.data.pages);
+    } catch (e) {
+        body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--danger);">Error loading catalog: ' + escHtml(e.message) + '</td></tr>';
+    }
+}
+
+function renderPagination(total, page, pages) {
+    const el = document.getElementById('pagination');
+    if (pages <= 1) { el.innerHTML = ''; return; }
+    let html = '';
+    if (page > 1) html += `<button class="btn btn-outline btn-sm" onclick="loadCatalog(${page-1})">←</button>`;
+    html += `<span style="line-height:30px;font-size:13px;">Page ${page} of ${pages} (${total} total)</span>`;
+    if (page < pages) html += `<button class="btn btn-outline btn-sm" onclick="loadCatalog(${page+1})">→</button>`;
+    el.innerHTML = html;
+}
+
+function statusBadge(status) {
+    const colors = {
+        active: 'var(--success,#28a745)',
+        pending_review: 'var(--warning,#ffc107)',
+        unmapped: 'var(--danger,#dc3545)',
+        inactive: 'var(--text-secondary,#999)',
+        suppressed: 'var(--text-secondary,#999)',
+    };
+    const c = colors[status] || 'var(--text-secondary)';
+    return `<span class="badge" style="background:${c};color:#fff;font-size:10px;padding:2px 6px;">${status}</span>`;
+}
+
+function confidenceBadge(val) {
+    if (val == null) return '-';
+    const pct = Math.round(val * 100);
+    const color = val >= 0.8 ? 'var(--success)' : val >= 0.5 ? 'var(--warning)' : 'var(--danger)';
+    return `<span style="color:${color};font-weight:600;">${pct}%</span>`;
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function seedCommon() {
+    if (!confirm('Seed ~100 common PCP medications into the catalog?')) return;
+    try {
+        const resp = await fetch('/admin/med-catalog/api/seed-common', {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) {
+            alert(`Seeded ${data.data.seeded} medications.`);
+            loadStats(); loadCatalog();
+        } else alert('Seed failed: ' + data.error);
+    } catch (e) { alert('Seed error: ' + e.message); }
+}
+
+async function seedLocal() {
+    if (!confirm('Import medications from local patient data?')) return;
+    try {
+        const resp = await fetch('/admin/med-catalog/api/seed-local', {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) {
+            alert(`Imported ${data.data.imported} new medications.`);
+            loadStats(); loadCatalog();
+        } else alert('Import failed: ' + data.error);
+    } catch (e) { alert('Import error: ' + e.message); }
+}
+
+async function refreshEntry(id) {
+    try {
+        const resp = await fetch(`/admin/med-catalog/api/refresh/${id}`, {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) loadCatalog(currentPage);
+        else alert('Refresh failed: ' + data.error);
+    } catch (e) { alert('Refresh error: ' + e.message); }
+}
+
+async function acceptEntry(id) {
+    try {
+        const resp = await fetch(`/admin/med-catalog/api/accept/${id}`, {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) loadCatalog(currentPage);
+        else alert('Accept failed: ' + data.error);
+    } catch (e) { alert('Accept error: ' + e.message); }
+}
+
+async function suppressEntry(id) {
+    const reason = prompt('Reason for suppression (optional):');
+    if (reason === null) return;
+    try {
+        const resp = await fetch(`/admin/med-catalog/api/suppress/${id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({reason}),
+        });
+        const data = await resp.json();
+        if (data.success) loadCatalog(currentPage);
+        else alert('Suppress failed: ' + data.error);
+    } catch (e) { alert('Suppress error: ' + e.message); }
+}
+
+function openOverrideModal(ruleId) {
+    document.getElementById('overrideRuleId').value = ruleId;
+    document.getElementById('overrideModal').style.display = 'flex';
+}
+function closeOverrideModal() { document.getElementById('overrideModal').style.display = 'none'; }
+
+async function submitOverride() {
+    const ruleId = document.getElementById('overrideRuleId').value;
+    const scope = document.getElementById('overrideScope').value;
+    const interval = document.getElementById('overrideInterval').value;
+    const reason = document.getElementById('overrideReason').value;
+
+    try {
+        const resp = await fetch('/admin/med-catalog/api/override', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                monitoring_rule_id: parseInt(ruleId),
+                scope, interval_days: interval ? parseInt(interval) : null, reason,
+            }),
+        });
+        const data = await resp.json();
+        if (data.success) { closeOverrideModal(); loadCatalog(currentPage); loadStats(); }
+        else alert('Override failed: ' + data.error);
+    } catch (e) { alert('Override error: ' + e.message); }
+}
+</script>
+{% endblock %}

@@ -442,8 +442,9 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | F33 | UX Infrastructure Overhaul | ✅ Complete | ✅ | ⬜ | UX Audit | 14 items: double-submit guard, 401 interceptor, modal focus trap, loading spinner system, .btn-close class, default table CSS, autofocus (9 pages), empty states, role/tabindex (12 elements), input types, status dot a11y, back nav links, cmd-palette focus fix, 8 silent-fetch error handlers |
 | F34 | CSS Design System & Template Migration (M1–M3) | ✅ Complete | ✅ | ⬜ | UI Overhaul | M1: core CSS classes (.page-header, .data-table, .cc-modal, .stat-grid, .action-bar, .form-row). M2: 8 primary templates migrated. M3: 31 secondary templates migrated (15 admin, 5 billing, 7 clinical tools, 4 settings). All inline styles replaced with utility classes. |
 | F35 | JS Enhancement System (M4) | ✅ Complete | ✅ | ⬜ | UI Overhaul | 4 init functions: sortable headers (6 tables), state persistence (billing_log filters), collapsible sections (admin_dashboard + 8 settings sections), quick actions (notifications mark-all-read). Pagination macro. |
+| F36 | Medication Monitoring Master Catalog | ✅ Complete | ✅ | ⬜ | MM-1–MM-8 | 5 models, 4 services, 20 routes, 5 templates, parser auto-catalog hook, admin dashboard card, calendar Why? button. 20/20 tests passing. |
 
-**Summary:** 33/34 complete · 1 blocked (F9, calibration wizard ready) · 1 not started (F30) · UI Overhaul M1–M4 complete
+**Summary:** 34/35 complete · 1 blocked (F9, calibration wizard ready) · 1 not started (F30) · UI Overhaul M1–M4 complete · Med Catalog MM-1–MM-8 complete
 
 ---
 

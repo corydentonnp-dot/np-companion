@@ -35,6 +35,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from models import db
 from models.monitoring import MonitoringRule, MonitoringSchedule, REMSTrackerEntry
+from models.monitoring import MonitoringEvaluationLog, MonitoringRuleDiff
 from models.patient import PatientLabResult, PatientMedication
 from models.agent import AgentError
 
@@ -272,6 +273,7 @@ class MonitoringRuleEngine:
                 continue
 
             rules = self.get_monitoring_rules(rxcui=rxcui, drug_name=drug_name)
+            med_entries = []
             for rule in rules:
                 entry = self._upsert_schedule_entry(
                     patient_mrn_hash, user_id, rule, lab_index,
@@ -280,6 +282,17 @@ class MonitoringRuleEngine:
                 )
                 if entry:
                     created.append(entry)
+                    med_entries.append(entry)
+
+            # ── Evaluation logging (MM-2) ────────────────────────
+            self._log_evaluation(
+                user_id=user_id,
+                patient_mrn_hash=patient_mrn_hash,
+                medication_key=drug_name,
+                rules=rules,
+                entries=med_entries,
+                lab_index=lab_index,
+            )
 
             # ---- REMS delegation (B5) --------------------------------
             try:
@@ -327,7 +340,23 @@ class MonitoringRuleEngine:
         """
         Force-refresh monitoring rules for a single medication from
         DailyMed/Drug@FDA, ignoring cache freshness.
+        Logs diffs when rules change, preserving overrides.
         """
+        # ── Snapshot before state for diff detection ────────────
+        before_snapshot = {}
+        if rxcui:
+            old_rules = MonitoringRule.query.filter_by(
+                rxcui=rxcui, trigger_type='MEDICATION', is_active=True
+            ).all()
+            for r in old_rules:
+                before_snapshot[r.lab_loinc_code] = {
+                    'interval_days': r.interval_days,
+                    'priority': r.priority,
+                    'source': r.source,
+                    'lab_name': r.lab_name,
+                    'confidence': r.extraction_confidence,
+                }
+
         # Invalidate existing rules so waterfall proceeds past step 1
         if rxcui:
             MonitoringRule.query.filter_by(
@@ -335,7 +364,13 @@ class MonitoringRuleEngine:
             ).update({'last_refreshed': datetime(2000, 1, 1, tzinfo=timezone.utc)})
             self._db.session.commit()
 
-        return self.get_monitoring_rules(rxcui=rxcui, drug_name=drug_name)
+        new_rules = self.get_monitoring_rules(rxcui=rxcui, drug_name=drug_name)
+
+        # ── Diff detection: compare before vs after ─────────────
+        if rxcui and before_snapshot:
+            self._log_rule_diffs(rxcui, drug_name, before_snapshot, new_rules)
+
+        return new_rules
 
     # ================================================================
     # 4. refresh_condition_rules
@@ -1079,6 +1114,28 @@ class MonitoringRuleEngine:
         if not loinc:
             return None
 
+        # ── Override-aware interval resolution ──────────────────────
+        override_source = None
+        if rule_id:
+            try:
+                from app.services.med_override_service import MedOverrideService
+                override_svc = MedOverrideService(self._db)
+                effective = override_svc.get_effective_interval(rule_id, user_id)
+                if effective['interval_days'] is not None:
+                    interval = effective['interval_days']
+                    override_source = effective['source']
+                    if effective.get('override_id'):
+                        # Check if override disables this rule entirely
+                        from models.monitoring import MonitoringRuleOverride
+                        ov = MonitoringRuleOverride.query.get(effective['override_id'])
+                        if ov and not ov.override_active:
+                            return None  # Rule suppressed by override
+            except Exception as exc:
+                logger.debug("Override resolution skipped: %s", exc)
+
+        if not loinc:
+            return None
+
         # Deduplication: keep shortest interval
         if loinc in seen_loinc:
             if interval >= seen_loinc[loinc]:
@@ -1258,6 +1315,128 @@ class MonitoringRuleEngine:
                 seen.add(loinc)
                 merged.append(r)
         return merged
+
+    # ── Evaluation logging (MM-2) ──────────────────────────────────
+
+    def _log_evaluation(
+        self, user_id, patient_mrn_hash, medication_key, rules, entries,
+        lab_index=None, is_synthetic=False,
+    ):
+        """
+        Record a MonitoringEvaluationLog entry for a medication evaluation.
+        Called once per medication in populate_patient_schedule().
+        """
+        fired = len(entries) > 0
+        matched_ids = []
+        explanation = {}
+        suppression_reason = None
+        next_due = None
+        days_overdue = None
+
+        if rules:
+            matched_ids = [
+                r.id for r in rules if isinstance(r, MonitoringRule)
+            ]
+
+        if fired and entries:
+            # Use the earliest next_due_date from created schedule entries
+            due_dates = [
+                e.next_due_date for e in entries
+                if hasattr(e, 'next_due_date') and e.next_due_date
+            ]
+            if due_dates:
+                from datetime import date as date_type
+                next_due = min(due_dates)
+                if isinstance(next_due, date_type):
+                    days_overdue = (date_type.today() - next_due).days
+
+            explanation = {
+                'rules_matched': len(rules),
+                'schedules_created': len(entries),
+                'labs': [e.lab_name for e in entries if hasattr(e, 'lab_name')],
+            }
+        elif not rules:
+            suppression_reason = 'no_rules_found'
+            explanation = {'reason': 'No monitoring rules exist for this medication'}
+        else:
+            suppression_reason = 'all_up_to_date_or_filtered'
+            explanation = {
+                'rules_matched': len(rules),
+                'schedules_created': 0,
+                'reason': 'Rules matched but no new schedule entries needed',
+            }
+
+        try:
+            log = MonitoringEvaluationLog(
+                user_id=user_id,
+                patient_mrn_hash=patient_mrn_hash,
+                is_synthetic=is_synthetic or patient_mrn_hash.startswith('SYN-'),
+                medication_key=medication_key,
+                fired=fired,
+                suppression_reason=suppression_reason,
+                matched_rule_ids=json.dumps(matched_ids),
+                explanation_json=json.dumps(explanation),
+                next_due_date=next_due,
+                days_overdue=days_overdue,
+            )
+            self._db.session.add(log)
+        except Exception as exc:
+            logger.debug("Evaluation log write failed: %s", exc)
+
+    # ── Diff logging (MM-2) ────────────────────────────────────────
+
+    def _log_rule_diffs(
+        self, rxcui, drug_name, before_snapshot, new_rules,
+    ):
+        """
+        Compare before vs after rule snapshots and create
+        MonitoringRuleDiff entries for any changes detected.
+        Overrides are NEVER silently overwritten.
+        """
+        after_snapshot = {}
+        for r in new_rules:
+            if not isinstance(r, MonitoringRule):
+                continue
+            after_snapshot[r.lab_loinc_code] = {
+                'interval_days': r.interval_days,
+                'priority': r.priority,
+                'source': r.source,
+                'lab_name': r.lab_name,
+                'confidence': r.extraction_confidence,
+            }
+
+        all_loincs = set(before_snapshot.keys()) | set(after_snapshot.keys())
+        for loinc in all_loincs:
+            old = before_snapshot.get(loinc)
+            new = after_snapshot.get(loinc)
+
+            if old and not new:
+                diff_type = 'REMOVED'
+            elif new and not old:
+                diff_type = 'ADDED'
+            elif old and new:
+                if old['interval_days'] != new['interval_days']:
+                    diff_type = 'INTERVAL_CHANGED'
+                elif old['priority'] != new['priority']:
+                    diff_type = 'PRIORITY_CHANGED'
+                elif old.get('lab_name') != new.get('lab_name'):
+                    diff_type = 'LAB_CHANGED'
+                else:
+                    continue  # No meaningful change
+            else:
+                continue
+
+            try:
+                diff = MonitoringRuleDiff(
+                    rxcui=rxcui,
+                    drug_name=drug_name or '',
+                    diff_type=diff_type,
+                    before_rules_json=json.dumps(old or {}),
+                    after_rules_json=json.dumps(new or {}),
+                )
+                self._db.session.add(diff)
+            except Exception as exc:
+                logger.debug("Diff log write failed: %s", exc)
 
 
 # ── Module-level helper ────────────────────────────────────────────

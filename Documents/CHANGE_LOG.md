@@ -6,6 +6,59 @@
 
 ---
 
+## CL-MM1 — Medication Monitoring Master Catalog (Phases MM-1 through MM-8)
+**Completed:** 03-23-26 03:30:00 UTC
+
+Full implementation of the Medication Monitoring Master Catalog system — a unified admin surface for monitoring rule management, overrides, coverage analysis, scenario testing, and parser drift tracking.
+
+### Models & Migration (MM-1)
+- 5 new models in `models/monitoring.py`: `MedicationCatalogEntry`, `MonitoringRuleOverride`, `MonitoringEvaluationLog`, `MonitoringRuleTestResult`, `MonitoringRuleDiff`
+- Migration: `migrations/migrate_add_med_catalog.py` — creates 5 tables idempotently
+
+### Services (MM-2)
+- `app/services/med_catalog_service.py` — Catalog CRUD, seeding (~100 common PCP meds), auto-catalog, search/filter/paginate
+- `app/services/med_override_service.py` — Override precedence chain (user → practice → rule default → class), bulk class override
+- `app/services/med_coverage_service.py` — Coverage gap stats, queue, dead rule detection, accept/suppress actions
+- `app/services/med_test_service.py` — Scenario-based rule testing (5 standard + 5 edge cases), bulk runner, result persistence
+
+### Routes (MM-3)
+- `routes/admin_med_catalog.py` — 20 endpoints (5 page routes + 15 API routes), all `@login_required @require_role('admin')`
+- Blueprint registered at `app/__init__.py`
+
+### Templates (MM-4)
+- `templates/admin_med_catalog.html` — Master Control Panel with stats, search, catalogs table, override modal
+- `templates/admin_med_explorer.html` — Medication normalization chain explorer
+- `templates/admin_med_coverage.html` — Coverage queue with progress bar, accept/suppress, dead rule list
+- `templates/admin_med_testing.html` — Bulk test runner with scope selector, summary cards, results table
+- `templates/admin_med_diffs.html` — Parser drift viewer with before/after JSON, acknowledge/bulk actions
+
+### Parser Hook (MM-5)
+- `agent/clinical_summary_parser.py` — Added `_trigger_auto_catalog()` after Trigger 2 (new-med education); auto-catalogs parsed medications
+
+### Integration Hooks (MM-7)
+- `templates/admin_dashboard.html` — Added Medication Catalog tool card
+- `templates/monitoring_calendar.html` — Added "Why?" button per row with explain modal (shows interval, trigger, source, override info)
+
+### Tests (MM-8)
+- `tests/test_med_catalog.py` — 20 tests covering all 4 services, all 5 models, override precedence, search filter. 20/20 passing.
+
+### Files Added
+- `app/services/med_catalog_service.py`, `app/services/med_override_service.py`, `app/services/med_coverage_service.py`, `app/services/med_test_service.py`
+- `routes/admin_med_catalog.py`
+- `templates/admin_med_catalog.html`, `templates/admin_med_explorer.html`, `templates/admin_med_coverage.html`, `templates/admin_med_testing.html`, `templates/admin_med_diffs.html`
+- `migrations/migrate_add_med_catalog.py`
+- `tests/test_med_catalog.py`
+
+### Files Modified
+- `models/monitoring.py` — 5 new classes appended
+- `models/__init__.py` — 5 new imports
+- `app/__init__.py` — Blueprint registration
+- `agent/clinical_summary_parser.py` — Auto-catalog trigger
+- `templates/admin_dashboard.html` — Tool card
+- `templates/monitoring_calendar.html` — Why? button + explain modal
+
+---
+
 ## CL-M4 — JS Enhancement System (Phase M4)
 **Completed:** 03-23-26 04:00:00 UTC
 

@@ -117,6 +117,7 @@
                         <th style="padding:4px 8px;font-weight:600;">Source</th>
                         <th style="padding:4px 8px;font-weight:600;">Last Result</th>
                         <th style="padding:4px 8px;font-weight:600;">Priority</th>
+                        <th style="padding:4px 8px;font-weight:600;width:40px;"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -160,6 +161,11 @@
                             <span style="font-size:11px;color:var(--text-secondary);">LOW</span>
                             {% endif %}
                         </td>
+                        <td style="padding:6px 8px;">
+                            {% if e.monitoring_rule_id %}
+                            <button onclick="showExplain({{ e.id }})" style="background:none;border:1px solid var(--border-color,#555);color:var(--text-secondary);padding:1px 6px;border-radius:3px;font-size:11px;cursor:pointer;" title="Why is this lab due?">Why?</button>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -183,4 +189,54 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Explain modal -->
+<div id="explainModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+    <div style="background:var(--bg-primary,#1e1e1e);border:1px solid var(--border-color,#555);border-radius:8px;max-width:480px;width:90%;padding:24px;position:relative;">
+        <h3 style="margin-top:0;">Why is this lab due?</h3>
+        <div id="explainContent" style="font-size:13px;">Loading...</div>
+        <div style="margin-top:16px;text-align:right;">
+            <button onclick="document.getElementById('explainModal').style.display='none'" style="padding:4px 12px;border:1px solid var(--border-color);background:none;color:var(--text-primary);border-radius:4px;cursor:pointer;">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function showExplain(scheduleId) {
+    const modal = document.getElementById('explainModal');
+    const content = document.getElementById('explainContent');
+    modal.style.display = 'flex';
+    content.innerHTML = '<em>Loading...</em>';
+    try {
+        const resp = await fetch('/admin/med-catalog/api/explain/' + scheduleId);
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.error);
+        const d = result.data;
+        let html = '';
+        html += '<div style="margin-bottom:8px;"><strong>Lab:</strong> ' + esc(d.lab_name) + '</div>';
+        html += '<div style="margin-bottom:8px;"><strong>Due:</strong> ' + esc(d.next_due_date || 'Unknown') + '</div>';
+        html += '<div style="margin-bottom:8px;"><strong>Interval:</strong> ' + (d.interval_days || '?') + ' days</div>';
+        if (d.triggering_medication) html += '<div style="margin-bottom:8px;"><strong>Triggered by:</strong> ' + esc(d.triggering_medication) + '</div>';
+        if (d.triggering_condition) html += '<div style="margin-bottom:8px;"><strong>Condition:</strong> ' + esc(d.triggering_condition) + '</div>';
+        html += '<div style="margin-bottom:8px;"><strong>Source:</strong> ' + esc(d.source || 'Unknown') + '</div>';
+        if (d.rule) {
+            html += '<hr style="border-color:var(--border-color);margin:12px 0;">';
+            html += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">Rule Details</div>';
+            html += '<div style="margin-bottom:4px;"><strong>Confidence:</strong> ' + Math.round((d.rule.confidence || 0) * 100) + '%</div>';
+            if (d.rule.clinical_context) html += '<div style="margin-bottom:4px;"><strong>Context:</strong> ' + esc(d.rule.clinical_context) + '</div>';
+            if (d.rule.evidence_url) html += '<div style="margin-bottom:4px;"><strong>Evidence:</strong> <a href="' + esc(d.rule.evidence_url) + '" target="_blank" style="color:var(--color-teal);">Link</a></div>';
+            html += '<div style="margin-bottom:4px;"><strong>Default interval:</strong> ' + (d.rule.default_interval || '?') + 'd</div>';
+        }
+        if (d.override && d.override.has_override) {
+            html += '<hr style="border-color:var(--border-color);margin:12px 0;">';
+            html += '<div style="font-size:12px;color:var(--warning,#ffc107);margin-bottom:4px;">Override Active</div>';
+            html += '<div><strong>Effective interval:</strong> ' + (d.override.effective_interval || '?') + 'd</div>';
+        }
+        content.innerHTML = html;
+    } catch (e) {
+        content.innerHTML = '<span style="color:var(--danger);">Error: ' + esc(e.message) + '</span>';
+    }
+}
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+</script>
 {% endblock %}

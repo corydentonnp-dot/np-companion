@@ -231,3 +231,291 @@ class REMSTrackerEntry(db.Model):
             f'<REMSTrackerEntry {self.id} {self.drug_name} '
             f'{self.rems_program_name} esc={self.escalation_level}>'
         )
+
+
+# ── MedicationCatalogEntry ─────────────────────────────────────────
+class MedicationCatalogEntry(db.Model):
+    """
+    Denormalized medication catalog index — one row per normalized
+    medication.  Links to MonitoringRule rows via rxcui.  Provides the
+    browsable master list for the admin Medication Control Panel.
+
+    Populated via seeding (common PCP meds), local patient data scan,
+    or auto-discovery during XML import.
+    """
+    __tablename__ = 'medication_catalog_entry'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Medication identity
+    display_name = db.Column(db.String(250), nullable=False, index=True)
+    normalized_name = db.Column(db.String(250), nullable=False, index=True)
+    rxcui = db.Column(db.String(20), nullable=True, index=True)
+    ingredient_name = db.Column(db.String(250), default='')
+    ingredient_rxcui = db.Column(db.String(20), default='')
+    drug_class = db.Column(db.String(200), default='')
+
+    # Origin and confidence
+    source_origin = db.Column(
+        db.String(30), nullable=False, default='manual'
+    )  # local_patient | seeded | api_discovered | manual
+    source_confidence = db.Column(db.Float, default=1.0)
+
+    # Status workflow
+    status = db.Column(
+        db.String(20), nullable=False, default='active', index=True
+    )  # active | pending_review | unmapped | inactive | suppressed
+
+    # Usage stats
+    local_patient_count = db.Column(db.Integer, default=0)
+
+    # Timestamps
+    first_seen_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    last_seen_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    last_refreshed_at = db.Column(db.DateTime, nullable=True)
+    last_tested_at = db.Column(db.DateTime, nullable=True)
+
+    notes = db.Column(db.Text, default='')
+    is_active = db.Column(db.Boolean, default=True, index=True)
+
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    def __repr__(self):
+        return f'<MedicationCatalogEntry {self.id} {self.display_name}>'
+
+
+# ── MonitoringRuleOverride ─────────────────────────────────────────
+class MonitoringRuleOverride(db.Model):
+    """
+    User-level or practice-level override for a MonitoringRule.
+
+    Precedence chain for effective interval:
+      user_override → practice_override → MonitoringRule.interval_days
+      → class-level rule → null (no rule)
+
+    API refreshes NEVER overwrite overrides — they are preserved and
+    the diff is logged in MonitoringRuleDiff.
+    """
+    __tablename__ = 'monitoring_rule_override'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    monitoring_rule_id = db.Column(
+        db.Integer, db.ForeignKey('monitoring_rule.id'),
+        nullable=False, index=True
+    )
+
+    # Scope: 'user' → scope_id is user_id; 'practice' → scope_id is NULL
+    scope = db.Column(
+        db.String(20), nullable=False, default='user'
+    )  # user | practice
+    scope_id = db.Column(db.Integer, nullable=True, index=True)
+
+    # Override values (null = inherit from rule default)
+    override_interval_days = db.Column(db.Integer, nullable=True)
+    override_priority = db.Column(db.String(20), nullable=True)
+    override_active = db.Column(db.Boolean, default=True)
+    override_reminder_text = db.Column(db.String(500), nullable=True)
+
+    reason = db.Column(db.Text, default='')
+    created_by = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=False
+    )
+
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    monitoring_rule = db.relationship(
+        'MonitoringRule', backref='overrides', lazy=True
+    )
+    creator = db.relationship(
+        'User', backref='monitoring_overrides', lazy=True
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'monitoring_rule_id', 'scope', 'scope_id',
+            name='uq_monitoring_override_rule_scope'
+        ),
+    )
+
+    def __repr__(self):
+        return (
+            f'<MonitoringRuleOverride {self.id} rule={self.monitoring_rule_id} '
+            f'scope={self.scope} interval={self.override_interval_days}>'
+        )
+
+
+# ── MonitoringEvaluationLog ───────────────────────────────────────
+class MonitoringEvaluationLog(db.Model):
+    """
+    Audit trail of monitoring rule evaluations.  Records whether a
+    rule fired (produced a reminder) or was suppressed, and why.
+
+    Used for explainability ("Why is this lab due?"), QA coverage
+    analysis, and synthetic-vs-real data separation.
+
+    HIPAA: Uses patient_mrn_hash — never stores plain MRN.
+    """
+    __tablename__ = 'monitoring_evaluation_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=False, index=True
+    )
+    patient_mrn_hash = db.Column(db.String(64), nullable=False, index=True)
+    is_synthetic = db.Column(db.Boolean, default=False, index=True)
+
+    # What was evaluated
+    medication_key = db.Column(db.String(250), nullable=False)
+
+    # Result
+    fired = db.Column(db.Boolean, nullable=False, default=False)
+    suppression_reason = db.Column(db.String(300), nullable=True)
+
+    # Rule traceability (JSON list of MonitoringRule.id values)
+    matched_rule_ids = db.Column(db.Text, default='[]')
+
+    # Full explanation payload (JSON)
+    explanation_json = db.Column(db.Text, default='{}')
+
+    # Computed schedule result
+    next_due_date = db.Column(db.Date, nullable=True)
+    days_overdue = db.Column(db.Integer, nullable=True)
+
+    evaluation_timestamp = db.Column(
+        db.DateTime, nullable=False,
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    # Relationships
+    user = db.relationship('User', backref='monitoring_eval_logs', lazy=True)
+
+    __table_args__ = (
+        db.Index(
+            'ix_eval_log_patient_timestamp',
+            'patient_mrn_hash', 'evaluation_timestamp'
+        ),
+    )
+
+    def __repr__(self):
+        status = 'FIRED' if self.fired else 'SUPPRESSED'
+        return (
+            f'<MonitoringEvaluationLog {self.id} {self.medication_key} '
+            f'{status}>'
+        )
+
+
+# ── MonitoringRuleTestResult ─────────────────────────────────────
+class MonitoringRuleTestResult(db.Model):
+    """
+    Result of running a test scenario against a monitoring rule.
+
+    Stores pass/fail and explanation for each scenario type (overdue,
+    up-to-date, discontinued, etc.).  Used by the bulk test runner
+    and golden case regression harness.
+    """
+    __tablename__ = 'monitoring_rule_test_result'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    monitoring_rule_id = db.Column(
+        db.Integer, db.ForeignKey('monitoring_rule.id'),
+        nullable=True, index=True
+    )
+    catalog_entry_id = db.Column(
+        db.Integer, db.ForeignKey('medication_catalog_entry.id'),
+        nullable=True, index=True
+    )
+
+    test_scenario = db.Column(
+        db.String(50), nullable=False
+    )  # no_prior_lab | overdue | up_to_date | discontinued | class_inherited |
+       # ingredient_inherited | direct_override | combo_product
+
+    passed = db.Column(db.Boolean, nullable=False)
+    explanation = db.Column(db.Text, default='')
+
+    tested_at = db.Column(
+        db.DateTime, nullable=False,
+        default=lambda: datetime.now(timezone.utc)
+    )
+    tested_by = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=True
+    )
+
+    # Relationships
+    monitoring_rule = db.relationship(
+        'MonitoringRule', backref='test_results', lazy=True
+    )
+    catalog_entry = db.relationship(
+        'MedicationCatalogEntry', backref='test_results', lazy=True
+    )
+
+    def __repr__(self):
+        result = 'PASS' if self.passed else 'FAIL'
+        return (
+            f'<MonitoringRuleTestResult {self.id} rule={self.monitoring_rule_id} '
+            f'{self.test_scenario} {result}>'
+        )
+
+
+# ── MonitoringRuleDiff ────────────────────────────────────────────
+class MonitoringRuleDiff(db.Model):
+    """
+    Parser drift detection: records before/after snapshots when an
+    API refresh (DailyMed, Drug@FDA, etc.) changes a rule's default
+    values.
+
+    Manual overrides are NEVER silently overwritten — the attempted
+    change is logged here and the override remains active.
+    """
+    __tablename__ = 'monitoring_rule_diff'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    rxcui = db.Column(db.String(20), nullable=False, index=True)
+    drug_name = db.Column(db.String(250), default='')
+
+    # What changed
+    diff_type = db.Column(
+        db.String(30), nullable=False
+    )  # ADDED | REMOVED | INTERVAL_CHANGED | PRIORITY_CHANGED | LAB_CHANGED
+
+    # Snapshots (JSON)
+    before_rules_json = db.Column(db.Text, default='{}')
+    after_rules_json = db.Column(db.Text, default='{}')
+
+    # Review status
+    reviewed = db.Column(db.Boolean, default=False, index=True)
+    reviewed_by = db.Column(
+        db.Integer, db.ForeignKey('users.id'), nullable=True
+    )
+
+    diff_timestamp = db.Column(
+        db.DateTime, nullable=False,
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+    def __repr__(self):
+        return (
+            f'<MonitoringRuleDiff {self.id} {self.rxcui} '
+            f'{self.diff_type} reviewed={self.reviewed}>'
+        )

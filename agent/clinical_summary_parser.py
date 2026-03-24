@@ -853,6 +853,31 @@ def store_parsed_summary(user_id, mrn, parsed):
         logger.info(f'Trigger 2: {len(new_meds)} new med(s) detected for MRN hash {_hash_mrn(mrn)}')
         _trigger_new_med_education(user_id, mrn, new_meds)
 
+    # ---- Trigger 3: auto-catalog medications for monitoring coverage ----
+    _trigger_auto_catalog(parsed)
+
+
+def _trigger_auto_catalog(parsed):
+    """Auto-catalog each parsed medication into MedicationCatalogEntry."""
+    try:
+        from app.services.med_catalog_service import MedCatalogService
+        svc = MedCatalogService()
+        for row in parsed.get('medications', []):
+            if 'text' in row:
+                continue
+            status = (row.get('Status') or 'active').strip().lower()
+            if status != 'active':
+                continue
+            drug_text = row.get('Medication', '')
+            display_name, code_sys, code_val = _parse_code_from_text(drug_text)
+            name = (display_name or drug_text).strip()
+            if not name:
+                continue
+            rxcui = code_val if code_sys.lower() in ('rxnorm', 'rx') else ''
+            svc.auto_catalog_new_medication(name, rxcui or None)
+    except Exception as e:
+        logger.debug(f'Auto-catalog trigger skipped: {e}')
+
 
 def detect_pregnancy(user_id, mrn):
     """Phase 15.6: Scan PatientDiagnosis for O-codes (O00-O9A) indicating pregnancy."""

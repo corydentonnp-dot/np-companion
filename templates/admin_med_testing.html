@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Rule Testing — Admin — CareCompanion{% endblock %}
+{% block page_id %}admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-header__title">Monitoring Rule Testing</h1>
+    <span class="badge badge--info" id="testBadge">Ready</span>
+    <div class="page-header__actions">
+        <a href="/admin/med-catalog" class="btn btn-outline btn-sm">← Catalog</a>
+        <a href="/admin/med-catalog/explorer" class="btn btn-outline btn-sm">Explorer</a>
+        <a href="/admin/med-catalog/coverage" class="btn btn-outline btn-sm">Coverage</a>
+        <a href="/admin/med-catalog/diffs" class="btn btn-outline btn-sm">Diffs</a>
+    </div>
+</div>
+
+<p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">
+    Run automated scenarios against monitoring rules to verify they generate correct lab schedules.
+    Tests use synthetic patients (SYN- prefix) and never touch real patient data.
+</p>
+
+<!-- Bulk test controls -->
+<div class="card" style="padding:16px;margin-bottom:20px;">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <div>
+            <label style="display:block;font-size:11px;font-weight:600;margin-bottom:4px;">Test Scope</label>
+            <select id="testScope" class="form-control" style="width:200px;">
+                <option value="all">All Rules</option>
+                <option value="per_medication">Per Medication</option>
+                <option value="per_drug_class">Per Drug Class</option>
+                <option value="edge_cases">Edge Cases Only</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+            <button class="btn btn-primary" id="runBulkBtn" onclick="runBulkTests()">
+                Run Tests
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="loadResults()">Refresh Results</button>
+        </div>
+        <div id="progressArea" style="display:none;flex:1;min-width:200px;">
+            <div style="font-size:12px;margin-bottom:4px;" id="progressLabel">Running...</div>
+            <div style="height:8px;background:var(--border-color,#e0e0e0);border-radius:4px;overflow:hidden;">
+                <div id="progressBar" style="height:100%;background:var(--primary,#0d6efd);border-radius:4px;transition:width 0.3s;width:0;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div id="summaryRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;display:none;">
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;" id="sumTotal">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Total Tests</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--success,#28a745);" id="sumPassed">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Passed</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--danger,#dc3545);" id="sumFailed">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Failed</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--primary,#0d6efd);" id="sumPct">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Pass Rate</div>
+    </div>
+</div>
+
+<!-- Results table -->
+<div class="card">
+    <div class="card-header">
+        <strong>Test Results</strong>
+        <div style="float:right;display:flex;gap:8px;align-items:center;">
+            <select id="resultFilter" class="form-control" style="width:140px;font-size:12px;" onchange="loadResults()">
+                <option value="">All Results</option>
+                <option value="passed">Passed Only</option>
+                <option value="failed">Failed Only</option>
+            </select>
+        </div>
+    </div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table" id="resultsTable">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Rule ID</th>
+                    <th>Catalog Entry</th>
+                    <th>Scenario</th>
+                    <th>Explanation</th>
+                    <th>Tested At</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody">
+                <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary);">
+                    No test results yet. Click "Run Tests" to start.
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div id="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:16px;"></div>
+
+<script>
+let currentPage = 1;
+const perPage = 50;
+let isRunning = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadResults();
+});
+
+async function runBulkTests() {
+    if (isRunning) return;
+    isRunning = true;
+
+    const btn = document.getElementById('runBulkBtn');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+
+    const progressArea = document.getElementById('progressArea');
+    progressArea.style.display = 'block';
+    document.getElementById('progressLabel').textContent = 'Running scenarios...';
+    document.getElementById('progressBar').style.width = '30%';
+    document.getElementById('testBadge').textContent = 'Running...';
+    document.getElementById('testBadge').className = 'badge badge--warning';
+
+    const scope = document.getElementById('testScope').value;
+
+    try {
+        const resp = await fetch('/admin/med-catalog/api/test-bulk', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({scope}),
+        });
+        const result = await resp.json();
+
+        document.getElementById('progressBar').style.width = '100%';
+
+        if (result.success) {
+            const d = result.data;
+            document.getElementById('progressLabel').textContent = 'Complete!';
+            document.getElementById('testBadge').textContent = 'Complete';
+            document.getElementById('testBadge').className = 'badge badge--success';
+
+            /* Show summary */
+            document.getElementById('summaryRow').style.display = 'grid';
+            const total = d.total || 0;
+            const passed = d.passed || 0;
+            const failed = d.failed || 0;
+            document.getElementById('sumTotal').textContent = total;
+            document.getElementById('sumPassed').textContent = passed;
+            document.getElementById('sumFailed').textContent = failed;
+            document.getElementById('sumPct').textContent = total > 0 ? Math.round((passed / total) * 100) + '%' : '-';
+
+            loadResults();
+        } else {
+            document.getElementById('progressLabel').textContent = 'Error: ' + result.error;
+            document.getElementById('testBadge').textContent = 'Error';
+            document.getElementById('testBadge').className = 'badge badge--danger';
+        }
+    } catch (e) {
+        document.getElementById('progressLabel').textContent = 'Error: ' + e.message;
+        document.getElementById('testBadge').textContent = 'Error';
+        document.getElementById('testBadge').className = 'badge badge--danger';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Tests';
+        isRunning = false;
+    }
+}
+
+async function loadResults(page) {
+    currentPage = page || 1;
+    const params = new URLSearchParams({
+        page: currentPage,
+        per_page: perPage,
+    });
+
+    const body = document.getElementById('resultsBody');
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch('/admin/med-catalog/api/test-results?' + params);
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.error);
+
+        let items = result.data.items;
+
+        /* Client-side filter (passed/failed) */
+        const filter = document.getElementById('resultFilter').value;
+        if (filter === 'passed') items = items.filter(i => i.passed);
+        else if (filter === 'failed') items = items.filter(i => !i.passed);
+
+        if (!items.length) {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary);">No test results.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = items.map(item => `
+            <tr>
+                <td>${item.passed
+                    ? '<span style="color:var(--success);font-weight:700;">PASS</span>'
+                    : '<span style="color:var(--danger);font-weight:700;">FAIL</span>'
+                }</td>
+                <td>${item.monitoring_rule_id || '-'}</td>
+                <td>${item.catalog_entry_id || '-'}</td>
+                <td style="font-size:12px;">${escHtml(item.test_scenario || '')}</td>
+                <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                    title="${escAttr(item.explanation || '')}">${escHtml(item.explanation || '')}</td>
+                <td style="font-size:11px;white-space:nowrap;">${formatDate(item.tested_at)}</td>
+            </tr>
+        `).join('');
+
+        renderPagination(result.data.total, result.data.page, result.data.pages);
+
+        /* Update summary if we have data */
+        if (result.data.total > 0) {
+            document.getElementById('summaryRow').style.display = 'grid';
+        }
+    } catch (e) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--danger);">Error: ' + escHtml(e.message) + '</td></tr>';
+    }
+}
+
+function renderPagination(total, page, pages) {
+    const el = document.getElementById('pagination');
+    if (pages <= 1) { el.innerHTML = ''; return; }
+    let html = '';
+    if (page > 1) html += `<button class="btn btn-outline btn-sm" onclick="loadResults(${page-1})">←</button>`;
+    html += `<span style="line-height:30px;font-size:13px;">Page ${page} of ${pages} (${total} total)</span>`;
+    if (page < pages) html += `<button class="btn btn-outline btn-sm" onclick="loadResults(${page+1})">→</button>`;
+    el.innerHTML = html;
+}
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function escAttr(s) { return (s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+</script>
+{% endblock %}

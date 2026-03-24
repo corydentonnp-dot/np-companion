@@ -54,6 +54,22 @@
 
 ---
 
+# Medication Monitoring Master Catalog ✅ COMPLETE (03-23-26)
+
+> Ref: Unified plan from two ChatGPT sessions merged into 8 phases (MM-1 through MM-8).
+> Graduated to `CHANGE_LOG.md` as `CL-MM1`.
+
+- [x] MM-1 — Models & Migration (5 models, 5 tables, idempotent migration)
+- [x] MM-2 — Services (MedCatalogService, MedOverrideService, MedCoverageService, MedTestService)
+- [x] MM-3 — Routes & Blueprint (20 endpoints, admin_med_catalog_bp)
+- [x] MM-4 — Templates (5 admin pages: catalog, explorer, coverage, testing, diffs)
+- [x] MM-5 — Parser Hook (_trigger_auto_catalog in clinical_summary_parser.py)
+- [x] MM-6 — Scenario Factory (MedTestService with 5 standard + 5 edge case scenarios)
+- [x] MM-7 — Integration Hooks (admin dashboard card, monitoring calendar Why? button)
+- [x] MM-8 — Tests (20/20 passing in tests/test_med_catalog.py)
+
+---
+
 # AC Automation Upgrade — UIA + Win32 Messages
 
 > Ref: Plan created 03-24-26. Replaces fragile OCR/pyautogui with UIA element discovery + Win32 message injection.

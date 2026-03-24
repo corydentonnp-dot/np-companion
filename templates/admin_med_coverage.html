@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Coverage Queue — Admin — CareCompanion{% endblock %}
+{% block page_id %}admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-header__title">Medication Coverage</h1>
+    <span class="badge badge--info" id="covBadge">Loading...</span>
+    <div class="page-header__actions">
+        <a href="/admin/med-catalog" class="btn btn-outline btn-sm">← Catalog</a>
+        <a href="/admin/med-catalog/explorer" class="btn btn-outline btn-sm">Explorer</a>
+        <a href="/admin/med-catalog/testing" class="btn btn-outline btn-sm">Testing</a>
+        <a href="/admin/med-catalog/diffs" class="btn btn-outline btn-sm">Diffs</a>
+    </div>
+</div>
+
+<!-- Stats row -->
+<div id="statsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;" id="statTotal">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Total in Catalog</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--success,#28a745);" id="statCovered">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Fully Covered</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--warning,#ffc107);" id="statPartial">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Partial Coverage</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--danger,#dc3545);" id="statUncovered">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">No Rules</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--text-secondary,#999);" id="statDead">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Dead Rules</div>
+    </div>
+</div>
+
+<!-- Coverage percentage bar -->
+<div class="card" style="padding:16px;margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <strong style="font-size:13px;">Overall Coverage</strong>
+        <span id="covPct" style="font-size:13px;font-weight:600;">-</span>
+    </div>
+    <div style="height:12px;background:var(--border-color,#e0e0e0);border-radius:6px;overflow:hidden;">
+        <div id="covBar" style="height:100%;background:var(--success,#28a745);border-radius:6px;transition:width 0.4s;width:0;"></div>
+    </div>
+</div>
+
+<!-- Queue filter -->
+<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+    <select id="queueFilter" class="form-control" style="width:180px;" onchange="loadCoverage()">
+        <option value="">All Uncovered</option>
+        <option value="unmapped">Unmapped</option>
+        <option value="pending_review">Pending Review</option>
+    </select>
+    <input type="text" id="queueSearch" placeholder="Search drugs..." class="form-control" style="width:240px;">
+    <button class="btn btn-primary btn-sm" onclick="loadCoverage()">Filter</button>
+</div>
+
+<!-- Queue table -->
+<div class="card">
+    <div class="card-header"><strong>Coverage Queue</strong> — Medications needing rules</div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table" id="queueTable">
+            <thead>
+                <tr>
+                    <th>Medication</th>
+                    <th>Ingredient</th>
+                    <th>Class</th>
+                    <th>RxCUI</th>
+                    <th>Patients</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="queueBody">
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary);">Loading coverage queue...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div id="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:16px;"></div>
+
+<!-- Dead rules section -->
+<div class="card" style="margin-top:24px;">
+    <div class="card-header"><strong>Dead Rules</strong> — Rules with no matching catalog entries</div>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table" id="deadTable">
+            <thead>
+                <tr>
+                    <th>Rule ID</th>
+                    <th>Medication Key</th>
+                    <th>Lab</th>
+                    <th>Interval</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody id="deadBody">
+                <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-secondary);">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+const perPage = 50;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadCoverage();
+    document.getElementById('queueSearch').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') loadCoverage();
+    });
+});
+
+async function loadCoverage(page) {
+    currentPage = page || 1;
+    const params = new URLSearchParams({
+        page: currentPage,
+        per_page: perPage,
+    });
+
+    const search = document.getElementById('queueSearch').value.trim();
+    if (search) params.set('search', search);
+
+    const filter = document.getElementById('queueFilter').value;
+    if (filter) params.set('status', filter);
+
+    document.getElementById('queueBody').innerHTML =
+        '<tr><td colspan="7" style="text-align:center;padding:20px;">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch('/admin/med-catalog/api/coverage?' + params);
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.error);
+
+        const d = result.data;
+        const stats = d.stats;
+
+        /* Stats */
+        document.getElementById('statTotal').textContent = stats.total;
+        document.getElementById('statCovered').textContent = stats.covered;
+        document.getElementById('statPartial').textContent = stats.partial || 0;
+        document.getElementById('statUncovered').textContent = stats.uncovered;
+        document.getElementById('statDead').textContent = stats.dead_rules || 0;
+        document.getElementById('covBadge').textContent = stats.uncovered + ' need rules';
+
+        const pct = stats.total > 0 ? Math.round((stats.covered / stats.total) * 100) : 0;
+        document.getElementById('covPct').textContent = pct + '%';
+        document.getElementById('covBar').style.width = pct + '%';
+        document.getElementById('covBar').style.background =
+            pct >= 80 ? 'var(--success,#28a745)' : pct >= 50 ? 'var(--warning,#ffc107)' : 'var(--danger,#dc3545)';
+
+        /* Queue items */
+        const items = d.queue.items;
+        if (!items.length) {
+            document.getElementById('queueBody').innerHTML =
+                '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--success);">All medications have monitoring rules!</td></tr>';
+        } else {
+            document.getElementById('queueBody').innerHTML = items.map(item => `
+                <tr>
+                    <td><strong>${escHtml(item.display_name)}</strong></td>
+                    <td>${escHtml(item.ingredient_name || '')}</td>
+                    <td>${escHtml(item.drug_class || '')}</td>
+                    <td style="font-size:11px;">${escHtml(item.rxcui || '-')}</td>
+                    <td style="text-align:center;">${item.local_patient_count || 0}</td>
+                    <td>${statusBadge(item.status)}</td>
+                    <td>
+                        <div style="display:flex;gap:4px;">
+                            <button class="btn btn-primary btn-sm" style="padding:2px 6px;font-size:11px;"
+                                onclick="acceptEntry(${item.id})">Accept & Generate</button>
+                            <button class="btn btn-outline btn-sm" style="padding:2px 6px;font-size:11px;"
+                                onclick="suppressEntry(${item.id})">Suppress</button>
+                            <a href="/admin/med-catalog/explorer?drug=${encodeURIComponent(item.display_name)}"
+                               class="btn btn-outline btn-sm" style="padding:2px 6px;font-size:11px;">Explore</a>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        renderPagination(d.queue.total, d.queue.page, d.queue.pages);
+
+        /* Dead rules */
+        if (stats.dead_rules_list && stats.dead_rules_list.length) {
+            document.getElementById('deadBody').innerHTML = stats.dead_rules_list.map(r => `
+                <tr>
+                    <td>${r.id}</td>
+                    <td>${escHtml(r.medication_key)}</td>
+                    <td>${escHtml(r.lab_name)}</td>
+                    <td>${r.interval_days}d</td>
+                    <td style="font-size:11px;">${escHtml(r.source)}</td>
+                </tr>
+            `).join('');
+        } else {
+            document.getElementById('deadBody').innerHTML =
+                '<tr><td colspan="5" style="text-align:center;color:var(--success);">No dead rules found</td></tr>';
+        }
+
+    } catch (e) {
+        document.getElementById('queueBody').innerHTML =
+            '<tr><td colspan="7" style="text-align:center;color:var(--danger);">Error: ' + escHtml(e.message) + '</td></tr>';
+    }
+}
+
+function renderPagination(total, page, pages) {
+    const el = document.getElementById('pagination');
+    if (pages <= 1) { el.innerHTML = ''; return; }
+    let html = '';
+    if (page > 1) html += `<button class="btn btn-outline btn-sm" onclick="loadCoverage(${page-1})">←</button>`;
+    html += `<span style="line-height:30px;font-size:13px;">Page ${page} of ${pages} (${total} total)</span>`;
+    if (page < pages) html += `<button class="btn btn-outline btn-sm" onclick="loadCoverage(${page+1})">→</button>`;
+    el.innerHTML = html;
+}
+
+async function acceptEntry(id) {
+    try {
+        const resp = await fetch(`/admin/med-catalog/api/accept/${id}`, {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) loadCoverage(currentPage);
+        else alert('Accept failed: ' + data.error);
+    } catch (e) { alert('Accept error: ' + e.message); }
+}
+
+async function suppressEntry(id) {
+    const reason = prompt('Reason for suppression (optional):');
+    if (reason === null) return;
+    try {
+        const resp = await fetch(`/admin/med-catalog/api/suppress/${id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({reason}),
+        });
+        const data = await resp.json();
+        if (data.success) loadCoverage(currentPage);
+        else alert('Suppress failed: ' + data.error);
+    } catch (e) { alert('Suppress error: ' + e.message); }
+}
+
+function statusBadge(status) {
+    const colors = {
+        active: 'var(--success,#28a745)',
+        pending_review: 'var(--warning,#ffc107)',
+        unmapped: 'var(--danger,#dc3545)',
+        inactive: 'var(--text-secondary,#999)',
+        suppressed: 'var(--text-secondary,#999)',
+    };
+    const c = colors[status] || 'var(--text-secondary)';
+    return `<span class="badge" style="background:${c};color:#fff;font-size:10px;padding:2px 6px;">${status}</span>`;
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+</script>
+{% endblock %}

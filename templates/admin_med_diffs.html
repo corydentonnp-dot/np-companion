@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Rule Diffs — Admin — CareCompanion{% endblock %}
+{% block page_id %}admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-header__title">Parser Drift Viewer</h1>
+    <span class="badge badge--info" id="diffBadge">Loading...</span>
+    <div class="page-header__actions">
+        <a href="/admin/med-catalog" class="btn btn-outline btn-sm">← Catalog</a>
+        <a href="/admin/med-catalog/explorer" class="btn btn-outline btn-sm">Explorer</a>
+        <a href="/admin/med-catalog/coverage" class="btn btn-outline btn-sm">Coverage</a>
+        <a href="/admin/med-catalog/testing" class="btn btn-outline btn-sm">Testing</a>
+    </div>
+</div>
+
+<p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">
+    When the monitoring rule engine refreshes rules from external APIs, any changes to interval,
+    labs, or priority are logged here. Review diffs to catch API drift and decide which changes to keep.
+</p>
+
+<!-- Filters -->
+<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+    <select id="reviewedFilter" class="form-control" style="width:180px;" onchange="loadDiffs()">
+        <option value="0">Unreviewed Only</option>
+        <option value="">All Diffs</option>
+        <option value="1">Reviewed Only</option>
+    </select>
+    <button class="btn btn-primary btn-sm" onclick="loadDiffs()">Refresh</button>
+    <div style="margin-left:auto;">
+        <button class="btn btn-outline btn-sm" onclick="acknowledgeAll()">Acknowledge All Visible</button>
+    </div>
+</div>
+
+<!-- Diffs table -->
+<div class="card">
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="data-table" id="diffsTable">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Drug</th>
+                    <th>RxCUI</th>
+                    <th>Change Type</th>
+                    <th>Before</th>
+                    <th>After</th>
+                    <th>Detected</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="diffsBody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary);">Loading diffs...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div id="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:16px;"></div>
+
+<!-- Detail modal -->
+<div id="diffDetailModal" class="cc-modal" style="display:none;">
+    <div class="cc-modal__backdrop" onclick="closeDiffModal()"></div>
+    <div class="cc-modal__content" style="max-width:640px;">
+        <h3 style="margin-top:0;">Diff Detail</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+                <strong style="font-size:12px;color:var(--danger,#dc3545);">Before</strong>
+                <pre id="diffBefore" style="background:var(--bg-secondary,#f5f5f5);padding:12px;border-radius:6px;font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap;"></pre>
+            </div>
+            <div>
+                <strong style="font-size:12px;color:var(--success,#28a745);">After</strong>
+                <pre id="diffAfter" style="background:var(--bg-secondary,#f5f5f5);padding:12px;border-radius:6px;font-size:12px;max-height:300px;overflow:auto;white-space:pre-wrap;"></pre>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-outline btn-sm" onclick="closeDiffModal()">Close</button>
+            <button class="btn btn-primary btn-sm" id="modalAckBtn" onclick="acknowledgeDiff(currentDiffId)">Acknowledge</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+const perPage = 50;
+let diffsData = [];
+let currentDiffId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDiffs();
+});
+
+async function loadDiffs(page) {
+    currentPage = page || 1;
+    const params = new URLSearchParams({
+        page: currentPage,
+        per_page: perPage,
+        reviewed: document.getElementById('reviewedFilter').value,
+    });
+
+    const body = document.getElementById('diffsBody');
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">Loading...</td></tr>';
+
+    try {
+        const resp = await fetch('/admin/med-catalog/api/diffs?' + params);
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.error);
+
+        diffsData = result.data.items;
+        const total = result.data.total;
+
+        /* Badge */
+        const unreviewed = diffsData.filter(d => !d.reviewed).length;
+        document.getElementById('diffBadge').textContent =
+            unreviewed > 0 ? unreviewed + ' unreviewed' : total + ' total';
+        document.getElementById('diffBadge').className =
+            unreviewed > 0 ? 'badge badge--warning' : 'badge badge--info';
+
+        if (!diffsData.length) {
+            body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--success);">No diffs found. Rules are stable!</td></tr>';
+            return;
+        }
+
+        body.innerHTML = diffsData.map(item => `
+            <tr style="${item.reviewed ? 'opacity:0.6;' : ''}">
+                <td>${item.reviewed
+                    ? '<span style="color:var(--success);font-size:11px;">✓ Reviewed</span>'
+                    : '<span style="color:var(--warning);font-weight:600;font-size:11px;">● Pending</span>'
+                }</td>
+                <td><strong>${escHtml(item.drug_name)}</strong></td>
+                <td style="font-size:11px;">${escHtml(item.rxcui || '-')}</td>
+                <td>${diffTypeBadge(item.diff_type)}</td>
+                <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                    title="${escAttr(summarizeJson(item.before_rules_json))}">${escHtml(summarizeJson(item.before_rules_json))}</td>
+                <td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                    title="${escAttr(summarizeJson(item.after_rules_json))}">${escHtml(summarizeJson(item.after_rules_json))}</td>
+                <td style="font-size:11px;white-space:nowrap;">${formatDate(item.diff_timestamp)}</td>
+                <td>
+                    <div style="display:flex;gap:4px;">
+                        <button class="btn btn-outline btn-sm" style="padding:2px 6px;font-size:11px;"
+                            onclick="showDiffDetail(${item.id})">View</button>
+                        ${!item.reviewed ? `<button class="btn btn-primary btn-sm" style="padding:2px 6px;font-size:11px;"
+                            onclick="acknowledgeDiff(${item.id})">Ack</button>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        renderPagination(total, result.data.page, result.data.pages);
+    } catch (e) {
+        body.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--danger);">Error: ' + escHtml(e.message) + '</td></tr>';
+    }
+}
+
+function renderPagination(total, page, pages) {
+    const el = document.getElementById('pagination');
+    if (pages <= 1) { el.innerHTML = ''; return; }
+    let html = '';
+    if (page > 1) html += `<button class="btn btn-outline btn-sm" onclick="loadDiffs(${page-1})">←</button>`;
+    html += `<span style="line-height:30px;font-size:13px;">Page ${page} of ${pages} (${total} total)</span>`;
+    if (page < pages) html += `<button class="btn btn-outline btn-sm" onclick="loadDiffs(${page+1})">→</button>`;
+    el.innerHTML = html;
+}
+
+function diffTypeBadge(type) {
+    const colors = {
+        interval_changed: 'var(--warning,#ffc107)',
+        labs_changed: 'var(--primary,#0d6efd)',
+        priority_changed: 'var(--info,#17a2b8)',
+        rule_added: 'var(--success,#28a745)',
+        rule_removed: 'var(--danger,#dc3545)',
+    };
+    const c = colors[type] || 'var(--text-secondary)';
+    const label = (type || '').replace(/_/g, ' ');
+    return `<span class="badge" style="background:${c};color:#fff;font-size:10px;padding:2px 6px;">${label}</span>`;
+}
+
+function summarizeJson(jsonStr) {
+    if (!jsonStr) return '-';
+    try {
+        const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+        if (Array.isArray(data)) {
+            return data.map(r => r.lab_name + ' ' + (r.interval_days || '?') + 'd').join(', ');
+        }
+        if (data.lab_name) return data.lab_name + ' ' + (data.interval_days || '?') + 'd';
+        return JSON.stringify(data).substring(0, 80);
+    } catch (e) {
+        return String(jsonStr).substring(0, 80);
+    }
+}
+
+function formatJsonPretty(jsonStr) {
+    if (!jsonStr) return '(none)';
+    try {
+        const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+        return JSON.stringify(data, null, 2);
+    } catch (e) { return String(jsonStr); }
+}
+
+function showDiffDetail(id) {
+    const item = diffsData.find(d => d.id === id);
+    if (!item) return;
+
+    currentDiffId = id;
+    document.getElementById('diffBefore').textContent = formatJsonPretty(item.before_rules_json);
+    document.getElementById('diffAfter').textContent = formatJsonPretty(item.after_rules_json);
+    document.getElementById('modalAckBtn').style.display = item.reviewed ? 'none' : 'inline-block';
+    document.getElementById('diffDetailModal').style.display = 'flex';
+}
+
+function closeDiffModal() {
+    document.getElementById('diffDetailModal').style.display = 'none';
+    currentDiffId = null;
+}
+
+async function acknowledgeDiff(id) {
+    try {
+        const resp = await fetch(`/admin/med-catalog/api/diffs/${id}/acknowledge`, {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) {
+            closeDiffModal();
+            loadDiffs(currentPage);
+        } else alert('Acknowledge failed: ' + data.error);
+    } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function acknowledgeAll() {
+    const unreviewed = diffsData.filter(d => !d.reviewed);
+    if (!unreviewed.length) { alert('No unreviewed diffs on this page.'); return; }
+    if (!confirm(`Acknowledge ${unreviewed.length} unreviewed diffs?`)) return;
+
+    let success = 0;
+    for (const diff of unreviewed) {
+        try {
+            const resp = await fetch(`/admin/med-catalog/api/diffs/${diff.id}/acknowledge`, {method: 'POST'});
+            const data = await resp.json();
+            if (data.success) success++;
+        } catch (e) { /* continue */ }
+    }
+    alert(`Acknowledged ${success}/${unreviewed.length} diffs.`);
+    loadDiffs(currentPage);
+}
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+}
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function escAttr(s) { return (s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+</script>
+{% endblock %}

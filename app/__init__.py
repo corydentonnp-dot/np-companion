@@ -388,6 +388,7 @@ def _register_blueprints(app):
 		('routes.calculator', 'calculator_bp'),
 		('routes.daily_summary', 'daily_summary_bp'),
 		('routes.help', 'help_bp'),
+		('routes.admin_med_catalog', 'admin_med_catalog_bp'),
 	]
 
 	for module_path, bp_name in blueprint_map:
