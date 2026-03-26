@@ -27,6 +27,7 @@ from models.timelog import TimeLog
 from models.patient import PatientRecord
 
 import config
+from app.services.schedule_service import analyze_schedule_anomalies
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
