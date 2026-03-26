@@ -177,9 +177,9 @@
   | TEST_PLAYWRIGHT.md | Playwright MCP browser testing phases & checklists |
 
 ### BAND 2 CHECKPOINT
-- [ ] Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
-- [ ] Git commit: `git add -A && git commit -m "Band 2: Doc consolidation — always-on dedup, instructions merge, qa dissolved, prompts consolidated"`
-- [ ] Update CHANGE_LOG.md with CL entry for Band 2
+- [x] Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
+- [x] Git commit: `git add -A && git commit -m "Band 2: Doc consolidation — always-on dedup, instructions merge, qa dissolved, prompts consolidated"`
+- [x] Update CHANGE_LOG.md with CL entry for Band 2
 
 ---
 
