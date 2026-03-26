@@ -369,7 +369,7 @@
         {% set feats = cg.get('features', []) %}
         {% if feats %}
         <div class="help-cat-group" data-cat="{{ cat.id }}">
-            <div class="help-cat-label" onclick="toggleCatGroup(this)">
+            <div class="help-cat-label" role="button" tabindex="0" onclick="toggleCatGroup(this)" onkeydown="if(event.key==='Enter'){this.click();}">
                 <span class="help-cat-icon">{{ cat.icon }}</span>
                 {{ cat.name }}
                 <span class="help-nav-count">({{ feats|length }})</span>
@@ -460,7 +460,7 @@
             {% set cg = grouped.get(cat.id, {}) %}
             {% set feats = cg.get('features', []) %}
             {% if feats %}
-            <div class="card help-cat-card" onclick="scrollToCat('{{ cat.id }}')">
+            <div class="card help-cat-card" role="button" tabindex="0" onclick="scrollToCat('{{ cat.id }}')" onkeydown="if(event.key==='Enter'){this.click();}">
                 <div class="help-cat-card-icon">{{ cat.icon }}</div>
                 <h3>{{ cat.name }}</h3>
                 <p>{{ cat.description }}</p>

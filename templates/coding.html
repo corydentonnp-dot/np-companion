@@ -48,7 +48,7 @@
             <div class="card-body" style="padding:0;max-height:500px;overflow-y:auto;">
                 {% if favorites %}
                 {% for f in favorites %}
-                <div style="padding:8px 14px;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="document.getElementById('code-search').value='{{ f.icd10_code }}';doSearch();">
+                <div style="padding:8px 14px;border-bottom:1px solid var(--border,#f1f5f9);font-size:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" role="button" tabindex="0" onclick="document.getElementById('code-search').value='{{ f.icd10_code }}';doSearch();" onkeydown="if(event.key==='Enter'){this.click();}">
                     <div>
                         <span class="mono" style="font-weight:600;color:var(--color-teal);">{{ f.icd10_code }}</span>
                         <div style="color:var(--text-secondary);font-size:11px;">{{ f.description[:60] }}</div>

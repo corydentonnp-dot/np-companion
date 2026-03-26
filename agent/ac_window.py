@@ -40,6 +40,97 @@ if getattr(config, 'AC_MOCK_MODE', False):
         logger.warning('AC_MOCK_MODE is True but tests.ac_mock not found')
 
 
+# ---------------------------------------------------------------------------
+# Chart title parsing regex for the AC subprocess window format:
+# LASTNAME, FIRSTNAME (DOB:MM/DD/YYYY; ID: #####) XX year old SEX, Portal:YES/NO Cell: (###) ###-####
+# ---------------------------------------------------------------------------
+_CHART_TITLE_RE = re.compile(
+    r'^(?P<last_name>[^,]+),\s*'
+    r'(?P<first_name>[^(]+?)\s*'
+    r'\(DOB:\s*(?P<dob>[\d/]+);\s*'
+    r'ID:\s*(?P<mrn>\d+)\)\s*'
+    r'(?P<age>\d+)\s+year\s+old\s+'
+    r'(?P<sex>\w+)'
+    r'(?:,\s*Portal:\s*(?P<portal>YES|NO))?'
+    r'(?:\s+Cell:\s*(?P<cell>[\d() -]+))?',
+    re.IGNORECASE
+)
+
+
+def parse_chart_title(title):
+    """
+    Parse an AC subprocess chart window title into structured patient data.
+
+    Expected format:
+        LASTNAME, FIRSTNAME (DOB:MM/DD/YYYY; ID: #####) XX year old SEX, Portal:YES/NO Cell: (###) ###-####
+
+    Handles variations: missing Cell, missing Portal, multi-word names.
+
+    Parameters
+    ----------
+    title : str
+        Window title text.
+
+    Returns
+    -------
+    dict | None
+        Dict with keys {last_name, first_name, dob, mrn, age, sex, portal, cell}
+        or None if the title doesn't match the chart format.
+    """
+    if not title:
+        return None
+    m = _CHART_TITLE_RE.search(title)
+    if not m:
+        return None
+    return {
+        'last_name': m.group('last_name').strip(),
+        'first_name': m.group('first_name').strip(),
+        'dob': m.group('dob'),
+        'mrn': m.group('mrn'),
+        'age': m.group('age'),
+        'sex': m.group('sex').upper(),
+        'portal': m.group('portal') or '',
+        'cell': (m.group('cell') or '').strip(),
+    }
+
+
+def get_all_chart_windows():
+    """
+    Enumerate ALL visible windows and return parsed patient data for
+    any that match the AC chart title format.
+
+    Unlike get_ac_chart_title() which only checks the foreground window,
+    this uses EnumWindows to find chart subprocess windows regardless
+    of z-order — so the chart is detected even when the browser is in focus.
+
+    Returns
+    -------
+    list[dict]
+        List of parsed chart dicts from parse_chart_title().
+        Empty list if no charts found.
+    """
+    if _mock:
+        return _mock.mock_get_all_chart_windows()
+    if not win32gui:
+        return []
+
+    results = []
+
+    def _enum_cb(hwnd, _):
+        if win32gui.IsWindowVisible(hwnd):
+            title = win32gui.GetWindowText(hwnd)
+            parsed = parse_chart_title(title)
+            if parsed:
+                results.append(parsed)
+
+    try:
+        win32gui.EnumWindows(_enum_cb, None)
+    except Exception as e:
+        logger.error(f'EnumWindows failed in get_all_chart_windows: {e}')
+
+    return results
+
+
 def find_ac_window():
     """
     Enumerate all visible windows and return the hwnd of the first

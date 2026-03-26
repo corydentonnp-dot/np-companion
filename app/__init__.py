@@ -12,6 +12,7 @@ import traceback
 
 from flask import Flask, render_template, request, session
 from flask_bcrypt import Bcrypt
+from flask_compress import Compress
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
 
@@ -24,6 +25,7 @@ from utils.paths import get_data_dir, get_db_path, get_resource_dir, is_frozen
 login_manager = LoginManager()
 bcrypt = Bcrypt()
 csrf = CSRFProtect()
+compress = Compress()
 
 
 # Role-based access control for sidebar/module visibility.
@@ -38,7 +40,7 @@ ROLE_PERMISSIONS = {
 }
 
 
-def create_app():
+def create_app(testing=False):
 	"""Build and return a fully configured Flask app instance."""
 	if is_frozen():
 		res = get_resource_dir()
@@ -69,6 +71,10 @@ def create_app():
 	login_manager.init_app(app)
 	bcrypt.init_app(app)
 	csrf.init_app(app)
+
+	# Enable response compression (gzip/brotli) in non-test environments.
+	if not testing:
+		compress.init_app(app)
 
 	login_manager.login_view = 'auth.login'
 	login_manager.login_message = 'Please log in to access CareCompanion.'
@@ -141,14 +147,25 @@ def create_app():
 				return False
 
 		def oncall_pending_count():
+			"""Cached for 60s to avoid a COUNT(*) on every page render."""
 			try:
 				if not current_user.is_authenticated:
 					return 0
+				import time
+				cache_key = '_oncall_count'
+				cache_ts_key = '_oncall_count_ts'
+				cached = session.get(cache_key)
+				cached_ts = session.get(cache_ts_key, 0)
+				if cached is not None and (time.time() - cached_ts) < 60:
+					return cached
 				from models.oncall import OnCallNote
-				return OnCallNote.query.filter_by(
+				count = OnCallNote.query.filter_by(
 					user_id=current_user.id,
 					documentation_status='pending',
 				).count()
+				session[cache_key] = count
+				session[cache_ts_key] = time.time()
+				return count
 			except Exception:
 				return 0
 
@@ -161,6 +178,7 @@ def create_app():
 			'app_version': app.config.get('APP_VERSION', ''),
 			'user_can_use_ai': lambda: current_user.is_authenticated and current_user.can_use_ai(),
 			'user_ai_enabled': lambda: current_user.is_authenticated and getattr(current_user, 'ai_enabled', False),
+			'chart_flag_enabled': lambda: app.config.get('CHART_FLAG_ENABLED', False),
 			'utcnow': datetime.now(timezone.utc),
 		}
 
@@ -171,6 +189,11 @@ def create_app():
 				skip_paths = (
 					'/api/notifications', '/api/agent-status', '/api/auth-status',
 					'/api/setup-status', '/api/netpractice/', '/static/',
+					# Skip high-frequency AJAX widget endpoints (patient chart
+					# fires ~15 parallel calls on load — audit logging each one
+					# adds 15 synchronous DB writes per chart open).
+					'/api/patient/',
+					'/api/active-chart',
 				)
 				if not any(request.path.startswith(p) for p in skip_paths):
 					module = request.blueprints[0] if request.blueprints else ''
@@ -187,13 +210,14 @@ def create_app():
 			db.session.rollback()
 		if response.status_code >= 400:
 			log_http_error(response, request)
+
+		# Cache-Control for static assets — avoid re-fetching CSS/JS.
+		if request.path.startswith('/static/'):
+			response.cache_control.public = True
+			response.cache_control.max_age = 604800  # 7 days
+
 		return response
 
-	@app.before_request
-	def make_session_permanent():
-		session.permanent = True
-
-	# -- Structured JSON logging with daily rotation --
 	log_dir = os.path.join(get_data_dir(), 'logs')
 	os.makedirs(log_dir, exist_ok=True)
 
@@ -250,15 +274,23 @@ def create_app():
 		try:
 			import models  # noqa: F401
 
-			db.create_all()
-			_run_pending_migrations(app)
+			# In dev mode the Werkzeug reloader spawns a parent process that
+			# never serves requests.  Skip heavy DB init in that parent --
+			# the child (WERKZEUG_RUN_MAIN=true) will do the real work.
+			_is_reloader_parent = (
+				app.debug
+				and not os.environ.get('WERKZEUG_RUN_MAIN')
+			)
+			if not _is_reloader_parent:
+				db.create_all()
+				_run_pending_migrations(app)
 
-			try:
-				from agent.caregap_engine import seed_default_rules
+				try:
+					from agent.caregap_engine import seed_default_rules
 
-				seed_default_rules(app)
-			except Exception:
-				pass
+					seed_default_rules(app)
+				except Exception:
+					pass
 		except Exception as e:
 			log_startup_error('Failed during app startup', e)
 			raise
@@ -302,6 +334,14 @@ def _run_pending_migrations(app):
 		project_root = os.path.dirname(root)
 		scripts = sorted(glob.glob(os.path.join(project_root, 'migrate_*.py')))
 		scripts += sorted(glob.glob(os.path.join(project_root, 'migrations', 'migrate_*.py')))
+
+		# Fast-path: if every migration file is already applied, skip the
+		# expensive per-file loop entirely (avoids reading 69+ files).
+		script_names = {os.path.basename(s) for s in scripts}
+		if script_names.issubset(applied):
+			conn.close()
+			app.logger.debug('All %d migrations already applied -- skipping scan', len(applied))
+			return
 
 		for script_path in scripts:
 			name = os.path.basename(script_path)
@@ -389,6 +429,8 @@ def _register_blueprints(app):
 		('routes.daily_summary', 'daily_summary_bp'),
 		('routes.help', 'help_bp'),
 		('routes.admin_med_catalog', 'admin_med_catalog_bp'),
+		('routes.admin_rules_registry', 'admin_rules_registry_bp'),
+		('routes.admin_benchmarks', 'admin_benchmarks_bp'),
 	]
 
 	for module_path, bp_name in blueprint_map:

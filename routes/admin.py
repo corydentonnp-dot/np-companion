@@ -458,7 +458,7 @@ def admin_clear_test_data():
 
 # ======================================================================
 # POST /admin/tools/purge-reimport-xml — Purge all patient data and
-# re-import every XML test patient from Documents/xml_test_patients/
+# re-import every XML test patient from Documents/demo_patients/
 # ======================================================================
 @admin_bp.route('/admin/tools/purge-reimport-xml', methods=['POST'])
 @login_required
@@ -475,10 +475,7 @@ def admin_purge_reimport_xml():
     from agent.clinical_summary_parser import parse_clinical_summary, store_parsed_summary
 
     uid = current_user.id
-    xml_dir = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        'Documents', 'xml_test_patients',
-    )
+    xml_dir = current_app.config['DEMO_PATIENTS_DIR']
 
     try:
         # ---- Phase 1: purge all patient clinical data for this user ----
@@ -525,6 +522,77 @@ def admin_purge_reimport_xml():
         flash('Purge & reimport failed. Check server logs.', 'error')
 
     return redirect(url_for('admin_hub.admin_tools'))
+
+
+# ======================================================================
+# POST /admin/tools/sever-all-patients — Unclaim all patients
+# ======================================================================
+@admin_bp.route('/admin/tools/sever-all-patients', methods=['POST'])
+@login_required
+@_require_admin
+def admin_sever_all_patients():
+    """Set claimed_by=NULL for all patients owned by the current user."""
+    from models.patient import PatientRecord
+    try:
+        count = (
+            PatientRecord.query
+            .filter_by(user_id=current_user.id)
+            .filter(PatientRecord.claimed_by.isnot(None))
+            .update({PatientRecord.claimed_by: None, PatientRecord.claimed_at: None})
+        )
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'{count} patient(s) unclaimed.'})
+    except Exception as e:
+        db.session.rollback()
+        import logging
+        logging.getLogger(__name__).error('Sever all patients error: %s', e)
+        return jsonify({'success': False, 'error': 'Failed to unclaim patients.'}), 500
+
+
+# ======================================================================
+# POST /admin/tools/update-all-patients — Re-import XML for all patients
+# ======================================================================
+@admin_bp.route('/admin/tools/update-all-patients', methods=['POST'])
+@login_required
+@_require_admin
+def admin_update_all_patients():
+    """Re-import XML data for all patients from demo_patients directory."""
+    import glob
+    from models.patient import PatientRecord
+    from agent.clinical_summary_parser import parse_clinical_summary, store_parsed_summary
+
+    uid = current_user.id
+    xml_dir = current_app.config['DEMO_PATIENTS_DIR']
+
+    try:
+        xml_files = sorted(glob.glob(os.path.join(xml_dir, '*.xml')))
+        if not xml_files:
+            return jsonify({'success': False, 'error': 'No XML files found in demo patients folder.'}), 404
+
+        updated = 0
+        errors = []
+        for xml_path in xml_files:
+            try:
+                parsed = parse_clinical_summary(xml_path)
+                mrn = parsed.get('patient_mrn', '').strip()
+                if not mrn:
+                    errors.append(os.path.basename(xml_path) + ' (no MRN)')
+                    continue
+                store_parsed_summary(uid, mrn, parsed)
+                updated += 1
+            except Exception as inner:
+                errors.append(os.path.basename(xml_path) + f' ({inner})')
+
+        db.session.commit()
+        msg = f'Updated {updated}/{len(xml_files)} patient(s) from XML.'
+        if errors:
+            msg += f' Errors: {", ".join(errors)}'
+        return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        db.session.rollback()
+        import logging
+        logging.getLogger(__name__).error('Update all patients error: %s', e)
+        return jsonify({'success': False, 'error': 'Update failed. Check server logs.'}), 500
 
 
 # ======================================================================

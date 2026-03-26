@@ -1,0 +1,308 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603251000-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="00000000-0000-0000-0000-000000090009" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="90009" />
+      <addr use="HP">
+        <streetAddressLine>2404 Huguenot Road</streetAddressLine>
+        <city>Richmond</city>
+        <state>VA</state>
+        <postalCode>23235</postalCode>
+        <country nullFlavor="NI" />
+        <useablePeriod xsi:type="IVL_TS"><low value="20260325" /></useablePeriod>
+      </addr>
+      <telecom use="HP" value="tel:+1(804)-555-1009" />
+      <patient>
+        <name use="L">
+          <given>William</given>
+          <family>Brooks</family>
+        </name>
+        <administrativeGenderCode code="M" codeSystem="2.16.840.1.113883.5.1" displayName="Male" codeSystemName="AdministrativeGender" />
+        <birthTime value="19671112" />
+        <maritalStatusCode code="D" displayName="Divorced" codeSystem="2.16.840.1.113883.5.2" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode code="2106-3" displayName="White" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <ethnicGroupCode code="2186-5" displayName="Not Hispanic or Latino" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <languageCommunication>
+          <languageCode code="en" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="202603251000-0400" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime><low value="19671112" /><high value="20260325" /></effectiveTime>
+      <performer typeCode="PRF">
+        <time><low value="20250101" /></time>
+        <assignedEntity>
+          <id extension="1891645123" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter>
+      <id root="00000000-0000-0000-0000-000000090009" extension="1306884820" />
+      <code code="AMB" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Ambulatory" />
+      <effectiveTime><low value="202603251000-0400" /></effectiveTime>
+      <location>
+        <healthCareFacility>
+          <id root="2.16.840.1.113883.19" extension="1306884820" />
+          <location>
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </location>
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Substance</th><th>Reaction</th><th>Severity</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Acetaminophen [RxNorm: 161]</td><td>Hepatotoxicity risk</td><td>severe</td><td>active</td></tr>
+                <tr><td>NSAIDs [RxNorm: 7258]</td><td>GI bleeding risk</td><td>severe</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Medications" />
+          <title>MEDICATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Medication</th><th>Generic Name</th><th>Instructions</th><th>Dosage</th><th>Start Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>furosemide 40 mg tablet [RxNorm: 310429]</td><td>furosemide</td><td>Take 1 tablet by mouth daily</td><td>40 mg</td><td>08/01/2024</td><td>active</td></tr>
+                <tr><td>spironolactone 100 mg tablet [RxNorm: 312600]</td><td>spironolactone</td><td>Take 1 tablet by mouth daily</td><td>100 mg</td><td>08/01/2024</td><td>active</td></tr>
+                <tr><td>lactulose 10 g/15 mL solution [RxNorm: 197971]</td><td>lactulose</td><td>Take 30 mL by mouth 2-3 times daily, titrate to 2-3 soft BMs</td><td>20 g</td><td>08/01/2024</td><td>active</td></tr>
+                <tr><td>rifaximin 550 mg tablet [RxNorm: 859419]</td><td>rifaximin</td><td>Take 1 tablet by mouth twice daily</td><td>550 mg</td><td>11/01/2024</td><td>active</td></tr>
+                <tr><td>nadolol 40 mg tablet [RxNorm: 197748]</td><td>nadolol</td><td>Take 1 tablet by mouth daily</td><td>40 mg</td><td>08/01/2024</td><td>active</td></tr>
+                <tr><td>naltrexone 50 mg tablet [RxNorm: 197382]</td><td>naltrexone</td><td>Take 1 tablet by mouth daily</td><td>50 mg</td><td>06/15/2024</td><td>active</td></tr>
+                <tr><td>thiamine 100 mg tablet [RxNorm: 312611]</td><td>thiamine</td><td>Take 1 tablet by mouth daily</td><td>100 mg</td><td>06/15/2024</td><td>active</td></tr>
+                <tr><td>folic acid 1 mg tablet [RxNorm: 310539]</td><td>folic acid</td><td>Take 1 tablet by mouth daily</td><td>1 mg</td><td>06/15/2024</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problems" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Problem</th><th>Problem Status</th><th>Date Started</th><th>Date Resolved</th></tr></thead>
+              <tbody>
+                <tr><td>Alcoholic cirrhosis of liver [ICD10: K70.30]</td><td>active</td><td>08/01/2024</td><td></td></tr>
+                <tr><td>Portal hypertension [ICD10: K76.6]</td><td>active</td><td>08/01/2024</td><td></td></tr>
+                <tr><td>Esophageal varices without bleeding [ICD10: I85.00]</td><td>active</td><td>09/15/2024</td><td></td></tr>
+                <tr><td>Ascites [ICD10: R18.8]</td><td>active</td><td>08/01/2024</td><td></td></tr>
+                <tr><td>Alcohol use disorder severe in early remission [ICD10: F10.21]</td><td>active</td><td>06/15/2024</td><td></td></tr>
+                <tr><td>Hepatic encephalopathy [ICD10: K72.90]</td><td>active</td><td>11/01/2024</td><td></td></tr>
+                <tr><td>Thrombocytopenia [ICD10: D69.6]</td><td>active</td><td>08/01/2024</td><td></td></tr>
+                <tr><td>Malnutrition [ICD10: E46]</td><td>active</td><td>08/01/2024</td><td></td></tr>
+                <tr><td>Hepatic encephalopathy episode [ICD10: K72.90]</td><td>resolved</td><td>01/05/2026</td><td>01/15/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Vital Signs" />
+          <title>VITAL SIGNS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Encounter</th><th>Height (in)</th><th>Weight (lb)</th><th>BMI (kg/m2)</th><th>BP Sys (mmHg)</th><th>BP Dias (mmHg)</th><th>Heart Rate (/min)</th><th>O2 % BldC Oximetry</th><th>Body Temperature</th><th>Respiratory Rate (/min)</th></tr></thead>
+              <tbody>
+                <tr><td>03/18/2026</td><td>72</td><td>185</td><td>25.1</td><td>108</td><td>66</td><td>58</td><td>96</td><td>98.0</td><td>16</td></tr>
+                <tr><td>01/05/2026</td><td>72</td><td>192</td><td>26.0</td><td>100</td><td>60</td><td>54</td><td>95</td><td>97.8</td><td>18</td></tr>
+                <tr><td>10/15/2025</td><td>72</td><td>180</td><td>24.4</td><td>112</td><td>68</td><td>62</td><td>97</td><td>98.4</td><td>16</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Lab Results" />
+          <title>LAB RESULTS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Test Name</th><th>Result</th><th>Units</th><th>Flag</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>Total Bilirubin [LOINC: 1975-2]</td><td>3.2</td><td>mg/dL</td><td>H</td><td>03/15/2026</td></tr>
+                <tr><td>Direct Bilirubin [LOINC: 1968-7]</td><td>1.8</td><td>mg/dL</td><td>H</td><td>03/15/2026</td></tr>
+                <tr><td>Albumin [LOINC: 1751-7]</td><td>2.8</td><td>g/dL</td><td>L</td><td>03/15/2026</td></tr>
+                <tr><td>INR [LOINC: 6301-6]</td><td>1.6</td><td></td><td>H</td><td>03/15/2026</td></tr>
+                <tr><td>Creatinine [LOINC: 2160-0]</td><td>1.1</td><td>mg/dL</td><td>normal</td><td>03/15/2026</td></tr>
+                <tr><td>Sodium [LOINC: 2951-2]</td><td>132</td><td>mmol/L</td><td>L</td><td>03/15/2026</td></tr>
+                <tr><td>Platelet Count [LOINC: 777-3]</td><td>68</td><td>10*3/uL</td><td>L</td><td>03/15/2026</td></tr>
+                <tr><td>AST [LOINC: 1920-8]</td><td>85</td><td>U/L</td><td>H</td><td>03/15/2026</td></tr>
+                <tr><td>ALT [LOINC: 1742-6]</td><td>52</td><td>U/L</td><td>H</td><td>03/15/2026</td></tr>
+                <tr><td>Ammonia [LOINC: 1988-5]</td><td>48</td><td>umol/L</td><td>H</td><td>03/15/2026</td></tr>
+                <tr><td>AFP [LOINC: 1834-1]</td><td>8.2</td><td>ng/mL</td><td>normal</td><td>03/15/2026</td></tr>
+                <tr><td>Hemoglobin [LOINC: 718-7]</td><td>11.2</td><td>g/dL</td><td>L</td><td>03/15/2026</td></tr>
+                <tr><td>CBC WBC [LOINC: 6690-2]</td><td>4.5</td><td>10*3/uL</td><td>normal</td><td>03/15/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Vaccine</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Influenza vaccine 2025-2026</td><td>10/20/2025</td><td>completed</td></tr>
+                <tr><td>Hepatitis A vaccine (2 doses)</td><td>09/01/2024</td><td>completed</td></tr>
+                <tr><td>Hepatitis B series (3 doses)</td><td>12/01/2024</td><td>completed</td></tr>
+                <tr><td>Pneumococcal PCV20 (Prevnar 20)</td><td>09/01/2024</td><td>completed</td></tr>
+                <tr><td>COVID-19 Vaccine 2024-2025 (Pfizer)</td><td>10/15/2024</td><td>completed</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>Tobacco: Former smoker (quit 2024, 25 pack-years). Alcohol: In early remission -- last drink June 2024. Previous consumption: 12-18 beers/day x 20 years. Attends AA 3x/week. Employment: Unemployed/disabled. Marital Status: Divorced (2022). Lives in sober-living facility. Children: 2 adult children, limited contact. Support: AA sponsor, therapist weekly.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Insurance" />
+          <title>INSURANCE</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Payer</th><th>Policy Type</th><th>Member ID</th><th>Group</th></tr></thead>
+              <tbody>
+                <tr><td>Virginia Medicaid</td><td>Medicaid</td><td>MCD-990009</td><td>N/A</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11506-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Progress Notes" />
+          <title>PROGRESS NOTES</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Date</th><th>Provider</th><th>Note Type</th><th>Note Text</th><th>Location</th></tr></thead>
+              <tbody>
+                <tr><td>03/18/2026</td><td>Cory Denton, FNP</td><td>Progress Note</td><td>CC: Cirrhosis follow-up, hepatology co-management.
+HPI: 58yo male with alcoholic cirrhosis (Child-Pugh B, MELD 16). Sober since June 2024 on naltrexone. Reports compliance with lactulose -- 2-3 BMs daily, no confusion episodes since January admission. Abdomen: moderate ascites, last paracentesis 02/2026 (3L removed). Weight 185 (down from 192 after para). No melena, hematemesis. Eating better -- sees nutritionist monthly.
+PE: Jaundice mild. Spider angiomata on chest. Abdomen: distended, fluid wave present, nontender. No asterixis. Oriented x3. Extremities: 1+ pretibial edema.
+Assessment:
+# Cirrhosis (K70.30): Child-Pugh B (score 8). MELD 16. Continue diuretics. Hepatology transplant evaluation in progress.
+# Ascites (R18.8): Moderate. Sodium restriction &lt;2g/day. May need paracentesis in 4 weeks.
+# HE (K72.90): Stable on lactulose + rifaximin. No episodes x 2 months.
+# Varices (I85.00): EGD 09/2024 showed grade II. Nadolol for prophylaxis. Repeat EGD due 09/2026.
+# AUD (F10.21): 21 months sober. Continue naltrexone, AA, therapy.
+# Malnutrition: Albumin 2.8. High-protein diet. Nutritionist.
+# HCC surveillance: AFP 8.2 normal. Liver US q6 months -- due 06/2026.
+Plan: Continue all meds. Paracentesis if symptomatic. Hepatology transplant eval. Liver US 06/2026. Labs monthly. Return 4 weeks.</td><td>Family Practice Associates of Chesterfield</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

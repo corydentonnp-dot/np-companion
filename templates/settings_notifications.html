@@ -280,6 +280,74 @@
         </div>
     </div>
 
+    {# ---- VIIS Automation ------------------------------------------- #}
+    <div class="card" style="margin-bottom:24px;max-width:600px;">
+        <div class="card-header">VIIS Pre-Visit Automation</div>
+        <div class="card-body">
+            <p style="margin:0 0 12px;color:var(--text-secondary);font-size:14px;">
+                Nightly batch lookup of tomorrow's scheduled patients against the
+                Virginia Immunization Information System. Only checks patients with
+                open vaccine care gaps who haven't been checked recently.
+            </p>
+            <div class="form-group">
+                <label class="toggle-row">
+                    <input type="checkbox" name="viis_batch_enabled"
+                        {{ 'checked' if current_user.get_pref('viis_batch_enabled', false) }}>
+                    <span>Enable nightly VIIS batch lookup</span>
+                </label>
+            </div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="viis_batch_time">Run time (24h)</label>
+                    <input
+                        type="time"
+                        id="viis_batch_time"
+                        name="viis_batch_time"
+                        class="form-input"
+                        value="{{ '%02d:%02d' % (current_user.get_pref('viis_batch_hour', 18), current_user.get_pref('viis_batch_minute', 30)) }}"
+                    >
+                    <p class="form-help">Default: 18:30 (after schedule scrape).</p>
+                </div>
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="viis_check_interval_days">Re-check interval (days)</label>
+                    <input
+                        type="number"
+                        id="viis_check_interval_days"
+                        name="viis_check_interval_days"
+                        class="form-input"
+                        min="30" max="730" step="1"
+                        value="{{ current_user.get_pref('viis_check_interval_days', 365) }}"
+                    >
+                    <p class="form-help">Skip patients checked within this many days. Default: 365.</p>
+                </div>
+            </div>
+            <div style="display:flex;gap:24px;flex-wrap:wrap;">
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="viis_delay_min">Min delay between lookups (sec)</label>
+                    <input
+                        type="number"
+                        id="viis_delay_min"
+                        name="viis_delay_min"
+                        class="form-input"
+                        min="2" max="60" step="1"
+                        value="{{ current_user.get_pref('viis_delay_min', 5) }}"
+                    >
+                </div>
+                <div class="form-group" style="flex:1;min-width:120px;">
+                    <label class="form-label" for="viis_delay_max">Max delay between lookups (sec)</label>
+                    <input
+                        type="number"
+                        id="viis_delay_max"
+                        name="viis_delay_max"
+                        class="form-input"
+                        min="5" max="120" step="1"
+                        value="{{ current_user.get_pref('viis_delay_max', 15) }}"
+                    >
+                </div>
+            </div>
+        </div>
+    </div>
+
     <button type="submit" class="btn btn-primary btn-lg">Save Preferences</button>
 </form>
 {% endblock %}

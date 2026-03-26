@@ -127,6 +127,44 @@
         }
     }
 
+    /* ---- Compact vertical gaps — pull widgets up to fill blank space ---- */
+    function _compactGaps(container) {
+        if (_getMode() !== 'free') return;
+        var GAP = 16;
+        var widgets = Array.from(container.querySelectorAll('.fw-widget'));
+        widgets = widgets.filter(function(w) { return w.style.display !== 'none'; });
+
+        widgets.sort(function(a, b) {
+            return (parseInt(a.style.top) || 0) - (parseInt(b.style.top) || 0);
+        });
+
+        for (var i = 0; i < widgets.length; i++) {
+            var w = widgets[i];
+            var wL = parseInt(w.style.left) || 0;
+            var wT = parseInt(w.style.top) || 0;
+            var wR = wL + w.offsetWidth;
+
+            // Find the lowest bottom edge of any widget above that horizontally overlaps
+            var minTop = 0;
+            for (var j = 0; j < i; j++) {
+                var above = widgets[j];
+                var aL = parseInt(above.style.left) || 0;
+                var aR = aL + above.offsetWidth;
+                var aB = (parseInt(above.style.top) || 0) + above.offsetHeight;
+                if (wL < aR && wR > aL) {
+                    var needed = aB + GAP;
+                    if (needed > minTop) minTop = needed;
+                }
+            }
+
+            if (wT > minTop) {
+                w.style.transition = 'top 0.2s ease';
+                w.style.top = minTop + 'px';
+                setTimeout((function(el) { return function() { el.style.transition = ''; }; })(w), 250);
+            }
+        }
+    }
+
     /* ---- Bring to front ---- */
     function _bringToFront(widget, container) {
         var all = container.querySelectorAll('.fw-widget');
@@ -216,6 +254,7 @@
             var h = _dragState.el.querySelector('.fw-drag-handle');
             if (h) { h.style.opacity = '0.5'; h.style.cursor = 'grab'; }
             _resolveOverlaps(_dragState.container);
+            _compactGaps(_dragState.container);
             _savePositions(_dragState.container);
             _savePositionsToServer(_dragState.container);
             _updateMinHeight(_dragState.container);
@@ -262,6 +301,7 @@
         if (_resizeState) {
             _resizeState.el.classList.remove('fw-resizing');
             _resolveOverlaps(_resizeState.container);
+            _compactGaps(_resizeState.container);
             _savePositions(_resizeState.container);
             _savePositionsToServer(_resizeState.container);
             _updateMinHeight(_resizeState.container);
@@ -546,17 +586,17 @@
             case 'size-s':
                 _settingsWidget.style.width = '280px';
                 _settingsWidget.style.height = '200px';
-                if (container) { _resolveOverlaps(container); _savePositions(container); }
+                if (container) { _resolveOverlaps(container); _compactGaps(container); _savePositions(container); }
                 break;
             case 'size-m':
                 _settingsWidget.style.width = '400px';
                 _settingsWidget.style.height = '350px';
-                if (container) { _resolveOverlaps(container); _savePositions(container); }
+                if (container) { _resolveOverlaps(container); _compactGaps(container); _savePositions(container); }
                 break;
             case 'size-l':
                 _settingsWidget.style.width = '600px';
                 _settingsWidget.style.height = '500px';
-                if (container) { _resolveOverlaps(container); _savePositions(container); }
+                if (container) { _resolveOverlaps(container); _compactGaps(container); _savePositions(container); }
                 break;
             case 'reset':
                 delete settings[wid];
@@ -769,6 +809,8 @@
     function _injectMgmtButton(container) {
         var existing = container.querySelector('.fw-mgmt-btn');
         if (existing) return;
+        /* Skip injection if a static Manage button already exists in page header */
+        if (document.querySelector('.page-header__actions .btn[onclick*="openManagePanel"]')) return;
         var btn = document.createElement('button');
         btn.className = 'btn btn-outline btn-sm fw-mgmt-btn';
         btn.innerHTML = '⚙ Manage Widgets';

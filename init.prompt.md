@@ -189,7 +189,7 @@ CareCompanion/
 │   │   ├── README.md
 │   │   └── SECURITY.md           ← HIPAA & compliance overview
 │   ├── billing_resources/      ← Billing prompts + payer guides
-│   ├── xml_test_patients/      ← Test patient XML files
+│   ├── demo_patients/          ← Test patient CDA XML files (7 patients)
 │   └── _archive/               ← Superseded/historical files
 Ã¢â€â€š
 Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ tests/

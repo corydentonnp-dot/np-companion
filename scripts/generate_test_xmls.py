@@ -15,7 +15,7 @@ from datetime import datetime
 
 OUTPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    'Documents', 'xml_test_patients'
+    'Documents', 'demo_patients'
 )
 
 PRACTICE_NAME = "Family Practice Associates of Chesterfield"

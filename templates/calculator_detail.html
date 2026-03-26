@@ -139,6 +139,12 @@
             Calculate
         </button>
     </form>
+    <script>
+    (function() {
+        var f = document.getElementById('calculator-form');
+        if (f) { var el = f.querySelector('input:not([type=hidden]),select'); if (el) el.focus(); }
+    })();
+    </script>
     {% endif %}
 
     {# — Result panel (shared by all form types) — #}

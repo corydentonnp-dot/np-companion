@@ -1198,6 +1198,7 @@ function initBookmarksBar() {
     }
 
     function removePersonalBookmark(index) {
+        if (!confirm('Remove this bookmark?')) return;
         fetch('/api/bookmarks/personal/' + index, { method: 'DELETE' })
             .then(function (r) { return r.json(); })
             .then(function () { loadBookmarks(); })
@@ -1572,12 +1573,13 @@ function initKeyboardShortcuts() {
     });
 
     /* Tab switching inside modals */
-    document.querySelectorAll('.tab-group').forEach(function (group) {
-        group.querySelectorAll('.tab-btn').forEach(function (btn) {
+    document.querySelectorAll('.cc-tabs').forEach(function (group) {
+        group.querySelectorAll('.cc-tab').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var tabId = btn.getAttribute('data-tab');
+                if (!tabId) return; /* skip tabs wired with their own onclick */
                 /* Deactivate siblings */
-                group.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+                group.querySelectorAll('.cc-tab').forEach(function (b) { b.classList.remove('active'); });
                 btn.classList.add('active');
                 /* Show matching panel, hide others */
                 var parent = group.parentElement;
@@ -2190,5 +2192,25 @@ function initQuickActions() {
                 showError('Network error');
             }
         });
+    });
+}
+
+
+/* ==========================================================
+   26.  _withSpinner — Global button loading state helper
+   ========================================================== */
+/**
+ * Disable a button, show a spinner, and restore when the promise settles.
+ * Usage:  _withSpinner(btn, fetch('/url', opts).then(...))
+ * Safe to call with btn=null (returns promise unchanged).
+ */
+function _withSpinner(btn, promise) {
+    if (!btn) return promise;
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner loading-spinner--sm"></span>';
+    return promise.finally(function () {
+        btn.disabled = false;
+        btn.innerHTML = orig;
     });
 }

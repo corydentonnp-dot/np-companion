@@ -32,6 +32,7 @@ DEFAULT_TEMPLATE = {
         {'key': 'Social History', 'label': 'Social History', 'required': False, 'boilerplate': ''},
         {'key': 'Medications', 'label': 'Current Medications', 'required': True, 'boilerplate': ''},
         {'key': 'Allergies', 'label': 'Allergies', 'required': True, 'boilerplate': ''},
+        {'key': 'Immunizations', 'label': 'Immunizations', 'required': False, 'boilerplate': ''},
         {'key': 'Review of Systems', 'label': 'Review of Systems', 'required': False, 'boilerplate': ''},
         {'key': 'Physical Examination', 'label': 'Physical Examination', 'required': True, 'boilerplate': ''},
         {'key': 'Labs', 'label': 'Labs / Diagnostics', 'required': False, 'boilerplate': ''},

@@ -16,18 +16,18 @@
 </div>
 
 {# Filters #}
-<form method="GET" action="/billing/log" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;align-items:end;">
+<form method="GET" action="/billing/log" class="filter-row">
     <div>
-        <label style="font-size:12px;color:var(--text-secondary);display:block;">Start Date</label>
-        <input type="date" name="start" value="{{ start }}" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+        <label class="form-label--sm">Start Date</label>
+        <input type="date" name="start" value="{{ start }}" class="form-input--sm">
     </div>
     <div>
-        <label style="font-size:12px;color:var(--text-secondary);display:block;">End Date</label>
-        <input type="date" name="end" value="{{ end }}" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+        <label class="form-label--sm">End Date</label>
+        <input type="date" name="end" value="{{ end }}" class="form-input--sm">
     </div>
     <div>
-        <label style="font-size:12px;color:var(--text-secondary);display:block;">Billing Level</label>
-        <select name="level" data-persist="level" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+        <label class="form-label--sm">Billing Level</label>
+        <select name="level" data-persist="level" class="form-select--sm">
             <option value="">All</option>
             {% for lvl in all_levels %}
             <option value="{{ lvl }}" {{ 'selected' if level_filter == lvl else '' }}>{{ lvl }}</option>
@@ -35,20 +35,20 @@
         </select>
     </div>
     <div>
-        <label style="font-size:12px;color:var(--text-secondary);display:block;">Status</label>
-        <select name="anomaly" data-persist="anomaly" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;">
+        <label class="form-label--sm">Status</label>
+        <select name="anomaly" data-persist="anomaly" class="form-select--sm">
             <option value="">All</option>
             <option value="flagged" {{ 'selected' if anomaly_filter == 'flagged' else '' }}>Flagged</option>
             <option value="clean" {{ 'selected' if anomaly_filter == 'clean' else '' }}>Clean</option>
         </select>
     </div>
-    <button type="submit" style="padding:6px 16px;border-radius:6px;background:var(--color-navy);color:#fff;border:none;font-size:13px;cursor:pointer;min-height:44px;">Filter</button>
+    <button type="submit" class="btn btn-primary">Filter</button>
 </form>
 
 {# Results #}
 {% if entries %}
-<div style="overflow-x:auto;">
-<table class="data-table" id="billing-log-table" style="font-size:13px;">
+<div class="overflow-auto">
+<table class="data-table data-table--compact" id="billing-log-table">
     <thead>
         <tr>
             <th data-sort="" data-sort-type="date">Date</th>
@@ -64,34 +64,34 @@
     </thead>
     <tbody>
     {% for e in entries %}
-    <tr style="border-bottom:1px solid var(--border,#f1f5f9);{% if e.anomalies %}background:#fef3c7;{% endif %}" id="row-{{ e.session.id }}">
-        <td style="padding:8px 6px;">{{ e.session.session_start.strftime('%Y-%m-%d %H:%M') if e.session.session_start else '' }}</td>
-        <td style="padding:8px 6px;">{{ e.session.mrn }}</td>
-        <td style="padding:8px 6px;">{{ e.session.visit_type or '—' }}</td>
-        <td style="padding:8px 6px;">{{ ((e.session.duration_seconds or 0) / 60)|round(1) }}</td>
-        <td style="padding:8px 6px;">{{ ((e.session.face_to_face_seconds or 0) / 60)|round(1) }}</td>
-        <td style="padding:8px 6px;font-weight:600;">{{ e.session.billed_level or '—' }}</td>
-        <td style="padding:8px 6px;">{{ e.rvu }}</td>
-        <td style="padding:8px 6px;">
+    <tr class="{% if e.anomalies %}status--warning{% endif %}" id="row-{{ e.session.id }}">
+        <td>{{ e.session.session_start.strftime('%Y-%m-%d %H:%M') if e.session.session_start else '' }}</td>
+        <td>{{ e.session.mrn }}</td>
+        <td>{{ e.session.visit_type or '—' }}</td>
+        <td>{{ ((e.session.duration_seconds or 0) / 60)|round(1) }}</td>
+        <td>{{ ((e.session.face_to_face_seconds or 0) / 60)|round(1) }}</td>
+        <td style="font-weight:600;">{{ e.session.billed_level or '—' }}</td>
+        <td>{{ e.rvu }}</td>
+        <td>
             {% if e.anomalies %}
-            <button onclick="openAnomalyPanel({{ e.session.id }})" style="background:none;border:none;cursor:pointer;color:#d97706;font-weight:600;font-size:13px;padding:0;" title="Click for details">&#9888; {{ e.anomalies|length }} flag{{ 's' if e.anomalies|length > 1 else '' }}</button>
+            <button onclick="openAnomalyPanel({{ e.session.id }})" class="btn btn-sm btn-link" title="Click for details">&#9888; {{ e.anomalies|length }} flag{{ 's' if e.anomalies|length > 1 else '' }}</button>
             {% else %}
-            <span style="color:#059669;">&#10003;</span>
+            <span class="status--success">&#10003;</span>
             {% endif %}
         </td>
-        <td style="padding:8px 6px;">
-            <button onclick="toggleDetail({{ e.session.id }})" style="padding:4px 10px;border-radius:4px;background:var(--color-lt-blue);color:var(--color-navy);border:none;font-size:12px;cursor:pointer;">Detail</button>
+        <td>
+            <button onclick="toggleDetail({{ e.session.id }})" class="btn btn-sm btn-outline">Detail</button>
         </td>
     </tr>
-    <tr id="detail-{{ e.session.id }}" style="display:none;border-bottom:1px solid var(--border,#e2e8f0);">
+    <tr id="detail-{{ e.session.id }}" style="display:none;">
         <td colspan="9" style="padding:12px 6px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:600px;">
                 <div>
-                    <div style="font-size:12px;color:var(--text-secondary);">Complex Visit</div>
-                    <div>{{ 'Yes' if e.session.is_complex else 'No' }}{% if e.session.complexity_notes %} — {{ e.session.complexity_notes }}{% endif %}</div>
+                    <div class="form-label--sm">Complex Visit</div>
+                    <div>{{ 'Yes' if e.session.is_complex else 'No' }}{% if e.session.complexity_notes %} --- {{ e.session.complexity_notes }}{% endif %}</div>
                 </div>
                 <div>
-                    <div style="font-size:12px;color:var(--text-secondary);">Manual Entry</div>
+                    <div class="form-label--sm">Manual Entry</div>
                     <div>{{ 'Yes' if e.session.manual_entry else 'No' }}</div>
                 </div>
             </div>
@@ -112,12 +112,12 @@
             </div>
             {% endif %}
 
-            <form method="POST" action="/billing/{{ e.session.id }}/add-rationale" style="margin-top:12px;display:flex;gap:8px;align-items:end;">
+            <form method="POST" action="/billing/{{ e.session.id }}/add-rationale" class="filter-row" style="margin-top:12px;">
                 <div style="flex:1;">
-                    <label style="font-size:12px;color:var(--text-secondary);display:block;">Add Rationale</label>
-                    <textarea name="rationale" rows="2" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:13px;resize:vertical;" placeholder="Explain billing decision..."></textarea>
+                    <label class="form-label--sm">Add Rationale</label>
+                    <textarea name="rationale" rows="2" class="form-input" style="font-size:13px;" placeholder="Explain billing decision..."></textarea>
                 </div>
-                <button type="submit" style="padding:6px 14px;border-radius:6px;background:var(--color-navy);color:#fff;border:none;font-size:13px;cursor:pointer;min-height:44px;">Save</button>
+                <button type="submit" class="btn btn-primary">Save</button>
             </form>
         </td>
     </tr>
@@ -134,14 +134,14 @@
 {% endif %}
 
 {# Side Panel for Anomaly Explanation (F14b) #}
-<div id="anomaly-panel" style="display:none;position:fixed;top:0;right:0;width:380px;max-width:90vw;height:100vh;background:#fff;box-shadow:-4px 0 20px rgba(0,0,0,0.15);z-index:1000;overflow-y:auto;padding:24px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+<div id="anomaly-panel" class="side-panel" style="padding:24px;">
+    <div class="side-panel__header" style="padding:0;border:none;margin-bottom:16px;">
         <h3 style="margin:0;font-size:16px;">Anomaly Details</h3>
-        <button onclick="closeAnomalyPanel()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-secondary);line-height:1;">&times;</button>
+        <button onclick="closeAnomalyPanel()" class="side-panel__close">&times;</button>
     </div>
     <div id="anomaly-panel-content"></div>
 </div>
-<div id="anomaly-overlay" onclick="closeAnomalyPanel()" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.3);z-index:999;"></div>
+<div id="anomaly-overlay" onclick="closeAnomalyPanel()" class="side-panel-overlay"></div>
 
 <script>
 var _anomalyData = {};

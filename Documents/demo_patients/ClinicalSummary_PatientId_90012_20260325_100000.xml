@@ -1,0 +1,305 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603251000-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="00000000-0000-0000-0000-000000090012" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="90012" />
+      <addr use="HP">
+        <streetAddressLine>7202 Jahnke Road</streetAddressLine>
+        <city>Richmond</city>
+        <state>VA</state>
+        <postalCode>23225</postalCode>
+        <country nullFlavor="NI" />
+        <useablePeriod xsi:type="IVL_TS"><low value="20260325" /></useablePeriod>
+      </addr>
+      <telecom use="HP" value="tel:+1(804)-555-1012" />
+      <patient>
+        <name use="L">
+          <given>Dorothy</given>
+          <family>Washington</family>
+        </name>
+        <administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female" codeSystemName="AdministrativeGender" />
+        <birthTime value="19400301" />
+        <maritalStatusCode code="W" displayName="Widowed" codeSystem="2.16.840.1.113883.5.2" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode code="2054-5" displayName="Black or African American" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <ethnicGroupCode code="2186-5" displayName="Not Hispanic or Latino" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <languageCommunication>
+          <languageCode code="en" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="202603251000-0400" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime><low value="19400301" /><high value="20260325" /></effectiveTime>
+      <performer typeCode="PRF">
+        <time><low value="20250101" /></time>
+        <assignedEntity>
+          <id extension="1891645123" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter>
+      <id root="00000000-0000-0000-0000-000000090012" extension="1306884820" />
+      <code code="AMB" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Ambulatory" />
+      <effectiveTime><low value="202603251000-0400" /></effectiveTime>
+      <location>
+        <healthCareFacility>
+          <id root="2.16.840.1.113883.19" extension="1306884820" />
+          <location>
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </location>
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Substance</th><th>Reaction</th><th>Severity</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Digoxin [RxNorm: 3407]</td><td>Toxicity/Bradycardia</td><td>severe</td><td>active</td></tr>
+                <tr><td>Vancomycin [RxNorm: 11124]</td><td>Red man syndrome</td><td>moderate</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Medications" />
+          <title>MEDICATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Medication</th><th>Generic Name</th><th>Instructions</th><th>Dosage</th><th>Start Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>furosemide 80 mg tablet [RxNorm: 310429]</td><td>furosemide</td><td>Take 1 tablet by mouth twice daily</td><td>80 mg</td><td>03/01/2025</td><td>active</td></tr>
+                <tr><td>carvedilol 12.5 mg tablet [RxNorm: 200031]</td><td>carvedilol</td><td>Take 1 tablet by mouth twice daily</td><td>12.5 mg</td><td>06/15/2023</td><td>active</td></tr>
+                <tr><td>sacubitril-valsartan 49-51 mg tablet [RxNorm: 1656340]</td><td>sacubitril/valsartan</td><td>Take 1 tablet by mouth twice daily</td><td>49/51 mg</td><td>06/15/2023</td><td>active</td></tr>
+                <tr><td>spironolactone 25 mg tablet [RxNorm: 312600]</td><td>spironolactone</td><td>Take 1 tablet by mouth daily</td><td>25 mg</td><td>06/15/2023</td><td>active</td></tr>
+                <tr><td>sodium bicarbonate 650 mg tablet [RxNorm: 312293]</td><td>sodium bicarbonate</td><td>Take 2 tablets by mouth three times daily</td><td>1300 mg</td><td>01/01/2025</td><td>active</td></tr>
+                <tr><td>epoetin alfa 10000 units injection [RxNorm: 105442]</td><td>epoetin alfa</td><td>Inject 10000 units subcutaneously weekly</td><td>10000 units</td><td>01/01/2025</td><td>active</td></tr>
+                <tr><td>metolazone 2.5 mg tablet [RxNorm: 197770]</td><td>metolazone</td><td>Take 1 tablet by mouth as needed for edema flare</td><td>2.5 mg</td><td>03/01/2025</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problems" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Problem</th><th>Problem Status</th><th>Date Started</th><th>Date Resolved</th></tr></thead>
+              <tbody>
+                <tr><td>Heart failure with reduced ejection fraction [ICD10: I50.22]</td><td>active</td><td>06/15/2023</td><td></td></tr>
+                <tr><td>Chronic kidney disease stage 4 [ICD10: N18.4]</td><td>active</td><td>01/01/2025</td><td></td></tr>
+                <tr><td>Anemia of chronic kidney disease [ICD10: D63.1]</td><td>active</td><td>01/01/2025</td><td></td></tr>
+                <tr><td>Type 2 diabetes mellitus without complications [ICD10: E11.9]</td><td>active</td><td>04/15/2010</td><td></td></tr>
+                <tr><td>Essential hypertension [ICD10: I10]</td><td>active</td><td>01/01/2000</td><td></td></tr>
+                <tr><td>Metabolic acidosis [ICD10: E87.2]</td><td>active</td><td>01/01/2025</td><td></td></tr>
+                <tr><td>Diastolic dysfunction [ICD10: I50.32]</td><td>active</td><td>06/15/2023</td><td></td></tr>
+                <tr><td>Macular degeneration bilateral [ICD10: H35.30]</td><td>active</td><td>09/01/2022</td><td></td></tr>
+                <tr><td>CHF exacerbation [ICD10: I50.22]</td><td>resolved</td><td>02/10/2026</td><td>02/20/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Vital Signs" />
+          <title>VITAL SIGNS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Encounter</th><th>Height (in)</th><th>Weight (lb)</th><th>BMI (kg/m2)</th><th>BP Sys (mmHg)</th><th>BP Dias (mmHg)</th><th>Heart Rate (/min)</th><th>O2 % BldC Oximetry</th><th>Body Temperature</th><th>Respiratory Rate (/min)</th></tr></thead>
+              <tbody>
+                <tr><td>03/22/2026</td><td>61</td><td>145</td><td>27.4</td><td>118</td><td>68</td><td>62</td><td>95</td><td>97.8</td><td>18</td></tr>
+                <tr><td>02/10/2026</td><td>61</td><td>158</td><td>29.8</td><td>100</td><td>58</td><td>54</td><td>91</td><td>97.4</td><td>22</td></tr>
+                <tr><td>12/10/2025</td><td>61</td><td>148</td><td>28.0</td><td>122</td><td>72</td><td>64</td><td>96</td><td>98.2</td><td>16</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Lab Results" />
+          <title>LAB RESULTS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Test Name</th><th>Result</th><th>Units</th><th>Flag</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>Creatinine [LOINC: 2160-0]</td><td>3.2</td><td>mg/dL</td><td>H</td><td>03/20/2026</td></tr>
+                <tr><td>eGFR [LOINC: 48642-3]</td><td>18</td><td>mL/min/1.73m2</td><td>L</td><td>03/20/2026</td></tr>
+                <tr><td>BUN [LOINC: 3094-0]</td><td>58</td><td>mg/dL</td><td>H</td><td>03/20/2026</td></tr>
+                <tr><td>Potassium [LOINC: 2823-3]</td><td>5.4</td><td>mmol/L</td><td>H</td><td>03/20/2026</td></tr>
+                <tr><td>Bicarbonate [LOINC: 1963-8]</td><td>18</td><td>mmol/L</td><td>L</td><td>03/20/2026</td></tr>
+                <tr><td>BNP [LOINC: 42637-9]</td><td>1250</td><td>pg/mL</td><td>H</td><td>02/10/2026</td></tr>
+                <tr><td>BNP [LOINC: 42637-9]</td><td>580</td><td>pg/mL</td><td>H</td><td>03/20/2026</td></tr>
+                <tr><td>Hemoglobin A1c [LOINC: 4548-4]</td><td>7.0</td><td>%</td><td>H</td><td>03/20/2026</td></tr>
+                <tr><td>Hemoglobin [LOINC: 718-7]</td><td>9.8</td><td>g/dL</td><td>L</td><td>03/20/2026</td></tr>
+                <tr><td>Albumin [LOINC: 1751-7]</td><td>3.0</td><td>g/dL</td><td>L</td><td>03/20/2026</td></tr>
+                <tr><td>Phosphorus [LOINC: 2777-1]</td><td>5.8</td><td>mg/dL</td><td>H</td><td>03/20/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Vaccine</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Influenza vaccine 2025-2026</td><td>10/01/2025</td><td>completed</td></tr>
+                <tr><td>Pneumococcal PCV20 (Prevnar 20)</td><td>01/15/2024</td><td>completed</td></tr>
+                <tr><td>COVID-19 Vaccine 2024-2025 (Pfizer)</td><td>10/20/2024</td><td>completed</td></tr>
+                <tr><td>Tdap (Boostrix)</td><td>06/10/2018</td><td>completed</td></tr>
+                <tr><td>Shingrix (Zoster) complete</td><td>09/01/2022</td><td>completed</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>Tobacco: Never smoker. Alcohol: None. Employment: Retired nurse. Marital Status: Widowed (husband passed 2018). Lives with son and daughter-in-law. Home health aide 5 days/week. Wheelchair bound for distances, uses walker at home. Church active (attends via livestream). DNR/DNI -- completed MOLST on file. No dialysis per patient preference.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Insurance" />
+          <title>INSURANCE</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Payer</th><th>Policy Type</th><th>Member ID</th><th>Group</th></tr></thead>
+              <tbody>
+                <tr><td>Medicare Part B</td><td>Medicare</td><td>4KL9-MN1-OP23</td><td>N/A</td></tr>
+                <tr><td>AARP Medicare Supplement Plan G</td><td>Supplemental</td><td>SUP-112233</td><td>GRP-44521</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11506-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Progress Notes" />
+          <title>PROGRESS NOTES</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Date</th><th>Provider</th><th>Note Type</th><th>Note Text</th><th>Location</th></tr></thead>
+              <tbody>
+                <tr><td>03/22/2026</td><td>Cory Denton, FNP</td><td>Progress Note</td><td>CC: CHF/CKD follow-up post-hospitalization.
+HPI: 85yo AA female with HFrEF (EF 25%) and CKD Stage 4 (eGFR 18). Hospitalized 02/10-02/20 for acute CHF exacerbation. Came in with 13 lbs fluid gain, O2 91%, BNP 1250. IV diuresis x 5 days. Now dry weight 145 lbs. Reports dyspnea with minimal exertion (going to bathroom). No orthopnea with 3 pillows. Appetite poor. Vision declining (macular degeneration).
+Goals of care discussion: Patient reaffirms no dialysis, no intubation. DNR/DNI. Wants comfort-focused care. Son present and agrees.
+PE: Frail. Lungs -- bibasilar crackles, mild. CV -- S3 gallop, no murmur. JVP 8 cm. Trace pedal edema (improved from 3+).
+Assessment:
+# HFrEF (I50.22): EF 25%. Guideline-directed therapy: carvedilol, Entresto, spironolactone. BNP improved 1250-&gt;580. Close to dry weight.
+# CKD 4 (N18.4): eGFR 18, declining. K+ 5.4 -- monitor closely. Bicarb 18 -- continue sodium bicarbonate. No dialysis per goals.
+# Anemia (D63.1): Hgb 9.8. Epoetin weekly. Target Hgb 10-11.
+# DM2 (E11.9): A1c 7.0 -- acceptable given age/comorbidities. Less aggressive target OK.
+# Goals of care: DNR/DNI, no dialysis, comfort-focused. MOLST current.
+Plan: Continue all meds. Daily weights. Fluid restriction 1.5L/day. Sodium &lt;2g. Palliative care referral for symptom management. Nephrology aware of no-dialysis preference. Home health to monitor daily. Return 2 weeks or PRN.</td><td>Family Practice Associates of Chesterfield</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

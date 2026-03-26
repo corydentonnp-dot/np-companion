@@ -213,7 +213,7 @@ function renderDrugCard(d, container) {
         if (!content) return;
         var bgColor = s.isCritical ? 'rgba(220,38,38,0.06)' : 'transparent';
         html += '<div data-section-key="' + s.key + '" style="padding:12px 16px;border-bottom:1px solid var(--border,#e2e8f0);background:' + bgColor + ';">';
-        html += '<div class="section-header" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+        html += '<div class="section-header" role="button" tabindex="0" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'" onkeydown="if(event.key===\'Enter\'){this.click();}">';
         html += '<span style="color:' + s.color + ';">' + s.icon + '</span>';
         html += '<strong style="font-size:13px;' + (s.isCritical ? 'color:var(--color-red);text-transform:uppercase;' : '') + '">' + s.title + '</strong>';
         html += '<span style="font-size:11px;color:var(--text-secondary);margin-left:auto;">click to expand</span>';

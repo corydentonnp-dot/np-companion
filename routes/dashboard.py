@@ -26,6 +26,8 @@ from models.schedule import Schedule
 from models.timelog import TimeLog
 from models.patient import PatientRecord
 
+import config
+
 dashboard_bp = Blueprint('dashboard', __name__)
 
 # ---- Data collection job tracker (Phase 4) ----
@@ -360,6 +362,9 @@ def index():
         .all()
     )
 
+    # Claimed subset — patients this provider has claimed
+    claimed_patients = [p for p in my_patients if p.claimed_by == current_user.id]
+
     # Billing opportunities for today's scheduled patients
     billing_opportunities = []
     total_estimated_revenue = 0.0
@@ -395,6 +400,22 @@ def index():
     try:
         from routes.tools import get_overdue_pdmp_patients
         pdmp_overdue = get_overdue_pdmp_patients(current_user.id)
+    except Exception:
+        pass
+
+    # VIIS check status per patient for schedule badges
+    viis_check_map = {}
+    try:
+        from models.viis import VIISCheck
+        scheduled_mrns = [a.patient_mrn for a in appointments if a.patient_mrn]
+        if scheduled_mrns:
+            for mrn in set(scheduled_mrns):
+                latest = VIISCheck.query.filter(
+                    VIISCheck.user_id == current_user.id,
+                    VIISCheck.mrn == mrn,
+                ).order_by(VIISCheck.checked_at.desc()).first()
+                if latest:
+                    viis_check_map[mrn] = latest.status
     except Exception:
         pass
 
@@ -465,6 +486,7 @@ def index():
         is_today=(view_date == today),
         care_gap_counts=care_gap_counts,
         my_patients=my_patients,
+        claimed_patients=claimed_patients,
         billing_opportunities=billing_opportunities,
         total_estimated_revenue=total_estimated_revenue,
         billing_opp_counts=billing_opp_counts,
@@ -475,6 +497,7 @@ def index():
         tcm_urgent=tcm_urgent,
         schedule_start_hour=schedule_start,
         schedule_end_hour=schedule_end,
+        viis_check_map=viis_check_map,
     )
 
 
@@ -649,17 +672,16 @@ def api_schedule_add():
     except (TypeError, ValueError):
         duration = 15
 
-    # --- duplicate detection (same MRN + time + date) ---
+    # --- duplicate detection (same MRN + date, regardless of time) ---
     existing = Schedule.query.filter_by(
         user_id=current_user.id,
         appointment_date=appt_date,
-        appointment_time=appointment_time,
         patient_mrn=patient_mrn,
     ).first()
     if existing:
         return jsonify({
             'success': False,
-            'errors': [f'Duplicate: {patient_mrn} already scheduled at {appointment_time} on {appt_date}']
+            'errors': [f'{patient_mrn} is already on the schedule for {appt_date}']
         }), 409
 
     appt = Schedule(
@@ -1081,4 +1103,72 @@ def api_schedule_collect_status(schedule_id):
     return jsonify({
         'status': job.get('status', 'not_started'),
         'message': job.get('message', ''),
+    })
+
+
+# ======================================================================
+# GET /api/active-chart — chart flag widget data
+# ======================================================================
+@dashboard_bp.route('/api/active-chart')
+@login_required
+def api_active_chart():
+    """
+    Return the currently open AC chart info for the chart flag widget.
+    Reads data/active_chart.json written by the agent's mrn_reader.
+    """
+    import json
+    import os
+    from datetime import datetime, timezone
+
+    if not getattr(config, 'CHART_FLAG_ENABLED', False):
+        return jsonify({'success': True, 'data': {'active': False}})
+
+    chart_path = os.path.join('data', 'active_chart.json')
+    try:
+        if not os.path.exists(chart_path):
+            return jsonify({'success': True, 'data': {'active': False}})
+
+        with open(chart_path, 'r') as f:
+            chart_state = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return jsonify({'success': True, 'data': {'active': False}})
+
+    if not chart_state.get('active'):
+        return jsonify({'success': True, 'data': {'active': False}})
+
+    # Check freshness — stale data means agent isn't running or chart closed
+    stale_seconds = getattr(config, 'CHART_FLAG_STALE_SECONDS', 10)
+    detected_at = chart_state.get('detected_at', '')
+    try:
+        detected_dt = datetime.fromisoformat(detected_at)
+        age = (datetime.now(timezone.utc) - detected_dt).total_seconds()
+        if age > stale_seconds:
+            return jsonify({'success': True, 'data': {'active': False}})
+    except (ValueError, TypeError):
+        return jsonify({'success': True, 'data': {'active': False}})
+
+    # Look up the MRN in PatientRecord for current user
+    mrn = chart_state.get('mrn', '')
+    has_cc_record = False
+    cc_url = None
+    if mrn:
+        record = PatientRecord.query.filter_by(
+            user_id=current_user.id, mrn=str(mrn)
+        ).first()
+        if record:
+            has_cc_record = True
+            cc_url = f'/patient/{mrn}'
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'active': True,
+            'mrn': mrn,
+            'patient_name': chart_state.get('patient_name', ''),
+            'dob': chart_state.get('dob', ''),
+            'age': chart_state.get('age', ''),
+            'sex': chart_state.get('sex', ''),
+            'has_cc_record': has_cc_record,
+            'cc_url': cc_url,
+        }
     })

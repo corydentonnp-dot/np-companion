@@ -38,7 +38,7 @@
             </div>
             <div style="display:flex;gap:6px;">
                 <button class="btn btn-sm btn-outline" onclick="editPhrase({{ p.id }}, '{{ p.abbreviation }}', `{{ p.expansion|replace('`','\\`')|replace('\n','\\n') }}`, '{{ p.category }}')" title="Edit">✏️</button>
-                <button class="btn btn-sm btn-outline" onclick="deletePhrase({{ p.id }}, '{{ p.abbreviation }}')" title="Delete" style="color:var(--danger,#e74c3c);">🗑️</button>
+                <button class="btn btn-sm btn-outline" onclick="deletePhrase({{ p.id }}, '{{ p.abbreviation }}', this)" title="Delete" style="color:var(--danger,#e74c3c);">🗑️</button>
             </div>
         </div>
         <div style="font-size:13px;color:var(--text-secondary,#666);max-height:80px;overflow:hidden;white-space:pre-wrap;line-height:1.4;">{{ p.expansion[:200] }}{% if p.expansion|length > 200 %}…{% endif %}</div>
@@ -88,7 +88,7 @@
         </div>
         <div class="cc-modal__footer">
             <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="savePhrase()">Save</button>
+            <button class="btn btn-primary" onclick="savePhrase(this)">Save</button>
         </div>
     </div>
 </div>
@@ -106,7 +106,7 @@
         </div>
         <div class="cc-modal__footer">
             <button class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="doImport()">Import</button>
+            <button class="btn btn-primary" onclick="doImport(this)">Import</button>
         </div>
     </div>
 </div>
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (ta) ta.addEventListener('input', updatePreview);
 });
 
-function savePhrase() {
+function savePhrase(btn) {
     const editId = document.getElementById('edit-id').value;
     const abbreviation = document.getElementById('modal-abbrev').value.trim();
     const expansion = document.getElementById('modal-expansion').value.trim();
@@ -181,7 +181,7 @@ function savePhrase() {
     const url = editId ? '/tools/dot-phrases/' + editId : '/tools/dot-phrases';
     const method = editId ? 'PUT' : 'POST';
 
-    fetch(url, {
+    _withSpinner(btn, fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({abbreviation, expansion, category})
@@ -193,17 +193,17 @@ function savePhrase() {
         } else {
             showError(data.error || 'Failed to save dot phrase.');
         }
-    });
+    }));
 }
 
-function deletePhrase(id, abbrev) {
+function deletePhrase(id, abbrev, btn) {
     if (!confirm('Delete "' + abbrev + '"?')) return;
-    fetch('/tools/dot-phrases/' + id, {method: 'DELETE'})
+    _withSpinner(btn, fetch('/tools/dot-phrases/' + id, {method: 'DELETE'})
     .then(r => r.json())
     .then(data => {
         if (data.success) location.reload();
         else showError(data.error || 'Failed to delete.');
-    });
+    }));
 }
 
 /* ── Import Modal ── */
@@ -214,10 +214,10 @@ function showImportModal() {
 function closeImportModal() {
     document.getElementById('import-modal').classList.remove('cc-modal--open');
 }
-function doImport() {
+function doImport(btn) {
     const content = document.getElementById('import-text').value.trim();
     if (!content) { showWarning('Paste AHK hotstrings to import.'); return; }
-    fetch('/tools/macros/import', {
+    _withSpinner(btn, fetch('/tools/macros/import', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({content: content})
@@ -230,7 +230,7 @@ function doImport() {
         } else {
             showError(data.error || 'Import failed.');
         }
-    });
+    }));
 }
 </script>
 {% endblock %}

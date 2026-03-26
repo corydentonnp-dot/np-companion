@@ -49,8 +49,8 @@ def find_xml_file(explicit_path=None):
 
     # Fall back to sample XML
     sample = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                          'Documents', 'xml_test_patients',
-                          'ClinicalSummary_PatientId_62815_20260317_142457.xml')
+                          'Documents', 'demo_patients',
+                          'ClinicalSummary_PatientId_62815_20260317_142334.xml')
     if os.path.isfile(sample):
         print(f'Using sample XML: {sample}')
         return sample

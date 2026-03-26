@@ -1,0 +1,304 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603251000-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="00000000-0000-0000-0000-000000090014" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="90014" />
+      <addr use="HP">
+        <streetAddressLine>1833 Courthouse Road</streetAddressLine>
+        <city>Chesterfield</city>
+        <state>VA</state>
+        <postalCode>23832</postalCode>
+        <country nullFlavor="NI" />
+        <useablePeriod xsi:type="IVL_TS"><low value="20260325" /></useablePeriod>
+      </addr>
+      <telecom use="HP" value="tel:+1(804)-555-1014" />
+      <patient>
+        <name use="L">
+          <given>Barbara</given>
+          <family>Nelson</family>
+        </name>
+        <administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female" codeSystemName="AdministrativeGender" />
+        <birthTime value="19590710" />
+        <maritalStatusCode code="D" displayName="Divorced" codeSystem="2.16.840.1.113883.5.2" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode code="2106-3" displayName="White" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <ethnicGroupCode code="2186-5" displayName="Not Hispanic or Latino" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <languageCommunication>
+          <languageCode code="en" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="202603251000-0400" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime><low value="19590710" /><high value="20260325" /></effectiveTime>
+      <performer typeCode="PRF">
+        <time><low value="20250101" /></time>
+        <assignedEntity>
+          <id extension="1891645123" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter>
+      <id root="00000000-0000-0000-0000-000000090014" extension="1306884820" />
+      <code code="AMB" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Ambulatory" />
+      <effectiveTime><low value="202603251000-0400" /></effectiveTime>
+      <location>
+        <healthCareFacility>
+          <id root="2.16.840.1.113883.19" extension="1306884820" />
+          <location>
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </location>
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Substance</th><th>Reaction</th><th>Severity</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Amoxicillin [RxNorm: 723]</td><td>Diarrhea</td><td>mild</td><td>active</td></tr>
+                <tr><td>Latex</td><td>Contact dermatitis</td><td>moderate</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Medications" />
+          <title>MEDICATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Medication</th><th>Generic Name</th><th>Instructions</th><th>Dosage</th><th>Start Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>tiotropium-olodaterol 2.5-2.5 mcg inhaler [RxNorm: 1720839]</td><td>tiotropium/olodaterol</td><td>Inhale 2 puffs daily</td><td>2.5/2.5 mcg</td><td>03/01/2024</td><td>active</td></tr>
+                <tr><td>budesonide-formoterol 160-4.5 mcg inhaler [RxNorm: 790275]</td><td>budesonide/formoterol</td><td>Inhale 2 puffs twice daily</td><td>160/4.5 mcg</td><td>03/01/2024</td><td>active</td></tr>
+                <tr><td>albuterol 90 mcg inhaler [RxNorm: 245314]</td><td>albuterol</td><td>Inhale 2 puffs every 4-6 hours as needed</td><td>90 mcg</td><td>01/01/2020</td><td>active</td></tr>
+                <tr><td>home oxygen 2L nasal cannula</td><td>supplemental oxygen</td><td>Use continuously, increase to 4L with exertion</td><td>2-4 L/min</td><td>06/15/2025</td><td>active</td></tr>
+                <tr><td>azithromycin 250 mg tablet [RxNorm: 261085]</td><td>azithromycin</td><td>Take 1 tablet by mouth MWF (chronic)</td><td>250 mg</td><td>06/15/2025</td><td>active</td></tr>
+                <tr><td>losartan 50 mg tablet [RxNorm: 979480]</td><td>losartan</td><td>Take 1 tablet by mouth daily</td><td>50 mg</td><td>09/01/2022</td><td>active</td></tr>
+                <tr><td>sertraline 100 mg tablet [RxNorm: 312938]</td><td>sertraline</td><td>Take 1 tablet by mouth daily</td><td>100 mg</td><td>01/15/2024</td><td>active</td></tr>
+                <tr><td>nicotine patch 14 mg [RxNorm: 312130]</td><td>nicotine</td><td>Apply 1 patch daily</td><td>14 mg</td><td>03/01/2026</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problems" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Problem</th><th>Problem Status</th><th>Date Started</th><th>Date Resolved</th></tr></thead>
+              <tbody>
+                <tr><td>Chronic obstructive pulmonary disease severe [ICD10: J44.1]</td><td>active</td><td>01/01/2020</td><td></td></tr>
+                <tr><td>Chronic respiratory failure with hypoxemia [ICD10: J96.11]</td><td>active</td><td>06/15/2025</td><td></td></tr>
+                <tr><td>Tobacco use disorder [ICD10: F17.210]</td><td>active</td><td>01/01/1980</td><td></td></tr>
+                <tr><td>Essential hypertension [ICD10: I10]</td><td>active</td><td>09/01/2022</td><td></td></tr>
+                <tr><td>Major depressive disorder recurrent [ICD10: F33.1]</td><td>active</td><td>01/15/2024</td><td></td></tr>
+                <tr><td>Osteoporosis [ICD10: M81.0]</td><td>active</td><td>03/15/2023</td><td></td></tr>
+                <tr><td>Lung nodule 8mm right upper lobe [ICD10: R91.1]</td><td>active</td><td>09/15/2025</td><td></td></tr>
+                <tr><td>COPD exacerbation [ICD10: J44.1]</td><td>resolved</td><td>01/20/2026</td><td>02/05/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Vital Signs" />
+          <title>VITAL SIGNS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Encounter</th><th>Height (in)</th><th>Weight (lb)</th><th>BMI (kg/m2)</th><th>BP Sys (mmHg)</th><th>BP Dias (mmHg)</th><th>Heart Rate (/min)</th><th>O2 % BldC Oximetry</th><th>Body Temperature</th><th>Respiratory Rate (/min)</th></tr></thead>
+              <tbody>
+                <tr><td>03/18/2026</td><td>63</td><td>118</td><td>20.9</td><td>128</td><td>78</td><td>82</td><td>92 on 2L</td><td>98.2</td><td>20</td></tr>
+                <tr><td>01/20/2026</td><td>63</td><td>115</td><td>20.4</td><td>140</td><td>86</td><td>98</td><td>87 on RA</td><td>101.2</td><td>26</td></tr>
+                <tr><td>09/15/2025</td><td>63</td><td>120</td><td>21.3</td><td>130</td><td>80</td><td>80</td><td>91 on 2L</td><td>98.4</td><td>18</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Lab Results" />
+          <title>LAB RESULTS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Test Name</th><th>Result</th><th>Units</th><th>Flag</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>CBC WBC [LOINC: 6690-2]</td><td>9.5</td><td>10*3/uL</td><td>normal</td><td>03/15/2026</td></tr>
+                <tr><td>Hemoglobin [LOINC: 718-7]</td><td>14.2</td><td>g/dL</td><td>normal</td><td>03/15/2026</td></tr>
+                <tr><td>Comprehensive Metabolic Panel [LOINC: 24323-8]</td><td>normal</td><td></td><td>normal</td><td>03/15/2026</td></tr>
+                <tr><td>Sputum culture [LOINC: 630-4]</td><td>Normal flora</td><td></td><td>normal</td><td>01/25/2026</td></tr>
+                <tr><td>ABG pH [LOINC: 2744-1]</td><td>7.36</td><td></td><td>normal</td><td>09/15/2025</td></tr>
+                <tr><td>ABG pCO2 [LOINC: 2019-8]</td><td>48</td><td>mmHg</td><td>H</td><td>09/15/2025</td></tr>
+                <tr><td>ABG pO2 [LOINC: 2703-7]</td><td>62</td><td>mmHg</td><td>L</td><td>09/15/2025</td></tr>
+                <tr><td>Vitamin D 25-OH [LOINC: 1989-3]</td><td>24</td><td>ng/mL</td><td>L</td><td>03/15/2026</td></tr>
+                <tr><td>DEXA T-score lumbar [LOINC: 80941-3]</td><td>-2.8</td><td></td><td>L</td><td>03/15/2023</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Vaccine</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Influenza vaccine 2025-2026</td><td>10/10/2025</td><td>completed</td></tr>
+                <tr><td>Pneumococcal PCV20 (Prevnar 20)</td><td>03/01/2024</td><td>completed</td></tr>
+                <tr><td>COVID-19 Vaccine 2024-2025 (Pfizer)</td><td>10/05/2024</td><td>completed</td></tr>
+                <tr><td>Shingrix (Zoster) complete</td><td>06/01/2023</td><td>completed</td></tr>
+                <tr><td>Tdap (Boostrix)</td><td>09/01/2022</td><td>completed</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>Tobacco: Active smoker -- currently 1/2 ppd, down from 1 ppd. Started age 21. Approximately 35 pack-years. On nicotine patch, trying to quit. Alcohol: Former heavy drinker, quit 2020. Employment: Disabled/SSDI since 2023. Marital Status: Divorced x 2. Lives alone, daughter checks daily. Home oxygen via concentrator + portable tanks. Exercise: Very limited by dyspnea. Can walk ~50 feet.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Insurance" />
+          <title>INSURANCE</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Payer</th><th>Policy Type</th><th>Member ID</th><th>Group</th></tr></thead>
+              <tbody>
+                <tr><td>Medicare Part B</td><td>Medicare</td><td>5QR2-ST3-UV45</td><td>N/A</td></tr>
+                <tr><td>Virginia Medicaid (dual eligible)</td><td>Medicaid</td><td>MCD-901414</td><td>N/A</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11506-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Progress Notes" />
+          <title>PROGRESS NOTES</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Date</th><th>Provider</th><th>Note Type</th><th>Note Text</th><th>Location</th></tr></thead>
+              <tbody>
+                <tr><td>03/18/2026</td><td>Cory Denton, FNP</td><td>Progress Note</td><td>CC: COPD follow-up, lung nodule surveillance, smoking cessation.
+HPI: 66yo female with severe COPD (GOLD Stage III, FEV1 38%). On triple inhaler therapy + chronic azithromycin + home O2. Last exacerbation Jan 2026 (prednisone burst + augmentin). Lung nodule 8mm RUL found on LDCT screening Sept 2025 -- follow-up CT due now. Currently smoking 1/2 ppd -- down from 1 ppd. Started nicotine patch 14mg. Motivated to quit. Reports increased depression during exacerbation, stable now on sertraline.
+Pulm Rehab: Completed 12-week program. Functional capacity improved. 6MWT: 200m (was 150m).
+PE: Barrel chest. Lungs -- diffuse expiratory wheezes, prolonged expiration. No crackles. O2 92% on 2L. CV RRR. Cachexic.
+Assessment:
+# COPD severe (J44.1): FEV1 38%. Triple therapy + azithromycin prophylaxis. Pulm rehab complete.
+# Lung nodule (R91.1): 8mm RUL. Follow-up CT chest ordered today per Lung-RADS guidelines.
+# Smoking cessation (F17.210): Reduced to 1/2 ppd. Nicotine patch 14mg. Discussed adding bupropion -- patient amenable. Start 150mg daily x 3 days then BID.
+# Respiratory failure (J96.11): Stable on 2L. ABG showed compensated respiratory acidosis.
+# Osteoporosis (M81.0): On calcium/D. Consider bisphosphonate after dental clearance.
+# Depression (F33.1): Stable on sertraline. PHQ-9 = 8.
+Plan: CT chest ordered. Start bupropion for smoking cessation. Pulmonology 2 months. Return 6 weeks. Advance directive discussion -- patient open, will complete next visit.</td><td>Family Practice Associates of Chesterfield</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

@@ -54,8 +54,8 @@ SCREENSHOTS = {
 
 SAMPLE_XML = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
-    'Documents', 'xml_test_patients',
-    'ClinicalSummary_PatientId_62815_20260317_142457.xml',
+    'Documents', 'demo_patients',
+    'ClinicalSummary_PatientId_62815_20260317_142334.xml',
 )
 
 # ---------------------------------------------------------------------------
@@ -147,6 +147,23 @@ def mock_get_ac_state():
         'login': 'login_screen',
     }
     return state_map.get(_mock_state, 'home_screen')
+
+
+def mock_get_all_chart_windows():
+    """Return list of parsed chart windows. One entry when in chart state."""
+    if _mock_state == 'chart':
+        return [{
+            'hwnd': 12345,
+            'last_name': 'TEST',
+            'first_name': 'TEST',
+            'dob': MOCK_PATIENT['dob'],
+            'mrn': MOCK_PATIENT['mrn'],
+            'age': str(MOCK_PATIENT['age']),
+            'sex': MOCK_PATIENT['sex'],
+            'portal': None,
+            'cell': None,
+        }]
+    return []
 
 
 def mock_detect_resurrect_dialog():

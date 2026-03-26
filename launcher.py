@@ -76,6 +76,7 @@ def _run_flask_dev():
         port=app.config.get('PORT', 5000),
         debug=True,
         use_reloader=True,
+        exclude_patterns=['data/*', 'data/**/*', '*.db', '*.log', '*.pkl'],
     )
 
 

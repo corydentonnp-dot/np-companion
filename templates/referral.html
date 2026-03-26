@@ -3,9 +3,10 @@
 {% block page_id %}referral{% endblock %}
 
 {% block content %}
-<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
-    <h1 style="margin:0;">Referral Letter Generator</h1>
-    <span class="badge badge--success">F27</span>
+<div class="page-header" style="margin-bottom:24px;">
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm btn-outline" style="margin-right:12px;">← Back</a>
+    <h1 class="page-header__title" style="margin:0;">Referral Letter Generator</h1>
+    <span class="badge badge--success" style="margin-left:12px;">F27</span>
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
@@ -94,7 +95,7 @@
                             </td>
                             <td>
                                 {% if not r.consultation_received %}
-                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="markReceived({{ r.id }})">Received</button>
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="markReceived({{ r.id }}, this)">Received</button>
                                 {% endif %}
                             </td>
                         </tr>
@@ -173,8 +174,8 @@ function generateReferral() {
 function copyLetter() {
     navigator.clipboard.writeText(document.getElementById('ref-letter').value);
 }
-function markReceived(id) {
-    fetch('/referral/' + id + '/received', {method:'POST'}).then(function(){location.reload();});
+function markReceived(id, btn) {
+    _withSpinner(btn, fetch('/referral/' + id + '/received', {method:'POST'}).then(function(){location.reload();}));
 }
 </script>
 {% endblock %}

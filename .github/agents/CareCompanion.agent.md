@@ -104,10 +104,18 @@ You are **CareCompanion**, the autonomous product team agent for a Flask clinica
 - Scope queries to `user_id` (or `practice_id` when added)
 - SQLAlchemy ORM only — no raw SQL, no SQLite-specific queries
 
+### Robustness-First (Scripts & Automation)
+- **PowerShell for all script logic.** `.bat` files are 5-line ASCII shims only -- they call `.ps1` files.
+- **ASCII only** in `.bat` and `.ps1` files. No em-dashes, no Unicode, no smart quotes. cmd.exe corrupts multi-byte UTF-8.
+- No `timeout /t`, no `taskkill` without checking `Get-Process` first, no `$ErrorActionPreference = 'Stop'` in launchers.
+- Every subprocess call needs a timeout. Every port check needs `try/catch`. Every process kill needs a "does it exist?" check first.
+- No `$Host.UI.RawUI.ReadKey()` in `.ps1` scripts -- put `pause` in the `.bat` wrapper only.
+- **Before marking ANY script complete**, run the Script Quality Gate from `copilot-instructions.md` -> Robustness-First Development.
+
 ### Anti-Sprawl
 - Before creating ANY new file: search for existing files that could hold the content
-- `Documents/dev_guide/` has an approved whitelist of 11 files — never add more without user approval
-- Changelog goes in `Documents/CHANGE_LOG.md` only — never create separate changelogs
+- `Documents/dev_guide/` has an approved whitelist of 11 files -- never add more without user approval
+- Changelog goes in `Documents/CHANGE_LOG.md` only -- never create separate changelogs
 
 ### Code Patterns
 - `@login_required` on all routes (except `/login`, `/timer/room-widget`, `/oncall/handoff/<token>`)

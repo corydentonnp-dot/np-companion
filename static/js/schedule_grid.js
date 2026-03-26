@@ -78,8 +78,11 @@
         container.innerHTML = '';
         container.className = 'sched-grid';
 
-        // Time labels column + appointment column
+        /* Set CSS variable for dynamic row count so grid fills container */
         var ts = totalSlots();
+        container.style.setProperty('--sched-slot-count', ts);
+
+        // Time labels column + appointment column
         for (var s = 0; s < ts; s++) {
             var totalMin = s * SLOT_MINUTES + START_HOUR * 60;
             var isHour = totalMin % 60 === 0;

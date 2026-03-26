@@ -10,11 +10,11 @@
 </div>
 
 {# ---- Tab bar ---- #}
-<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border-color,#ddd);">
-    <button class="btn btn-sm" id="tab-pending" onclick="showTab('pending')" style="border-radius:6px 6px 0 0;border-bottom:2px solid var(--color-primary,#0D7377);font-weight:600;">
+<div class="cc-tabs">
+    <button class="cc-tab active" id="tab-pending" onclick="showTab('pending')">
         Pending Queue <span class="badge badge--warning" style="margin-left:6px;">{{ pending|length }}</span>
     </button>
-    <button class="btn btn-sm btn-outline" id="tab-history" onclick="showTab('history')" style="border-radius:6px 6px 0 0;">
+    <button class="cc-tab" id="tab-history" onclick="showTab('history')">
         Sent / History <span class="badge badge--secondary" style="margin-left:6px;">{{ history|length }}</span>
     </button>
 </div>
@@ -111,23 +111,8 @@
 function showTab(tab) {
     document.getElementById('panel-pending').style.display = tab === 'pending' ? '' : 'none';
     document.getElementById('panel-history').style.display = tab === 'history' ? '' : 'none';
-    var btnPending = document.getElementById('tab-pending');
-    var btnHistory = document.getElementById('tab-history');
-    if (tab === 'pending') {
-        btnPending.style.borderBottom = '2px solid var(--color-primary,#0D7377)';
-        btnPending.style.fontWeight = '600';
-        btnPending.className = 'btn btn-sm';
-        btnHistory.style.borderBottom = 'none';
-        btnHistory.style.fontWeight = 'normal';
-        btnHistory.className = 'btn btn-sm btn-outline';
-    } else {
-        btnHistory.style.borderBottom = '2px solid var(--color-primary,#0D7377)';
-        btnHistory.style.fontWeight = '600';
-        btnHistory.className = 'btn btn-sm';
-        btnPending.style.borderBottom = 'none';
-        btnPending.style.fontWeight = 'normal';
-        btnPending.className = 'btn btn-sm btn-outline';
-    }
+    document.getElementById('tab-pending').classList.toggle('active', tab === 'pending');
+    document.getElementById('tab-history').classList.toggle('active', tab === 'history');
 }
 </script>
 {% endblock %}

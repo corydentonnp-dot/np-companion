@@ -2002,47 +2002,46 @@ def admin_api_settings():
 
 
 # ======================================================================
-# Phase 7.1: VIIS Immunization Scraper Endpoint
+# Phase 7.1: VIIS Immunization Scraper Endpoint (persistent)
 # ======================================================================
 @intel_bp.route('/api/patient/<mrn>/immunizations/viis')
 @login_required
 def viis_immunizations(mrn):
     """
     Query Virginia Immunization Information System for patient immunization records.
-    Requires patient name and DOB from PatientRecord.
+    Results are persisted to PatientImmunization and VIISCheck tables, and matching
+    care gaps are auto-closed.
     """
-    record = PatientRecord.query.filter_by(
-        user_id=current_user.id, mrn=mrn
-    ).first()
-    if not record or not record.patient_name:
-        return jsonify({'success': False, 'error': 'Patient record not found or missing name'}), 404
-
-    # Parse patient name and DOB
-    name = record.patient_name.strip()
-    parts = name.split(',') if ',' in name else name.rsplit(' ', 1)
-    if len(parts) >= 2:
-        last_name = parts[0].strip()
-        first_name = parts[1].strip().split()[0] if parts[1].strip() else ''
-    else:
-        last_name = name
-        first_name = ''
-
-    dob = (record.patient_dob or '').strip()
-    if not first_name or not last_name or not dob:
-        return jsonify({'success': False, 'error': 'Patient name or DOB incomplete'}), 400
-
-    # Format DOB to MM/DD/YYYY if stored as YYYYMMDD
-    if len(dob) == 8 and dob.isdigit():
-        dob = f"{dob[4:6]}/{dob[6:8]}/{dob[:4]}"
+    from app.services.viis_batch import run_viis_single
 
     try:
-        from scrapers.viis import VIISScraper
-        scraper = VIISScraper(current_app._get_current_object())
-        result = asyncio.run(scraper.lookup_patient(first_name, last_name, dob))
+        result = run_viis_single(mrn, current_user.id, current_app._get_current_object())
         return jsonify(result)
     except Exception as e:
         logger.debug('VIIS lookup failed for MRN ••%s: %s', mrn[-4:], e)
         return jsonify({'success': False, 'error': f'VIIS lookup failed: {e}'}), 503
+
+
+@intel_bp.route('/api/patient/<mrn>/viis-status')
+@login_required
+def viis_status(mrn):
+    """Return the last VIIS check info for a patient (for badge display)."""
+    from models.viis import VIISCheck
+
+    check = VIISCheck.query.filter(
+        VIISCheck.user_id == current_user.id,
+        VIISCheck.mrn == mrn,
+    ).order_by(VIISCheck.checked_at.desc()).first()
+
+    if not check:
+        return jsonify({'checked': False})
+
+    return jsonify({
+        'checked': True,
+        'status': check.status,
+        'immunization_count': check.immunization_count,
+        'checked_at': check.checked_at.isoformat() if check.checked_at else None,
+    })
 
 
 # ======================================================================

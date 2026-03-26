@@ -140,7 +140,7 @@
                 {% if e.status == 'active' %}
                 <div style="display:flex;gap:4px;justify-content:center;">
                     <button onclick="showTimeLog({{ e.id }})" class="btn btn-sm" style="font-size:11px;padding:3px 8px;">+ Time</button>
-                    <button onclick="ccmDisenroll({{ e.id }})" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:var(--color-danger);">Disenroll</button>
+                    <button onclick="ccmDisenroll({{ e.id }}, this)" class="btn btn-sm" style="font-size:11px;padding:3px 8px;color:var(--color-danger);">Disenroll</button>
                 </div>
                 {% endif %}
             </td>
@@ -219,22 +219,24 @@ document.getElementById('time-log-form').addEventListener('submit', function(ev)
     ev.preventDefault();
     var eid = document.getElementById('tl-enrollment-id').value;
     var fd = new FormData(this);
-    fetch('/ccm/' + eid + '/log-time', {method:'POST', body:new URLSearchParams(fd)})
+    var btn = this.querySelector('button[type="submit"]');
+    _withSpinner(btn, fetch('/ccm/' + eid + '/log-time', {method:'POST', body:new URLSearchParams(fd)})
     .then(function(r){return r.json()}).then(function(d){
         if(d.success){closeTimeLog();location.reload();}
         else{alert(d.error||'Failed to log time.');}
-    });
+    }));
 });
-function ccmDisenroll(id) {
+function ccmDisenroll(id, btn) {
     if(!confirm('Disenroll this patient from CCM?'))return;
-    fetch('/ccm/' + id + '/disenroll', {method:'POST'})
+    _withSpinner(btn, fetch('/ccm/' + id + '/disenroll', {method:'POST'})
     .then(function(r){return r.json()}).then(function(d){
         if(d.success)location.reload();else alert(d.error||'Failed');
-    });
+    }));
 }
 document.getElementById('ccm-enroll-form').addEventListener('submit', function(ev) {
     ev.preventDefault();
     var fd = new FormData(this);
+    var btn = this.querySelector('button[type="submit"]');
     // Parse conditions text into JSON array
     var raw = fd.get('conditions_text') || '';
     var conds = raw.split(',').map(function(s){
@@ -245,12 +247,12 @@ document.getElementById('ccm-enroll-form').addEventListener('submit', function(e
     }).filter(Boolean);
     fd.set('conditions', JSON.stringify(conds));
     fd.delete('conditions_text');
-    fetch('/ccm/enroll', {method:'POST', body:new URLSearchParams(fd)})
+    _withSpinner(btn, fetch('/ccm/enroll', {method:'POST', body:new URLSearchParams(fd)})
     .then(function(r){return r.json()}).then(function(d){
         var msg = document.getElementById('ccm-enroll-msg');
         if(d.success){msg.style.color='var(--color-green)';msg.textContent='Patient enrolled.';msg.style.display='';location.reload();}
         else{msg.style.color='var(--color-danger)';msg.textContent=d.error||'Failed.';msg.style.display='';}
-    });
+    }));
 });
 </script>
 {% endblock %}

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}My Patients — CareCompanion{% endblock %}
+{% block title %}Patients — CareCompanion{% endblock %}
 {% block page_id %}patient-roster{% endblock %}
 
 {% block subpanel %}
-<div class="context-panel-header"><h3>My Patients</h3></div>
+<div class="context-panel-header"><h3>Patients</h3></div>
 
 <div class="context-panel-section">
     <div class="cp-section-label">Search</div>
@@ -27,8 +27,20 @@
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-header__title">My Patients</h1>
+    <h1 class="page-header__title">Patients</h1>
     <span class="badge badge--info">{{ patients|length }} patient{{ 's' if patients|length != 1 }}</span>
+</div>
+
+{# ---- All / My Patients tabs ---- #}
+<div class="cc-tabs">
+    <a href="{{ url_for('patient.roster', view='all') }}"
+       class="cc-tab {{ 'active' if current_view == 'all' }}">
+       All Patients
+    </a>
+    <a href="{{ url_for('patient.roster', view='mine') }}"
+       class="cc-tab {{ 'active' if current_view == 'mine' }}">
+       My Patients
+    </a>
 </div>
 
 {% if patients %}
@@ -100,8 +112,8 @@
 {% else %}
 <div class="card">
     <div class="card-body" style="text-align:center;padding:40px;color:var(--text-secondary);">
-        <p style="font-size:16px;margin-bottom:8px;">No patients claimed yet</p>
-        <p style="font-size:13px;">Open a patient chart and click "Claim Patient" to add them to your panel.</p>
+        <p style="font-size:16px;margin-bottom:8px;">No patients {% if current_view == 'mine' %}claimed{% else %}found{% endif %}</p>
+        <p style="font-size:13px;">{% if current_view == 'mine' %}Open a patient chart and click "Claim Patient" to add them to your panel.{% else %}Import patient XML files to populate the roster.{% endif %}</p>
     </div>
 </div>
 {% endif %}

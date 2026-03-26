@@ -406,12 +406,12 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 
 | ID | Feature | Status | Tested | Verified | Plan Ref | Notes |
 |----|---------|--------|--------|----------|----------|-------|
-| F1 | Core Platform (auth, dashboard, base UI) | ✅ Complete | ✅ | ⬜ | Phase 1 | 20+ blueprints, dark mode, auto-lock, agent health |
+| F1 | Core Platform (auth, dashboard, base UI) | ✅ Complete | ✅ | ⬜ | Phase 1 | 20+ blueprints, dark mode, auto-lock, agent health. Tier 1 QA fixes applied (CL-T1): header z-index, dark mode modal contrast, schedule header restructure, Reference tier removal, typeahead search, widget gap compaction |
 | F2 | Background Agent & Scheduler | ✅ Complete | ✅ | ⬜ | Phase 1 | System tray, APScheduler, heartbeat, crash recovery |
 | F3 | NetPractice Schedule Scraper | ✅ Complete | ✅ | ⬜ | Phase 2 | Playwright-based, Chrome 136 debug profile |
 | F4 | Today View & Timer | ✅ Complete | ✅ | ⬜ | Phase 2 | Timer, manual entry, paste-from-OCR, double-booking (RP4) |
 | F5 | Inbox Monitor | ✅ Complete | ✅ | ⬜ | Phase 2 | OCR-based, snapshot diffs, priority detection |
-| F6 | Clinical Summary Parser (CDA XML) | ✅ Complete | ✅ | ⬜ | Phase 2 | Patient chart, vitals, meds, diagnoses, new-med education (RP4) |
+| F6 | Clinical Summary Parser (CDA XML) | ✅ Complete | ✅ | ⬜ | Phase 2 | Patient chart, vitals, meds, diagnoses, new-med education (RP4). CL-115: header redesign, Chrome-style tabs, med inline editing + fade-undo, ICD-10 autocomplete with local CSV + NIH API. CL-123: 15 rich demo patients (MRNs 90001-90015) with full clinical data across all 9 sections |
 | F7 | On-Call Note Keeper | ✅ Complete | ✅ | ⬜ | Phase 3 | CRUD, export, callback tracking |
 | F8 | Order Set Manager | ✅ Complete | ✅ | ⬜ | Phase 3 | Sets, items, versions, execution tracking |
 | F9 | Chart Prefill (AC Automation) | ⏸️ AC-Blocked | ⬜ | ⬜ | Phase 3 | AC Calibration Wizard built (UX-17); awaits live AC testing |
@@ -443,8 +443,13 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | F34 | CSS Design System & Template Migration (M1–M3) | ✅ Complete | ✅ | ⬜ | UI Overhaul | M1: core CSS classes (.page-header, .data-table, .cc-modal, .stat-grid, .action-bar, .form-row). M2: 8 primary templates migrated. M3: 31 secondary templates migrated (15 admin, 5 billing, 7 clinical tools, 4 settings). All inline styles replaced with utility classes. |
 | F35 | JS Enhancement System (M4) | ✅ Complete | ✅ | ⬜ | UI Overhaul | 4 init functions: sortable headers (6 tables), state persistence (billing_log filters), collapsible sections (admin_dashboard + 8 settings sections), quick actions (notifications mark-all-read). Pagination macro. |
 | F36 | Medication Monitoring Master Catalog | ✅ Complete | ✅ | ⬜ | MM-1–MM-8 | 5 models, 4 services, 20 routes, 5 templates, parser auto-catalog hook, admin dashboard card, calendar Why? button. 20/20 tests passing. |
+| F37 | Admin Rules Registry | ✅ Complete | ✅ | ⬜ | CL-RR1 | Unified view of all monitoring + care gap rules. Search, filter, trigger testing, toggle active. 7 API endpoints. |
+| F38 | Engine Benchmarks Suite | ✅ Complete | ✅ | ⬜ | CL-BM1 | 18 synthetic patients, 102 tests across billing/caregap/monitoring engines. CLI + Admin UI with history/trends. Performance thresholds configurable. Advanced tier. |
+| F39 | AC Chart-Open Detection Flag | ✅ Complete | ✅ | ⬜ | CF-1–CF-4 | EnumWindows-based chart detection, active_chart.json IPC, /api/active-chart endpoint, bottom-left widget with 5s polling, dark mode, dismiss/auto-clear. 14/14 tests. |
+| F40 | Patient Chart UI Overhaul (Phase 1) | 🔄 In Progress | ⬜ | ⬜ | CL-115, CL-120 | Header redesign, Chrome tabs, med fade-undo + inline edit + XML flags, dx status tabs, ICD-10 autocomplete. JS functions wired. Loading states & button feedback (UX-L.1–L.3) done. Pending: user testing, skeleton placeholders (UX-L.4). |
+| F41 | Test Infrastructure & Billing Test Suite | ✅ Complete | ✅ | ⬜ | CL-118 | conftest.py nested savepoint fixture (SQLAlchemy 2.0), 57 billing opportunity tests, 26 billing engine detector tests. 83/83 passing. Smoke test 6/6. |
 
-**Summary:** 34/35 complete · 1 blocked (F9, calibration wizard ready) · 1 not started (F30) · UI Overhaul M1–M4 complete · Med Catalog MM-1–MM-8 complete
+**Summary:** 38/40 complete · 1 in-progress (F40) · 1 blocked (F9) · 1 not started (F30) · UI Overhaul M1–M4 complete · Med Catalog complete · Rules Registry complete · Benchmarks complete · QA complete
 
 ---
 
@@ -461,6 +466,7 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | R5 | External | API key expiration (UMLS, Pushover) disrupts features | Medium | Graceful degradation: stale cache → hardcoded fallback → "not available" | User | Open |
 | R6 | Operational | Config drift between dev machine and work PC (FPA-D-NP-DENTON) | Medium | deploy_check.py pre-flight; DEPLOYMENT_GUIDE.md procedures | Copilot | Mitigating |
 | R7 | Technical | 64 migration files — complexity risk on fresh installs; recursion risk if migrations call create_app() | Low | All migrations idempotent; recursion guard in `_run_pending_migrations`; all migrations now use `def run_migration(app, db)` pattern; consolidation planned for SaaS | Copilot | Mitigating |
+| R8 | Operational | Orphaned Python processes (100-300) crash machine | Critical | CL-122: Process watchdog with `--watch` mode (30s CSV logging, parent-chain origin tagging); agent spawn guard (PID file + port 5001 check); run.bat pre-flight cleanup; auto-kill at 95% CPU for 3 min sustained | Copilot | Mitigating |
 
 ### Closed Risks
 *None yet.*

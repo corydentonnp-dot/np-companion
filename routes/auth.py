@@ -543,6 +543,19 @@ def settings_notifications():
         overrides['critical_value'] = 1
         prefs['notification_priority_overrides'] = overrides
 
+        # VIIS automation settings
+        prefs['viis_batch_enabled'] = 'viis_batch_enabled' in request.form
+        viis_time = request.form.get('viis_batch_time', '18:30')
+        if ':' in viis_time:
+            parts = viis_time.split(':')
+            prefs['viis_batch_hour'] = int(parts[0])
+            prefs['viis_batch_minute'] = int(parts[1])
+        prefs['viis_check_interval_days'] = int(
+            request.form.get('viis_check_interval_days', 365)
+        )
+        prefs['viis_delay_min'] = int(request.form.get('viis_delay_min', 5))
+        prefs['viis_delay_max'] = int(request.form.get('viis_delay_max', 15))
+
         current_user.preferences = prefs
         db.session.commit()
         flash('Notification preferences saved.', 'success')

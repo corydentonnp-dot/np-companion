@@ -96,7 +96,7 @@ Each page gets `{% block subpanel %}` with relocated filters/stats/actions + Qui
 | 18 | Preventive Gaps | `care_gaps_preventive.html` | Stats, compliance filter, Export CSV | Care Gaps, Lab Track, Monitoring |
 | 19 | Billing Tasks | `staff_billing_tasks.html` | Role tabs, timing toggles, task counts | Timer, Bonus, Orders |
 | 20 | Notifications | `notifications.html` | Type filter, Mark All Read, unread count | Inbox, On-Call, Patients |
-| 21 | Patient Chart | `patient_chart.html` | 7-tab vertical nav, patient summary (name/MRN/DOB/age), quick actions (Refresh/Generate Note/Upload XML), care gap alerts, overdue labs, risk scores, specialist list, Edit Mode toggle | Patients, Care Gaps, Lab Track |
+| 21 | Patient Chart | `patient_chart.html` | Chrome-style horizontal tab nav (7 tabs), header (LASTNAME, FIRST (MRN) + age/DOB), gear edit button, allergy badge, action buttons, status bar (VIIS/PDMP/Synced). Med widget: tab filters (Active/Inactive/All), inline dose/freq editing, 5s fade-undo on toggle, XML discrepancy flags. Dx widget: status tabs, combined copy+settings dropdown, ICD-10 autocomplete. | Patients, Care Gaps, Lab Track |
 
 ---
 

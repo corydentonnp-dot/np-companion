@@ -101,8 +101,62 @@ This means:
 - Using `timeout: 0` on commands that should finish in seconds.
 
 ### Process Limits
-- **Max 8ython processes** should exist at any time during development (Flask, Agent, and at most 2 one-shot scripts).
+- **Max 8 Python processes** should exist at any time during development (Flask, Agent, and at most 2 one-shot scripts).
 - If `(Get-Process python).Count` exceeds 8, **STOP all work** and clean up before continuing.
+
+---
+
+## Robustness-First Development (Override Convenience)
+
+> **Every script, automation, and infrastructure file must work on the first try, every time, on any terminal.** This is the #1 cause of wasted dev time. No "happy path only" code allowed for anything that runs outside a browser.
+
+### Platform Rules
+- **PowerShell for all scripts.** Never use `.bat` for logic. A `.bat` file may exist only as a thin ASCII shim (~5 lines) that calls a `.ps1` file. All logic, branching, and error handling lives in PowerShell.
+- **ASCII only in `.bat` and `.ps1` files.** No em-dashes, curly quotes, or Unicode. Use `--` instead of em-dash. Use `'` not smart quotes. cmd.exe corrupts multi-byte UTF-8 silently.
+- **No `timeout /t` in batch files.** It hangs in non-interactive terminals and piped contexts. Use `ping -n N 127.0.0.1 >nul` if you must wait in batch. In PowerShell, use `Start-Sleep`.
+- **No `ReadKey` in scripts that may run non-interactively.** Put `pause` in the `.bat` wrapper only. PowerShell scripts should `exit 0` or `exit 1` cleanly.
+
+### Defensive Script Patterns
+Every script that manages processes, ports, or external tools MUST follow these patterns:
+
+**Process cleanup -- check before killing:**
+```powershell
+$procs = Get-Process -Name python -ErrorAction SilentlyContinue
+if ($procs) {
+    $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+}
+```
+
+**Port checks -- wrap in try/catch:**
+```powershell
+try {
+    $busy = Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue |
+            Where-Object { $_.State -eq 'Listen' }
+} catch { $busy = $null }
+```
+
+**Subprocess timeout -- never let a child run forever:**
+```powershell
+$proc = Start-Process -FilePath $Python -ArgumentList $script -PassThru -NoNewWindow
+$finished = $proc.WaitForExit(120000)  # 120 seconds
+if (-not $finished) { $proc | Stop-Process -Force }
+```
+
+**NEVER use these in scripts:**
+- `taskkill /F /IM python.exe` -- hangs with 100+ processes
+- `timeout /t 3 /nobreak` -- hangs in piped/non-interactive terminals
+- `$ErrorActionPreference = 'Stop'` -- one failed cmdlet kills the entire launcher
+- `$Host.UI.RawUI.ReadKey(...)` -- blocks in non-interactive contexts
+- `taskkill /F /T` -- tree-kill hangs on complex process hierarchies
+
+### Script Quality Gate (Before Marking Complete)
+Before any `.ps1`, `.bat`, `.py` script, or automation file is marked done:
+1. **Does every external call have a timeout?** (`WaitForExit`, `subprocess timeout=`, `Start-Sleep` loop with max retries)
+2. **Does it handle "nothing to do" gracefully?** (No processes to kill? No port in use? No git changes? It should skip, not crash.)
+3. **Does it work from: double-click, VS Code terminal, cmd.exe, PowerShell 5, PowerShell 7?** If `.bat`, keep it to a shim. All logic in `.ps1`.
+4. **Is every error message actionable?** (Not just "failed" -- say what failed and suggest a fix.)
+5. **Are there no Unicode characters in `.bat` files?** (Keep them to 5-line ASCII shims.)
+6. **No `$ErrorActionPreference = 'Stop'` in launcher/infrastructure scripts.** Use targeted `-ErrorAction Stop` on individual cmdlets that truly must succeed, with `try/catch` around each.
 
 ---
 
@@ -145,7 +199,10 @@ except Exception as e:
 ```
 not_running → login_screen → home_screen → chart_open
 ```
-Detect via `win32gui.EnumWindows()` + title bar regex: `LASTNAME, FIRSTNAME  (DOB: M/D/YYYY; ID: XXXXX)`
+Detect via `win32gui.EnumWindows()` + title bar regex. Use `parse_chart_title()` from `agent/ac_window.py`:
+- Full subprocess format: `LASTNAME, FIRSTNAME  (DOB: M/D/YYYY; ID: XXXXX)  XX year old SEX, Portal: YES/NO Cell: (###) ###-####`
+- `get_all_chart_windows()` detects charts regardless of z-order (works even when browser is in focus)
+- Chart flag widget reads `data/active_chart.json` written by `mrn_reader` every 3s
 
 ---
 

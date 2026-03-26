@@ -25,6 +25,7 @@ from flask_login import login_required, current_user
 import config
 
 from models import db
+from sqlalchemy.orm import joinedload
 from models.patient import (
     PatientRecord, PatientVitals, PatientMedication,
     PatientDiagnosis, PatientAllergy, PatientImmunization,
@@ -229,13 +230,13 @@ def _classify_diagnosis(name, icd10):
     return 'chronic'
 
 
-def _backfill_icd10_codes(user_id, mrn):
+def _backfill_icd10_codes(user_id, mrn, cache_only=False):
     """
     Ensure every PatientDiagnosis for this patient has an NIH-verified
     ICD-10 code.  Resolution order:
       1. Check the local Icd10Cache table (fast, no network).
-      2. If not cached, query the NIH Clinical Tables API via ICD10Service
-         and store the result in icd10_cache for future lookups.
+      2. If not cached and cache_only=False, query the NIH Clinical Tables API
+         via ICD10Service and store the result in icd10_cache for future lookups.
       3. NIH API codes always supersede codes that came from XML files.
     """
     import logging
@@ -270,6 +271,10 @@ def _backfill_icd10_codes(user_id, mrn):
             if diag.icd10_code != cached.icd10_code:
                 diag.icd10_code = cached.icd10_code
                 changed = True
+            continue
+
+        # In cache-only mode, skip API calls
+        if cache_only:
             continue
 
         # 2. Query NIH API via service (preferred) or raw urllib (fallback)
@@ -420,13 +425,14 @@ def _enrich_rxnorm_single(rxcui):
     }
 
 
-def _enrich_rxnorm(rxcui, drug_name_fallback=''):
+def _enrich_rxnorm(rxcui, drug_name_fallback='', cache_only=False):
     """
     Return an RxNormCache row for the given RXCUI.
     Checks local cache first; on miss, queries the NIH API.
     If rxcui is empty, tries approximate match by drug name.
     Uses RxNormService when available (with caching + retry),
     falls back to raw urllib.
+    When cache_only=True, skip all network calls (fast path for page load).
     """
     import urllib.parse
     import logging
@@ -437,26 +443,27 @@ def _enrich_rxnorm(rxcui, drug_name_fallback=''):
 
     # Fallback: look up by name if no CUI
     if not rxcui and drug_name_fallback:
-        # Try RxNormService first (has better caching and retry)
-        try:
-            from app.services.api.rxnorm import RxNormService
-            svc = RxNormService(db)
-            result = svc.get_rxcui(drug_name_fallback)
-            if result and result.get('rxcui'):
-                rxcui = result['rxcui']
-        except Exception:
-            pass
+        if not cache_only:
+            # Try RxNormService first (has better caching and retry)
+            try:
+                from app.services.api.rxnorm import RxNormService
+                svc = RxNormService(db)
+                result = svc.get_rxcui(drug_name_fallback)
+                if result and result.get('rxcui'):
+                    rxcui = result['rxcui']
+            except Exception:
+                pass
 
-        # Fallback to raw API if service didn't resolve
-        if not rxcui:
-            data = _fetch_rxnorm_api(
-                '/rxcui.json?name=' + urllib.parse.quote(drug_name_fallback) + '&search=2'
-            )
-            if data:
-                group = data.get('idGroup', {})
-                rxn_list = group.get('rxnormId', [])
-                if rxn_list:
-                    rxcui = rxn_list[0]
+            # Fallback to raw API if service didn't resolve
+            if not rxcui:
+                data = _fetch_rxnorm_api(
+                    '/rxcui.json?name=' + urllib.parse.quote(drug_name_fallback) + '&search=2'
+                )
+                if data:
+                    group = data.get('idGroup', {})
+                    rxn_list = group.get('rxnormId', [])
+                    if rxn_list:
+                        rxcui = rxn_list[0]
 
     if not rxcui:
         return None
@@ -465,6 +472,10 @@ def _enrich_rxnorm(rxcui, drug_name_fallback=''):
     cached = RxNormCache.query.filter_by(rxcui=rxcui).first()
     if cached:
         return cached
+
+    # In cache-only mode, stop here — no API call
+    if cache_only:
+        return None
 
     # 2. Query API
     info = _enrich_rxnorm_single(rxcui)
@@ -575,7 +586,7 @@ def _parse_dose_fallback(drug_name, frequency):
     return '', ''
 
 
-def _enrich_medications(medications):
+def _enrich_medications(medications, cache_only=False):
     """
     Annotate a list of PatientMedication objects with RxNorm data.
     Adds .rx_info attribute to each medication (RxNormCache row or None).
@@ -583,11 +594,13 @@ def _enrich_medications(medications):
     When RxNorm lookup fails, falls back to regex-based dose parsing
     from drug_name or frequency (Instructions) to avoid showing
     raw quantity in the dose column.
+    When cache_only=True, skip network calls for faster page load.
     """
     for med in medications:
         med.rx_info = _enrich_rxnorm(
             getattr(med, 'rxnorm_cui', ''),
             drug_name_fallback=med.drug_name,
+            cache_only=cache_only,
         )
         # Standardize frequency display
         med.std_frequency = _standardize_frequency(med.frequency)
@@ -609,33 +622,62 @@ def _enrich_medications(medications):
     return medications
 
 
-def _prepopulate_sections(mrn, user_id):
-    """Build dict mapping AC note section names to pre-populated text."""
+def _prepopulate_sections(mrn, user_id, allergies=None, medications=None,
+                          diagnoses=None, immunizations=None):
+    """Build dict mapping AC note section names to pre-populated text.
+
+    Accepts pre-fetched query results to avoid redundant DB queries.
+    Falls back to querying if not provided.
+    """
     prepop = {}
-    allergies = PatientAllergy.query.filter_by(user_id=user_id, mrn=mrn).all()
+    if allergies is None:
+        allergies = PatientAllergy.query.filter_by(user_id=user_id, mrn=mrn).all()
     if allergies:
         prepop['Allergies'] = '\n'.join(
             f'{a.allergen} — {a.reaction}' if a.reaction else a.allergen
             for a in allergies
         )
-    meds = PatientMedication.query.filter_by(
-        user_id=user_id, mrn=mrn, status='active'
-    ).order_by(PatientMedication.drug_name).all()
-    if meds:
+    if medications is None:
+        medications = PatientMedication.query.filter_by(
+            user_id=user_id, mrn=mrn, status='active'
+        ).order_by(PatientMedication.drug_name).all()
+    active_meds = [m for m in medications if getattr(m, 'status', '') == 'active']
+    if active_meds:
         prepop['Medications'] = '\n'.join(
-            f'{m.drug_name} {m.dosage} {m.frequency}'.strip() for m in meds
+            f'{m.drug_name} {m.dosage} {m.frequency}'.strip() for m in active_meds
         )
-    diagnoses = PatientDiagnosis.query.filter_by(
-        user_id=user_id, mrn=mrn, status='active'
-    ).all()
-    if diagnoses:
+    if diagnoses is None:
+        diagnoses = PatientDiagnosis.query.filter_by(
+            user_id=user_id, mrn=mrn, status='active'
+        ).all()
+    active_dx = [d for d in diagnoses if getattr(d, 'status', '') == 'active']
+    if active_dx:
         lines = []
-        for d in diagnoses:
+        for d in active_dx:
             line = d.diagnosis_name
             if d.icd10_code:
                 line += f' ({d.icd10_code})'
             lines.append(line)
         prepop['Past Medical History'] = '\n'.join(lines)
+
+    if immunizations is None:
+        immunizations = PatientImmunization.query.filter_by(
+            user_id=user_id, mrn=mrn
+        ).order_by(PatientImmunization.date_given.desc()).all()
+    if immunizations:
+        seen = set()
+        imm_lines = []
+        for imm in immunizations:
+            date_str = imm.date_given.strftime('%m/%Y') if imm.date_given else 'Unknown'
+            key = (imm.vaccine_name, date_str)
+            if key not in seen:
+                seen.add(key)
+                label = imm.vaccine_name
+                if imm.source == 'viis':
+                    label += ' [VIIS]'
+                imm_lines.append(f'{label} ({date_str})')
+        prepop['Immunizations'] = ', '.join(imm_lines)
+
     return prepop
 
 
@@ -728,11 +770,11 @@ def chart(mrn):
         user_id=current_user.id, mrn=mrn
     ).order_by(PatientMedication.status, PatientMedication.drug_name).all()
 
-    # Enrich medications with RxNorm data (cached, minimal API calls)
-    _enrich_medications(medications)
+    # Cache-only enrichment on page load (no API calls — fast path)
+    _enrich_medications(medications, cache_only=True)
 
-    # Backfill missing ICD-10 codes on chart load (cached, minimal API calls)
-    _backfill_icd10_codes(current_user.id, mrn)
+    # Cache-only ICD-10 backfill (no API calls — fast path)
+    _backfill_icd10_codes(current_user.id, mrn, cache_only=True)
 
     diagnoses = PatientDiagnosis.query.filter_by(
         user_id=current_user.id, mrn=mrn
@@ -752,7 +794,7 @@ def chart(mrn):
 
     lab_tracks = LabTrack.query.filter_by(
         user_id=current_user.id, mrn=mrn, is_archived=False
-    ).all()
+    ).options(joinedload(LabTrack.results)).all()
 
     care_gaps = CareGap.query.filter_by(
         user_id=current_user.id, mrn=mrn
@@ -780,7 +822,13 @@ def chart(mrn):
     ).first()
     draft_data = json.loads(draft.section_data) if draft else {}
 
-    prepopulated = _prepopulate_sections(mrn, current_user.id)
+    prepopulated = _prepopulate_sections(
+        mrn, current_user.id,
+        allergies=allergies,
+        medications=medications,
+        diagnoses=diagnoses,
+        immunizations=immunizations,
+    )
 
     # USPSTF recommendations
     age = _calc_age_years(record.patient_dob if record else '')
@@ -813,26 +861,11 @@ def chart(mrn):
     chart_free_positions = current_user.get_pref('chart_free_widget_positions', None)
     chart_view_mode = current_user.get_pref('chart_view_mode', 'tabs')
 
-    # Phase 24.4 — Immunization series gaps for patient chart
+    # Phase 24.4 — Immunization series gaps deferred to AJAX for faster page load
     imm_series_gaps = []
-    try:
-        from app.services.immunization_engine import get_series_gaps, populate_patient_series
-        from billing_engine.shared import hash_mrn
-        mrn_hash = hash_mrn(mrn)
-        populate_patient_series(mrn_hash, current_user.id)
-        imm_series_gaps = get_series_gaps(mrn_hash, current_user.id, age)
-    except Exception:
-        pass
 
-    # Phase 32.1 — Auto-compute risk scores from available EHR data
+    # Phase 32.1 — Auto-compute risk scores deferred to AJAX for faster page load
     auto_scores = {}
-    try:
-        from app.services.calculator_engine import CalculatorEngine
-        _calc_engine = CalculatorEngine()
-        _score_list = _calc_engine.run_auto_scores(mrn, current_user.id)
-        auto_scores = {s['calculator_key']: s for s in _score_list if s.get('score_value') is not None}
-    except Exception:
-        pass
 
     return render_template(
         'patient_chart.html',
@@ -865,6 +898,76 @@ def chart(mrn):
         auto_scores=auto_scores,
         encounter_notes=encounter_notes,
     )
+
+
+# ======================================================================
+# POST /api/patient/<mrn>/enrich — Deferred API enrichment (RxNorm + ICD-10)
+# Called via AJAX after page load to avoid blocking chart render.
+# ======================================================================
+@patient_bp.route('/api/patient/<mrn>/enrich', methods=['POST'])
+@login_required
+def enrich_patient_data(mrn):
+    """Run full API enrichment (RxNorm + ICD-10) for a patient."""
+    medications = PatientMedication.query.filter_by(
+        user_id=current_user.id, mrn=mrn
+    ).all()
+    _enrich_medications(medications, cache_only=False)
+    _backfill_icd10_codes(current_user.id, mrn, cache_only=False)
+    return jsonify({'success': True})
+
+
+# ======================================================================
+# GET /api/patient/<mrn>/auto-scores — Deferred risk score computation
+# Called via AJAX after page load to avoid blocking chart render.
+# ======================================================================
+@patient_bp.route('/api/patient/<mrn>/auto-scores')
+@login_required
+def get_auto_scores(mrn):
+    """Compute auto risk scores for patient chart (deferred from page load)."""
+    try:
+        from app.services.calculator_engine import CalculatorEngine
+        engine = CalculatorEngine()
+        score_list = engine.run_auto_scores(mrn, current_user.id)
+        scores = {s['calculator_key']: s for s in score_list if s.get('score_value') is not None}
+        return jsonify({'success': True, 'data': scores})
+    except Exception as e:
+        current_app.logger.debug('Auto-scores failed for ••%s: %s', mrn[-4:], e)
+        return jsonify({'success': True, 'data': {}})
+
+
+# ======================================================================
+# GET /api/patient/<mrn>/imm-gaps — Deferred immunization series gaps
+# Called via AJAX after page load to avoid blocking chart render.
+# ======================================================================
+@patient_bp.route('/api/patient/<mrn>/imm-gaps')
+@login_required
+def get_imm_gaps(mrn):
+    """Compute immunization series gaps for patient chart (deferred from page load)."""
+    try:
+        from app.services.immunization_engine import get_series_gaps, populate_patient_series
+        from billing_engine.shared import hash_mrn
+
+        record = PatientRecord.query.filter_by(
+            user_id=current_user.id, mrn=mrn
+        ).first()
+        age = _calc_age_years(record.patient_dob if record else '')
+
+        mrn_hash = hash_mrn(mrn)
+        populate_patient_series(mrn_hash, current_user.id)
+        gaps = get_series_gaps(mrn_hash, current_user.id, age)
+        # Serialize for JSON (gaps may contain non-serializable objects)
+        gap_list = []
+        for g in gaps:
+            gap_list.append({
+                'series_name': g.get('series_name', ''),
+                'status': g.get('status', ''),
+                'message': g.get('message', ''),
+                'next_due': str(g.get('next_due', '')) if g.get('next_due') else None,
+            })
+        return jsonify({'success': True, 'data': gap_list})
+    except Exception as e:
+        current_app.logger.debug('Imm gaps failed for ••%s: %s', mrn[-4:], e)
+        return jsonify({'success': True, 'data': []})
 
 
 # ======================================================================
@@ -1472,17 +1575,28 @@ def upload_xml_auto():
 @patient_bp.route('/patients')
 @login_required
 def roster():
-    """Show all patients claimed by the current provider."""
-    patients = (
-        PatientRecord.query
-        .filter_by(claimed_by=current_user.id)
-        .order_by(PatientRecord.patient_name)
-        .all()
-    )
+    """Show patients — 'all' (imported by user) or 'mine' (claimed by user)."""
+    view = request.args.get('view', 'all')
+    if view == 'mine':
+        patients = (
+            PatientRecord.query
+            .filter_by(claimed_by=current_user.id)
+            .order_by(PatientRecord.patient_name)
+            .all()
+        )
+    else:
+        view = 'all'
+        patients = (
+            PatientRecord.query
+            .filter_by(user_id=current_user.id)
+            .order_by(PatientRecord.patient_name)
+            .all()
+        )
 
     return render_template(
         'patient_roster.html',
         patients=patients,
+        current_view=view,
     )
 
 
@@ -1523,6 +1637,40 @@ def toggle_item_status(mrn, item_type, item_id):
     item.status = new_status
     db.session.commit()
     return jsonify({'success': True, 'new_status': new_status})
+
+
+# ======================================================================
+# POST /patient/<mrn>/medication/<id>/update — Edit medication fields
+# ======================================================================
+@patient_bp.route('/patient/<mrn>/medication/<int:med_id>/update', methods=['POST'])
+@login_required
+def update_medication(mrn, med_id):
+    """Update a medication's dosage or frequency. Marks user_modified flag."""
+    med = PatientMedication.query.filter_by(
+        id=med_id, user_id=current_user.id, mrn=mrn
+    ).first()
+    if not med:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    field = data.get('field', '')
+    value = (data.get('value') or '').strip()
+
+    if field == 'dosage':
+        med.dosage = value
+    elif field == 'frequency':
+        med.frequency = value
+    else:
+        return jsonify({'success': False, 'error': 'Invalid field'}), 400
+
+    med.user_modified = True
+    try:
+        db.session.commit()
+        return jsonify({'success': True, 'field': field, 'value': value, 'user_modified': True})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating medication: {str(e)}")
+        return jsonify({'success': False, 'error': 'Update failed'}), 500
 
 
 # ======================================================================
@@ -1638,12 +1786,42 @@ def print_paperwork(mrn):
 
 
 # ======================================================================
-# GET /api/icd10/search — Proxy to NIH ICD-10 API
+# GET /api/icd10/search — Proxy to NIH ICD-10 API + local CSV fallback
 # ======================================================================
+_icd10_local_cache = None
+
+def _load_icd10_csv():
+    """Load local ICD-10 codes from billing CSV (cached in memory)."""
+    global _icd10_local_cache
+    if _icd10_local_cache is not None:
+        return _icd10_local_cache
+    import csv
+    csv_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        'Documents', 'billing_resources',
+        'calendar_year_dx_revenue_priority_icd10.csv'
+    )
+    codes = []
+    try:
+        with open(csv_path, encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                desc = (row.get('ICD & Description') or '').strip()
+                if not desc:
+                    continue
+                parts = desc.split(' ', 1)
+                if len(parts) == 2:
+                    codes.append({'code': parts[0], 'name': parts[1]})
+    except FileNotFoundError:
+        pass
+    _icd10_local_cache = codes
+    return codes
+
+
 @patient_bp.route('/api/icd10/search')
 @login_required
 def icd10_search():
-    """Search ICD-10-CM codes using the NIH Clinical Tables API."""
+    """Search ICD-10-CM codes — local CSV first, then NIH API."""
     import urllib.request
     import urllib.parse
     import urllib.error
@@ -1652,21 +1830,40 @@ def icd10_search():
     if not query or len(query) < 2:
         return jsonify({'results': []})
 
+    q_lower = query.lower()
+
+    # Local CSV matches first (instant, no network)
+    local_codes = _load_icd10_csv()
+    local_matches = [
+        c for c in local_codes
+        if q_lower in c['code'].lower() or q_lower in c['name'].lower()
+    ]
+
+    # NIH API for broader results
+    api_results = []
     url = (
         'https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search'
         '?sf=code,name&terms=' + urllib.parse.quote(query)
     )
-
     try:
         req = urllib.request.Request(url, headers={'Accept': 'application/json'})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode())
-            # API returns [total, codes, null, [code, name] pairs]
-            results = []
             if len(data) >= 4 and data[3]:
                 for item in data[3]:
                     if len(item) >= 2:
-                        results.append({'code': item[0], 'name': item[1]})
-            return jsonify({'results': results[:20]})
+                        api_results.append({'code': item[0], 'name': item[1]})
     except Exception:
-        return jsonify({'results': []})
+        pass  # local results still available
+
+    # Merge: local first, then API (deduplicated)
+    seen = set()
+    results = []
+    for r in local_matches + api_results:
+        if r['code'] not in seen:
+            seen.add(r['code'])
+            results.append(r)
+        if len(results) >= 25:
+            break
+
+    return jsonify({'results': results})

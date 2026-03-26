@@ -18,14 +18,14 @@
     <div class="card">
         <div class="card-header">Method 1: Medical Decision Making</div>
         <div class="card-body">
-            <label style="font-size:13px;display:block;margin-bottom:8px;">MDM Complexity Level:</label>
-            <select name="mdm_level" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:14px;margin-bottom:8px;">
+            <label class="form-label">MDM Complexity Level:</label>
+            <select name="mdm_level" class="form-input" style="margin-bottom:8px;">
                 <option value="straightforward" {{ 'selected' if result and result.mdm_input == 'Straightforward' else '' }}>Straightforward</option>
                 <option value="low" {{ 'selected' if result and result.mdm_input == 'Low' else '' }}>Low</option>
                 <option value="moderate" {{ 'selected' if result and result.mdm_input == 'Moderate' else '' }}>Moderate</option>
                 <option value="high" {{ 'selected' if result and result.mdm_input == 'High' else '' }}>High</option>
             </select>
-            <p style="font-size:12px;color:var(--text-secondary);margin:0;">Based on 2023 AMA E&M guidelines: number/complexity of problems, data reviewed, and risk of complications.</p>
+            <p class="form-hint">Based on 2023 AMA E&M guidelines: number/complexity of problems, data reviewed, and risk of complications.</p>
         </div>
     </div>
 
@@ -33,58 +33,58 @@
     <div class="card">
         <div class="card-header">Method 2: Total Time</div>
         <div class="card-body">
-            <label style="font-size:13px;display:block;margin-bottom:8px;">Total Physician Time (minutes):</label>
-            <input type="number" name="total_minutes" min="0" max="300" value="{{ result.time_input.split()[0] if result else '0' }}" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:14px;margin-bottom:8px;">
-            <p style="font-size:12px;color:var(--text-secondary);margin:0;">Total time on encounter date including charting, counseling, and care coordination. Per 2021 AMA time-based rules.</p>
+            <label class="form-label">Total Physician Time (minutes):</label>
+            <input type="number" name="total_minutes" min="0" max="300" value="{{ result.time_input.split()[0] if result else '0' }}" class="form-input" style="margin-bottom:8px;">
+            <p class="form-hint">Total time on encounter date including charting, counseling, and care coordination. Per 2021 AMA time-based rules.</p>
         </div>
     </div>
 </div>
 
-<div style="margin-top:16px;">
-    <button type="submit" style="padding:10px 28px;border-radius:6px;background:var(--color-navy);color:#fff;border:none;font-size:14px;cursor:pointer;min-height:44px;">Calculate (Higher of Two)</button>
+<div class="form-actions">
+    <button type="submit" class="btn btn-primary btn-lg">Calculate (Higher of Two)</button>
 </div>
 </form>
 
 {% if result %}
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:800px;margin-top:20px;">
     {# Winner card #}
-    <div class="card" style="border-left:4px solid var(--color-navy);">
+    <div class="card card--highlight-navy">
         <div class="card-header">Recommended Level</div>
         <div class="card-body">
             <div style="display:flex;gap:20px;align-items:center;margin-bottom:8px;">
-                <div style="text-align:center;">
-                    <div style="font-size:36px;font-weight:700;color:var(--color-navy);">{{ result.suggested_code }}</div>
-                    <div style="font-size:12px;color:var(--text-secondary);">CPT Code</div>
+                <div class="text-center">
+                    <div class="result-value">{{ result.suggested_code }}</div>
+                    <div class="result-label">CPT Code</div>
                 </div>
-                <div style="text-align:center;">
-                    <div style="font-size:28px;font-weight:700;color:var(--color-navy);">{{ result.rvu }}</div>
-                    <div style="font-size:12px;color:var(--text-secondary);">wRVU</div>
+                <div class="text-center">
+                    <div class="result-value--md">{{ result.rvu }}</div>
+                    <div class="result-label">wRVU</div>
                 </div>
             </div>
-            <div style="font-size:13px;color:var(--text-secondary);">Winner: {{ result.method }}</div>
+            <div class="form-hint">Winner: {{ result.method }}</div>
         </div>
     </div>
 
     {# MDM result #}
-    <div class="card" style="{% if result.method == 'MDM' %}border-left:4px solid #10b981;{% endif %}">
+    <div class="card {% if result.method == 'MDM' %}card--highlight-success{% endif %}">
         <div class="card-header">MDM Result</div>
         <div class="card-body">
             <div style="font-size:24px;font-weight:700;">{{ result.mdm_code }}</div>
-            <div style="font-size:13px;color:var(--text-secondary);">{{ result.mdm_rvu }} wRVU &middot; {{ result.mdm_input }}</div>
+            <div class="form-hint">{{ result.mdm_rvu }} wRVU &middot; {{ result.mdm_input }}</div>
         </div>
     </div>
 
     {# Time result #}
-    <div class="card" style="{% if result.method == 'Time-Based' %}border-left:4px solid #10b981;{% endif %}">
+    <div class="card {% if result.method == 'Time-Based' %}card--highlight-success{% endif %}">
         <div class="card-header">Time-Based Result</div>
         <div class="card-body">
             <div style="font-size:24px;font-weight:700;">{{ result.time_code }}</div>
-            <div style="font-size:13px;color:var(--text-secondary);">{{ result.time_rvu }} wRVU &middot; {{ result.time_input }}</div>
+            <div class="form-hint">{{ result.time_rvu }} wRVU &middot; {{ result.time_input }}</div>
         </div>
     </div>
 </div>
 
-<p style="margin:12px 0 0;font-size:12px;color:var(--text-secondary);max-width:800px;">
+<p class="form-hint" style="margin:12px 0 0;max-width:800px;">
     This is a guideline-based suggestion only. Always verify against your documentation and payer requirements.
 </p>
 {% endif %}
@@ -93,21 +93,21 @@
 <div class="card" style="max-width:640px;margin-top:20px;">
     <div class="card-header">E&M Quick Reference (Established Patient)</div>
     <div class="card-body">
-        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        <table class="data-table data-table--compact" style="width:100%;">
             <thead>
-                <tr style="border-bottom:2px solid var(--border,#e2e8f0);">
-                    <th style="padding:6px;text-align:left;">Code</th>
-                    <th style="padding:6px;text-align:left;">MDM</th>
-                    <th style="padding:6px;text-align:left;">Time</th>
-                    <th style="padding:6px;text-align:right;">wRVU</th>
+                <tr>
+                    <th>Code</th>
+                    <th>MDM</th>
+                    <th>Time</th>
+                    <th style="text-align:right;">wRVU</th>
                 </tr>
             </thead>
             <tbody>
-                <tr style="border-bottom:1px solid var(--border,#f1f5f9);"><td style="padding:6px;">99211</td><td>N/A (nurse visit)</td><td>&lt;10 min</td><td style="text-align:right;">0.18</td></tr>
-                <tr style="border-bottom:1px solid var(--border,#f1f5f9);"><td style="padding:6px;">99212</td><td>Straightforward</td><td>10-19 min</td><td style="text-align:right;">0.70</td></tr>
-                <tr style="border-bottom:1px solid var(--border,#f1f5f9);"><td style="padding:6px;">99213</td><td>Low</td><td>20-29 min</td><td style="text-align:right;">1.30</td></tr>
-                <tr style="border-bottom:1px solid var(--border,#f1f5f9);"><td style="padding:6px;">99214</td><td>Moderate</td><td>30-39 min</td><td style="text-align:right;">1.92</td></tr>
-                <tr><td style="padding:6px;">99215</td><td>High</td><td>40+ min</td><td style="text-align:right;">2.80</td></tr>
+                <tr><td>99211</td><td>N/A (nurse visit)</td><td>&lt;10 min</td><td style="text-align:right;">0.18</td></tr>
+                <tr><td>99212</td><td>Straightforward</td><td>10-19 min</td><td style="text-align:right;">0.70</td></tr>
+                <tr><td>99213</td><td>Low</td><td>20-29 min</td><td style="text-align:right;">1.30</td></tr>
+                <tr><td>99214</td><td>Moderate</td><td>30-39 min</td><td style="text-align:right;">1.92</td></tr>
+                <tr><td>99215</td><td>High</td><td>40+ min</td><td style="text-align:right;">2.80</td></tr>
             </tbody>
         </table>
     </div>

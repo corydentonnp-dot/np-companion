@@ -73,7 +73,7 @@
     {% for date_label, notes in grouped_notes.items() %}
     <h3 style="font-size:14px;color:var(--text-secondary);margin:20px 0 8px;font-weight:500;">{{ date_label }}</h3>
         {% for note in notes %}
-        <div class="card" data-filterable style="margin-bottom:8px;border-left:4px solid {{ 'var(--color-danger,#ef4444)' if note.documentation_status == 'pending' else ('var(--color-warning,#f59e0b)' if note.callback_promised and not note.callback_completed else 'var(--color-success,#22c55e)') }};">
+        <div class="card" data-filterable style="margin-bottom:8px;border-left:4px solid {{ 'var(--color-danger,#ef4444)' if note.documentation_status == 'pending' else ('var(--color-warning,#f59e0b)' if note.callback_promised and not note.callback_completed else 'var(--color-success,#22c55e)') }};" aria-label="{{ 'Pending' if note.documentation_status == 'pending' else ('Callback needed' if note.callback_promised and not note.callback_completed else 'Completed') }} on-call note: {{ note.chief_complaint or 'No complaint' }}">>
             <div class="card-body" style="padding:12px 16px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                     <div style="flex:1;min-width:200px;">

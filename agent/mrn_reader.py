@@ -13,7 +13,9 @@ Logs use sha256(mrn)[:12] only. UI displays last-4 digits only.
 
 import ctypes
 import ctypes.wintypes
+import json
 import logging
+import os
 import re
 import threading
 import time
@@ -24,6 +26,7 @@ from agent.ac_window import (
     get_ac_chart_title,
     get_active_patient_dob,
     get_active_patient_mrn,
+    get_all_chart_windows,
     is_ac_foreground,
 )
 from agent.ocr_helpers import get_ac_window_rect
@@ -41,6 +44,12 @@ _chart_open_since = {}       # MRN → when chart was first detected
 
 # Timeout before closing a TimeLog when MRN goes blank (seconds)
 _BLANK_TIMEOUT = 60
+
+# Path for active chart state file (transient, agent-written)
+_ACTIVE_CHART_PATH = os.path.join('data', 'active_chart.json')
+_ACTIVE_CHART_TMP = _ACTIVE_CHART_PATH + '.tmp'
+# Track when MRN last went blank so we can clear chart state after stale timeout
+_chart_flag_cleared = False
 
 
 def _hash_mrn(mrn):
@@ -206,6 +215,7 @@ def _read_mrn_inner(user_id):
     source = 'none'
     mrn = None
     dob = None
+    chart_data = None  # Structured data from parse_chart_title for chart flag
 
     # ---- Tier 1: Title bar parsing ------------------------------------
     if is_ac_foreground():
@@ -225,6 +235,22 @@ def _read_mrn_inner(user_id):
         mrn = _try_ocr_mrn()
         if mrn:
             source = 'ocr'
+
+    # ---- Chart flag: detect chart windows regardless of z-order ------
+    # get_all_chart_windows() uses EnumWindows so it finds charts even
+    # when the browser is in the foreground (unlike get_ac_chart_title).
+    chart_windows = get_all_chart_windows()
+    if chart_windows:
+        chart_data = chart_windows[0]  # Use the first chart found
+        # If MRN wasn't found via other tiers, use the EnumWindows result
+        if not mrn:
+            mrn = chart_data.get('mrn')
+            dob = chart_data.get('dob')
+            if mrn:
+                source = 'enum_windows'
+
+    # Write active chart state for the web UI chart flag widget
+    _write_active_chart(mrn, chart_data, source)
 
     # ---- TimeLog management -------------------------------------------
     from models import db
@@ -299,6 +325,59 @@ def _read_mrn_inner(user_id):
                 _blank_since = None
 
     return {'mrn': mrn, 'dob': dob, 'source': source}
+
+
+def _write_active_chart(mrn, chart_data, source):
+    """
+    Write active chart state to data/active_chart.json for the chart flag widget.
+    Uses atomic write (tmp + rename) to prevent partial reads by Flask.
+    """
+    global _chart_flag_cleared
+    if not getattr(config, 'CHART_FLAG_ENABLED', False):
+        return
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if mrn and chart_data:
+        # Chart is open — write patient data
+        payload = {
+            'active': True,
+            'mrn': chart_data.get('mrn', mrn),
+            'patient_name': f"{chart_data.get('last_name', '')}, {chart_data.get('first_name', '')}",
+            'dob': chart_data.get('dob', ''),
+            'age': chart_data.get('age', ''),
+            'sex': chart_data.get('sex', ''),
+            'detected_at': now_iso,
+            'source': source,
+        }
+        _chart_flag_cleared = False
+    else:
+        # No chart open — write inactive state (only once per transition)
+        if _chart_flag_cleared:
+            return
+        payload = {
+            'active': False,
+            'cleared_at': now_iso,
+        }
+        _chart_flag_cleared = True
+
+    try:
+        os.makedirs(os.path.dirname(_ACTIVE_CHART_PATH), exist_ok=True)
+        with open(_ACTIVE_CHART_TMP, 'w') as f:
+            json.dump(payload, f)
+        # Atomic rename
+        os.replace(_ACTIVE_CHART_TMP, _ACTIVE_CHART_PATH)
+    except Exception as e:
+        logger.debug(f'Failed to write active_chart.json: {e}')
+
+
+def clear_active_chart():
+    """Clear active_chart.json on agent startup to prevent stale state."""
+    try:
+        if os.path.exists(_ACTIVE_CHART_PATH):
+            os.remove(_ACTIVE_CHART_PATH)
+    except Exception:
+        pass
 
 
 def _close_active_session(user_id, now):

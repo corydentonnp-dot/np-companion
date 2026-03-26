@@ -1,216 +1,71 @@
 @echo off
-setlocal enabledelayedexpansion
-
-:: ================================================================
-:: CareCompanion — One-Click Launch
-:: ================================================================
-:: What this does:
-::   1. Kills all running Python / CareCompanion processes
-::   2. Waits for ports 5000 + 5001 to be free
-::   3. Runs the verification test suite
-::   4. Git commit + push (if .git exists and there are changes)
-::   5. Starts Flask server + background agent
-::   6. Launches the desktop exe (falls back to Chrome)
-::
-:: Usage:
-::   Double-click this file, or run from terminal:
-::     run.bat              — full sequence (default, hot-reload)
-::     run.bat --skip-tests — skip verification tests
-::     run.bat --skip-git   — skip git commit/push
-:: ================================================================
-
-:: Use the folder this bat file lives in — works no matter where project is
-set "PROJECT=%~dp0"
-:: Remove trailing backslash
-if "%PROJECT:~-1%"=="\" set "PROJECT=%PROJECT:~0,-1%"
-
-set "PYTHON=%PROJECT%\venv\Scripts\python.exe"
-set "EXE=%PROJECT%\dist\CareCompanion\CareCompanion.exe"
-set "ERRORLOG=%PROJECT%\data\launch_error.txt"
-
-:: Parse flags
-set SKIP_TESTS=0
-set SKIP_GIT=0
-for %%a in (%*) do (
-    if "%%a"=="--skip-tests" set SKIP_TESTS=1
-    if "%%a"=="--skip-git" set SKIP_GIT=1
-)
-
-:: Ensure data directory exists
-if not exist "%PROJECT%\data" mkdir "%PROJECT%\data"
-if exist "%ERRORLOG%" del "%ERRORLOG%"
-
-cd /d "%PROJECT%"
-
+cd /d "%~dp0"
+cls
 echo.
-echo ============================================
-echo  CareCompanion — One-Click Launch
-echo ============================================
+echo  ============================================
+echo   CareCompanion Launcher
+echo  ============================================
 echo.
-
-:: ------------------------------------------------------------------
-:: STEP 1: Kill all existing processes
-:: ------------------------------------------------------------------
-echo [1/6] Stopping existing processes...
-taskkill /F /IM python.exe >nul 2>&1
-taskkill /F /IM pythonw.exe >nul 2>&1
-taskkill /F /IM CareCompanion.exe >nul 2>&1
-timeout /t 3 /nobreak >nul
-echo       Done.
-
-:: ------------------------------------------------------------------
-:: STEP 2: Verify ports are free
-:: ------------------------------------------------------------------
-echo [2/6] Checking ports 5000 + 5001...
-set RETRIES=0
-:CHECK_PORT
-netstat -ano | findstr ":5000 " | findstr "LISTENING" >nul 2>&1
-if %errorlevel%==0 (
-    set /a RETRIES+=1
-    if !RETRIES! geq 10 (
-        echo ERROR: Port 5000 still in use after 10 retries. >> "%ERRORLOG%"
-        netstat -ano | findstr ":5000 " >> "%ERRORLOG%"
-        goto :ERROR
-    )
-    echo       Port 5000 still in use, waiting... ^(attempt !RETRIES!/10^)
-    timeout /t 2 /nobreak >nul
-    goto :CHECK_PORT
-)
-echo       Ports are free.
-
-:: ------------------------------------------------------------------
-:: STEP 3: Verify Python environment
-:: ------------------------------------------------------------------
-echo [3/6] Checking Python environment...
-if not exist "%PYTHON%" (
-    echo ERROR: Python not found at %PYTHON% >> "%ERRORLOG%"
-    echo Make sure the virtual environment exists: >> "%ERRORLOG%"
-    echo   python -m venv venv >> "%ERRORLOG%"
-    goto :ERROR
-)
-echo       Python OK.
-
-:: ------------------------------------------------------------------
-:: STEP 4: Run verification tests (unless --skip-tests)
-:: ------------------------------------------------------------------
-if %SKIP_TESTS%==1 (
-    echo [4/6] Skipping tests ^(--skip-tests flag^)
-) else (
-    echo [4/6] Running verification tests...
-    echo.
-    "%PYTHON%" tests\test_verification.py
-    set TEST_EXIT=!errorlevel!
-
-    if !TEST_EXIT! neq 0 (
-        echo. >> "%ERRORLOG%"
-        echo ============================================ >> "%ERRORLOG%"
-        echo  TEST FAILURE — %date% %time% >> "%ERRORLOG%"
-        echo ============================================ >> "%ERRORLOG%"
-        echo test_verification.py exited with code !TEST_EXIT! >> "%ERRORLOG%"
-        "%PYTHON%" tests\test_verification.py >> "%ERRORLOG%" 2>&1
-        goto :ERROR
-    )
-    echo.
-    echo       All tests passed!
-)
-
-:: ------------------------------------------------------------------
-:: STEP 5: Git commit + push (unless --skip-git or no .git)
-:: ------------------------------------------------------------------
-if %SKIP_GIT%==1 (
-    echo [5/6] Skipping git ^(--skip-git flag^)
-) else if not exist "%PROJECT%\.git" (
-    echo [5/6] Skipping git ^(no .git repository found^)
-    echo       Run 'git init' to enable auto-commit on launch.
-) else (
-    echo [5/6] Git commit + push...
-
-    :: Check if there are any changes to commit
-    git status --porcelain 2>nul | findstr /r /c:"." >nul 2>&1
-    if !errorlevel!==0 (
-        git add -A
-        git commit -m "Auto-commit before launch — %date% %time%"
-        if !errorlevel! neq 0 (
-            echo       Warning: git commit failed, continuing anyway...
-        ) else (
-            echo       Committed changes.
-        )
-    ) else (
-        echo       No changes to commit.
-    )
-
-    :: Push if remote exists
-    git remote 2>nul | findstr /r /c:"." >nul 2>&1
-    if !errorlevel!==0 (
-        git push 2>nul
-        if !errorlevel!==0 (
-            echo       Pushed to remote.
-        ) else (
-            echo       Warning: git push failed ^(offline or auth issue^), continuing...
-        )
-    ) else (
-        echo       No remote configured, skipping push.
-    )
-)
-
-:: ------------------------------------------------------------------
-:: STEP 6: Start server + launch app
-:: ------------------------------------------------------------------
-echo [6/6] Starting dev server ^(hot-reload^)...
-start /d "%PROJECT%" "CareCompanion Server" "%PYTHON%" launcher.py --mode=dev
-
-:: Wait for server to be ready — uses netstat (fast, no Python spawn)
-echo       Waiting for server to bind port 5000...
-set RETRIES=0
-:WAIT_SERVER
-timeout /t 2 /nobreak >nul
-netstat -ano | findstr ":5000 " | findstr "LISTENING" >nul 2>&1
-if !errorlevel! neq 0 (
-    set /a RETRIES+=1
-    echo       Still waiting... ^(!RETRIES!/15^)
-    if !RETRIES! geq 15 (
-        echo.
-        echo       Server did not bind port 5000 within 30 seconds.
-        echo       Check the "CareCompanion Server" window for errors.
-        echo       Launching Chrome anyway...
-        goto :LAUNCH_APP
-    )
-    goto :WAIT_SERVER
-)
-echo       Server is running on port 5000.
-
-:: Launch app
-:LAUNCH_APP
-echo       Opening Chrome...
-start "" "chrome" "http://127.0.0.1:5000/dashboard"
-
+echo   [1] Start localhost server  (dev mode)
+echo   [2] Start CareCompanion.exe (packaged app)
+echo   [3] Start with process watchdog
 echo.
-echo ============================================
-echo  CareCompanion is running!
-echo  Dashboard: http://127.0.0.1:5000/dashboard
-echo ============================================
-echo.
-echo Flags:  --skip-tests  --skip-git
-echo.
-echo Press any key to close this window.
-echo (The server keeps running in the background)
-pause >nul
-goto :EOF
+choice /c 123 /n /m "  Choose (1, 2, or 3): "
+if errorlevel 3 goto startwatch
+if errorlevel 2 goto startexe
 
-:: ------------------------------------------------------------------
-:: ERROR HANDLER
-:: ------------------------------------------------------------------
-:ERROR
+:startdev
 echo.
-echo ============================================
-echo  LAUNCH FAILED
-echo ============================================
+echo  Cleaning up orphaned processes...
+powershell -ExecutionPolicy Bypass -File "%~dp0run.ps1" --cleanup-only
 echo.
-if exist "%ERRORLOG%" (
-    type "%ERRORLOG%"
-    echo.
-    echo Error log saved to: %ERRORLOG%
+echo  Starting CareCompanion dev server...
+start "CareCompanion Server" cmd /k powershell -ExecutionPolicy Bypass -File "%~dp0run.ps1"
+echo  Waiting for server to boot...
+ping -n 5 127.0.0.1 >nul
+echo.
+echo  ============================================
+echo   CareCompanion is running!
+echo   http://127.0.0.1:5000/dashboard
+echo  ============================================
+echo.
+echo  The server is in the other command window.
+echo  Close THAT window to stop the server.
+echo.
+pause
+exit /b
+
+:startwatch
+echo.
+echo  Cleaning up orphaned processes...
+powershell -ExecutionPolicy Bypass -File "%~dp0run.ps1" --cleanup-only
+echo.
+echo  Starting CareCompanion with process watchdog...
+start "CareCompanion Server" cmd /k powershell -ExecutionPolicy Bypass -File "%~dp0run.ps1" --watch-processes
+echo  Waiting for server to boot...
+ping -n 5 127.0.0.1 >nul
+echo.
+echo  ============================================
+echo   CareCompanion is running with watchdog!
+echo   http://127.0.0.1:5000/dashboard
+echo  ============================================
+echo.
+echo  The server + watchdog are in the other window.
+echo  Close THAT window to stop everything.
+echo.
+pause
+exit /b
+
+:startexe
+if not exist "dist\CareCompanion\CareCompanion.exe" (
+  echo.
+  echo  ERROR: CareCompanion.exe not found.
+  echo  Build it first:  venv\Scripts\python.exe build.py
+  echo.
+  pause
+  exit /b
 )
 echo.
-echo Press any key to close...
-pause >nul
+echo  Starting CareCompanion.exe...
+start "" "dist\CareCompanion\CareCompanion.exe"
+exit /b

@@ -41,7 +41,10 @@ For each patient on the schedule:
 1. In the **Patient List** panel — the blue search field underneath the "Schedule", "Messages", "Reports", "Secure" buttons — search by patient ID (from the NetPractice schedule)
 2. Verify the first and last name match the expected patient
 3. **Double-click** the verified name to open a new chart
-4. In the chart window (title bar format: `LASTNAME, FIRSTNAME  (DOB: M/D/YYYY; ID: XXXXX)`), select the **Visit Template** radio button (not "Encounter")
+4. In the chart window (title bar format: `LASTNAME, FIRSTNAME  (DOB: M/D/YYYY; ID: XXXXX)  XX year old SEX, Portal: YES/NO Cell: (###) ###-####`), select the **Visit Template** radio button (not "Encounter")
+   - **Primary detection:** `agent/ac_window.py` → `parse_chart_title()` regex extracts all fields (last_name, first_name, dob, mrn, age, sex, portal, cell)
+   - **Z-order independent:** `get_all_chart_windows()` uses `EnumWindows` to detect chart subprocess windows even when the browser is in focus
+   - OCR detection is fallback tier 2/3 only
 5. Click the **Select Template** dropdown → **Procedure Visit** → **Companion**
 6. Clear any popup boxes (click OK or X)
 7. Press **Ctrl+S** to save and close the chart (this sends the note to the inbox)

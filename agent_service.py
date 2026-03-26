@@ -850,6 +850,19 @@ class AgentService:
                     db.session.rollback()
                     logger.error(f'Pre-visit billing failed for user {user.id}: {e}')
 
+    def job_viis_previsit(self):
+        """VIIS: Nightly batch lookup for tomorrow's scheduled patients with open vaccine care gaps."""
+        from app.services.viis_batch import run_viis_batch
+        from models.user import User
+
+        with self.app.app_context():
+            users = User.query.filter_by(is_active_account=True).all()
+            for user in users:
+                try:
+                    run_viis_batch(user.id, self.app)
+                except Exception as e:
+                    logger.error(f'VIIS pre-visit batch failed for user {user.id}: {e}')
+
     def job_daily_backup(self):
         """Phase 18: Nightly database backup with PRAGMA integrity_check."""
         import shutil
@@ -1178,6 +1191,9 @@ This is an automated summary from CareCompanion. Log in to view full metrics.</p
             previsit_billing_fn=lambda: self.safe_job('previsit_billing', self.job_previsit_billing),
             daily_backup_fn=lambda: self.safe_job('daily_backup', self.job_daily_backup),
             escalation_fn=lambda: self.safe_job('escalation_check', self.job_escalation_check),
+            viis_previsit_fn=lambda: self.safe_job('viis_previsit', self.job_viis_previsit),
+            viis_previsit_hour=getattr(config, 'VIIS_BATCH_HOUR', 18),
+            viis_previsit_minute=getattr(config, 'VIIS_BATCH_MINUTE', 30),
             tcm_deadline_fn=lambda: self.safe_job('tcm_deadline_check', self.job_tcm_deadline_checker),
             ccm_month_end_fn=lambda: self.safe_job('ccm_month_end', self.job_ccm_month_end),
         )
@@ -1333,8 +1349,29 @@ This is an automated summary from CareCompanion. Log in to view full metrics.</p
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
+    def _write_pid_file(self):
+        """Write own PID to data/agent.pid so other code can detect a running agent."""
+        try:
+            pid_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+            os.makedirs(pid_dir, exist_ok=True)
+            pid_path = os.path.join(pid_dir, 'agent.pid')
+            with open(pid_path, 'w') as f:
+                f.write(str(self.pid))
+        except Exception as e:
+            logger.warning(f'Failed to write PID file: {e}')
+
+    def _delete_pid_file(self):
+        """Remove data/agent.pid on clean shutdown."""
+        try:
+            pid_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'agent.pid')
+            if os.path.exists(pid_path):
+                os.remove(pid_path)
+        except Exception as e:
+            logger.warning(f'Failed to delete PID file: {e}')
+
     def start(self):
         logger.info('Agent starting...')
+        self._write_pid_file()
 
         recovery_summary = self.perform_crash_recovery()
         self.write_startup_log(
@@ -1350,10 +1387,11 @@ This is an automated summary from CareCompanion. Log in to view full metrics.</p
     def start_headless(self):
         """
         Start the agent without blocking on pystray.
-        Used by launcher.py — the tray icon is managed by the launcher's
+        Used by launcher.py -- the tray icon is managed by the launcher's
         main thread instead.
         """
         logger.info('Agent starting (headless)...')
+        self._write_pid_file()
 
         recovery_summary = self.perform_crash_recovery()
         self.write_startup_log(
@@ -1392,6 +1430,7 @@ This is an automated summary from CareCompanion. Log in to view full metrics.</p
         except Exception as e:
             logger.warning(f'HTTP server shutdown warning: {e}')
 
+        self._delete_pid_file()
         self.write_shutdown_log()
         logger.info('Agent stopped.')
 

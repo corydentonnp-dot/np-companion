@@ -56,6 +56,89 @@ def api_health():
 
 
 # ======================================================================
+# GET /api/health/deep — thorough diagnostic check (no auth)
+# ======================================================================
+@agent_api_bp.route('/api/health/deep')
+def api_health_deep():
+    """
+    Deep health check that validates DB tables, blueprints, billing
+    engine, log paths, and demo data. Used by QA scripts and CI.
+    """
+    checks = {}
+
+    # --- DB connectivity -------------------------------------------------
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        checks['db'] = 'ok'
+    except Exception as e:
+        checks['db'] = f'error: {str(e)}'
+
+    # --- Required tables -------------------------------------------------
+    required_tables = [
+        'users', 'patient_records', 'billing_opportunities', 'care_gaps',
+        'schedules', 'bonus_tracker', 'agent_logs', 'agent_errors',
+    ]
+    try:
+        result = db.session.execute(
+            db.text("SELECT name FROM sqlite_master WHERE type='table'")
+        )
+        existing = {row[0] for row in result}
+        missing = [t for t in required_tables if t not in existing]
+        checks['tables'] = {'missing': missing, 'ok': len(missing) == 0}
+    except Exception as e:
+        checks['tables'] = {'error': str(e), 'ok': False}
+
+    # --- Blueprints registered -------------------------------------------
+    bp_names = sorted(current_app.blueprints.keys())
+    checks['blueprints'] = {'count': len(bp_names), 'names': bp_names}
+
+    # --- Billing engine detectors ----------------------------------------
+    try:
+        from billing_engine.engine import BillingCaptureEngine
+        engine = BillingCaptureEngine(db_session=db.session)
+        detector_count = len(engine.detectors)
+        checks['billing_detectors'] = {'count': detector_count, 'ok': detector_count > 0}
+    except Exception as e:
+        checks['billing_detectors'] = {'error': str(e), 'ok': False}
+
+    # --- Log paths exist -------------------------------------------------
+    log_dir = os.path.join(current_app.root_path, 'data', 'logs')
+    checks['log_directory'] = {
+        'path': log_dir,
+        'exists': os.path.isdir(log_dir),
+    }
+
+    # --- Demo data -------------------------------------------------------
+    try:
+        from models.patient import PatientRecord
+        demo_count = PatientRecord.query.filter(
+            PatientRecord.mrn.between('90001', '90035')
+        ).count()
+        checks['demo_data'] = {'count': demo_count, 'ok': demo_count > 0}
+    except Exception as e:
+        checks['demo_data'] = {'error': str(e), 'ok': False}
+
+    # --- Overall status --------------------------------------------------
+    all_ok = (
+        checks.get('db') == 'ok'
+        and checks.get('tables', {}).get('ok', False)
+        and checks.get('billing_detectors', {}).get('ok', False)
+        and checks.get('demo_data', {}).get('ok', False)
+    )
+
+    version = current_app.config.get('APP_VERSION', 'unknown')
+    now = datetime.now(timezone.utc)
+    uptime = (now - _server_started_at).total_seconds()
+
+    return jsonify({
+        'status': 'ok' if all_ok else 'degraded',
+        'version': version,
+        'uptime_seconds': int(uptime),
+        'checks': checks,
+    }), 200 if all_ok else 503
+
+
+# ======================================================================
 # Helpers
 # ======================================================================
 def _read_active_user_file():
@@ -216,13 +299,47 @@ def admin_restart_agent():
     """
     Launches agent.py as a new detached subprocess.  The old agent
     (if running) should detect the new PID file and shut down.
+
+    Safety: checks for existing agent via PID file + port 5001 before spawning.
     """
     try:
+        # -- Guard: check if agent is already running --
+        pid_file = os.path.join(current_app.root_path, 'data', 'agent.pid')
+        if os.path.exists(pid_file):
+            try:
+                with open(pid_file, 'r') as f:
+                    existing_pid = int(f.read().strip())
+                # Verify the process is actually alive
+                import psutil
+                if psutil.pid_exists(existing_pid):
+                    proc = psutil.Process(existing_pid)
+                    if proc.is_running() and 'python' in proc.name().lower():
+                        return jsonify({
+                            'success': False,
+                            'error': f'Agent already running (PID {existing_pid}). Kill it first or wait for it to stop.',
+                        }), 409
+            except (ValueError, ImportError, Exception):
+                # PID file corrupt or psutil missing -- proceed with restart
+                pass
+
+        # Also check port 5001 as a fallback
+        try:
+            import socket
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                result = s.connect_ex(('127.0.0.1', 5001))
+                if result == 0:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Agent port 5001 is already in use. An agent may be running.',
+                    }), 409
+        except Exception:
+            pass
+
         from utils.paths import is_frozen
         python_exe = sys.executable
 
         if is_frozen():
-            # In exe mode, the exe itself handles --mode=agent
             cmd = [python_exe, '--mode=agent']
         else:
             agent_path = os.path.join(current_app.root_path, 'agent.py')
@@ -233,9 +350,7 @@ def admin_restart_agent():
                 }), 404
             cmd = [python_exe, agent_path]
 
-        # Start as a detached process (Windows-friendly)
-        # CREATE_NEW_PROCESS_GROUP lets it survive if Flask restarts
-        subprocess.Popen(
+        proc = subprocess.Popen(
             cmd,
             cwd=os.path.dirname(python_exe) if is_frozen() else current_app.root_path,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
@@ -243,9 +358,17 @@ def admin_restart_agent():
             stderr=subprocess.DEVNULL,
         )
 
+        # Write PID file so future calls can detect this agent
+        try:
+            os.makedirs(os.path.dirname(pid_file), exist_ok=True)
+            with open(pid_file, 'w') as f:
+                f.write(str(proc.pid))
+        except Exception:
+            pass
+
         return jsonify({
             'success': True,
-            'message': 'Agent restart initiated',
+            'message': f'Agent restart initiated (PID {proc.pid})',
         })
     except Exception as e:
         return jsonify({

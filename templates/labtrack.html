@@ -308,7 +308,7 @@ function renderLabRefList(labs) {
                 panelBadges += '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--color-teal,#26a69a);color:#fff;margin-left:3px;">' + _esc(p) + '</span>';
             });
         }
-        html += '<div class="lab-ref-row" onclick="openLabDetail(\'' + _esc(lab.name).replace(/'/g, "\\'") + '\')" style="display:flex;align-items:center;gap:12px;padding:10px 24px;border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;transition:background 0.1s;" onmouseenter="this.style.background=\'var(--bg-muted)\'" onmouseleave="this.style.background=\'\'">';
+        html += '<div class="lab-ref-row" role="button" tabindex="0" onclick="openLabDetail(\'' + _esc(lab.name).replace(/'/g, "\\'") + '\')" onkeydown="if(event.key===\'Enter\'){this.click();}" style="display:flex;align-items:center;gap:12px;padding:10px 24px;border-bottom:1px solid var(--border,#f1f5f9);cursor:pointer;transition:background 0.1s;" onmouseenter="this.style.background=\'var(--bg-muted)\'" onmouseleave="this.style.background=\'\'">';
         html += '<div style="flex:1;min-width:0;">';
         html += '<div style="font-weight:600;font-size:14px;">' + _esc(lab.name) + ' <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">(' + _esc(lab.abbr) + ')</span>' + panelBadges + '</div>';
         if (ref.what) html += '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">' + _esc(ref.what) + '</div>';

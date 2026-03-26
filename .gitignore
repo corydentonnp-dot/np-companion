@@ -39,3 +39,4 @@ build/
 
 # Workspace
 *.code-workspace
+data/active_chart.json

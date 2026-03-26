@@ -98,6 +98,7 @@ class PatientMedication(db.Model):
     frequency = db.Column(db.String(100), default='')
     status = db.Column(db.String(20), default='active')  # active / inactive
     start_date = db.Column(db.DateTime, nullable=True)
+    user_modified = db.Column(db.Boolean, default=False)  # True when user edited locally
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc)
     )
@@ -149,7 +150,7 @@ class PatientAllergy(db.Model):
 
 
 class PatientImmunization(db.Model):
-    """Immunization record from parsed Clinical Summary XML."""
+    """Immunization record from parsed Clinical Summary XML or VIIS lookup."""
     __tablename__ = 'patient_immunizations'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -159,12 +160,26 @@ class PatientImmunization(db.Model):
     mrn = db.Column(db.String(20), nullable=False, index=True)
     vaccine_name = db.Column(db.String(200), nullable=False)
     date_given = db.Column(db.DateTime, nullable=True)
+    # Source: 'ac' (Amazing Charts XML) or 'viis' (VIIS scraper)
+    source = db.Column(db.String(10), nullable=False, default='ac')
+    # Links VIIS-sourced records to their lookup (nullable for AC records)
+    viis_check_id = db.Column(
+        db.Integer, db.ForeignKey('viis_check.id'), nullable=True, index=True
+    )
     created_at = db.Column(
         db.DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
+    # Unique constraint: prevent duplicate immunization records
+    __table_args__ = (
+        db.UniqueConstraint(
+            'mrn', 'vaccine_name', 'date_given', 'source',
+            name='uq_patient_imm_mrn_vaccine_date_source'
+        ),
+    )
+
     def __repr__(self):
-        return f'<PatientImmunization {self.id} {self.vaccine_name}>'
+        return f'<PatientImmunization {self.id} {self.vaccine_name} ({self.source})>'
 
 
 class PatientSpecialist(db.Model):

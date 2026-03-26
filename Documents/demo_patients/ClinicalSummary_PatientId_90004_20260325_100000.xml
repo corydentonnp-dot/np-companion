@@ -1,0 +1,311 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603251000-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="00000000-0000-0000-0000-000000090004" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="90004" />
+      <addr use="HP">
+        <streetAddressLine>502 Willowbrook Place</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23113</postalCode>
+        <country nullFlavor="NI" />
+        <useablePeriod xsi:type="IVL_TS"><low value="20260325" /></useablePeriod>
+      </addr>
+      <telecom use="HP" value="tel:+1(804)-555-1004" />
+      <patient>
+        <name use="L">
+          <given>Patricia</given>
+          <family>OBrien</family>
+        </name>
+        <administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female" codeSystemName="AdministrativeGender" />
+        <birthTime value="19471022" />
+        <maritalStatusCode code="W" displayName="Widowed" codeSystem="2.16.840.1.113883.5.2" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode code="2106-3" displayName="White" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <ethnicGroupCode code="2186-5" displayName="Not Hispanic or Latino" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <languageCommunication>
+          <languageCode code="en" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="202603251000-0400" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime><low value="19471022" /><high value="20260325" /></effectiveTime>
+      <performer typeCode="PRF">
+        <time><low value="20250101" /></time>
+        <assignedEntity>
+          <id extension="1891645123" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter>
+      <id root="00000000-0000-0000-0000-000000090004" extension="1306884820" />
+      <code code="AMB" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Ambulatory" />
+      <effectiveTime><low value="202603251000-0400" /></effectiveTime>
+      <location>
+        <healthCareFacility>
+          <id root="2.16.840.1.113883.19" extension="1306884820" />
+          <location>
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </location>
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Substance</th><th>Reaction</th><th>Severity</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Opioids [RxNorm: 27384]</td><td>Confusion/Delirium</td><td>severe</td><td>active</td></tr>
+                <tr><td>Fluoroquinolones [RxNorm: 372832]</td><td>Tendon rupture risk</td><td>severe</td><td>active</td></tr>
+                <tr><td>Shellfish</td><td>Hives</td><td>moderate</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Medications" />
+          <title>MEDICATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Medication</th><th>Generic Name</th><th>Instructions</th><th>Dosage</th><th>Start Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>donepezil 10 mg tablet [RxNorm: 312935]</td><td>donepezil</td><td>Take 1 tablet by mouth at bedtime</td><td>10 mg</td><td>03/15/2024</td><td>active</td></tr>
+                <tr><td>memantine 10 mg tablet [RxNorm: 312113]</td><td>memantine</td><td>Take 1 tablet by mouth twice daily</td><td>10 mg</td><td>09/01/2024</td><td>active</td></tr>
+                <tr><td>alendronate 70 mg tablet [RxNorm: 151558]</td><td>alendronate</td><td>Take 1 tablet by mouth weekly on empty stomach</td><td>70 mg</td><td>02/01/2026</td><td>active</td></tr>
+                <tr><td>calcium carbonate 600 mg + D3 400 IU [RxNorm: 215459]</td><td>calcium/vitamin D</td><td>Take 1 tablet by mouth twice daily</td><td>600 mg/400 IU</td><td>02/01/2026</td><td>active</td></tr>
+                <tr><td>acetaminophen 500 mg tablet [RxNorm: 198440]</td><td>acetaminophen</td><td>Take 2 tablets by mouth three times daily as needed</td><td>1000 mg</td><td>02/01/2026</td><td>active</td></tr>
+                <tr><td>levothyroxine 75 mcg tablet [RxNorm: 966202]</td><td>levothyroxine</td><td>Take 1 tablet by mouth daily on empty stomach</td><td>75 mcg</td><td>06/20/2019</td><td>active</td></tr>
+                <tr><td>metoprolol succinate 25 mg tablet [RxNorm: 866924]</td><td>metoprolol</td><td>Take 1 tablet by mouth daily</td><td>25 mg</td><td>08/10/2020</td><td>active</td></tr>
+                <tr><td>sertraline 50 mg tablet [RxNorm: 312938]</td><td>sertraline</td><td>Take 1 tablet by mouth daily</td><td>50 mg</td><td>03/15/2024</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problems" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Problem</th><th>Problem Status</th><th>Date Started</th><th>Date Resolved</th></tr></thead>
+              <tbody>
+                <tr><td>Alzheimer disease dementia moderate [ICD10: G30.1]</td><td>active</td><td>03/15/2024</td><td></td></tr>
+                <tr><td>Postmenopausal osteoporosis with pathological fracture [ICD10: M80.08]</td><td>active</td><td>01/15/2026</td><td></td></tr>
+                <tr><td>Status post right hip ORIF [ICD10: Z96.641]</td><td>active</td><td>01/20/2026</td><td></td></tr>
+                <tr><td>Hypothyroidism [ICD10: E03.9]</td><td>active</td><td>06/20/2019</td><td></td></tr>
+                <tr><td>Essential hypertension [ICD10: I10]</td><td>active</td><td>08/10/2020</td><td></td></tr>
+                <tr><td>Major depressive disorder recurrent [ICD10: F33.1]</td><td>active</td><td>03/15/2024</td><td></td></tr>
+                <tr><td>Fall risk [ICD10: R29.6]</td><td>active</td><td>01/15/2026</td><td></td></tr>
+                <tr><td>Urinary incontinence [ICD10: R32]</td><td>active</td><td>09/01/2025</td><td></td></tr>
+                <tr><td>Right hip fracture [ICD10: S72.001A]</td><td>resolved</td><td>01/15/2026</td><td>02/15/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Vital Signs" />
+          <title>VITAL SIGNS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Encounter</th><th>Height (in)</th><th>Weight (lb)</th><th>BMI (kg/m2)</th><th>BP Sys (mmHg)</th><th>BP Dias (mmHg)</th><th>Heart Rate (/min)</th><th>O2 % BldC Oximetry</th><th>Body Temperature</th><th>Respiratory Rate (/min)</th></tr></thead>
+              <tbody>
+                <tr><td>03/22/2026</td><td>62</td><td>128</td><td>23.4</td><td>126</td><td>72</td><td>68</td><td>97</td><td>98.0</td><td>16</td></tr>
+                <tr><td>02/15/2026</td><td>62</td><td>122</td><td>22.3</td><td>118</td><td>68</td><td>72</td><td>96</td><td>98.2</td><td>18</td></tr>
+                <tr><td>09/15/2025</td><td>62</td><td>135</td><td>24.7</td><td>132</td><td>76</td><td>70</td><td>98</td><td>98.4</td><td>14</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Lab Results" />
+          <title>LAB RESULTS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Test Name</th><th>Result</th><th>Units</th><th>Flag</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>TSH [LOINC: 3016-3]</td><td>3.4</td><td>mIU/L</td><td>normal</td><td>03/20/2026</td></tr>
+                <tr><td>Free T4 [LOINC: 3024-7]</td><td>1.1</td><td>ng/dL</td><td>normal</td><td>03/20/2026</td></tr>
+                <tr><td>Vitamin D 25-OH [LOINC: 1989-3]</td><td>35</td><td>ng/mL</td><td>normal</td><td>03/20/2026</td></tr>
+                <tr><td>Calcium [LOINC: 17861-6]</td><td>9.4</td><td>mg/dL</td><td>normal</td><td>03/20/2026</td></tr>
+                <tr><td>CBC WBC [LOINC: 6690-2]</td><td>6.2</td><td>10*3/uL</td><td>normal</td><td>03/20/2026</td></tr>
+                <tr><td>Hemoglobin [LOINC: 718-7]</td><td>11.8</td><td>g/dL</td><td>L</td><td>03/20/2026</td></tr>
+                <tr><td>Creatinine [LOINC: 2160-0]</td><td>0.9</td><td>mg/dL</td><td>normal</td><td>03/20/2026</td></tr>
+                <tr><td>Vitamin B12 [LOINC: 2132-9]</td><td>320</td><td>pg/mL</td><td>normal</td><td>03/20/2026</td></tr>
+                <tr><td>Folate [LOINC: 2284-8]</td><td>12</td><td>ng/mL</td><td>normal</td><td>03/20/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Vaccine</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Influenza vaccine 2025-2026</td><td>10/20/2025</td><td>completed</td></tr>
+                <tr><td>Pneumococcal PCV20 (Prevnar 20)</td><td>09/15/2025</td><td>completed</td></tr>
+                <tr><td>COVID-19 Vaccine 2024-2025 (Pfizer)</td><td>10/15/2024</td><td>completed</td></tr>
+                <tr><td>Shingrix (Zoster) Dose 1</td><td>03/15/2024</td><td>completed</td></tr>
+                <tr><td>Shingrix (Zoster) Dose 2</td><td>06/15/2024</td><td>completed</td></tr>
+                <tr><td>Tdap (Boostrix)</td><td>06/20/2019</td><td>completed</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>Tobacco: Never smoker. Alcohol: None. Employment: Retired librarian. Marital Status: Widowed (husband died 2020). Lives with daughter who is primary caregiver. Exercise: PT 3x/week for hip rehab, home exercises daily. ADLs: Needs assistance bathing, dressing. Drives: No longer drives. Wandering risk: Yes, door alarms installed.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Insurance" />
+          <title>INSURANCE</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Payer</th><th>Policy Type</th><th>Member ID</th><th>Group</th></tr></thead>
+              <tbody>
+                <tr><td>Medicare Part B</td><td>Medicare</td><td>2FG5-HI6-JK78</td><td>N/A</td></tr>
+                <tr><td>Humana Medicare Supplement Plan F</td><td>Supplemental</td><td>HUM-554321</td><td>GRP-66789</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11506-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Progress Notes" />
+          <title>PROGRESS NOTES</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Date</th><th>Provider</th><th>Note Type</th><th>Note Text</th><th>Location</th></tr></thead>
+              <tbody>
+                <tr><td>03/22/2026</td><td>Cory Denton, FNP</td><td>Progress Note</td><td>CC: Post-hip fracture follow-up, dementia management.
+HPI: 78yo female, 2 months s/p right hip ORIF after mechanical fall at home. PT 3x/week, progressing well. Now walking with rolling walker. Pain controlled with scheduled acetaminophen. Daughter reports increased confusion at night (sundowning). MMSE today 18/30 (was 20/30 in Sept). Donepezil + memantine continued.
+PE: Surgical site well-healed. ROM right hip 0-100 degrees flexion. Gait -- slow, steady with walker. No TTP spine. Oriented x2 (person, place). Clock draw: 2/5.
+Assessment:
+# Alzheimer dementia (G30.1): Progressive decline. MMSE 18. Continue donepezil/memantine. Caregiver education on sundowning -- consistent routine, night light, no caffeine after noon.
+# s/p Hip fracture (Z96.641): Healing well. Continue PT. Fall prevention: remove throw rugs, grab bars installed.
+# Osteoporosis (M80.08): Started alendronate + calcium/D post-fracture. Vit D level now 35 (was 22).
+# HTN (I10): BP 126/72. Metoprolol appropriate -- not over-treating.
+# Depression (F33.1): Daughter reports less tearfulness on sertraline. PHQ-9 difficult to administer (cognitive limitations).
+Plan: Continue all meds. PT continue 6 more weeks. Home safety re-evaluation. Consider adult day program for socialization. Caregiver support group info given. Return 6 weeks. Advance directive review with daughter.</td><td>Family Practice Associates of Chesterfield</td></tr>
+                <tr><td>01/15/2026</td><td>Gretchen Lockard, MD</td><td>Acute Visit</td><td>CC: Fall at home, right hip pain, unable to bear weight.
+HPI: 78yo with dementia found on floor by daughter at 6 AM. Uncertain how long she was down. Complains of right hip pain. Unable to stand.
+PE: Right leg shortened and externally rotated. TTP right groin. Neurovascular intact distally.
+XR: Right femoral neck fracture, displaced.
+Assessment: Right hip fracture (S72.001A). Osteoporosis likely contributing.
+Plan: Orthopedic consult -- ORIF performed 01/20/2026. Post-op course uncomplicated. Discharged to SNF for rehab 01/25/2026. Start osteoporosis treatment after surgical healing (6 weeks). DEXA ordered. PT/OT daily at SNF.</td><td>Family Practice Associates of Chesterfield</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

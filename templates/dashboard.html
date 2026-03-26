@@ -12,6 +12,7 @@
     <span class="page-header__subtitle">{{ view_date.strftime('%A, %B %d, %Y').replace(' 0', ' ') }}</span>
     <div class="page-header__actions">
         {% include '_free_widgets.html' %}
+        <button class="btn btn-outline btn-sm" onclick="if(window.FreeWidgets)FreeWidgets.openManagePanel()" style="padding:2px 10px;font-size:12px;">&#9881; Manage</button>
     </div>
 </div>
 
@@ -49,6 +50,7 @@
         {% endfor %}
     </div>
     <a href="/tcm/watch-list" class="tcm-alert-cta">Review TCM →</a>
+    <button class="tcm-alert-dismiss" onclick="this.closest('.tcm-alert-bar').remove()" title="Dismiss" aria-label="Dismiss">&times;</button>
 </div>
 {% endif %}
 
@@ -144,8 +146,8 @@
                                 {% endif %}
                             </td>
                             <td style="white-space:nowrap;">
-                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }})">Capture</button>
-                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }})">Dismiss</button>
+                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }}, this)">Capture</button>
+                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }}, this)">Dismiss</button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -317,8 +319,8 @@
                                 {% endif %}
                             </td>
                             <td style="white-space:nowrap;">
-                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }})">Capture</button>
-                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }})">Dismiss</button>
+                                <button class="btn btn-sm btn-primary" onclick="captureBillingOpp({{ opp.id }}, this)">Capture</button>
+                                <button class="btn btn-sm btn-outline" onclick="dismissBillingOpp({{ opp.id }}, this)">Dismiss</button>
                             </td>
                         </tr>
                         {# Documentation checklist preview for top 3 #}
@@ -344,16 +346,10 @@
 </section>
 
 {# ================================================================
-   TIER 3 — REFERENCE (green/neutral accent)
-   Schedule table + My Patients + XML Import + Scheduling Intelligence
+   DAILY SCHEDULE + MY PATIENTS — always visible (not collapsible)
    ================================================================ #}
-<section class="dash-tier dash-tier--reference" id="tier-reference" data-tier="reference">
-    <div class="dash-tier-header" onclick="toggleTier('reference')" role="button" tabindex="0">
-        <span>&#128203; Reference <span class="tier-badge">{{ appointments|length }}</span></span>
-        <span class="dash-tier-toggle">&#9660;</span>
-    </div>
-    <div class="dash-tier-body">
-        <div class="dash-widget-grid fw-container" style="margin:0;padding:0 0 8px;">
+<section class="dash-core-widgets" id="dash-core-widgets">
+    <div class="dash-widget-grid fw-container" style="margin:0;padding:0 0 8px;">
 
     {# ---- SCHEDULING INTELLIGENCE WIDGET (AWV/CCM candidates) ---- #}
     <div class="dash-widget dash-widget-full fw-widget" data-widget-id="scheduling-intel" style="display:none;" id="sched-intel-widget">
@@ -362,33 +358,23 @@
             <span id="sched-intel-badge" class="badge badge--info" style="margin-left:8px;">0</span>
         </div>
         <div class="dash-widget-body" id="sched-intel-body" style="padding:0;">
-            <div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:13px;">Loading scheduling analysis...</div>
+            <div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:13px;"><span class="loading-spinner" style="margin-right:6px;"></span>Loading scheduling analysis...</div>
         </div>
     </div>
 
     {# ---- APPOINTMENT SCHEDULE WIDGET ---- #}
     <div class="dash-widget dash-widget-wide fw-widget" data-widget-id="schedule">
-        <div class="dash-widget-header">
-            <div style="display:flex;align-items:center;gap:12px;">
+        <div class="dash-widget-header" style="flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:200px;">
                 <span>&#128197; Patient Schedule</span>
                 <span class="badge badge--info">{{ appointments|length }} patient{{ 's' if appointments|length != 1 }}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:4px;">
-                <div style="display:flex;gap:2px;margin-right:8px;border:1px solid var(--border-color,#e2e8f0);border-radius:4px;overflow:hidden;">
+                <div style="display:flex;gap:2px;margin-left:auto;border:1px solid var(--border-color,#e2e8f0);border-radius:4px;overflow:hidden;">
                     <button id="sched-view-table" class="btn btn-sm btn-primary" onclick="ScheduleGrid.toggleView('table')" title="Table view" style="border-radius:0;border:none;padding:3px 8px;font-size:11px;">&#9776; Table</button>
                     <button id="sched-view-grid" class="btn btn-sm btn-secondary" onclick="ScheduleGrid.toggleView('grid')" title="Grid view" style="border-radius:0;border:none;padding:3px 8px;font-size:11px;">&#9638; Grid</button>
                 </div>
-                <button class="btn btn-sm btn-secondary" onclick="openSchedSettings()" title="Schedule display hours" style="margin-right:4px;padding:3px 6px;font-size:12px;">⚙</button>
-                {% if is_today %}
-                <button class="btn btn-sm btn-primary" onclick="openAddPatientModal()" title="Add patient to schedule" style="margin-right:4px;">+ Add</button>
-                <button class="btn btn-sm btn-secondary" onclick="openPasteScheduleModal()" title="Paste schedule from clipboard" style="margin-right:8px;">&#128203; Paste</button>
-                {% endif %}
-                <button class="btn btn-sm btn-secondary" id="scrape-tomorrow-btn"
-                        onclick="scrapeTomorrow()" title="Scrape tomorrow's schedule from webPRACTICE"
-                        style="margin-right:8px;">
-                    &#128259; Scrape Tomorrow
-                </button>
-                <span id="scrape-status-text" style="font-size:12px;color:var(--text-secondary);margin-right:8px;"></span>
+                <button class="btn btn-sm btn-secondary" onclick="openSchedSettings()" title="Schedule display hours" style="padding:3px 6px;font-size:12px;">&#9881;</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 <a href="/dashboard?date={{ yesterday.isoformat() }}" class="btn btn-secondary btn-sm" title="Yesterday">
                     &larr; {{ yesterday.strftime('%b %d').replace(' 0', ' ') }}
                 </a>
@@ -398,6 +384,16 @@
                 <a href="/dashboard?date={{ tomorrow.isoformat() }}" class="btn btn-secondary btn-sm" title="Tomorrow">
                     {{ tomorrow.strftime('%b %d').replace(' 0', ' ') }} &rarr;
                 </a>
+                <span style="width:1px;height:18px;background:var(--border-color,#ddd);margin:0 2px;"></span>
+                {% if is_today %}
+                <button class="btn btn-sm btn-primary" onclick="openAddPatientModal()" title="Add patient to schedule">+ Add</button>
+                <button class="btn btn-sm btn-secondary" onclick="openPasteScheduleModal()" title="Paste schedule from clipboard">&#128203; Paste</button>
+                {% endif %}
+                <button class="btn btn-sm btn-secondary" id="scrape-tomorrow-btn"
+                        onclick="scrapeTomorrow()" title="Scrape tomorrow's schedule from webPRACTICE">
+                    &#128259; Scrape Tomorrow
+                </button>
+                <span id="scrape-status-text" style="font-size:12px;color:var(--text-secondary);"></span>
             </div>
         </div>
         <div class="dash-widget-body" style="padding:0;">
@@ -422,7 +418,8 @@
                         <th>Reason</th>
                         <th style="text-align:center;" title="Care Gaps">Gaps</th>
                         <th style="text-align:center;" title="Billing Opportunities">Billing</th>
-                        <th style="width:44px;text-align:center;" title="Delete">🗑</th>
+                        <th style="text-align:center;width:50px;" title="VIIS Status">VIIS</th>
+                        <th style="width:44px;text-align:center;" title="Delete">&#128465;</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -491,7 +488,19 @@
                         <td style="text-align:center;">
                             {% set bill_count = billing_opp_counts.get(appt.patient_mrn, 0) if appt.patient_mrn else 0 %}
                             {% if bill_count > 0 %}
-                            <span style="font-size:16px;cursor:default;" title="{{ bill_count }} billing opportunit{{ 'ies' if bill_count != 1 else 'y' }}">✅</span>
+                            <span style="font-size:16px;cursor:default;" title="{{ bill_count }} billing opportunit{{ 'ies' if bill_count != 1 else 'y' }}">&#10004;</span>
+                            {% else %}
+                            <span style="color:var(--text-secondary);font-size:14px;">&mdash;</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:center;">
+                            {% set viis_status = viis_check_map.get(appt.patient_mrn, '') if appt.patient_mrn else '' %}
+                            {% if viis_status == 'found' %}
+                            <span style="font-size:12px;color:#14b8a6;" title="VIIS: records found">&#127973;</span>
+                            {% elif viis_status == 'not_found' %}
+                            <span style="font-size:12px;color:#f59e0b;" title="VIIS: no records">&#9898;</span>
+                            {% elif viis_status == 'error' %}
+                            <span style="font-size:12px;color:#ef4444;" title="VIIS: error">&#9888;</span>
                             {% else %}
                             <span style="color:var(--text-secondary);font-size:14px;">&mdash;</span>
                             {% endif %}
@@ -511,7 +520,7 @@
                         ondrop="dropOnSlot(event,'{{ slot_key }}')"
                         style="height:28px;{{ 'border-top:1px solid var(--border-color,#e2e8f0);' if is_hour else '' }}">
                         <td class="schedule-time" style="{{ 'font-weight:600;' if is_hour else 'color:var(--text-secondary);font-size:12px;' }}">{{ slot_key }}</td>
-                        <td colspan="5" style="color:var(--text-secondary);font-size:12px;opacity:.4;">&mdash;</td>
+                        <td colspan="6" style="color:var(--text-secondary);font-size:12px;opacity:.4;">&mdash;</td>
                     </tr>
                         {%- endif -%}
                     {%- endfor -%}
@@ -519,7 +528,7 @@
             </table>
             </div>{# /table-wrap #}
             </div>{# /schedule-table-view #}
-            <div id="schedule-grid-view" style="display:none;" data-start-hour="{{ schedule_start_hour|default(7) }}" data-end-hour="{{ schedule_end_hour|default(19) }}"></div>
+            <div id="schedule-grid-view" style="display:none;height:calc(100vh - 280px);min-height:300px;overflow:hidden;" data-start-hour="{{ schedule_start_hour|default(7) }}" data-end-hour="{{ schedule_end_hour|default(19) }}"></div>
             {%- endif %}
         </div>
     </div>
@@ -528,11 +537,11 @@
     <div class="dash-widget fw-widget my-patients-panel" data-widget-id="patients">
         <div class="dash-widget-header">
             <div class="action-bar">
-                <span style="font-size:13px;">&#128100; My Patients</span>
-                {% if my_patients %}<span class="badge badge--muted badge--sm">{{ my_patients|length }}</span>{% endif %}
+                <span style="font-size:13px;">&#128100; Patients</span>
+                {% if my_patients %}<span class="badge badge--muted badge--sm" id="pt-tab-count">{{ my_patients|length }}</span>{% endif %}
             </div>
             <div class="action-bar">
-                <input type="text" id="patient-search" class="form-input" placeholder="Search..."
+                <input type="text" id="patient-search" class="form-input" placeholder="Search..." autofocus
                        style="width:160px;padding:4px 10px;font-size:13px;" oninput="filterPatientPanel()">
                 <select id="patient-sort" class="form-input" style="width:auto;padding:4px 8px;font-size:13px;" onchange="sortPatientPanel()">
                     <option value="name">Name</option>
@@ -541,38 +550,38 @@
                 </select>
             </div>
         </div>
+        {# Filing-cabinet tabs for All / Claimed #}
+        <div class="cc-tabs" style="margin-bottom:0;padding:0 8px;">
+            <button class="cc-tab cc-tab--sm active" onclick="switchPatientTab('all',this)">All <span class="badge badge--muted badge--sm">{{ my_patients|length }}</span></button>
+            <button class="cc-tab cc-tab--sm" onclick="switchPatientTab('claimed',this)">Claimed <span class="badge badge--muted badge--sm">{{ claimed_patients|length }}</span></button>
+        </div>
         <div class="dash-widget-body p-0" style="max-height:400px;overflow-y:auto;">
             {% if my_patients %}
-            <table class="data-table data-table--secondary data-table--striped" id="patient-panel-table">
+            <table class="data-table data-table--secondary data-table--striped" id="patient-panel-table" style="table-layout:fixed;width:100%;">
                 <thead>
                     <tr>
-                        <th>Patient</th>
-                        <th>MRN</th>
-                        <th>DOB</th>
-                        <th>Last Import</th>
+                        <th style="width:50%;overflow:hidden;text-overflow:ellipsis;">Patient</th>
+                        <th style="width:22%;overflow:hidden;text-overflow:ellipsis;">MRN</th>
+                        <th style="width:28%;white-space:nowrap;">DOB</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for pt in my_patients %}
                     <tr data-name="{{ pt.patient_name|lower }}" data-mrn="{{ pt.mrn }}"
                         data-recent="{{ pt.last_xml_parsed.isoformat() if pt.last_xml_parsed else '' }}"
+                        data-claimed="{{ 'yes' if pt.claimed_by == current_user.id else 'no' }}"
                         draggable="true"
                         ondragstart="event.dataTransfer.setData('application/patient',JSON.stringify({name:{{ pt.patient_name|tojson }},mrn:{{ pt.mrn|tojson }},dob:{{ (pt.patient_dob or '')|tojson }}}));event.dataTransfer.effectAllowed='copy'"
                         class="cursor-grab">
-                        <td>
+                        <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                             <a href="/patient/{{ pt.mrn }}" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--text-secondary);">
                                 {{ pt.patient_name or '(unknown)' }}
                             </a>
                         </td>
-                        <td class="mono">{{ pt.mrn }}</td>
-                        <td>
+                        <td class="mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ pt.mrn }}</td>
+                        <td style="white-space:nowrap;">
                             {% if pt.patient_dob and pt.patient_dob|length >= 8 %}
                                 {{ pt.patient_dob[4:6] }}-{{ pt.patient_dob[6:8] }}-{{ pt.patient_dob[:4] }}
-                            {% else %}&mdash;{% endif %}
-                        </td>
-                        <td class="text-muted">
-                            {% if pt.last_xml_parsed %}
-                                {{ pt.last_xml_parsed.strftime('%m-%d-%Y %I:%M %p') }}
                             {% else %}&mdash;{% endif %}
                         </td>
                     </tr>
@@ -603,9 +612,8 @@
         </div>
     </div>
 
-        </div>{# /dash-widget-grid inside reference tier #}
-    </div>{# /dash-tier-body #}
-</section>{# /tier-reference #}
+        </div>{# /dash-widget-grid #}
+</section>{# /dash-core-widgets #}
 
 {# ---- DASHBOARD JAVASCRIPT ---- #}
 <script>
@@ -669,7 +677,14 @@ function uploadXmlFiles(files) {
     var fd = new FormData();
     for (var i = 0; i < files.length; i++) fd.append('xml_files', files[i]);
     fetch('/patient/upload-xml', { method: 'POST', body: fd })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+            if (!r.ok) {
+                return r.text().then(function(txt) {
+                    try { return JSON.parse(txt); } catch(e) { return { success: false, message: 'Server error (' + r.status + ')' }; }
+                });
+            }
+            return r.json();
+        })
         .then(function(d) {
             if (d.success) {
                 status.style.color = 'var(--color-green)';
@@ -680,10 +695,31 @@ function uploadXmlFiles(files) {
                 status.textContent = d.message || 'Upload failed';
             }
         })
-        .catch(function() {
+        .catch(function(err) {
             status.style.color = 'var(--color-red)';
-            status.textContent = 'Upload error — check console';
+            status.textContent = 'Upload error: ' + (err.message || 'check connection');
+            console.error('XML upload error:', err);
         });
+}
+
+/* ---- Patient Panel Tabs (All / Claimed) ---- */
+var _ptTabMode = 'all';
+function switchPatientTab(mode, btn) {
+    _ptTabMode = mode;
+    btn.parentElement.querySelectorAll('.cc-tab').forEach(function(t){ t.classList.remove('active'); });
+    btn.classList.add('active');
+    var rows = document.querySelectorAll('#patient-panel-table tbody tr');
+    var vis = 0;
+    rows.forEach(function(tr) {
+        if (mode === 'claimed' && tr.getAttribute('data-claimed') !== 'yes') {
+            tr.setAttribute('data-tab-hidden', '1');
+        } else {
+            tr.removeAttribute('data-tab-hidden');
+            vis++;
+        }
+    });
+    document.getElementById('pt-tab-count').textContent = vis;
+    filterPatientPanel();
 }
 
 /* ---- Patient Panel Search / Sort ---- */
@@ -691,6 +727,7 @@ function filterPatientPanel() {
     var q = (document.getElementById('patient-search').value || '').toLowerCase();
     var rows = document.querySelectorAll('#patient-panel-table tbody tr');
     rows.forEach(function(tr) {
+        if (tr.getAttribute('data-tab-hidden') === '1') { tr.style.display = 'none'; return; }
         var name = tr.getAttribute('data-name') || '';
         var mrn = tr.getAttribute('data-mrn') || '';
         tr.style.display = (name.indexOf(q) !== -1 || mrn.indexOf(q) !== -1) ? '' : 'none';
@@ -713,29 +750,31 @@ function sortPatientPanel() {
 }
 
 /* ---- Billing Opportunity Actions ---- */
-function captureBillingOpp(id) {
-    fetch('/api/billing/opportunity/' + id + '/capture', {method:'POST',headers:{'Content-Type':'application/json'}})
+function captureBillingOpp(id, btn) {
+    _withSpinner(btn, fetch('/api/billing/opportunity/' + id + '/capture', {method:'POST',headers:{'Content-Type':'application/json'}})
         .then(function(r){return r.json();})
         .then(function(d){
             if (d.success) location.reload();
             else showError(d.error || 'Failed to capture opportunity');
-        });
+        }));
 }
-function dismissBillingOpp(id) {
+function dismissBillingOpp(id, btn) {
     var reason = prompt('Dismiss reason (optional):');
     if (reason === null) return;
-    fetch('/api/billing/opportunity/' + id + '/dismiss', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})})
+    _withSpinner(btn, fetch('/api/billing/opportunity/' + id + '/dismiss', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason})})
         .then(function(r){return r.json();})
         .then(function(d){
             if (d.success) location.reload();
             else showError(d.error || 'Failed to dismiss');
-        });
+        }));
 }
 
 function batchAcceptHighPriority() {
     var rows = document.querySelectorAll('tr[data-priority="high"]');
     if (rows.length === 0) { showInfo('No high-priority opportunities to accept.'); return; }
     if (!confirm('Accept all ' + rows.length + ' high-priority opportunities?')) return;
+    var btn = event.target.closest('button');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner loading-spinner--sm"></span> Processing...'; }
     var ids = [];
     rows.forEach(function(r) { ids.push(r.getAttribute('data-opp-id')); });
     var done = 0;
@@ -871,6 +910,97 @@ function submitAddPatient() {
         btn.textContent = 'Add to Schedule';
     });
 }
+
+/* ---------- Patient Typeahead Search (Add Modal) ---------- */
+var _taTimer = null;
+var _taActiveIdx = -1;
+
+function _patientTypeahead(q) {
+    clearTimeout(_taTimer);
+    q = (q || '').trim();
+    var dd = document.getElementById('add-patient-suggestions');
+    if (q.length < 2) { dd.style.display = 'none'; _taActiveIdx = -1; return; }
+    _taTimer = setTimeout(function() {
+        fetch('/api/patient-search?q=' + encodeURIComponent(q))
+            .then(function(r) { return r.json(); })
+            .then(function(results) {
+                if (!results || results.length === 0) { dd.style.display = 'none'; _taActiveIdx = -1; return; }
+                _taActiveIdx = 0;
+                var html = '';
+                for (var i = 0; i < results.length; i++) {
+                    html += '<div class="typeahead-item' + (i === 0 ? ' active' : '') + '" data-idx="' + i + '" '
+                         + 'onclick="_selectPatientSuggestion(' + i + ')" '
+                         + 'onmouseenter="_highlightSuggestion(' + i + ')">'
+                         + '<span class="typeahead-item-name">' + _escTA(results[i].name) + '</span>'
+                         + '<span class="typeahead-item-meta">MRN: ' + _escTA(results[i].mrn) + (results[i].dob ? ' | DOB: ' + _escTA(results[i].dob) : '') + '</span>'
+                         + '</div>';
+                }
+                dd.innerHTML = html;
+                dd.style.display = 'block';
+                dd._results = results;
+            })
+            .catch(function() { dd.style.display = 'none'; });
+    }, 250);
+}
+
+function _escTA(s) { if(!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function _selectPatientSuggestion(idx) {
+    var dd = document.getElementById('add-patient-suggestions');
+    if (!dd._results || !dd._results[idx]) return;
+    var pt = dd._results[idx];
+    document.getElementById('add-patient-name').value = pt.name;
+    document.getElementById('add-patient-mrn').value = pt.mrn;
+    if (pt.dob) {
+        /* Try to convert DOB formats to YYYY-MM-DD for <input type=date> */
+        var dobVal = pt.dob;
+        if (/^\d{8}$/.test(dobVal)) {
+            dobVal = dobVal.substring(0,4) + '-' + dobVal.substring(4,6) + '-' + dobVal.substring(6,8);
+        } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dobVal)) {
+            var p = dobVal.split('/');
+            dobVal = p[2] + '-' + ('0'+p[0]).slice(-2) + '-' + ('0'+p[1]).slice(-2);
+        }
+        document.getElementById('add-patient-dob').value = dobVal;
+    }
+    dd.style.display = 'none';
+    _taActiveIdx = -1;
+    /* Focus time field since patient is filled */
+    document.getElementById('add-patient-time').focus();
+}
+
+function _highlightSuggestion(idx) {
+    _taActiveIdx = idx;
+    var items = document.querySelectorAll('#add-patient-suggestions .typeahead-item');
+    items.forEach(function(el, i) { el.classList.toggle('active', i === idx); });
+}
+
+/* Keyboard navigation for typeahead dropdown */
+(function() {
+    document.addEventListener('keydown', function(e) {
+        var dd = document.getElementById('add-patient-suggestions');
+        if (!dd || dd.style.display === 'none' || !dd._results) return;
+        var items = dd.querySelectorAll('.typeahead-item');
+        if (items.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            _taActiveIdx = Math.min(_taActiveIdx + 1, items.length - 1);
+            _highlightSuggestion(_taActiveIdx);
+            items[_taActiveIdx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            _taActiveIdx = Math.max(_taActiveIdx - 1, 0);
+            _highlightSuggestion(_taActiveIdx);
+            items[_taActiveIdx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter' && _taActiveIdx >= 0) {
+            e.preventDefault();
+            _selectPatientSuggestion(_taActiveIdx);
+        } else if (e.key === 'Escape') {
+            dd.style.display = 'none';
+            _taActiveIdx = -1;
+        }
+    });
+})();
 
 /* ---------- Table drag-drop onto empty slots ---------- */
 function dropOnSlot(e, slotTime) {
@@ -1049,13 +1179,16 @@ function confirmDeleteAppt(deletePrep) {
         <form id="add-patient-form" onsubmit="event.preventDefault();submitAddPatient();">
             <div class="cc-modal__body">
                 <div class="form-row">
-                    <div class="form-col-2">
+                    <div class="form-col-2" style="position:relative;">
                         <label class="form-label">Patient Name *</label>
-                        <input type="text" id="add-patient-name" class="form-input" required placeholder="LAST, FIRST">
+                        <input type="text" id="add-patient-name" class="form-input" required placeholder="Search by name or MRN..." autocomplete="off"
+                               oninput="_patientTypeahead(this.value)">
+                        <div id="add-patient-suggestions" class="typeahead-dropdown" style="display:none;"></div>
                     </div>
                     <div class="form-col">
-                        <label class="form-label">MRN *</label>
-                        <input type="text" id="add-patient-mrn" class="form-input" required placeholder="e.g. 54321">
+                        <label class="form-label">MRN</label>
+                        <input type="text" id="add-patient-mrn" class="form-input" placeholder="Auto-filled or enter manually" autocomplete="off"
+                               oninput="_patientTypeahead(this.value)">
                     </div>
                 </div>
                 <div class="form-row">
@@ -1123,6 +1256,39 @@ function confirmDeleteAppt(deletePrep) {
 .collect-spinner { display:inline-block;width:16px;height:16px;border:2px solid var(--border,#e2e8f0);border-top-color:var(--color-primary,#3b82f6);border-radius:50%;animation:spin 0.8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 #paste-results-table input, #paste-results-table select { font-size: 12px; padding: 3px 6px; border: 1px solid var(--border, #e2e8f0); border-radius: 4px; background: var(--bg-surface, #fff); }
+
+/* ---- Typeahead dropdown for patient search ---- */
+.typeahead-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 0 0 var(--radius, 6px) var(--radius, 6px);
+    box-shadow: var(--shadow-lg);
+    z-index: 9100;
+    max-height: 200px;
+    overflow-y: auto;
+    font-size: 13px;
+}
+.typeahead-item {
+    padding: 6px 10px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color, #eee);
+    color: var(--text-primary);
+}
+.typeahead-item:last-child { border-bottom: none; }
+.typeahead-item:hover, .typeahead-item.active {
+    background: var(--color-lt-blue, #dbeafe);
+}
+.typeahead-item-name { font-weight: 500; }
+.typeahead-item-meta { font-size: 11px; color: var(--text-secondary); }
+[data-theme="dark"] .typeahead-dropdown { background: var(--bg-card, #16213e); border-color: var(--border, #2a2a4a); }
+[data-theme="dark"] .typeahead-item:hover, [data-theme="dark"] .typeahead-item.active { background: var(--bg-muted, #1a2a4a); }
 </style>
 
 {# ---- Data Collection Takeover Warning Modal (Phase 4) ---- #}
@@ -1454,10 +1620,9 @@ function submitParsedSchedule() {
 
     /* Apply saved state or defaults:
        action  = expanded (if it exists)
-       awareness = expanded
-       reference = collapsed */
+       awareness = expanded */
     var state = loadState();
-    var defaults = { action: false, awareness: false, reference: true };
+    var defaults = { action: false, awareness: false };
     var tiers = document.querySelectorAll('.dash-tier');
     tiers.forEach(function(tier) {
         var id = tier.getAttribute('data-tier');
@@ -1505,7 +1670,18 @@ function scrapeTomorrow() {
 function pollScrapeProgress() {
     var btn = document.getElementById('scrape-tomorrow-btn');
     var txt = document.getElementById('scrape-status-text');
+    var elapsed = 0;
+    var TIMEOUT_MS = 60000;
     var poll = setInterval(function() {
+        elapsed += 2000;
+        if (elapsed > TIMEOUT_MS) {
+            clearInterval(poll);
+            btn.disabled = false;
+            btn.innerHTML = '&#128259; Scrape Tomorrow';
+            txt.textContent = '⚠️ Timed out — check scrape status manually';
+            txt.style.color = 'var(--warning)';
+            return;
+        }
         fetch('/api/netpractice/scrape-status')
             .then(function(r) { return r.json(); })
             .then(function(prog) {

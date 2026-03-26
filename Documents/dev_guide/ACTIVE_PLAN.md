@@ -70,6 +70,18 @@
 
 ---
 
+# Test Infrastructure Fix ✅ COMPLETE (03-25-26)
+
+> Ref: CL-118 in CHANGE_LOG.md. Fixed all billing test failures across both test suites.
+
+- [x] Rewrite `tests/conftest.py` `db_session` fixture — nested savepoint pattern for SQLAlchemy 2.0
+- [x] Fix 4 failing tests in `tests/test_billing_opportunities.py` (confidence default, 3 unauth tests)
+- [x] Fix 10 failing detector tests in `tests/test_billing_engine.py` (field names, categories, test data)
+- [x] Verify 83/83 billing tests pass + smoke test 6/6
+- [ ] Delete `tests/_debug_auth.py` (leftover debug file — policy blocked deletion, needs manual cleanup)
+
+---
+
 # AC Automation Upgrade — UIA + Win32 Messages
 
 > Ref: Plan created 03-24-26. Replaces fragile OCR/pyautogui with UIA element discovery + Win32 message injection.
@@ -99,6 +111,241 @@
 - [ ] Replace chart navigation in `clinical_summary_parser.py` → `smart_navigate_menu()`
 - [ ] Update MRN reader to try UIA title bar read before OCR crop
 - [ ] Verify all agent scheduler jobs still work with UIA-first path
+
+---
+
+# AC Chart-Open Detection Flag — Bottom-Corner Widget
+
+> **Created:** 03-24-26
+> **Goal:** When a patient chart is open in Amazing Charts, show a small non-intrusive popup in the CareCompanion web UI (messenger-style, bottom-left corner) offering to open that same patient's chart in CareCompanion.
+> **Detection:** Window title parsing via `win32gui.EnumWindows()` — NOT OCR. The AC chart subprocess title already contains all needed data.
+> **AC Subprocess Title Format:** `LASTNAME, FIRSTNAME (DOB:MM/DD/YYYY; ID: #####) XX year old SEX, Portal:YES/NO Cell: (###) ###-####`
+
+### Architecture
+
+```
+Agent (every 3s)                    Flask                          Browser
+   |                                  |                              |
+   |-- EnumWindows() finds chart ---> |                              |
+   |   subprocess title               |                              |
+   |-- Parse: name, MRN, DOB,         |                              |
+   |   age, sex from title             |                              |
+   |-- Write data/active_chart.json -->|                              |
+   |                                   |                              |
+   |                              GET /api/active-chart <--- poll every 5s
+   |                              Read JSON, check freshness          |
+   |                              Check PatientRecord for MRN         |
+   |                              Return {active, mrn, name, url} --> |
+   |                                                          Show/hide flag
+```
+
+**Key insight:** Current `get_ac_chart_title()` only checks the **foreground** window — when CareCompanion browser is in focus, it can't see the AC chart behind it. Must use `EnumWindows` (already used by `find_ac_window()` and `is_chart_window_open()`) to find chart subprocess windows regardless of z-order.
+
+### Phase CF-1 — Agent: Enhanced Window Title Parsing
+
+- [x] **CF-1.1** `agent/ac_window.py` — Add `parse_chart_title(title)` function:
+  - Comprehensive regex for the subprocess title format:
+    ```
+    LASTNAME, FIRSTNAME (DOB:MM/DD/YYYY; ID: #####) XX year old SEX, Portal:YES/NO Cell: (###) ###-####
+    ```
+  - Returns dict: `{last_name, first_name, dob, mrn, age, sex, portal, cell}` or `None` if no match
+  - Must handle variations: missing Cell field, missing Portal field, multi-word names
+
+- [x] **CF-1.2** `agent/ac_window.py` — Add `get_all_chart_windows()` function:
+  - Uses `win32gui.EnumWindows()` to find ALL visible windows with chart-like titles
+  - For each, calls `parse_chart_title()` to extract patient data
+  - Returns list of dicts (sorted by most recently activated if possible)
+  - Mock-aware: returns mock data when `AC_MOCK_MODE = True`
+
+- [x] **CF-1.3** `agent/mrn_reader.py` — Write active chart state to `data/active_chart.json`:
+  - After MRN detection succeeds: write `{mrn, patient_name, dob, age, sex, detected_at (ISO UTC), source}`
+  - When no chart detected for >10 seconds: write `{active: false, cleared_at}`
+  - Use atomic write (write to `.tmp` then rename) to prevent partial reads
+  - Clear the file on agent startup (stale state from prior crash)
+  - HIPAA: This file contains patient identifiers — same access controls as the DB. Add to `.gitignore`.
+
+- [x] **CF-1.4** `config.py` — Add config entries:
+  - `CHART_FLAG_ENABLED = True` — master toggle for the feature
+  - `CHART_FLAG_STALE_SECONDS = 10` — how old `active_chart.json` can be before considered stale
+
+### Phase CF-2 — Flask: API Endpoint
+
+- [x] **CF-2.1** `routes/dashboard.py` — Add `GET /api/active-chart` endpoint:
+  - `@login_required` — scoped to logged-in user
+  - Reads `data/active_chart.json`
+  - If file missing, unreadable, or `detected_at` older than `CHART_FLAG_STALE_SECONDS`: return `{"active": false}`
+  - If fresh: look up MRN in `PatientRecord` for current user
+    - If found: `{"active": true, "mrn": "62815", "patient_name": "TEST, TEST", "dob": "10/1/1980", "age": "45", "sex": "F", "has_cc_record": true, "cc_url": "/patient/62815"}`
+    - If not found: `{"active": true, "mrn": "62815", "patient_name": "TEST, TEST", ... "has_cc_record": false, "cc_url": null}`
+  - Standard JSON response: `{"success": true, "data": {...}}`
+  - Never exposes more than name, MRN, DOB, age, sex — no diagnoses, no meds
+
+### Phase CF-3 — Frontend: Chart Flag Widget
+
+- [x] **CF-3.1** `templates/base.html` — Add chart flag widget HTML:
+  - Position: bottom-left corner (AI chat panel is bottom-right)
+  - Structure:
+    ```html
+    <div id="chart-flag" class="chart-flag" style="display:none;">
+      <div class="chart-flag__header">
+        <span class="chart-flag__icon">📋</span>
+        <span class="chart-flag__title">Chart Open in AC</span>
+        <button class="chart-flag__close" id="chart-flag-dismiss">&times;</button>
+      </div>
+      <div class="chart-flag__body">
+        <div class="chart-flag__patient" id="chart-flag-name"></div>
+        <div class="chart-flag__meta" id="chart-flag-meta"></div>
+        <a class="btn btn-sm btn-primary chart-flag__action" id="chart-flag-link" href="#">
+          Open in CareCompanion
+        </a>
+      </div>
+    </div>
+    ```
+  - Only rendered when `CHART_FLAG_ENABLED` is True (pass via Jinja context)
+  - Hidden by default (`style="display:none;"`)
+
+- [x] **CF-3.2** `static/css/main.css` — Add `.chart-flag` styles:
+  - `position: fixed; bottom: 16px; left: 16px; z-index: 9400;`
+  - Width: 280px. Border-radius: 12px. Box shadow matching `.ai-panel`.
+  - Slide-in animation from left (transform: translateX)
+  - Dark mode support: `[data-theme="dark"] .chart-flag { ... }`
+  - `.chart-flag--hidden` class with opacity 0 + pointer-events none for smooth dismiss
+
+- [x] **CF-3.3** `templates/base.html` or `static/js/main.js` — Add polling JS:
+  - Poll `GET /api/active-chart` every 5 seconds (only when tab is visible — use `document.visibilityState`)
+  - On response `active: true`: show widget with patient name, DOB, age/sex. Set link href to `cc_url` or show "No CC record" message.
+  - On response `active: false`: hide widget with slide-out animation
+  - Dismiss button: sets `sessionStorage['chart_flag_dismissed_mrn'] = mrn`. While this MRN matches, don't re-show.
+  - When MRN changes (new patient chart opened): clear dismissed state, show fresh flag.
+  - Prevent polling when user is on the patient chart page for the same MRN (no point showing "open X" when X is already open)
+
+### Phase CF-4 — Documentation & Config
+
+- [x] **CF-4.1** Update `Documents/dev_guide/AC_PATIENT_INFO_GUIDE.md`:
+  - Document the subprocess window title format as the **primary** detection method
+  - Note: `LASTNAME, FIRSTNAME (DOB:MM/DD/YYYY; ID: #####) XX year old SEX, Portal:YES/NO Cell: (###) ###-####`
+  - List which fields are extractable and the regex used
+  - Mark OCR as fallback tier 2/3 only
+
+- [x] **CF-4.2** Update `.github/copilot-instructions.md` AC State Detection section:
+  - Replace/augment the title bar regex example to include the full subprocess format
+  - Add `parse_chart_title()` as the recommended parsing function
+
+- [x] **CF-4.3** Add `data/active_chart.json` to `.gitignore`
+
+- [x] **CF-4.4** Update `data/help_guide.json` — Add entry for the chart flag feature
+
+- [x] **CF-4.5** Update Feature Registry in `PROJECT_STATUS.md` — Add F-CF row
+
+### Verification Checklist
+
+- [ ] Open AC with test patient (MRN 62815, TEST TEST) → `data/active_chart.json` updates within 3s
+- [ ] CareCompanion web UI shows flag in bottom-left with patient name and link
+- [ ] Close chart in AC → flag auto-dismisses within 10s
+- [ ] Click dismiss → flag stays hidden for that MRN until chart closes and reopens
+- [ ] Open different patient → flag shows new patient info
+- [ ] No PHI in logs (MRN hashed via `safe_patient_id`)
+- [ ] Works in both light and dark themes
+- [ ] No overlap with AI chat panel (bottom-right)
+- [ ] Widget does not appear when `CHART_FLAG_ENABLED = False`
+- [ ] Polling stops when browser tab is hidden (saves CPU)
+
+### Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Detection method | `win32gui.EnumWindows()` + title regex | Subprocess title has ALL data; OCR is unreliable fallback |
+| Data transport | `data/active_chart.json` file | Transient state (3s refresh) — DB writes would be wasteful |
+| Widget position | Bottom-left, fixed | AI chat panel occupies bottom-right; messenger-style pattern |
+| Poll interval | 5 seconds | Responsive enough, negligible HTTP overhead |
+| Dismiss behavior | Per-MRN via sessionStorage | New patient shows fresh flag; same patient stays dismissed |
+| Scope to user | Yes — PatientRecord lookup uses `current_user.id` | Multi-user safe |
+
+### Files to Modify/Create
+
+| File | Action | Description |
+|------|--------|-------------|
+| `agent/ac_window.py` | Modify | Add `parse_chart_title()`, `get_all_chart_windows()` |
+| `agent/mrn_reader.py` | Modify | Write `data/active_chart.json` on chart detect/close |
+| `routes/dashboard.py` | Modify | Add `GET /api/active-chart` endpoint |
+| `templates/base.html` | Modify | Add chart flag widget HTML + polling JS |
+| `static/css/main.css` | Modify | Add `.chart-flag` styles (light + dark) |
+| `config.py` | Modify | Add `CHART_FLAG_ENABLED`, `CHART_FLAG_STALE_SECONDS` |
+| `data/active_chart.json` | Created at runtime | Transient chart state (agent-written) |
+| `.gitignore` | Modify | Add `data/active_chart.json` |
+| `data/help_guide.json` | Modify | Add help entry for chart flag |
+| `Documents/dev_guide/AC_PATIENT_INFO_GUIDE.md` | Modify | Document subprocess title format |
+
+---
+
+# UX Usability Audit — Implementation Plan
+
+> **Ref:** Full audit completed 03-24-26. 78 findings: 3 Critical, 18 High, 36 Medium, 21 Low.
+> **Scope:** Quick wins first, then systematic fixes. Skip admin-only pages (low traffic).
+
+## Phase BM — Engine Benchmark Suite (F38) ✅ COMPLETE
+
+- [x] BM.1 — Create `tests/benchmark_fixtures.py` with 18 synthetic patient profiles + expected results
+- [x] BM.2 — Create `models/benchmark.py` (BenchmarkRun + BenchmarkResult) + migration
+- [x] BM.3 — Create `tests/benchmark_engine.py` (BenchmarkRunner class: timing + correctness)
+- [x] BM.4 — Create `tests/test_benchmarks.py` (102-test CLI suite: billing/caregap/monitoring × 18 patients)
+- [x] BM.5 — Create `routes/admin_benchmarks.py` (4 endpoints) + `templates/admin_benchmarks.html` (Admin UI)
+- [x] BM.6 — Register blueprint, add admin dashboard card + base.html dropdown entry
+- [x] BM.7 — Run migration, verify 102/102 pass, update docs
+
+## Phase UX-Q — Quick Wins (< 5 min each) ✅ COMPLETE
+
+- [x] UX-Q.1 — Add `box-shadow` fallback to `.calc-input:focus` in `calculators.css` (Critical: no focus ring)
+- [x] UX-Q.2 — Add `role="button" tabindex="0"` to 5 clickable divs: `coding.html`, `labtrack.html` (lab-ref-row), `help_guide.html` ×2, `medref.html`
+- [x] UX-Q.3 — Add `autofocus` to: dashboard patient search, `calculators.html` search, `calculator_detail.html` first input
+- [x] UX-Q.4 — Add `aria-live="polite"` to patient chart count badges (billing, ccm, lab-interp, safety, trials)
+- [x] UX-Q.5 — Add `if (!confirm(...)) return;` before bookmark delete in `main.js`
+- [x] UX-Q.6 — `labtrack.html` patient loop — already had empty state ✅
+- [x] UX-Q.7 — `dashboard.html` appointments loop — already had empty state via `empty_state()` macro ✅
+- [x] UX-Q.8 — Add `← Back` link to `referral.html` page header
+- [x] UX-Q.9 — Add `aria-label` for `oncall.html` card border-color status
+- [x] UX-Q.10 — Swap inline-styled buttons in `billing_log.html` for `.btn` classes (5 buttons)
+
+## Phase UX-L — Loading States & Button Feedback
+
+- [x] UX-L.1 — Patient chart: add element disable + spinner to fetch calls (claimPatient, saveDemographics, saveSpecialist, saveDraft, auto-scores AJAX, imm-gaps AJAX)
+- [x] UX-L.2 — Dashboard: replace plain "Loading scheduling analysis..." with animated spinner
+- [x] UX-L.3 — Add button disable to 13 form actions: `billing_review` captureOpp, `caregap` addressGap, `ccm_registry` log-time/enroll/disenroll, `pa` updatePAStatus/denyPA/appealPA/submitPA, `referral` markReceived, `dot_phrases` save/delete/import, `dashboard` billing capture/dismiss/batchAccept. Global `_withSpinner` utility added to `main.js`.
+- [ ] UX-L.4 — Add skeleton/shimmer placeholder for patient chart panels during load
+
+## Process Watchdog & Orphan Prevention ✅ COMPLETE (03-25-26 CL-122)
+
+- [x] Root cause analysis: 132 zombies traced to Flask reloader children + migration subprocesses whose parents were killed
+- [x] Extended `tools/process_guard.py` with `--watch` mode (30s CSV logging, parent-chain resolution, origin tagging, CPU alert at 95%, auto-kill after 3 min sustained)
+- [x] Updated `run.ps1` with `--watch-processes` and `--cleanup-only` switches + pre-flight audit
+- [x] Updated `run.bat` with option [3] watchdog mode + pre-flight cleanup on every launch
+- [x] Fixed critical agent spawn bug: `/admin/agent/restart` now checks PID file + port 5001 before spawning
+- [x] Added PID file lifecycle to `agent_service.py` (write on start, delete on stop)
+
+## Phase UX-S — Inline Style → CSS Class Migration
+
+- [ ] UX-S.1 — `billing_log.html`: Replace 3 inline-styled buttons → `.btn .btn-primary .btn-sm`, form inputs → `.form-input`
+- [ ] UX-S.2 — `billing_em_calculator.html`: Replace inline button/select/label → `.btn .btn-primary`, `.form-input`, `.form-label`
+- [ ] UX-S.3 — `labtrack.html`: Replace inline H1/button styles → `.page-header__title`, `.btn-danger`
+- [ ] UX-S.4 — `medref.html`: Replace inline H1 margin, sticky card → `.page-header__title`, `.card--sticky` (add class)
+- [ ] UX-S.5 — `oncall.html`: Replace card border-left/padding → `.card--danger`, `.card-body--compact` (add classes)
+- [ ] UX-S.6 — `caregap.html` / `caregap_panel.html`: Replace inline flex, badge patterns → CSS utility classes
+- [ ] UX-S.7 — Add CSS spacing variables to `:root` (`--gap-sm/md/lg/xl`) and typography utilities
+
+## Phase UX-F — Form Input Preservation on POST Errors
+
+- [ ] UX-F.1 — Audit all POST routes using `flash() + redirect()` pattern
+- [ ] UX-F.2 — Convert high-traffic routes to re-render with `form=request.form`: timer manual entry, orders create, message compose, oncall handoff
+- [ ] UX-F.3 — Add field-specific error messages to timer, orders, message routes
+- [ ] UX-F.4 — Add `pattern`, `maxlength`, `inputmode` client-side hints to MRN and code inputs
+
+## Phase UX-E — Empty State & Error Polish
+
+- [ ] UX-E.1 — Inbox main view: Add zero-item "Your inbox is clear" empty state
+- [ ] UX-E.2 — Referral log: Add explanatory empty state
+- [ ] UX-E.3 — Search no-results: Create shared `renderNoResults()` JS utility, migrate command palette, coding, patient chart
+- [ ] UX-E.4 — Import `_empty_state.html` macro in 10+ additional templates
+- [ ] UX-E.5 — Silent fetch failures: Add toast errors to bookmark delete, calculator history, and 3 other silent catches
 
 ---
 
@@ -1119,3 +1366,226 @@ Calculator slots (ASCVD, Gail, Peak Flow main-group, AAP Peds HTN <13) Ã¢â‚
 - [x] Fix MRN fallback in `cs_tracker.html` → `••{{ e.mrn[-4:] }}`
 - [x] Create + run migration `migrate_add_is_archived.py`
 - [x] Update CHANGE_LOG (CL-HIPAA-SOFTDEL) + Risk Register (R2)
+
+---
+
+# VIIS Automated Batch Lookup — Pre-Visit Immunization Check
+
+> **Created:** 03-24-26
+> **Scope:** Automate Virginia Immunization Information System lookups for scheduled patients with open vaccine care gaps. Persist results, auto-close care gaps, display in patient chart + dashboard, integrate into note generator.
+> **Existing foundation:** `scrapers/viis.py` (single-patient Playwright scraper), `/api/patient/<mrn>/immunizations/viis` (on-demand, non-persisted), encrypted VIIS credentials on User model, `PatientImmunization` model (AC-only), `ImmunizationSeries` model, care gap engine with 5 vaccine rules.
+
+## Design Decisions
+
+- **Trigger:** Pre-visit — runs daily after auto_scrape (6:30 PM) for tomorrow's patients
+- **Scope:** Only patients on tomorrow's schedule with open vaccine care gaps AND no VIIS check in last 12 months
+- **Rate limiting:** 5-15 second random delays between lookups to simulate human browsing; pause 60s on throttle detection
+- **Storage:** VIIS immunizations persisted to `PatientImmunization` with `source='viis'`. Lookup history in `VIISCheck`. Batch runs tracked in `VIISBatchRun`.
+- **Conflict resolution:** Positive supersedes negative. If EITHER AC or VIIS shows vaccine given, treat as given. Never re-open a gap closed by positive finding from either source.
+- **Notifications:** Pushover on batch completion/failure (counts only, no PHI)
+- **Manual trigger:** From patient chart (auto-detects patient) or from tools menu (prompts for name/DOB/MRN)
+
+---
+
+## Phase VIIS-1 — Data Layer
+
+- [x] **VIIS-1.1** Create `models/viis.py` with `VIISCheck` model:
+  - `id` (Integer PK), `user_id` (FK users), `mrn` (String(20) indexed)
+  - `status` (String(20): `found` / `not_found` / `error`)
+  - `immunization_count` (Integer), `error_message` (Text nullable)
+  - `checked_at` (DateTime UTC), `raw_response` (Text — JSON for audit)
+  - `batch_run_id` (FK VIISBatchRun, nullable — null for manual checks)
+
+- [x] **VIIS-1.2** Add `VIISBatchRun` model to `models/viis.py`:
+  - `id`, `user_id` (FK), `started_at`, `completed_at` (nullable)
+  - `total_eligible`, `total_checked`, `total_found`, `total_not_found`, `total_errors`
+  - `gaps_closed` (Integer), `last_mrn_processed` (String — for resume)
+  - `status` (String: `running` / `completed` / `failed` / `partial`)
+
+- [x] **VIIS-1.3** Add `source` column to `PatientImmunization` (String(10), default `'ac'`):
+  - Existing records get `'ac'`; VIIS-sourced records get `'viis'`
+  - Add `viis_check_id` FK to VIISCheck (nullable)
+  - Add unique constraint: `(mrn, vaccine_name, date_given, source)` to prevent duplicates
+
+- [x] **VIIS-1.4** Create migration `migrations/migrate_add_viis_models.py` (idempotent)
+
+- [x] **VIIS-1.5** Register models in `models/__init__.py`
+
+> Phase VIIS-1 complete when: migration runs clean, `VIISCheck`, `VIISBatchRun` tables exist, `PatientImmunization.source` column present with default `'ac'`.
+
+---
+
+## Phase VIIS-2 — Batch Scraper Service
+
+- [x] **VIIS-2.1** Create `app/services/viis_batch.py` with:
+  - `get_viis_eligible_patients(user_id, app)` — tomorrow's schedule → filter open vaccine care gaps → exclude checked in last 12 months → return list of `(mrn, first_name, last_name, dob)`
+  - `run_viis_batch(user_id, app)` — create `VIISBatchRun`, iterate patients with 5-15s random delays, call `VIISScraper.lookup_patient()`, call `process_single_patient()`, update batch stats
+  - `run_viis_single(mrn, user_id, app)` — single manual check entry point, same persist/gap-close logic
+  - `process_single_patient(mrn, result, user_id, batch_run_id, app)` — persist immunizations to `PatientImmunization(source='viis')`, create `VIISCheck` record, trigger care gap matching
+
+- [x] **VIIS-2.2** Resume logic: on batch start, check for `VIISBatchRun(status='running')` — if found, resume from `last_mrn_processed`
+
+- [x] **VIIS-2.3** Error handling:
+  - Auth failure mid-batch → retry login once → if fail, mark batch `partial`, log remaining patients as `error`
+  - Single patient failure → log `VIISCheck(status='error')`, continue to next patient
+  - Full crash → `VIISBatchRun.status` stays `running`; next invocation resumes
+
+> Phase VIIS-2 complete when: `run_viis_batch()` and `run_viis_single()` work end-to-end in mock mode, data persisted correctly.
+
+---
+
+## Phase VIIS-3 — Care Gap Auto-Close
+
+- [x] **VIIS-3.1** Add vaccine name mapping (fuzzy match) in `viis_batch.py`:
+  - `influenza` / `flu` → `flu_vaccine`
+  - `covid` / `sars-cov` → `covid_vaccine`
+  - `zoster` / `shingrix` → `shingrix`
+  - `tdap` / `tetanus` / `adacel` / `boostrix` → `tdap`
+  - `pneumo` / `prevnar` / `ppsv23` / `pcv20` → `pneumococcal`
+
+- [x] **VIIS-3.2** Auto-close logic in `process_single_patient()`:
+  - For each VIIS immunization, find matching open CareGap for that patient
+  - If match → `is_addressed=True`, `addressed_date=date_given`, `notes="Auto-closed: VIIS record from MM/DD/YYYY"`
+  - Track count in `VIISBatchRun.gaps_closed`
+
+- [x] **VIIS-3.3** Positive-supersedes-negative rule:
+  - In care gap engine evaluation, before opening a vaccine gap, check `PatientImmunization` for matching records from ANY source
+  - If positive finding exists from either `'ac'` or `'viis'`, do NOT open/reopen the gap
+
+- [x] **VIIS-3.4** Multi-dose series update:
+  - For Shingrix/HepB: update `ImmunizationSeries.dose_number`, recalculate `series_status`
+
+> Phase VIIS-3 complete when: VIIS lookup results auto-close matching care gaps, positive-supersedes-negative enforced, series tracking updated.
+
+---
+
+## Phase VIIS-4 — Scheduler Integration
+
+- [x] **VIIS-4.1** Add `viis_previsit` cron job to `agent/scheduler.py`:
+  - Cron: 6:30 PM daily (after auto_scrape at 6:00 PM)
+  - Calls `run_viis_batch(user_id, app)`
+
+- [x] **VIIS-4.2** Pushover notifications via `agent/notifier.py`:
+  - On completion: `"VIIS pre-visit: 12/15 checked, 8 found, 4 not found, 3 gaps closed"` (counts only)
+  - On failure: `"VIIS batch failed after 5/15 patients: session expired"`
+
+- [x] **VIIS-4.3** Config entries in `config.py`:
+  - `VIIS_BATCH_ENABLED = True` (toggle)
+  - `VIIS_BATCH_HOUR = 18`, `VIIS_BATCH_MINUTE = 30`
+  - `VIIS_CHECK_INTERVAL_DAYS = 365` (12-month recency window)
+  - `VIIS_DELAY_MIN = 5`, `VIIS_DELAY_MAX = 15` (seconds between lookups)
+
+> Phase VIIS-4 complete when: nightly job fires after auto_scrape, Pushover summary sent, batch respects config toggles.
+
+---
+
+## Phase VIIS-5 — Patient Chart UI
+
+- [x] **VIIS-5.1** Add VIIS badge to `pt-header-right` in `patient_chart.html` (near allergies badge):
+  - Green `[VIIS checkmark MM/DD/YY]` — patient found, records on file
+  - Gray `[VIIS empty-set MM/DD/YY]` — searched but not found in VIIS
+  - Amber `[VIIS warning Error]` — last check failed
+  - No badge if never checked
+  - Clickable → expands details + "Re-check Now" button
+
+- [x] **VIIS-5.2** Enhance immunizations widget:
+  - Merged AC + VIIS immunizations in one table
+  - Source indicator column: small `AC` or `VIIS` tag per row
+  - Deduplicate: same vaccine + same date from both sources → show once with `AC+VIIS` tag
+
+- [x] **VIIS-5.3** Pass VIIS check data to template in `routes/patient.py`:
+  - Query latest `VIISCheck` for this patient
+  - Query `PatientImmunization` records with `source='viis'`
+
+> Phase VIIS-5 complete when: badge renders all 4 states correctly, merged immunization table displays both sources.
+
+---
+
+## Phase VIIS-6 — Dashboard Schedule Badge
+
+- [x] **VIIS-6.1** Add VIIS summary line to daily schedule view:
+  - `"VIIS: 3/18 qualified, 3 checked"` — of N patients, X had open vaccine gaps and hadn't been checked in 12 months
+  - Per-patient row: tiny `VIIS checkmark` or `VIIS ?` icon if they have unchecked vaccine gaps
+
+- [x] **VIIS-6.2** Query helper in `routes/dashboard.py`:
+  - Count eligible patients (open vaccine care gap + no recent VIIS check)
+  - Count checked patients (have `VIISCheck` for today's batch)
+
+> Phase VIIS-6 complete when: dashboard schedule shows VIIS batch summary + per-patient status icons.
+
+---
+
+## Phase VIIS-7 — Note Generator Integration
+
+- [x] **VIIS-7.1** Add "Immunizations" section to note reformatter `DEFAULT_TEMPLATE`:
+  - `{'key': 'Immunizations', 'required': False}`
+
+- [x] **VIIS-7.2** In `routes/patient.py` note prepopulation:
+  - Pull all `PatientImmunization` records (both `source='ac'` and `source='viis'`)
+  - Deduplicate and format: `"Immunizations: Influenza (10/2025), Shingrix dose 1 (08/2025), Tdap (2019)"`
+  - Populate into Past Medical History section
+
+> Phase VIIS-7 complete when: generated notes include merged immunization data from both sources.
+
+---
+
+## Phase VIIS-8 — Manual Trigger
+
+- [x] **VIIS-8.1** New route `POST /patient/<mrn>/viis-check` (`@login_required`):
+  - Calls `run_viis_single(mrn, user_id, app)`
+  - Returns JSON with results, triggers chart badge update via JS
+
+- [x] **VIIS-8.2** Wire existing "Check VIIS" button in patient chart to new persistent route:
+  - Replace current fire-and-forget `/api/patient/<mrn>/immunizations/viis` call
+  - New call persists results + auto-closes gaps + updates badge
+
+- [x] **VIIS-8.3** Add VIIS lookup option to tools menu (for use outside patient chart):
+  - Accessible from nav or tools page
+  - Prompts for Last Name, First Name, DOB, MRN
+  - Runs single check, shows results inline
+
+> Phase VIIS-8 complete when: manual check from chart persists results + closes gaps; standalone lookup works from tools menu.
+
+---
+
+## VIIS Settings UI (Post-Phase Addition)
+
+- [x] **VIIS-UI.1** Added "VIIS Pre-Visit Automation" card to Settings → Notifications page with:
+  - Enable/disable toggle (`viis_batch_enabled`)
+  - Run time picker (hour:minute)
+  - Re-check interval (days, 30–730, default 365)
+  - Min/max delay between lookups (seconds)
+- [x] **VIIS-UI.2** Wired POST handler in `routes/auth.py` to save all VIIS user prefs
+- [x] **VIIS-UI.3** Updated `app/services/viis_batch.py` to read user prefs (with `config.py` fallback)
+
+> All VIIS phases + UI settings complete.
+
+---
+
+## Implementation Order & Dependencies
+
+```
+VIIS-1 (Data Layer)          <-- do first, everything depends on it
+   |
+VIIS-2 (Batch Service)      <-- core engine
+   |
+VIIS-3 (Care Gap Auto-Close) <-- tightly coupled with VIIS-2
+   |
+VIIS-4 (Scheduler)           <-- wires VIIS-2 into nightly run
+   |
+VIIS-5 (Chart UI)            <-- can start in parallel with VIIS-4
+VIIS-6 (Dashboard Badge)     <-- after VIIS-5
+VIIS-7 (Note Generator)      <-- after VIIS-1 (just needs data)
+VIIS-8 (Manual Trigger)      <-- after VIIS-2 + VIIS-5
+```
+
+## Risk Considerations
+
+| Risk | Mitigation |
+|------|------------|
+| VIIS session expiry mid-batch | Re-login once on auth failure; mark batch `partial` if retry fails |
+| VIIS rate limiting / CAPTCHA | 5-15s random delays; 60s pause on HTTP 429 or CAPTCHA detection; resume next run |
+| Patient not in VIIS | Legitimate (out-of-state, not yet reported); flagged as `not_found`, not treated as error |
+| Duplicate immunizations | Unique constraint `(mrn, vaccine_name, date_given, source)` prevents doubles |
+| HIPAA | VIIS is state-authorized clinical system; name/DOB sent only to VIIS; no PHI in Pushover or logs |
+| Orphan batch runs | Resume logic picks up `running` batches on next invocation |

@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Engine Benchmarks — Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="/admin" class="back-link">← Admin Dashboard</a>
+    <h1>Engine Benchmarks</h1>
+    <p class="subtitle">Run correctness and performance tests against billing, care gap, and monitoring engines.</p>
+</div>
+
+{# ── Run Controls ─────────────────────────────────────────────── #}
+<div class="card mb-3">
+    <div class="card-body">
+        <h3 style="margin-top:0;">Run Benchmark Suite</h3>
+        <form id="benchmark-form" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
+            <div>
+                <label for="bm-engine" style="display:block; font-size:0.85rem; margin-bottom:4px;">Engine</label>
+                <select id="bm-engine" name="engine" class="form-input" style="min-width:140px;">
+                    <option value="all">All Engines</option>
+                    <option value="billing">Billing</option>
+                    <option value="caregap">Care Gaps</option>
+                    <option value="monitoring">Monitoring</option>
+                </select>
+            </div>
+            <div>
+                <label for="bm-patient" style="display:block; font-size:0.85rem; margin-bottom:4px;">Patient</label>
+                <select id="bm-patient" name="patient" class="form-input" style="min-width:200px;">
+                    <option value="all">All Patients (18)</option>
+                </select>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+                <input type="checkbox" id="bm-perf" name="perf" value="true">
+                <label for="bm-perf" style="font-size:0.85rem;">Performance checks</label>
+            </div>
+            <button type="submit" class="btn btn-primary" id="bm-run-btn">Run Benchmarks</button>
+        </form>
+    </div>
+</div>
+
+{# ── Live Results Panel ──────────────────────────────────────── #}
+<div id="bm-results" class="card mb-3" style="display:none;">
+    <div class="card-body">
+        <h3 style="margin-top:0;">Results</h3>
+        <div id="bm-summary" style="display:flex; gap:2rem; margin-bottom:1rem; flex-wrap:wrap;"></div>
+        <div id="bm-detail" style="max-height:500px; overflow-y:auto;"></div>
+    </div>
+</div>
+
+{# ── Run History ─────────────────────────────────────────────── #}
+<div class="card">
+    <div class="card-body">
+        <h3 style="margin-top:0;">Run History</h3>
+        {% if runs %}
+        <table class="data-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Run ID</th>
+                    <th>Engine</th>
+                    <th>Patients</th>
+                    <th>Passed</th>
+                    <th>Failed</th>
+                    <th>Pass Rate</th>
+                    <th>Duration</th>
+                    <th>Date</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for run in runs %}
+                <tr>
+                    <td>#{{ run.id }}</td>
+                    <td>{{ run.engine_filter }}</td>
+                    <td>{{ run.patient_filter }}</td>
+                    <td style="color:var(--color-green);">{{ run.passed_tests }}</td>
+                    <td style="color:{% if run.failed_tests > 0 %}var(--color-danger){% else %}var(--text-secondary){% endif %};">{{ run.failed_tests }}</td>
+                    <td>{{ run.pass_rate() }}%</td>
+                    <td>{{ "%.0f"|format(run.total_duration_ms) }}ms</td>
+                    <td>{{ run.started_at.strftime('%m/%d/%y %H:%M') if run.started_at else '-' }}</td>
+                    <td><button class="btn btn-sm" onclick="viewRun({{ run.id }})">View</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--text-secondary);">No benchmark runs yet. Use the form above to run your first benchmark.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+(function() {
+    // Load patient list into dropdown
+    fetch('/admin/benchmarks/patients')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            const sel = document.getElementById('bm-patient');
+            data.data.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.id} (${p.age}${p.sex[0].toUpperCase()} ${p.insurer})`;
+                sel.appendChild(opt);
+            });
+        });
+
+    // Run benchmark
+    document.getElementById('benchmark-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('bm-run-btn');
+        btn.disabled = true;
+        btn.textContent = 'Running…';
+
+        const formData = new FormData();
+        formData.append('engine', document.getElementById('bm-engine').value);
+        formData.append('patient', document.getElementById('bm-patient').value);
+        formData.append('perf', document.getElementById('bm-perf').checked ? 'true' : 'false');
+
+        fetch('/admin/benchmarks/run', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = 'Run Benchmarks';
+                if (data.success) {
+                    renderResults(data.data);
+                } else {
+                    alert('Benchmark failed: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.textContent = 'Run Benchmarks';
+                alert('Request failed: ' + err.message);
+            });
+    });
+
+    function renderResults(data) {
+        const panel = document.getElementById('bm-results');
+        panel.style.display = '';
+
+        // Summary badges
+        const summary = document.getElementById('bm-summary');
+        const rate = data.total > 0 ? ((data.passed / data.total) * 100).toFixed(1) : 0;
+        summary.innerHTML = `
+            <div style="text-align:center;">
+                <div style="font-size:2rem; font-weight:700; color:${data.failed === 0 ? 'var(--color-green)' : 'var(--color-danger)'};">${rate}%</div>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">Pass Rate</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:2rem; font-weight:700;">${data.total}</div>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">Total Tests</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:2rem; font-weight:700; color:var(--color-green);">${data.passed}</div>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">Passed</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:2rem; font-weight:700; color:${data.failed > 0 ? 'var(--color-danger)' : 'var(--text-secondary)'};">${data.failed}</div>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">Failed</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:2rem; font-weight:700;">${data.duration_ms.toFixed(0)}ms</div>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">Duration</div>
+            </div>
+        `;
+
+        // Detail table
+        const detail = document.getElementById('bm-detail');
+        let html = '<table class="data-table" style="width:100%; font-size:0.85rem;"><thead><tr>'
+            + '<th>Patient</th><th>Engine</th><th>Test</th><th>Result</th><th>Time</th><th>Details</th>'
+            + '</tr></thead><tbody>';
+
+        (data.results || []).forEach(r => {
+            const icon = r.passed ? '✅' : '❌';
+            const rowClass = r.passed ? '' : ' style="background:var(--color-danger-bg, rgba(255,0,0,0.05));"';
+            const timing = r.duration_ms > 0 ? r.duration_ms.toFixed(1) + 'ms' : '-';
+            html += `<tr${rowClass}>`
+                + `<td>${escHtml(r.patient_id)}</td>`
+                + `<td>${escHtml(r.engine)}</td>`
+                + `<td>${escHtml(r.test_name)}</td>`
+                + `<td>${icon}</td>`
+                + `<td>${timing}</td>`
+                + `<td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(r.explanation)}">${escHtml(r.explanation)}</td>`
+                + '</tr>';
+        });
+
+        html += '</tbody></table>';
+        detail.innerHTML = html;
+    }
+
+    window.viewRun = function(runId) {
+        fetch('/admin/benchmarks/run/' + runId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    renderResults(data.data);
+                    window.scrollTo({top: 0, behavior: 'smooth'});
+                }
+            });
+    };
+
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str || '';
+        return d.innerHTML;
+    }
+})();
+</script>
+{% endblock %}

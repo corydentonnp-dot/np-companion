@@ -25,6 +25,9 @@ def build_scheduler(*, timezone, heartbeat_fn, mrn_fn, inbox_fn, inbox_minutes=1
                     auto_scrape_fn=None,
                     auto_scrape_hour=18,
                     auto_scrape_minute=0,
+                    viis_previsit_fn=None,
+                    viis_previsit_hour=18,
+                    viis_previsit_minute=30,
                     **kwargs):
     """
     Build and configure a BackgroundScheduler with standard NP jobs.
@@ -262,6 +265,19 @@ def build_scheduler(*, timezone, heartbeat_fn, mrn_fn, inbox_fn, inbox_minutes=1
             hour=20,
             minute=0,
             id='previsit_billing',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+
+    # VIIS: pre-visit VIIS batch lookup — daily (default 6:30 PM)
+    if viis_previsit_fn is not None:
+        scheduler.add_job(
+            viis_previsit_fn,
+            trigger='cron',
+            hour=viis_previsit_hour,
+            minute=viis_previsit_minute,
+            id='viis_previsit',
             replace_existing=True,
             max_instances=1,
             coalesce=True,

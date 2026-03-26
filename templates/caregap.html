@@ -96,7 +96,7 @@
                                 <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;">Code: {{ g.billing_code_suggested }}</div>
                                 {% endif %}
                                 <div style="margin-top:8px;display:flex;gap:6px;">
-                                    <button class="btn btn-primary btn-sm" onclick="addressGap('{{ p.mrn }}', {{ g.id }})">
+                                    <button class="btn btn-primary btn-sm" onclick="addressGap('{{ p.mrn }}', {{ g.id }}, this)">
                                         ✓ Address
                                     </button>
                                     <form method="post" action="/caregap/{{ p.mrn }}/status/{{ g.id }}" style="display:inline;">
@@ -188,8 +188,8 @@ function toggleGapRow(mrn) {
     if (row) row.style.display = (row.style.display === 'none') ? '' : 'none';
 }
 
-function addressGap(mrn, gapId) {
-    fetch('/caregap/' + mrn + '/address/' + gapId, {
+function addressGap(mrn, gapId, btn) {
+    _withSpinner(btn, fetch('/caregap/' + mrn + '/address/' + gapId, {
         method: 'POST',
         headers: {'X-Requested-With': 'XMLHttpRequest'},
     })
@@ -202,7 +202,7 @@ function addressGap(mrn, gapId) {
             /* Refresh after closing modal */
             document.getElementById('doc-modal-overlay')._refresh = true;
         }
-    });
+    }));
 }
 
 function closeDocModal() {

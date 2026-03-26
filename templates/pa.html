@@ -92,7 +92,7 @@
                 <span>Generated Narrative</span>
                 <div style="display:flex;gap:6px;">
                     <button class="btn btn-sm btn-outline" onclick="copyNarrative()">Copy</button>
-                    <button class="btn btn-sm btn-primary" onclick="submitPA()">Mark Submitted</button>
+                    <button class="btn btn-sm btn-primary" onclick="submitPA(this)">Mark Submitted</button>
                 </div>
             </div>
             <div class="card-body">
@@ -137,10 +137,10 @@
                             </td>
                             <td style="white-space:nowrap;">
                                 {% if pa.status == 'submitted' %}
-                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="updatePAStatus({{ pa.id }},'approved')">Approve</button>
-                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="denyPA({{ pa.id }})">Deny</button>
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="updatePAStatus({{ pa.id }},'approved', this)">Approve</button>
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;" onclick="denyPA({{ pa.id }}, this)">Deny</button>
                                 {% elif pa.status == 'denied' %}
-                                <button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--color-warning);" onclick="appealPA({{ pa.id }})">Appeal</button>
+                                <button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--color-warning);" onclick="appealPA({{ pa.id }}, this)">Appeal</button>
                                 {% endif %}
                             </td>
                         </tr>
@@ -230,25 +230,25 @@ function copyNarrative() {
     });
 }
 
-function submitPA() {
+function submitPA(btn) {
     if (!_currentPAId) return;
-    updatePAStatus(_currentPAId, 'submitted');
+    updatePAStatus(_currentPAId, 'submitted', btn);
 }
 
-function updatePAStatus(id, status) {
-    fetch('/pa/' + id + '/status', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status})})
-        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+function updatePAStatus(id, status, btn) {
+    _withSpinner(btn, fetch('/pa/' + id + '/status', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status})})
+        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();}));
 }
 
-function denyPA(id) {
+function denyPA(id, btn) {
     var reason = prompt('Denial reason:');
     if (reason === null) return;
-    fetch('/pa/' + id + '/status', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'denied',reason:reason})})
-        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();});
+    _withSpinner(btn, fetch('/pa/' + id + '/status', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'denied',reason:reason})})
+        .then(function(r){return r.json();}).then(function(d){if(d.success)location.reload();}));
 }
 
-function appealPA(id) {
-    fetch('/pa/' + id + '/appeal', {method:'POST'})
+function appealPA(id, btn) {
+    _withSpinner(btn, fetch('/pa/' + id + '/appeal', {method:'POST'})
         .then(function(r){return r.json();})
         .then(function(d){
             if (d.success) {
@@ -256,7 +256,7 @@ function appealPA(id) {
                 document.getElementById('narrative-card').style.display = '';
                 _currentPAId = id;
             }
-        });
+        }));
 }
 
 function escHtml(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML;}

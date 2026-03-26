@@ -95,30 +95,43 @@
                 </li>
                 {% endif %}
 
-                {# My Patients #}
+                {# Patients #}
                 {% if user_can_access('dashboard') %}
                 <li class="nav-item {% if request.path.startswith('/patients') or request.path.startswith('/patient/') %}active{% endif %}" data-nav-id="patients">
-                    <a href="/patients" class="nav-link" title="My Patients">
+                    <a href="/patients" class="nav-link" title="Patients">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                             <circle cx="9" cy="7" r="4"/>
                             <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                         </svg>
-                        <span class="nav-label">My Patients</span>
+                        <span class="nav-label">Patients</span>
                     </a>
                 </li>
                 {% endif %}
 
                 {# Timer #}
                 {% if user_can_access('timer') %}
-                <li class="nav-item {% if request.path.startswith('/timer') or request.path.startswith('/billing') %}active{% endif %}" data-nav-id="timer">
+                <li class="nav-item {% if request.path.startswith('/timer') %}active{% endif %}" data-nav-id="timer">
                     <a href="/timer" class="nav-link" title="Timer">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"/>
                             <polyline points="12 6 12 12 16 14"/>
                         </svg>
                         <span class="nav-label">Timer</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                {# Billing #}
+                {% if user_can_access('timer') %}
+                <li class="nav-item {% if request.path.startswith('/billing') %}active{% endif %}" data-nav-id="billing">
+                    <a href="/billing/log" class="nav-link" title="Billing">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23"/>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                        </svg>
+                        <span class="nav-label">Billing</span>
                     </a>
                 </li>
                 {% endif %}
@@ -453,7 +466,12 @@
                         <div class="menu-separator"></div>
                         <button class="menu-dd-item" data-url="/admin"><span class="menu-dd-icon">📊</span>Practice Overview<span class="menu-dd-shortcut"></span></button>
                         <button class="menu-dd-item" data-url="/admin/config"><span class="menu-dd-icon">⚙</span>Configuration<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/admin/rules-registry"><span class="menu-dd-icon">✅</span>Rules Registry<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-url="/admin/benchmarks"><span class="menu-dd-icon">⚡</span>Benchmarks<span class="menu-dd-shortcut"></span></button>
                         <button class="menu-dd-item" data-url="/caregap/rules"><span class="menu-dd-icon">📋</span>Care Gap Rules<span class="menu-dd-shortcut"></span></button>
+                        <div class="menu-separator"></div>
+                        <button class="menu-dd-item" data-action="severAllPatients" onclick="adminSeverAll(event)"><span class="menu-dd-icon">🔓</span>Sever All Patients<span class="menu-dd-shortcut"></span></button>
+                        <button class="menu-dd-item" data-action="updateAllPatients" onclick="adminUpdateAll(event)"><span class="menu-dd-icon">🔄</span>Update All Patients<span class="menu-dd-shortcut"></span></button>
                         <div class="menu-separator"></div>
                         <button class="menu-dd-item" data-url="/admin/updates"><span class="menu-dd-icon">⬆</span>Updates<span class="menu-dd-shortcut"></span></button>
                         <button class="menu-dd-item" data-url="/admin/sitemap"><span class="menu-dd-icon">🗺</span>Site Map<span class="menu-dd-shortcut"></span></button>
@@ -644,11 +662,11 @@
                 <button class="modal-close" data-dismiss="manage-refs-modal" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="tab-group" id="refs-tabs">
+                <div class="cc-tabs" id="refs-tabs">
                     {% if current_user.is_authenticated and current_user.role == 'admin' %}
-                    <button class="tab-btn active" data-tab="refs-practice">Practice</button>
+                    <button class="cc-tab cc-tab--sm active" data-tab="refs-practice">Practice</button>
                     {% endif %}
-                    <button class="tab-btn {% if not (current_user.is_authenticated and current_user.role == 'admin') %}active{% endif %}" data-tab="refs-personal">Personal</button>
+                    <button class="cc-tab cc-tab--sm {% if not (current_user.is_authenticated and current_user.role == 'admin') %}active{% endif %}" data-tab="refs-personal">Personal</button>
                 </div>
                 {% if current_user.is_authenticated and current_user.role == 'admin' %}
                 <div class="tab-panel active" id="refs-practice">
@@ -846,6 +864,120 @@
 {# ---- POPUP TASKBAR (PH44-2) ---------------------------------------- #}
 <div class="popup-taskbar" id="popup-taskbar"></div>
 
+{# ---- AC CHART FLAG WIDGET (CF) ------------------------------------- #}
+{% if chart_flag_enabled() %}
+<div id="chart-flag" class="chart-flag" style="display:none;">
+    <div class="chart-flag__header">
+        <span class="chart-flag__icon">&#128203;</span>
+        <span class="chart-flag__title">Chart Open in AC</span>
+        <button class="chart-flag__close" id="chart-flag-dismiss" title="Dismiss">&times;</button>
+    </div>
+    <div class="chart-flag__body">
+        <div class="chart-flag__patient" id="chart-flag-name"></div>
+        <div class="chart-flag__meta" id="chart-flag-meta"></div>
+        <a class="btn btn-sm btn-primary chart-flag__action" id="chart-flag-link" href="#" style="display:none;">
+            Open in CareCompanion
+        </a>
+        <span class="chart-flag__no-record" id="chart-flag-no-record" style="display:none;">
+            No CareCompanion record
+        </span>
+    </div>
+</div>
+<script>
+(function() {
+    var flag = document.getElementById('chart-flag');
+    if (!flag) return;
+
+    var nameEl = document.getElementById('chart-flag-name');
+    var metaEl = document.getElementById('chart-flag-meta');
+    var linkEl = document.getElementById('chart-flag-link');
+    var noRecEl = document.getElementById('chart-flag-no-record');
+    var dismissBtn = document.getElementById('chart-flag-dismiss');
+    var currentMrn = null;
+    var pollTimer = null;
+
+    function getDismissedMrn() {
+        try { return sessionStorage.getItem('chart_flag_dismissed_mrn'); } catch(e) { return null; }
+    }
+    function setDismissedMrn(mrn) {
+        try { sessionStorage.setItem('chart_flag_dismissed_mrn', mrn); } catch(e) {}
+    }
+    function clearDismissedMrn() {
+        try { sessionStorage.removeItem('chart_flag_dismissed_mrn'); } catch(e) {}
+    }
+
+    function showFlag(data) {
+        // Don't show if dismissed for this MRN
+        if (getDismissedMrn() === data.mrn) return;
+
+        // Don't show if already on this patient's chart page
+        if (data.cc_url && window.location.pathname === data.cc_url) return;
+
+        nameEl.textContent = data.patient_name || '';
+        metaEl.textContent = (data.age ? data.age + 'y ' : '') +
+                             (data.sex || '') +
+                             (data.dob ? ' | DOB: ' + data.dob : '');
+
+        if (data.has_cc_record && data.cc_url) {
+            linkEl.href = data.cc_url;
+            linkEl.style.display = '';
+            noRecEl.style.display = 'none';
+        } else {
+            linkEl.style.display = 'none';
+            noRecEl.style.display = '';
+        }
+
+        flag.style.display = '';
+        flag.classList.remove('chart-flag--hidden');
+        currentMrn = data.mrn;
+    }
+
+    function hideFlag() {
+        flag.classList.add('chart-flag--hidden');
+        setTimeout(function() {
+            flag.style.display = 'none';
+            flag.classList.remove('chart-flag--hidden');
+        }, 300);
+        currentMrn = null;
+    }
+
+    dismissBtn.addEventListener('click', function() {
+        if (currentMrn) setDismissedMrn(currentMrn);
+        hideFlag();
+    });
+
+    function pollActiveChart() {
+        if (document.visibilityState === 'hidden') return;
+
+        fetch('/api/active-chart', {credentials: 'same-origin'})
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                if (!resp.success) { hideFlag(); return; }
+                var d = resp.data;
+                if (!d.active) {
+                    if (currentMrn) { clearDismissedMrn(); hideFlag(); }
+                    return;
+                }
+                // New patient — clear old dismiss state
+                if (d.mrn !== currentMrn && d.mrn !== getDismissedMrn()) {
+                    clearDismissedMrn();
+                }
+                showFlag(d);
+            })
+            .catch(function() { /* silent — next poll will retry */ });
+    }
+
+    // Poll every 5 seconds, only when tab is visible
+    pollTimer = setInterval(pollActiveChart, 5000);
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') pollActiveChart();
+    });
+    // Initial poll
+    pollActiveChart();
+})();
+</script>
+{% endif %}
+
 {# ---- AI CHAT PANEL ------------------------------------------------- #}
 {% if user_ai_enabled() %}
 <div id="ai-panel" class="ai-panel" style="display:none;">
@@ -939,7 +1071,7 @@
 /* Route index for Command Palette (4.5) */
 window.__npRoutes = [
     {label: 'Dashboard', url: '/dashboard', category: 'Pages'},
-    {label: 'My Patients', url: '/patients', category: 'Pages'},
+    {label: 'Patients', url: '/patients', category: 'Pages'},
     {% if user_can_access('timer') %}{label: 'Timer', url: '/timer', category: 'Pages'},{% endif %}
     {% if user_can_access('inbox') %}{label: 'Inbox', url: '/inbox', category: 'Pages'},{% endif %}
     {% if user_can_access('oncall') %}{label: 'On-Call', url: '/oncall', category: 'Pages'},{% endif %}
@@ -1005,6 +1137,38 @@ function restartServer(e) {
             /* Server may already be shutting down — try reload */
             setTimeout(function() { location.reload(); }, 4000);
         });
+}
+
+function adminSeverAll(e) {
+    e.preventDefault();
+    if (!confirm('Unclaim ALL patients from your panel? They will still appear under All Patients.')) return;
+    fetch('/admin/tools/sever-all-patients', { method: 'POST' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                alert(data.message || 'All patients unclaimed.');
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to sever patients.');
+            }
+        })
+        .catch(function() { alert('Request failed. Check server logs.'); });
+}
+
+function adminUpdateAll(e) {
+    e.preventDefault();
+    if (!confirm('Re-import XML data for ALL patients? Existing data will be refreshed from XML files.')) return;
+    fetch('/admin/tools/update-all-patients', { method: 'POST' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                alert(data.message || 'All patients updated.');
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to update patients.');
+            }
+        })
+        .catch(function() { alert('Request failed. Check server logs.'); });
 }
 
 /* Patient Search (F4f) */

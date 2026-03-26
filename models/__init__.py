@@ -68,3 +68,5 @@ from models.immunization import ImmunizationSeries
 from models.telehealth import CommunicationLog
 from models.calculator import CalculatorResult
 from models.bookmark import PracticeBookmark
+from models.benchmark import BenchmarkRun, BenchmarkResult
+from models.viis import VIISCheck, VIISBatchRun

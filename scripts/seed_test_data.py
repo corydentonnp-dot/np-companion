@@ -1008,8 +1008,8 @@ def seed_patient_from_xml(user_id):
 
     xml_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        'Documents', 'xml_test_patients',
-        'ClinicalSummary_PatientId_62815_20260317_142457.xml'
+        'Documents', 'demo_patients',
+        'ClinicalSummary_PatientId_62815_20260317_142334.xml'
     )
 
     if not os.path.isfile(xml_path):

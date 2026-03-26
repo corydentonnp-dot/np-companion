@@ -48,22 +48,30 @@
 {% block content %}
 {# ---- PATIENT HEADER BAR ---- #}
 <div class="pt-header">
+    {# -- Left: Name + Demographics -- #}
     <div class="pt-header-left">
-        <h1 class="pt-name">{{ record.patient_name if record else 'Unknown Patient' }}</h1>
-        <button class="btn-icon" id="edit-demo-btn" onclick="toggleDemoEdit()" title="Edit demographics" style="margin-left:8px;font-size:14px;background:none;border:none;cursor:pointer;opacity:0.6;">&#9998;</button>
-        <div class="pt-meta" id="pt-meta-display">
-            {% if record and record.patient_dob %}
-                {% set dob = record.patient_dob|replace('-','')|replace('/','')|trim %}
-                {% if dob|length >= 8 %}
-            <span title="Date of birth">DOB: {{ dob[4:6] }}-{{ dob[6:8] }}-{{ dob[:4] }}</span>
-                {% else %}
-            <span title="Date of birth">DOB: {{ record.patient_dob }}</span>
+        <div class="pt-name-block">
+            <h1 class="pt-name">
+                {% if record and record.patient_name %}
+                    {% set parts = record.patient_name.split() %}
+                    {% if parts|length > 1 %}{{ parts[-1]|upper }}, {{ parts[:-1]|join(' ')|upper }}{% else %}{{ record.patient_name|upper }}{% endif %}
+                {% else %}UNKNOWN PATIENT{% endif %}
+                <span class="pt-mrn-inline">({{ mrn_display }})</span>
+            </h1>
+            <div class="pt-meta" id="pt-meta-display">
+                {% if age_str %}<span class="pt-age">{{ age_str }}</span>{% endif %}
+                {% if record and record.patient_dob %}
+                    {% set dob = record.patient_dob|replace('-','')|replace('/','')|trim %}
+                    {% if dob|length >= 8 %}
+                <span class="pt-dob">DOB: {{ dob[4:6] }}/{{ dob[6:8] }}/{{ dob[:4] }}</span>
+                    {% else %}
+                <span class="pt-dob">DOB: {{ record.patient_dob }}</span>
+                    {% endif %}
                 {% endif %}
-            {% endif %}
-            {% if age_str %}<span>{{ age_str }}</span>{% endif %}
-            {% if record and record.patient_sex %}<span title="Sex">{{ record.patient_sex }}</span>{% endif %}
-            <span title="Medical Record Number">MRN: {{ mrn_display }}</span>
+                {% if record and record.patient_sex %}<span class="pt-sex">{{ record.patient_sex }}</span>{% endif %}
+            </div>
         </div>
+        <button class="pt-gear-btn" id="edit-demo-btn" onclick="toggleDemoEdit()" title="Edit demographics">&#9998;</button>
         {# ---- Inline demographics edit form (hidden by default) ---- #}
         <div id="pt-meta-edit" style="display:none;" class="pt-meta">
             <label style="font-size:12px;">Name:
@@ -74,7 +82,7 @@
             </label>
             <label style="font-size:12px;">Sex:
                 <select id="demo-sex" class="form-input form-input-sm" style="width:80px;">
-                    <option value="">—</option>
+                    <option value="">--</option>
                     <option value="M" {% if record and record.patient_sex == 'M' %}selected{% endif %}>M</option>
                     <option value="F" {% if record and record.patient_sex == 'F' %}selected{% endif %}>F</option>
                 </select>
@@ -83,8 +91,9 @@
             <button class="btn btn-sm btn-outline" onclick="toggleDemoEdit()">Cancel</button>
         </div>
     </div>
-    <div class="pt-header-right">
-        {# Allergies banner — contrasting cell with hover details #}
+
+    {# -- Center: Allergies Badge -- #}
+    <div class="pt-header-center">
         <div class="pt-allergy-badge" title="{% if allergies %}{% for a in allergies %}{{ a.allergen }}{% if a.reaction %} ({{ a.reaction }}){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}{% else %}No Known Drug Allergies{% endif %}">
             <span class="pt-allergy-icon">&#9888;&#65039;</span>
             {% if allergies %}
@@ -93,31 +102,42 @@
                 <span class="pt-allergy-nkda">NKDA</span>
             {% endif %}
         </div>
-        {# Print paperwork stub #}
-        <a href="/patient/{{ mrn_display }}/print" target="_blank" class="btn btn-sm btn-outline" title="Print patient paperwork">&#128424; Print</a>
-        {# Claim button #}
-        <button class="btn btn-sm {% if record and record.claimed_by == current_user.id %}btn-outline{% else %}btn-primary{% endif %}" id="claim-btn" onclick="claimPatient('{{ mrn_display }}')">
-            {% if record and record.claimed_by == current_user.id %}
-                &#10003; Claimed
-            {% else %}
-                &#128100; Claim
-            {% endif %}
+    </div>
+
+    {# -- Action Buttons (between allergies and right info) -- #}
+    <div class="pt-header-actions">
+        <a href="/patient/{{ mrn_display }}/print" target="_blank" class="btn btn-sm btn-outline pt-action-btn" title="Print patient paperwork">&#128424; Print</a>
+        <button class="btn btn-sm {% if record and record.claimed_by == current_user.id %}btn-outline{% else %}btn-primary{% endif %} pt-action-btn" id="claim-btn" onclick="claimPatient('{{ mrn_display }}')">
+            {% if record and record.claimed_by == current_user.id %}&#10003; Claimed{% else %}&#128100; Claim{% endif %}
         </button>
-        <span class="pt-sync-label">
-            Last synced:
-            {% if record and record.last_xml_parsed %}
-                {{ record.last_xml_parsed.strftime('%m/%d/%Y %I:%M %p') }}
-            {% else %}
-                Never
-            {% endif %}
-        </span>
-        <button class="btn btn-sm btn-outline" onclick="toggleEditMode()">&#9881; Edit Layout</button>
-        <div class="chart-view-toggle" style="display:inline-flex;gap:2px;align-items:center;margin-left:4px;">
-            <span style="font-size:12px;color:var(--text-secondary);">View:</span>
-            <button id="view-tabs-btn" class="btn btn-sm" style="padding:2px 10px;font-size:12px;" onclick="setChartView('tabs')">Tabs</button>
-            <button id="view-grid-btn" class="btn btn-sm" style="padding:2px 10px;font-size:12px;" onclick="setChartView('grid')">Grid</button>
+        <button class="pt-gear-btn" onclick="document.getElementById('chart-settings-dropdown').classList.toggle('show')" title="Chart settings">&#9881;</button>
+        <div class="pt-settings-dropdown" id="chart-settings-dropdown">
+            <button onclick="toggleEditMode();document.getElementById('chart-settings-dropdown').classList.remove('show');">&#9881; Edit Layout</button>
+            <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
+            <span style="font-size:11px;color:var(--text-secondary);padding:2px 8px;">View:</span>
+            <button id="view-tabs-btn" onclick="setChartView('tabs');document.getElementById('chart-settings-dropdown').classList.remove('show');">Tabs</button>
+            <button id="view-grid-btn" onclick="setChartView('grid');document.getElementById('chart-settings-dropdown').classList.remove('show');">Grid</button>
+            {% include '_free_widgets.html' %}
         </div>
-        {% include '_free_widgets.html' %}
+    </div>
+
+    {# -- Right: Status Info -- #}
+    <div class="pt-header-right">
+        <span id="viis-badge" style="display:none;"></span>
+        <div class="pt-status-lines">
+            <div class="pt-status-row" onclick="checkVIIS()" title="Click to check VIIS" role="button" tabindex="0">
+                <span class="pt-status-label">VIIS checked:</span>
+                <span class="pt-status-date" id="viis-date-display">--</span>
+            </div>
+            <div class="pt-status-row" onclick="checkPDMP()" title="Click to check PDMP" role="button" tabindex="0">
+                <span class="pt-status-label">PDMP checked:</span>
+                <span class="pt-status-date" id="pdmp-date-display">--</span>
+            </div>
+            <div class="pt-status-row" onclick="location.reload()" title="Click to refresh data" role="button" tabindex="0">
+                <span class="pt-status-label">Last Synced:</span>
+                <span class="pt-status-date">{% if record and record.last_xml_parsed %}{{ record.last_xml_parsed.strftime('%m/%d/%Y') }}{% else %}Never{% endif %}</span>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -164,11 +184,11 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128138; Medications</span>
             <div class="widget-controls">
-                <select class="widget-filter" id="med-filter" onchange="filterMeds(this.value)">
-                    <option value="all">All</option>
-                    <option value="active" selected>Active</option>
-                    <option value="inactive">Inactive</option>
-                </select>
+                <div class="widget-tabs" id="med-tabs">
+                    <button class="widget-tab active" onclick="filterMeds('active',this)">Active</button>
+                    <button class="widget-tab" onclick="filterMeds('inactive',this)">Inactive</button>
+                    <button class="widget-tab" onclick="filterMeds('all',this)">All</button>
+                </div>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
@@ -176,7 +196,7 @@
             {% if medications %}
             <table class="widget-table med-table" id="med-table">
                 <thead>
-                    <tr><th class="med-col-name">Medication</th><th class="med-col-dose">Dose / Form</th><th class="med-col-freq">Freq</th><th class="med-col-status">Status</th><th class="med-col-price" title="Estimated monthly cost">$</th></tr>
+                    <tr><th class="med-col-name">Medication</th><th class="med-col-dose">Dose</th><th class="med-col-freq">Freq</th><th class="med-col-status">Status</th><th class="med-col-price" title="Estimated monthly cost">$</th></tr>
                 </thead>
                 <tbody>
                     {% for m in medications %}
@@ -184,18 +204,18 @@
                     {% set gen = rx.generic_name if rx and rx.generic_name else '' %}
                     {% set brand = rx.brand_name if rx and rx.brand_name else '' %}
                     {% set display_name = gen if gen else m.drug_name.split()[0] %}
-                    <tr data-status="{{ m.status }}" class="{% if m.status != 'active' %}row-inactive{% endif %}">
-                        <td class="fw-500 cell-clip" title="{{ brand ~ ' (' ~ gen ~ ')' if brand and gen else m.drug_name }}"><a href="https://www.uptodate.com/contents/search?search={{ display_name|urlencode }}+drug+information" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">{{ display_name }}</a>{% if brand and gen %} <span class="text-muted text-sm">({{ brand }})</span>{% endif %}</td>
-                        <td class="med-dose-cell">{{ (rx.dose_strength ~ ' ' ~ rx.dose_form) | trim if rx and rx.dose_strength else m.dosage }}</td>
-                        <td title="{{ m.frequency }}">{{ m.std_frequency if m.std_frequency else m.frequency }}</td>
-                        <td><span class="badge badge-{{ 'success' if m.status == 'active' else 'muted' }} badge-toggle" onclick="toggleItemStatus(this, '{{ mrn_display }}', 'medication', {{ m.id }})" title="Click to toggle" role="button" tabindex="0">{{ m.status }}</span></td>
+                    <tr data-status="{{ m.status }}" data-med-id="{{ m.id }}" class="{% if m.status != 'active' %}row-inactive{% endif %}{% if m.user_modified %} user-modified{% endif %}">
+                        <td class="fw-500 cell-clip" title="{{ brand ~ ' (' ~ gen ~ ')' if brand and gen else m.drug_name }}"><a href="https://www.uptodate.com/contents/search?search={{ display_name|urlencode }}+drug+information" target="_blank" rel="noopener" onclick="event.preventDefault();openInPreferredBrowser(this.href);">{{ display_name }}</a>{% if brand and gen %} <span class="text-muted text-sm">({{ brand }})</span>{% endif %}{% if m.user_modified %}<span class="med-xml-flag" title="User-edited; may differ from Amazing Charts XML data">&#9888;</span>{% endif %}</td>
+                        <td class="med-dose-cell med-editable" data-field="dosage" data-med-id="{{ m.id }}" ondblclick="editMedCell(this)">{{ (rx.dose_strength ~ ' ' ~ rx.dose_form) | trim if rx and rx.dose_strength else m.dosage }}</td>
+                        <td class="med-editable" data-field="frequency" data-med-id="{{ m.id }}" ondblclick="editMedCell(this)" title="{{ m.frequency }}">{{ m.std_frequency if m.std_frequency else m.frequency }}</td>
+                        <td><span class="badge badge-{{ 'success' if m.status == 'active' else 'muted' }} badge-toggle" onclick="toggleMedStatus(this, '{{ mrn_display }}', {{ m.id }})" title="Click to toggle" role="button" tabindex="0">{{ m.status }}</span></td>
                         <td class="price-cell" data-med-id="{{ m.id }}"><span class="price-badge price-loading" title="Loading..."></span></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
             {% else %}
-            {{ empty_state('💊', 'No medications found', 'Medications appear after importing a clinical summary.') }}
+            {{ empty_state('&#128138;', 'No medications found', 'Medications appear after importing a clinical summary.') }}
             {% endif %}
             <div class="widget-footer-count">{{ medications|selectattr('status','equalto','active')|list|length }} active / {{ medications|length }} total</div>
         </div>
@@ -207,15 +227,21 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#129658; Diagnoses</span>
             <div class="widget-controls">
-                <button class="btn btn-sm btn-outline" onclick="copyDiagnoses()" title="Copy all diagnoses">&#128203; Copy</button>
-                <button class="btn btn-sm btn-outline" onclick="document.getElementById('dx-col-picker').style.display=document.getElementById('dx-col-picker').style.display==='block'?'none':'block'" title="Choose columns to copy">&#9881;</button>
-                <button class="btn btn-sm btn-outline" onclick="document.getElementById('icd10-lookup-modal').style.display='flex'" title="ICD-10 Lookup">&#128270; ICD-10</button>
+                <div class="widget-tabs" id="dx-tabs">
+                    <button class="widget-tab active" onclick="filterDiagnoses('all',this)">All</button>
+                    <button class="widget-tab" onclick="filterDiagnoses('active',this)">Active</button>
+                    <button class="widget-tab" onclick="filterDiagnoses('inactive',this)">Inactive</button>
+                </div>
+                <div class="dx-copy-group">
+                    <button class="dx-copy-main" onclick="copyDiagnoses()" title="Copy diagnoses">&#128203; Copy</button>
+                    <span class="dx-copy-divider"></span>
+                    <button class="dx-copy-arrow" onclick="this.nextElementSibling.classList.toggle('show')" title="Copy options">&#9660;</button>
+                    <div class="dx-copy-dropdown" id="dx-copy-dropdown">
+                        <button onclick="document.getElementById('dx-col-picker').style.display='block';this.parentElement.classList.remove('show');">&#9881; Choose columns</button>
+                        <button onclick="document.getElementById('icd10-lookup-modal').style.display='flex';this.parentElement.classList.remove('show');">&#128270; ICD-10 Lookup</button>
+                    </div>
+                </div>
                 <button class="btn btn-sm btn-primary" onclick="document.getElementById('icd10-lookup-modal').style.display='flex'" title="Add a new diagnosis">+ Add Dx</button>
-                <select class="widget-filter" id="diag-filter" onchange="filterDiagnoses(this.value)">
-                    <option value="all" selected>All</option>
-                    <option value="chronic">Chronic</option>
-                    <option value="acute">Acute</option>
-                </select>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
@@ -388,12 +414,13 @@
         <div class="widget-body">
             {% if immunizations %}
             <table class="widget-table">
-                <thead><tr><th>Vaccine</th><th>Date</th></tr></thead>
+                <thead><tr><th>Vaccine</th><th>Date</th><th>Source</th></tr></thead>
                 <tbody>
                     {% for imm in immunizations %}
                     <tr>
                         <td>{{ imm.vaccine_name }}</td>
                         <td>{{ imm.date_given.strftime('%m/%d/%Y') if imm.date_given else 'Unknown' }}</td>
+                        <td><span style="font-size:10px;padding:1px 4px;border-radius:3px;{% if imm.source == 'viis' %}background:#14b8a6;color:#fff;{% else %}background:var(--bg-muted);color:var(--text-secondary);{% endif %}">{{ imm.source|upper if imm.source else 'AC' }}</span></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -402,25 +429,8 @@
             <p class="widget-empty">No immunizations loaded</p>
             {% endif %}
 
-            {# ---- Phase 24.4: Series Gap Flags ---- #}
-            {% if imm_series_gaps|default([]) %}
-            <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-                <div style="font-size:11px;font-weight:600;color:#8e44ad;margin-bottom:4px;">&#9888; Incomplete Series</div>
-                {% for g in imm_series_gaps %}
-                <div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;">
-                    <span style="font-weight:600;">{{ g.vaccine_group }}</span>
-                    <span style="color:var(--text-secondary);">{{ g.doses_received }}/{{ g.total_doses }}</span>
-                    {% if g.overdue %}
-                    <span style="background:#e74c3c;color:#fff;padding:0 4px;border-radius:3px;font-size:10px;">OVERDUE</span>
-                    {% elif g.status == 'in_progress' %}
-                    <span style="background:#f59e0b;color:#000;padding:0 4px;border-radius:3px;font-size:10px;">DUE</span>
-                    {% else %}
-                    <span style="background:#3498db;color:#fff;padding:0 4px;border-radius:3px;font-size:10px;">ELIGIBLE</span>
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
+            {# ---- Phase 24.4: Series Gap Flags (loaded via AJAX) ---- #}
+            <div id="imm-series-gaps" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"></div>
 
             <div id="viis-results" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"></div>
         </div>
@@ -525,75 +535,9 @@
             </div>
         </div>
         <div class="widget-body" id="risk-scores-body">
-        {% if auto_scores %}
-            {% set bmi = auto_scores.get('bmi') %}
-            {% set ldl = auto_scores.get('ldl') %}
-            {% set pack_years = auto_scores.get('pack_years') %}
-            {% set prevent = auto_scores.get('prevent') %}
-            <div class="risk-score-grid">
-                {% if bmi %}
-                {% set bmi_color = 'var(--success,#27ae60)' if bmi.score_label == 'normal' else ('var(--warning,#e67e22)' if bmi.score_label in ('overweight','obesity_class_1') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
-                    <div class="risk-card-header">
-                        <span class="risk-name">BMI</span>
-                        <span class="risk-badge" style="background:{{ bmi_color }}">{{ bmi.score_label|replace('_',' ')|title if bmi.score_label else '' }}</span>
-                    </div>
-                    <div class="risk-value" style="color:{{ bmi_color }}">{{ '%.1f'|format(bmi.score_value) }}</div>
-                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
-                        {% if bmi.score_detail %}{% for k,v in bmi.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
-                        <div style="margin-top:4px;color:var(--text-muted)">{{ bmi.computed_at[:10] if bmi.computed_at else '' }}</div>
-                    </div>
-                </div>
-                {% endif %}
-                {% if ldl %}
-                {% set ldl_color = 'var(--success,#27ae60)' if ldl.score_label in ('optimal','near_optimal') else ('var(--warning,#e67e22)' if ldl.score_label in ('borderline_high','high') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
-                    <div class="risk-card-header">
-                        <span class="risk-name">LDL</span>
-                        <span class="risk-badge" style="background:{{ ldl_color }}">{{ ldl.score_label|replace('_',' ')|title if ldl.score_label else '' }}</span>
-                    </div>
-                    <div class="risk-value" style="color:{{ ldl_color }}">{{ '%.0f'|format(ldl.score_value) }} <small>mg/dL</small></div>
-                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
-                        {% if ldl.score_detail %}{% for k,v in ldl.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
-                        <div style="margin-top:4px;color:var(--text-muted)">{{ ldl.computed_at[:10] if ldl.computed_at else '' }}</div>
-                    </div>
-                </div>
-                {% endif %}
-                {% if pack_years %}
-                {% set py_color = 'var(--success,#27ae60)' if pack_years.score_label == 'never_smoker' else ('var(--warning,#e67e22)' if 'light' in (pack_years.score_label or '') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
-                    <div class="risk-card-header">
-                        <span class="risk-name">Pack Years</span>
-                        <span class="risk-badge" style="background:{{ py_color }}">{{ pack_years.score_label|replace('_',' ')|title if pack_years.score_label else '' }}</span>
-                    </div>
-                    <div class="risk-value" style="color:{{ py_color }}">{{ '%.1f'|format(pack_years.score_value) }}</div>
-                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
-                        {% if pack_years.score_detail %}{% for k,v in pack_years.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
-                        <div style="margin-top:4px;color:var(--text-muted)">{{ pack_years.computed_at[:10] if pack_years.computed_at else '' }}</div>
-                    </div>
-                </div>
-                {% endif %}
-                {% if prevent %}
-                {% set prev_color = 'var(--success,#27ae60)' if prevent.score_label == 'low' else ('var(--warning,#e67e22)' if prevent.score_label in ('borderline','intermediate') else 'var(--danger,#e74c3c)') %}
-                <div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">
-                    <div class="risk-card-header">
-                        <span class="risk-name">PREVENT</span>
-                        <span class="risk-badge" style="background:{{ prev_color }}">{{ prevent.score_label|replace('_',' ')|title if prevent.score_label else '' }}</span>
-                    </div>
-                    <div class="risk-value" style="color:{{ prev_color }}">{{ '%.1f'|format(prevent.score_value) }}<small>% 10yr</small></div>
-                    <div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">
-                        {% if prevent.score_detail %}{% for k,v in prevent.score_detail.items() %}<div>{{ k }}: {{ v }}</div>{% endfor %}{% endif %}
-                        <div style="margin-top:4px;color:var(--text-muted)">{{ prevent.computed_at[:10] if prevent.computed_at else '' }}</div>
-                    </div>
-                </div>
-                {% endif %}
+            <div id="risk-scores-loading" style="text-align:center;padding:16px;">
+                <span class="loading-spinner"></span> Loading risk scores...
             </div>
-            {% if not (bmi or ldl or pack_years or prevent) %}
-            <p class="widget-empty">No auto-scores computed (clinical data needed)</p>
-            {% endif %}
-        {% else %}
-            <p class="widget-empty">No risk scores yet — load chart with clinical data</p>
-        {% endif %}
         </div>
         <div class="widget-resize-handle"></div>
     </div>
@@ -673,7 +617,7 @@
             <div id="note-action-bar" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
                 <button class="btn btn-sm" id="note-accept-btn" onclick="acceptAndCopy()" style="background:var(--color-green,#22c55e);color:#fff;font-weight:600;padding:6px 16px;">&#10003; Accept &amp; Copy</button>
                 <button class="btn btn-outline btn-sm" id="note-edit-btn" onclick="enterEditMode()">&#9998; Review &amp; Edit</button>
-                <button class="btn btn-outline btn-sm" onclick="saveDraft()">&#128190; Save Draft</button>
+                <button class="btn btn-outline btn-sm" id="save-draft-btn" onclick="saveDraft()">&#128190; Save Draft</button>
                 <button class="btn btn-outline btn-sm" onclick="runSpellCheck()" id="spell-check-btn" style="color:var(--color-teal);">&#128300; Check Terminology</button>
                 <span id="note-mode-label" style="font-size:11px;color:var(--text-secondary);margin-left:auto;">Preview</span>
             </div>
@@ -779,14 +723,15 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128176; Billing Opportunities</span>
             <div class="widget-controls">
-                <span id="billing-badge" class="widget-count-badge" style="background:var(--color-green,#27ae60);"></span>
+                <span id="billing-badge" class="widget-count-badge" aria-live="polite" aria-atomic="true" style="background:var(--color-green,#27ae60);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="billing-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Checking billing opportunities...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-badge"></span><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span><span class="skeleton-badge"></span></div>
+                <div class="skeleton-row"><span class="skeleton-badge"></span><span class="skeleton-bar skeleton-bar--lg" style="flex:1"></span><span class="skeleton-badge"></span></div>
+                <div class="skeleton-row"><span class="skeleton-badge"></span><span class="skeleton-bar skeleton-bar--sm" style="flex:1"></span><span class="skeleton-badge"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -797,14 +742,15 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128337; CCM Status</span>
             <div class="widget-controls">
-                <span id="ccm-badge" class="widget-count-badge" style="background:var(--color-teal,#1abc9c);"></span>
+                <span id="ccm-badge" class="widget-count-badge" aria-live="polite" aria-atomic="true" style="background:var(--color-teal,#1abc9c);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="ccm-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Checking CCM enrollment...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-circle"></span><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--full" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-badge"></span><span class="skeleton-bar skeleton-bar--sm" style="flex:1"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -856,14 +802,16 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128300; Lab Interpretation</span>
             <div class="widget-controls">
-                <span id="lab-interp-badge" class="widget-count-badge" style="background:var(--color-red,#e74c3c);"></span>
+                <span id="lab-interp-badge" class="widget-count-badge" aria-live="polite" aria-atomic="true" style="background:var(--color-red,#e74c3c);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="lab-interp-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Analyzing lab results...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--sm" style="flex:1"></span><span class="skeleton-bar skeleton-bar--sm" style="width:60px"></span><span class="skeleton-badge"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span><span class="skeleton-bar skeleton-bar--sm" style="width:60px"></span><span class="skeleton-badge"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--lg" style="flex:1"></span><span class="skeleton-bar skeleton-bar--sm" style="width:60px"></span><span class="skeleton-badge"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--sm" style="flex:1"></span><span class="skeleton-bar skeleton-bar--sm" style="width:60px"></span><span class="skeleton-badge"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -875,14 +823,14 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128165; Drug Safety</span>
             <div class="widget-controls">
-                <span id="safety-badge" class="widget-count-badge" style="background:var(--color-red,#e74c3c);"></span>
+                <span id="safety-badge" class="widget-count-badge" aria-live="polite" aria-atomic="true" style="background:var(--color-red,#e74c3c);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="drug-safety-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Checking recalls &amp; interactions...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-circle"></span><span class="skeleton-bar skeleton-bar--lg" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-circle"></span><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -899,9 +847,10 @@
             </div>
         </div>
         <div class="widget-body" id="guidelines-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Loading PubMed guidelines...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--lg" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--sm" style="flex:1"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -918,9 +867,10 @@
             </div>
         </div>
         <div class="widget-body" id="formulary-gaps-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Analyzing medication coverage...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-badge"></span><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-badge"></span><span class="skeleton-bar skeleton-bar--lg" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-badge"></span><span class="skeleton-bar skeleton-bar--sm" style="flex:1"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -937,9 +887,9 @@
             </div>
         </div>
         <div class="widget-body" id="education-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Loading patient education content...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--lg" style="flex:1"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -952,14 +902,15 @@
         <div class="widget-header" data-drag-handle>
             <span class="widget-title">&#128300; Clinical Trials Near You</span>
             <div class="widget-controls">
-                <span id="trials-badge" class="widget-count-badge" style="background:var(--color-teal,#0D7377);"></span>
+                <span id="trials-badge" class="widget-count-badge" aria-live="polite" aria-atomic="true" style="background:var(--color-teal,#0D7377);"></span>
                 <button class="widget-btn" onclick="toggleWidgetCollapse(this)" title="Collapse">&#9660;</button>
             </div>
         </div>
         <div class="widget-body" id="clinical-trials-body">
-            <div class="widget-loading">
-                <span class="loading-spinner"></span>
-                Searching recruiting trials...
+            <div class="skeleton-set">
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--md" style="flex:1"></span><span class="skeleton-badge"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--lg" style="flex:1"></span><span class="skeleton-badge"></span></div>
+                <div class="skeleton-row"><span class="skeleton-bar skeleton-bar--sm" style="flex:1"></span><span class="skeleton-badge"></span></div>
             </div>
         </div>
         <div class="widget-resize-handle"></div>
@@ -972,17 +923,18 @@
 <div id="icd10-lookup-modal" class="cc-modal">
     <div class="cc-modal__dialog cc-modal__dialog--lg" style="max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
         <div class="cc-modal__header" style="background:var(--bg-muted,#f8fafc);">
-            <h3 class="cc-modal__title">&#128270; ICD-10 Code Lookup (NIH)</h3>
+            <h3 class="cc-modal__title">&#128270; ICD-10 Code Lookup</h3>
             <button class="cc-modal__close" onclick="document.getElementById('icd10-lookup-modal').style.display='none'">&#10005;</button>
         </div>
-        <div style="padding:14px 20px;">
+        <div style="padding:14px 20px;position:relative;">
             <div class="action-bar">
-                <input type="text" id="icd10-search-input" class="form-input" placeholder="Search diagnoses or codes..." style="flex:1;" onkeydown="if(event.key==='Enter')searchICD10()">
+                <input type="text" id="icd10-search-input" class="form-input" placeholder="Start typing diagnosis or code..." style="flex:1;" autocomplete="off" oninput="icd10Autocomplete(this.value)" onkeydown="icd10KeyNav(event)">
                 <button class="btn btn-primary btn-sm" onclick="searchICD10()">Search</button>
             </div>
+            <div id="icd10-ac-dropdown" class="icd10-autocomplete" style="display:none;"></div>
         </div>
         <div id="icd10-results" style="flex:1;overflow-y:auto;padding:0 20px 14px;font-size:13px;">
-            <p class="text-center text-muted">Enter a term to search the NIH ICD-10 database.</p>
+            <p class="text-center text-muted">Start typing to search. Local billing codes match instantly; NIH database searched after a brief pause.</p>
         </div>
     </div>
 </div>
@@ -1022,34 +974,62 @@
 
 <style>
 /* ============= PATIENT CHART STYLES ============= */
-.pt-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border,#e2e8f0);margin:-20px -20px 16px;flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:50;}
-.pt-header-left{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-.pt-name{margin:0;font-size:20px;}
-.pt-meta{display:flex;gap:12px;font-size:13px;color:var(--text-secondary,#64748b);}
-.pt-header-right{display:flex;align-items:center;gap:10px;font-size:12px;}
-.pt-allergy-badge{display:flex;align-items:center;gap:6px;padding:4px 12px;background:var(--color-amber,#f59e0b);color:#000;border-radius:6px;font-size:12px;font-weight:600;cursor:default;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative;}
+/* Zero out main-content top padding so header sits flush against site header bar */
+body[data-page="patient-chart"] .main-content{padding-top:0;}
+body[data-page="patient-chart"] .breadcrumb-trail{display:none;}
+.pt-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--bg-surface,#fff);border-bottom:1px solid var(--border,#e2e8f0);margin:0 -24px;flex-wrap:nowrap;gap:12px;position:sticky;top:0;z-index:50;}
+.pt-header-left{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0;}
+.pt-name-block{display:flex;flex-direction:column;gap:0;}
+.pt-name{margin:0;font-size:18px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;}
+.pt-mrn-inline{font-weight:400;font-size:14px;color:var(--text-secondary,#64748b);margin-left:4px;}
+.pt-meta{display:flex;gap:8px;font-size:12px;color:var(--text-secondary,#64748b);margin-top:1px;}
+.pt-gear-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:3px 5px;color:var(--text-secondary,#64748b);opacity:0.4;border-radius:4px;transition:opacity .15s;}
+.pt-gear-btn:hover{opacity:1;background:var(--bg-muted,#f1f5f9);}
+
+/* Center: Allergies badge */
+.pt-header-center{flex:0 0 25%;display:flex;justify-content:center;padding:0 12px;}
+.pt-allergy-badge{display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 14px;background:var(--color-amber,#f59e0b);color:#000;border-radius:6px;font-size:12px;font-weight:600;cursor:default;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pt-allergy-badge:hover{opacity:0.9;}
 .pt-allergy-icon{flex-shrink:0;}
 .pt-allergy-list{overflow:hidden;text-overflow:ellipsis;}
 .pt-allergy-nkda{color:#000;font-weight:500;opacity:0.7;}
+
+/* Action buttons between allergies and status */
+.pt-header-actions{display:flex;flex-direction:column;gap:4px;align-items:center;flex-shrink:0;position:relative;}
+.pt-action-btn{font-size:11px;padding:3px 10px;white-space:nowrap;}
+.pt-settings-dropdown{display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg-surface,#fff);border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:4px 0;min-width:140px;}
+.pt-settings-dropdown.show{display:flex;flex-direction:column;}
+.pt-settings-dropdown button,.pt-settings-dropdown a{display:block;padding:5px 12px;font-size:12px;text-align:left;background:none;border:none;cursor:pointer;color:var(--text-primary);text-decoration:none;}
+.pt-settings-dropdown button:hover,.pt-settings-dropdown a:hover{background:var(--bg-muted,#f1f5f9);}
+
+/* Right: Status lines */
+.pt-header-right{display:flex;align-items:center;flex-shrink:0;}
+.pt-status-lines{display:flex;flex-direction:column;gap:2px;font-size:11px;}
+.pt-status-row{display:flex;align-items:baseline;gap:0;cursor:pointer;padding:1px 4px;border-radius:3px;transition:background .15s;}
+.pt-status-row:hover{background:var(--bg-muted,#f1f5f9);}
+.pt-status-label{display:inline-block;width:100px;color:var(--text-secondary,#64748b);text-align:left;white-space:nowrap;}
+.pt-status-date{color:var(--text-primary,#1e293b);font-weight:500;font-variant-numeric:tabular-nums;}
+
 .pt-sync-label{color:var(--text-secondary,#64748b);}
 .pt-no-data-banner{margin:0 0 16px;padding:14px 20px;background:var(--bg-warning,#fef3c7);border:1px solid var(--border-warning,#fbbf24);border-radius:8px;display:flex;align-items:center;gap:12px;}
 .pt-status-bar{padding:8px 16px;border-radius:6px;font-size:13px;margin-bottom:12px;}
 
 /* ============= WIDGET GRID ============= */
-.widget-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:0 0 40px;}
+.widget-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;border-top:1px solid var(--border,#e2e8f0);margin:0 -20px;padding:16px 20px 40px;}
 .widget{background:var(--bg-surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:10px;display:flex;flex-direction:column;min-height:120px;overflow:hidden;transition:box-shadow 0.15s;position:relative;}
 .widget:hover{box-shadow:0 2px 12px rgba(0,0,0,0.06);}
 .widget.widget-dragging{opacity:0.85;box-shadow:0 8px 30px rgba(0,0,0,0.15);z-index:1000;}
 .widget.widget-wide{grid-column:span 2;}
 .widget.widget-full{grid-column:span 3;}
 
-/* Chart tabs */
-.chart-tabs{display:flex;gap:2px;padding:8px 0;border-bottom:2px solid var(--border,#e2e8f0);margin-bottom:12px;}
-.chart-tab{padding:8px 16px;font-size:13px;font-weight:500;border:none;background:none;color:var(--text-secondary,#64748b);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;transition:color .15s,border-color .15s,background .15s;}
-.chart-tab:hover{color:var(--text-primary,#1e293b);background:var(--bg-muted,#f8fafc);}
-.chart-tab.active{color:var(--color-teal,#0D7377);border-bottom-color:var(--color-teal,#0D7377);font-weight:600;}
+/* Chart tabs — Chrome / filing-cabinet style */
+.chart-tabs{display:flex;justify-content:center;gap:0;padding:0;margin:0 -24px;border-bottom:1px solid var(--border,#e2e8f0);background:transparent;}
+.chart-tab{padding:8px 20px;font-size:13px;font-weight:500;border:1px solid var(--border,#e2e8f0);border-bottom:none;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);cursor:pointer;border-radius:8px 8px 0 0;margin:0 1px;position:relative;top:1px;transition:color .15s,background .15s;flex:1;text-align:center;}
+.chart-tab:hover{color:var(--text-primary,#1e293b);background:var(--bg-hover,#f8fafc);}
+.chart-tab.active{color:var(--color-teal,#0D7377);background:var(--bg-surface,#fff);font-weight:600;border-color:var(--border,#e2e8f0);z-index:2;}
 .chart-tab:focus-visible{outline:2px solid var(--color-teal);outline-offset:-1px;}
+/* Content area connects to active tab */
+.widget-grid{border-top:none;margin:0 -24px;padding:16px 24px 40px;background:var(--bg-surface,#fff);}
 .widget-grid.tab-mode .widget[data-tab-group]{display:none;}
 .widget-grid.tab-mode .widget[data-tab-group].tab-visible{display:flex;}
 
@@ -1086,6 +1066,8 @@
 .med-col-status{width:14%;}
 .med-col-price{width:8%;}
 .med-table td.cell-clip{max-width:none;}
+/* Diagnosis table — let names fill available width */
+#diag-table td.cell-clip{max-width:none;}
 .med-dose-cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .fw-500{font-weight:500;}
 .mono{font-family:monospace;font-size:11px;}
@@ -1200,6 +1182,49 @@
     .lab-modal-content{width:100vw;height:95vh;border-radius:0;}
 }
 @keyframes spin{to{transform:rotate(360deg);}}
+
+/* ============= WIDGET TABS (Chrome-style, reusable inside any widget) ============= */
+.widget-tabs{display:flex;gap:0;margin-right:8px;}
+.widget-tab{padding:3px 10px;font-size:11px;font-weight:500;border:1px solid var(--border,#e2e8f0);border-bottom:none;background:var(--bg-muted,#f1f5f9);color:var(--text-secondary,#64748b);cursor:pointer;border-radius:6px 6px 0 0;position:relative;top:1px;transition:color .15s,background .15s;}
+.widget-tab:hover{color:var(--text-primary);background:var(--bg-hover,#f8fafc);}
+.widget-tab.active{color:var(--color-teal,#0D7377);background:var(--bg-surface,#fff);font-weight:600;z-index:2;}
+/* Hide header border when widget has tabs — active tab bg matches body for contiguity */
+.widget-header:has(.widget-tabs){border-bottom-color:transparent;}
+
+/* ============= MEDICATION FADE-TO-BLACK UNDO ============= */
+@keyframes medFadeOut{0%{opacity:1;background:transparent;}80%{opacity:0.3;background:rgba(0,0,0,0.08);}100%{opacity:0;background:rgba(0,0,0,0.15);}}
+.med-fading{animation:medFadeOut 5s ease-in forwards;pointer-events:auto;}
+.med-fading .badge-toggle{pointer-events:auto!important;cursor:pointer!important;position:relative;z-index:10;}
+.med-fading .badge-toggle::after{content:' (undo)';font-size:9px;opacity:0.7;}
+
+/* ============= MED XML FLAG ============= */
+.med-xml-flag{color:var(--color-amber,#f59e0b);margin-left:4px;font-size:11px;cursor:help;}
+
+/* ============= MED INLINE EDIT ============= */
+.med-edit-input{width:100%;padding:2px 4px;font-size:12px;border:1px solid var(--color-teal,#0D7377);border-radius:3px;background:var(--bg-input,#fff);color:var(--text-primary);box-sizing:border-box;}
+
+/* ============= ICD-10 AUTOCOMPLETE ============= */
+.icd10-autocomplete{position:absolute;left:0;right:0;top:100%;background:var(--bg-surface,#fff);border:1px solid var(--border,#e2e8f0);border-top:none;border-radius:0 0 8px 8px;max-height:320px;overflow-y:auto;z-index:200;box-shadow:0 4px 16px rgba(0,0,0,0.12);}
+.icd10-ac-item{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border,#f1f5f9);}
+.icd10-ac-item:hover,.icd10-ac-item.focused{background:var(--bg-muted,#f1f5f9);}
+.icd10-ac-item .mono{min-width:70px;font-weight:600;}
+.icd10-ac-item .icd10-ac-add{margin-left:auto;padding:2px 8px;font-size:10px;background:var(--color-teal,#0D7377);color:#fff;border:none;border-radius:4px;cursor:pointer;}
+
+/* ============= COPY+OPTIONS DROPDOWN (diagnoses) ============= */
+.dx-copy-group{display:inline-flex;align-items:center;border:1px solid var(--border,#e2e8f0);border-radius:4px;overflow:hidden;font-size:11px;position:relative;}
+.dx-copy-group .dx-copy-main{padding:3px 8px;background:var(--bg-surface,#fff);border:none;cursor:pointer;font-size:11px;color:var(--text-primary);}
+.dx-copy-group .dx-copy-main:hover{background:var(--bg-muted);}
+.dx-copy-group .dx-copy-divider{width:1px;height:18px;background:var(--border,#e2e8f0);}
+.dx-copy-group .dx-copy-arrow{padding:3px 5px;background:var(--bg-surface,#fff);border:none;cursor:pointer;font-size:9px;color:var(--text-secondary);}
+.dx-copy-group .dx-copy-arrow:hover{background:var(--bg-muted);}
+.dx-copy-dropdown{display:none;position:absolute;top:100%;right:0;background:var(--bg-surface,#fff);border:1px solid var(--border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:4px 0;min-width:160px;z-index:100;}
+.dx-copy-dropdown.show{display:block;}
+.dx-copy-dropdown button{display:block;width:100%;padding:5px 12px;font-size:11px;text-align:left;background:none;border:none;cursor:pointer;color:var(--text-primary);}
+.dx-copy-dropdown button:hover{background:var(--bg-muted);}
+
+/* ============= WIDGET FULL-WIDTH FIX ============= */
+.widget-table{width:100%;table-layout:auto;}
+.widget-body{overflow-x:auto;}
 </style>
 
 <script>
@@ -1262,20 +1287,28 @@ function toggleRiskDetail(card) {
 
 function refreshAutoScores(mrn) {
     var btn = document.querySelector('[onclick="refreshAutoScores(\'' + mrn + '\')"]');
-    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    if (btn) { btn.disabled = true; btn.textContent = '\u23F3'; }
+    var body = document.getElementById('risk-scores-body');
+    if (body) body.innerHTML = '<div class="loading-spinner" style="text-align:center;padding:16px;"><span class="loading-spinner__dot"></span> Recalculating...</div>';
     fetch('/patient/' + mrn + '/auto-scores', {method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}})
     .then(function(r) { return r.json(); })
     .then(function(data) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#8635;'; }
         if (data.success) {
-            // Reload the widget body with fresh data via page reload (simplest approach)
-            location.reload();
+            /* Re-fetch via GET to render using same logic as initial load */
+            fetch('/api/patient/' + mrn + '/auto-scores')
+            .then(function(r2){return r2.json();})
+            .then(function(resp){
+                /* Trigger same rendering as deferred load — reload page for simplicity */
+                location.reload();
+            });
         } else {
-            alert('Risk score refresh failed: ' + (data.error || 'Unknown error'));
-            if (btn) { btn.disabled = false; btn.innerHTML = '&#8635;'; }
+            if (body) body.innerHTML = '<p class="widget-empty">Risk score refresh failed</p>';
         }
     })
     .catch(function() {
         if (btn) { btn.disabled = false; btn.innerHTML = '&#8635;'; }
+        if (body) body.innerHTML = '<p class="widget-empty">Network error</p>';
     });
 }
 
@@ -1375,8 +1408,12 @@ function removeDiagnosis(mrn, dxId, btn) {
 
 /* ---- Claim Patient ---- */
 function claimPatient(mrn) {
+    var btn = document.getElementById('claim-btn');
+    if (!btn) return;
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner loading-spinner--sm"></span>';
     var rawName = document.querySelector('.pt-name') ? document.querySelector('.pt-name').textContent.trim() : '';
-    // Never send placeholder text as the patient name
     var patientName = (rawName && rawName.toLowerCase() !== 'unknown patient' && rawName.toLowerCase() !== 'unknown') ? rawName : '';
     fetch('/patient/' + mrn + '/claim', {
         method: 'POST',
@@ -1386,12 +1423,15 @@ function claimPatient(mrn) {
     .then(function(r){return r.json();})
     .then(function(data) {
         if (data.success) {
-            var btn = document.getElementById('claim-btn');
+            btn.disabled = false;
             btn.innerHTML = '&#10003; Claimed';
-            btn.className = 'btn btn-sm btn-outline';
+            btn.className = 'btn btn-sm btn-outline pt-action-btn';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = orig;
         }
     })
-    .catch(function() { showError('Failed to claim patient'); });
+    .catch(function() { btn.disabled = false; btn.innerHTML = orig; showError('Failed to claim patient'); });
 }
 
 /* ---- Demographics Edit ---- */
@@ -1404,12 +1444,12 @@ function toggleDemoEdit() {
 }
 
 function saveDemographics() {
+    var saveBtn = document.querySelector('#pt-meta-edit .btn-primary');
     var name = document.getElementById('demo-name').value.trim();
-    var dobVal = document.getElementById('demo-dob').value; // YYYY-MM-DD from <input type=date>
+    var dobVal = document.getElementById('demo-dob').value;
     var sex = document.getElementById('demo-sex').value;
-    // Convert YYYY-MM-DD to YYYYMMDD for storage
     var dob = dobVal ? dobVal.replace(/-/g, '') : '';
-    fetch('/patient/' + MRN + '/update-demographics', {
+    _withSpinner(saveBtn, fetch('/patient/' + MRN + '/update-demographics', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({patient_name: name, patient_dob: dob, patient_sex: sex})
@@ -1419,7 +1459,7 @@ function saveDemographics() {
         if (data.success) { location.reload(); }
         else { showError('Failed to update demographics'); }
     })
-    .catch(function() { showError('Failed to save demographics'); });
+    .catch(function() { showError('Failed to save demographics'); }));
 }
 
 /* ---- Edit Mode (drag/resize) ---- */
@@ -1585,16 +1625,173 @@ function saveWidgetLayout() {
     }
 })();
 
-/* ---- Medication Filter ---- */
-function filterMeds(val) {
+/* ---- Medication Filter (tab switching) ---- */
+function filterMeds(val, tabBtn) {
+    if (tabBtn) {
+        tabBtn.closest('.widget-tabs').querySelectorAll('.widget-tab').forEach(function(t) { t.classList.remove('active'); });
+        tabBtn.classList.add('active');
+    }
     var rows = document.querySelectorAll('#med-table tbody tr');
     rows.forEach(function(r) {
+        if (r.classList.contains('med-fading')) return; // don't hide rows mid-fade
         if (val === 'all') r.style.display = '';
         else r.style.display = r.getAttribute('data-status') === val ? '' : 'none';
     });
 }
 /* Auto-filter to active on load */
 filterMeds('active');
+
+/* ---- Toggle Med Status (5-second fade with undo) ---- */
+var _medFadeTimers = {};
+function toggleMedStatus(badge, mrn, medId) {
+    var row = badge.closest('tr');
+    if (!row) return;
+    /* If already fading, cancel (undo) */
+    if (row.classList.contains('med-fading')) {
+        clearTimeout(_medFadeTimers[medId]);
+        delete _medFadeTimers[medId];
+        row.classList.remove('med-fading');
+        badge.textContent = row.getAttribute('data-status');
+        return;
+    }
+    /* Start fade — user has 5 seconds to undo */
+    row.classList.add('med-fading');
+    badge.textContent = 'undo';
+    _medFadeTimers[medId] = setTimeout(function() {
+        delete _medFadeTimers[medId];
+        fetch('/patient/' + mrn + '/medication/' + medId + '/toggle-status', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                row.classList.remove('med-fading');
+                row.setAttribute('data-status', data.new_status);
+                badge.textContent = data.new_status;
+                badge.className = 'badge badge-' + (data.new_status === 'active' ? 'success' : 'muted') + ' badge-toggle';
+                if (data.new_status === 'inactive') row.classList.add('row-inactive');
+                else row.classList.remove('row-inactive');
+                /* Re-apply current filter */
+                var activeTab = document.querySelector('#med-tabs .widget-tab.active');
+                if (activeTab) filterMeds(activeTab.textContent.trim().toLowerCase(), activeTab);
+            }
+        })
+        .catch(function() { row.classList.remove('med-fading'); badge.textContent = row.getAttribute('data-status'); });
+    }, 5000);
+}
+
+/* ---- Inline Med Editing (double-click) ---- */
+function editMedCell(td) {
+    if (td.querySelector('input')) return; /* already editing */
+    var field = td.getAttribute('data-field');
+    var medId = td.getAttribute('data-med-id');
+    var original = td.textContent.trim();
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'med-edit-input';
+    input.value = original;
+    input.setAttribute('data-original', original);
+    td.textContent = '';
+    td.appendChild(input);
+    input.focus();
+    input.select();
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') saveMedEdit(td, input, field, medId);
+        if (e.key === 'Escape') { td.textContent = original; }
+    });
+    input.addEventListener('blur', function() {
+        if (td.contains(input)) saveMedEdit(td, input, field, medId);
+    });
+}
+function saveMedEdit(td, input, field, medId) {
+    var value = input.value.trim();
+    var original = input.getAttribute('data-original');
+    if (value === original) { td.textContent = original; return; }
+    var row = td.closest('tr');
+    var mrn = MRN;
+    td.textContent = value;
+    fetch('/patient/' + mrn + '/medication/' + medId + '/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({field: field, value: value})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success && data.user_modified) {
+            /* Add XML-discrepancy flag if not already present */
+            var nameCell = row ? row.querySelector('td:first-child') : null;
+            if (nameCell && !nameCell.querySelector('.med-xml-flag')) {
+                var flag = document.createElement('span');
+                flag.className = 'med-xml-flag';
+                flag.title = 'User-edited; may differ from Amazing Charts XML data';
+                flag.textContent = '\u26A0';
+                nameCell.appendChild(flag);
+            }
+        } else if (!data.success) {
+            td.textContent = original;
+        }
+    })
+    .catch(function() { td.textContent = original; });
+}
+
+/* ---- ICD-10 Autocomplete ---- */
+var _icd10AcTimer = null;
+var _icd10AcIndex = -1;
+function icd10Autocomplete(query) {
+    var dropdown = document.getElementById('icd10-ac-dropdown');
+    _icd10AcIndex = -1;
+    if (!query || query.length < 2) { dropdown.style.display = 'none'; return; }
+    clearTimeout(_icd10AcTimer);
+    _icd10AcTimer = setTimeout(function() {
+        fetch('/api/icd10/search?q=' + encodeURIComponent(query))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var results = data.results || [];
+            if (results.length === 0) { dropdown.style.display = 'none'; return; }
+            var html = '';
+            results.slice(0, 12).forEach(function(r, i) {
+                html += '<div class="icd10-ac-item" data-index="' + i + '" data-code="' + escHtml(r.code) + '" data-name="' + escHtml(r.name) + '" onmousedown="icd10AcSelect(this)">'
+                     + '<span class="mono fw-500" style="margin-right:8px;">' + escHtml(r.code) + '</span>'
+                     + '<span>' + escHtml(r.name) + '</span></div>';
+            });
+            dropdown.innerHTML = html;
+            dropdown.style.display = 'block';
+            _icd10AcIndex = 0;
+            _icd10AcHighlight();
+        })
+        .catch(function() { dropdown.style.display = 'none'; });
+    }, 200);
+}
+function _icd10AcHighlight() {
+    var items = document.querySelectorAll('#icd10-ac-dropdown .icd10-ac-item');
+    items.forEach(function(el, i) { el.classList.toggle('focused', i === _icd10AcIndex); });
+}
+function icd10KeyNav(e) {
+    var dropdown = document.getElementById('icd10-ac-dropdown');
+    var items = dropdown.querySelectorAll('.icd10-ac-item');
+    if (!items.length || dropdown.style.display === 'none') return;
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _icd10AcIndex = Math.min(_icd10AcIndex + 1, items.length - 1);
+        _icd10AcHighlight();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _icd10AcIndex = Math.max(_icd10AcIndex - 1, 0);
+        _icd10AcHighlight();
+    } else if (e.key === 'Enter' && _icd10AcIndex >= 0) {
+        e.preventDefault();
+        icd10AcSelect(items[_icd10AcIndex]);
+    } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+    }
+}
+function icd10AcSelect(el) {
+    var code = el.getAttribute('data-code');
+    var name = el.getAttribute('data-name');
+    document.getElementById('icd10-ac-dropdown').style.display = 'none';
+    document.getElementById('icd10-search-input').value = code + ' ' + name;
+    addDiagnosisFromLookup(code, name);
+}
 
 /* ---- Prior Notes Filter ---- */
 function filterPriorNotes(val) {
@@ -1605,12 +1802,19 @@ function filterPriorNotes(val) {
     });
 }
 
-/* ---- Diagnosis Filter ---- */
-function filterDiagnoses(val) {
+/* ---- Diagnosis Filter (status tabs: all/active/inactive) ---- */
+function filterDiagnoses(val, tabBtn) {
+    if (tabBtn) {
+        tabBtn.closest('.widget-tabs').querySelectorAll('.widget-tab').forEach(function(t) { t.classList.remove('active'); });
+        tabBtn.classList.add('active');
+    }
     var rows = document.querySelectorAll('#diag-table tbody tr');
     rows.forEach(function(r) {
         if (val === 'all') r.style.display = '';
-        else r.style.display = r.getAttribute('data-category') === val ? '' : 'none';
+        else {
+            var status = r.getAttribute('data-status') || 'active';
+            r.style.display = status === val ? '' : 'none';
+        }
     });
 }
 
@@ -1700,6 +1904,7 @@ function printUSPSTF() {
 function showAddSpecialist() { document.getElementById('add-specialist-form').style.display = ''; }
 function hideAddSpecialist() { document.getElementById('add-specialist-form').style.display = 'none'; }
 function saveSpecialist() {
+    var saveBtn = document.querySelector('#add-specialist-form .btn-primary, #add-specialist-form button[onclick*="saveSpecialist"]');
     var data = {
         specialty: document.getElementById('spec-specialty').value,
         provider_name: document.getElementById('spec-name').value,
@@ -1708,13 +1913,13 @@ function saveSpecialist() {
         notes: document.getElementById('spec-notes').value
     };
     if (!data.specialty) return alert('Specialty is required');
-    fetch('/patient/' + MRN + '/specialist', {
+    _withSpinner(saveBtn, fetch('/patient/' + MRN + '/specialist', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     }).then(function(r){ return r.json(); }).then(function(d){
         if (d.success) location.reload();
     })
-    .catch(function() { showError('Failed to save specialist'); });
+    .catch(function() { showError('Failed to save specialist'); }));
 }
 function deleteSpecialist(id) {
     if (!confirm('Remove this specialist?')) return;
@@ -1907,16 +2112,17 @@ function copyAllSections() {
 }
 
 function saveDraft() {
+    var saveBtn = document.getElementById('save-draft-btn');
     var sections = {};
     document.querySelectorAll('#note-sections textarea').forEach(function(ta) {
         sections[ta.getAttribute('data-section')] = ta.value;
     });
-    fetch('/patient/' + MRN + '/note/save', {
+    _withSpinner(saveBtn, fetch('/patient/' + MRN + '/note/save', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({sections: sections})
     }).then(function(r){ return r.json(); }).then(function(d){
         showNoteStatus(d.success ? 'Draft saved!' : 'Save failed.', d.success ? 'success' : 'error');
-    });
+    }));
 }
 
 /* ---- Clinical Terminology Spell Check ---- */
@@ -2744,11 +2950,15 @@ function checkVIIS() {
                 return;
             }
             var imms = data.immunizations || [];
+            var gapsClosed = data.gaps_closed || 0;
             if (imms.length === 0) {
                 el.innerHTML = '<p style="color:var(--text-secondary);font-size:12px;">No immunizations found in VIIS for this patient.</p>';
                 return;
             }
             var html = '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;font-weight:600;">VIIS Registry (' + imms.length + ' records):</div>';
+            if (gapsClosed > 0) {
+                html += '<div style="font-size:11px;color:var(--color-teal,#14b8a6);margin-bottom:4px;">&#10003; ' + gapsClosed + ' care gap' + (gapsClosed > 1 ? 's' : '') + ' auto-closed</div>';
+            }
             html += '<table class="widget-table" style="font-size:11px;"><thead><tr><th>Vaccine</th><th>Date</th><th>Provider</th></tr></thead><tbody>';
             imms.forEach(function(im) {
                 html += '<tr><td>' + escHtml(im.vaccine || '') + '</td><td>' + escHtml(im.date_given || '') + '</td><td>' + escHtml(im.provider || '') + '</td></tr>';
@@ -2758,6 +2968,10 @@ function checkVIIS() {
                 html += '<div style="font-size:10px;color:var(--text-secondary);margin-top:4px;">Checked: ' + new Date(data.checked_at).toLocaleString() + '</div>';
             }
             el.innerHTML = html;
+            // Reload page after a short delay to show merged immunizations
+            if (imms.length > 0) {
+                setTimeout(function() { location.reload(); }, 3000);
+            }
         })
         .catch(function() {
             btn.disabled = false;
@@ -2765,6 +2979,44 @@ function checkVIIS() {
             el.innerHTML = '<p style="color:var(--color-red,#e74c3c);font-size:12px;">&#9888; VIIS service unavailable</p>';
         });
 }
+
+/* ---- VIIS Badge Loader ---- */
+(function loadVIISBadge() {
+    if (!MRN) return;
+    fetch('/api/patient/' + MRN + '/viis-status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var badge = document.getElementById('viis-badge');
+            if (!badge) return;
+            if (!data.checked) {
+                badge.style.display = 'inline';
+                badge.style.background = 'var(--bg-muted,#f1f5f9)';
+                badge.style.color = 'var(--text-secondary)';
+                badge.innerHTML = '&#127973; VIIS: Not Checked';
+                badge.title = 'No VIIS check on file. Click "Check VIIS" in Immunizations widget.';
+                return;
+            }
+            badge.style.display = 'inline';
+            var dt = data.checked_at ? new Date(data.checked_at).toLocaleDateString() : '';
+            if (data.status === 'found') {
+                badge.style.background = '#14b8a6';
+                badge.style.color = '#fff';
+                badge.innerHTML = '&#127973; VIIS: ' + data.immunization_count + ' records';
+                badge.title = 'VIIS checked ' + dt + ' -- ' + data.immunization_count + ' immunizations found';
+            } else if (data.status === 'not_found') {
+                badge.style.background = '#f59e0b';
+                badge.style.color = '#000';
+                badge.innerHTML = '&#127973; VIIS: None found';
+                badge.title = 'VIIS checked ' + dt + ' -- no immunizations on file';
+            } else {
+                badge.style.background = '#ef4444';
+                badge.style.color = '#fff';
+                badge.innerHTML = '&#127973; VIIS: Error';
+                badge.title = 'VIIS check failed ' + dt;
+            }
+        })
+        .catch(function() {});
+})();
 
 /* ---- Phase 7.2: PDMP Controlled Substance Check ---- */
 function checkPDMP() {
@@ -3009,6 +3261,81 @@ function teleSave() {
             controls.insertBefore(btn, controls.firstChild);
         }
     });
+})();
+</script>
+<script>
+/* Deferred enrichment — fire after page render to avoid blocking chart load */
+(function(){
+    fetch('/api/patient/{{ mrn }}/enrich', {method:'POST'}).catch(function(){});
+
+    /* Deferred auto risk scores */
+    fetch('/api/patient/{{ mrn }}/auto-scores')
+    .then(function(r){return r.json();})
+    .then(function(resp){
+        var body = document.getElementById('risk-scores-body');
+        if (!body) return;
+        var scores = (resp.data || {});
+        var bmi = scores.bmi, ldl = scores.ldl, pack_years = scores.pack_years, prevent = scores.prevent;
+        if (!bmi && !ldl && !pack_years && !prevent) {
+            body.innerHTML = '<p class="widget-empty">No auto-scores computed (clinical data needed)</p>';
+            return;
+        }
+        function _clr(label, good, mid) {
+            if (!label) return 'var(--text-secondary)';
+            if (good.indexOf(label) >= 0) return 'var(--success,#27ae60)';
+            if (mid.indexOf(label) >= 0) return 'var(--warning,#e67e22)';
+            return 'var(--danger,#e74c3c)';
+        }
+        function _card(name, s, unit, goodLabels, midLabels) {
+            if (!s) return '';
+            var c = _clr(s.score_label, goodLabels, midLabels);
+            var lbl = (s.score_label||'').replace(/_/g,' ').replace(/\b\w/g,function(m){return m.toUpperCase();});
+            var val = (typeof s.score_value === 'number') ? (name==='LDL'? Math.round(s.score_value) : s.score_value.toFixed(1)) : s.score_value;
+            return '<div class="risk-card" onclick="toggleRiskDetail(this)" role="button" tabindex="0">'
+                + '<div class="risk-card-header"><span class="risk-name">' + name + '</span>'
+                + '<span class="risk-badge" style="background:' + c + '">' + lbl + '</span></div>'
+                + '<div class="risk-value" style="color:' + c + '">' + val + (unit ? '<small>' + unit + '</small>' : '') + '</div>'
+                + '<div class="risk-detail" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;">'
+                + (s.computed_at ? '<div style="margin-top:4px;color:var(--text-muted)">' + s.computed_at.slice(0,10) + '</div>' : '')
+                + '</div></div>';
+        }
+        var html = '<div class="risk-score-grid">';
+        html += _card('BMI', bmi, '', ['normal'], ['overweight','obesity_class_1']);
+        html += _card('LDL', ldl, ' mg/dL', ['optimal','near_optimal'], ['borderline_high','high']);
+        html += _card('Pack Years', pack_years, '', ['never_smoker'], ['light_smoker']);
+        html += _card('PREVENT', prevent, '% 10yr', ['low'], ['borderline','intermediate']);
+        html += '</div>';
+        body.innerHTML = html;
+    })
+    .catch(function(){
+        var body = document.getElementById('risk-scores-body');
+        if (body) body.innerHTML = '<p class="widget-empty">Risk scores unavailable</p>';
+    });
+
+    /* Deferred immunization series gaps */
+    fetch('/api/patient/{{ mrn }}/imm-gaps')
+    .then(function(r){return r.json();})
+    .then(function(resp){
+        var gaps = resp.data || [];
+        var el = document.getElementById('imm-series-gaps');
+        if (!el || gaps.length === 0) return;
+        var html = '<div style="font-size:11px;font-weight:600;color:#8e44ad;margin-bottom:4px;">&#9888; Incomplete Series</div>';
+        for (var i = 0; i < gaps.length; i++) {
+            var g = gaps[i];
+            var badge = '';
+            var st = (g.status||'').toLowerCase();
+            if (st === 'overdue') badge = '<span style="background:#e74c3c;color:#fff;padding:0 4px;border-radius:3px;font-size:10px;">OVERDUE</span>';
+            else if (st === 'due' || st === 'in_progress') badge = '<span style="background:#f59e0b;color:#000;padding:0 4px;border-radius:3px;font-size:10px;">DUE</span>';
+            else badge = '<span style="background:#3498db;color:#fff;padding:0 4px;border-radius:3px;font-size:10px;">ELIGIBLE</span>';
+            html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;">'
+                + '<span style="font-weight:600;">' + (g.series_name||'') + '</span> '
+                + (g.message ? '<span style="color:var(--text-secondary);">' + g.message + '</span> ' : '')
+                + badge + '</div>';
+        }
+        el.innerHTML = html;
+        el.style.display = '';
+    })
+    .catch(function(){});
 })();
 </script>
 {% endblock %}

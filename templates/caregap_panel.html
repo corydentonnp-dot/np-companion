@@ -57,10 +57,10 @@
 </div>
 
 {# ---- TAB BAR ---- #}
-<div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border,#e2e8f0);align-items:center;">
-    <button class="panel-tab active" id="tab-summary" onclick="showView('summary')" style="padding:10px 20px;font-size:14px;font-weight:600;text-decoration:none;color:var(--color-navy);border:none;background:none;border-bottom:3px solid var(--color-navy);margin-bottom:-2px;cursor:pointer;">Summary</button>
-    <button class="panel-tab" id="tab-spreadsheet" onclick="showView('spreadsheet')" style="padding:10px 20px;font-size:14px;font-weight:400;text-decoration:none;color:var(--text-secondary);border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;">Spreadsheet</button>
-    <button class="panel-tab" id="tab-claimed" onclick="showView('claimed')" style="padding:10px 20px;font-size:14px;font-weight:400;text-decoration:none;color:var(--text-secondary);border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;">&#128100; Claimed Patients</button>
+<div class="cc-tabs" style="align-items:center;">
+    <button class="cc-tab active" id="tab-summary" onclick="showView('summary')">Summary</button>
+    <button class="cc-tab" id="tab-spreadsheet" onclick="showView('spreadsheet')">Spreadsheet</button>
+    <button class="cc-tab" id="tab-claimed" onclick="showView('claimed')">&#128100; Claimed Patients</button>
     <span style="flex:1;"></span>
     <a href="/caregap/panel/csv{% if claimed_only %}?claimed=1{% endif %}" class="btn btn-secondary btn-sm" style="margin-bottom:4px;" title="Export spreadsheet as CSV">&#128190; CSV Export</a>
     <a href="/caregap/panel/csv?claimed=1" class="btn btn-secondary btn-sm" style="margin-bottom:4px;margin-left:6px;" title="Export claimed patients CSV">&#128190; Claimed CSV</a>
@@ -252,20 +252,9 @@ function showView(view) {
     document.getElementById('view-summary').style.display = (view === 'summary') ? '' : 'none';
     document.getElementById('view-spreadsheet').style.display = (view === 'spreadsheet') ? '' : 'none';
     document.getElementById('view-claimed').style.display = (view === 'claimed') ? '' : 'none';
-    var tabs = document.querySelectorAll('.panel-tab');
-    tabs.forEach(function(t) {
-        t.style.fontWeight = '400';
-        t.style.color = 'var(--text-secondary)';
-        t.style.borderBottom = '3px solid transparent';
-        t.classList.remove('active');
-    });
+    document.querySelectorAll('.cc-tab').forEach(function(t) { t.classList.remove('active'); });
     var active = document.getElementById('tab-' + view);
-    if (active) {
-        active.style.fontWeight = '600';
-        active.style.color = 'var(--color-navy)';
-        active.style.borderBottom = '3px solid var(--color-navy)';
-        active.classList.add('active');
-    }
+    if (active) { active.classList.add('active'); }
 }
 </script>
 {% endblock %}

@@ -1,0 +1,326 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603251000-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="00000000-0000-0000-0000-000000090002" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="90002" />
+      <addr use="HP">
+        <streetAddressLine>3892 Magnolia Court</streetAddressLine>
+        <city>Chester</city>
+        <state>VA</state>
+        <postalCode>23831</postalCode>
+        <country nullFlavor="NI" />
+        <useablePeriod xsi:type="IVL_TS"><low value="20260325" /></useablePeriod>
+      </addr>
+      <telecom use="HP" value="tel:+1(804)-555-1002" />
+      <patient>
+        <name use="L">
+          <given>Maria</given>
+          <family>Garcia</family>
+        </name>
+        <administrativeGenderCode code="F" codeSystem="2.16.840.1.113883.5.1" displayName="Female" codeSystemName="AdministrativeGender" />
+        <birthTime value="19831220" />
+        <maritalStatusCode code="M" displayName="Married" codeSystem="2.16.840.1.113883.5.2" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode code="2106-3" displayName="White" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <ethnicGroupCode code="2135-2" displayName="Hispanic or Latino" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <languageCommunication>
+          <languageCode code="en" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="202603251000-0400" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime><low value="19831220" /><high value="20260325" /></effectiveTime>
+      <performer typeCode="PRF">
+        <time><low value="20250101" /></time>
+        <assignedEntity>
+          <id extension="1891645123" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter>
+      <id root="00000000-0000-0000-0000-000000090002" extension="1306884820" />
+      <code code="AMB" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Ambulatory" />
+      <effectiveTime><low value="202603251000-0400" /></effectiveTime>
+      <location>
+        <healthCareFacility>
+          <id root="2.16.840.1.113883.19" extension="1306884820" />
+          <location>
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </location>
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Substance</th><th>Reaction</th><th>Severity</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Sulfonamides [RxNorm: 10171]</td><td>Stevens-Johnson Syndrome</td><td>severe</td><td>active</td></tr>
+                <tr><td>NSAIDs [RxNorm: 7258]</td><td>Renal impairment</td><td>severe</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Medications" />
+          <title>MEDICATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Medication</th><th>Generic Name</th><th>Instructions</th><th>Dosage</th><th>Start Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>hydroxychloroquine 200 mg tablet [RxNorm: 979092]</td><td>hydroxychloroquine</td><td>Take 1 tablet by mouth twice daily</td><td>200 mg</td><td>06/15/2018</td><td>active</td></tr>
+                <tr><td>mycophenolate 500 mg tablet [RxNorm: 835829]</td><td>mycophenolate</td><td>Take 2 tablets by mouth twice daily</td><td>1000 mg</td><td>09/01/2020</td><td>active</td></tr>
+                <tr><td>prednisone 5 mg tablet [RxNorm: 312617]</td><td>prednisone</td><td>Take 1 tablet by mouth daily</td><td>5 mg</td><td>06/15/2018</td><td>active</td></tr>
+                <tr><td>losartan 100 mg tablet [RxNorm: 979480]</td><td>losartan</td><td>Take 1 tablet by mouth daily</td><td>100 mg</td><td>03/10/2021</td><td>active</td></tr>
+                <tr><td>amlodipine 10 mg tablet [RxNorm: 197361]</td><td>amlodipine</td><td>Take 1 tablet by mouth daily</td><td>10 mg</td><td>03/10/2021</td><td>active</td></tr>
+                <tr><td>ergocalciferol 50000 IU capsule [RxNorm: 904416]</td><td>ergocalciferol</td><td>Take 1 capsule weekly</td><td>50000 IU</td><td>01/15/2023</td><td>active</td></tr>
+                <tr><td>calcium carbonate 600 mg tablet [RxNorm: 215459]</td><td>calcium carbonate</td><td>Take 1 tablet by mouth twice daily</td><td>600 mg</td><td>01/15/2023</td><td>active</td></tr>
+                <tr><td>escitalopram 10 mg tablet [RxNorm: 352741]</td><td>escitalopram</td><td>Take 1 tablet by mouth daily</td><td>10 mg</td><td>11/01/2022</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problems" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Problem</th><th>Problem Status</th><th>Date Started</th><th>Date Resolved</th></tr></thead>
+              <tbody>
+                <tr><td>Systemic lupus erythematosus [ICD10: M32.9]</td><td>active</td><td>06/15/2018</td><td></td></tr>
+                <tr><td>Lupus nephritis class IV [ICD10: M32.14]</td><td>active</td><td>09/01/2020</td><td></td></tr>
+                <tr><td>Chronic kidney disease stage 3a [ICD10: N18.31]</td><td>active</td><td>09/01/2020</td><td></td></tr>
+                <tr><td>Essential hypertension [ICD10: I10]</td><td>active</td><td>03/10/2021</td><td></td></tr>
+                <tr><td>Vitamin D deficiency [ICD10: E55.9]</td><td>active</td><td>01/15/2023</td><td></td></tr>
+                <tr><td>Generalized anxiety disorder [ICD10: F41.1]</td><td>active</td><td>11/01/2022</td><td></td></tr>
+                <tr><td>Iron deficiency anemia [ICD10: D50.9]</td><td>active</td><td>06/01/2024</td><td></td></tr>
+                <tr><td>Raynaud phenomenon [ICD10: I73.00]</td><td>active</td><td>06/15/2018</td><td></td></tr>
+                <tr><td>SLE flare [ICD10: M32.9]</td><td>resolved</td><td>11/15/2025</td><td>12/20/2025</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Vital Signs" />
+          <title>VITAL SIGNS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Encounter</th><th>Height (in)</th><th>Weight (lb)</th><th>BMI (kg/m2)</th><th>BP Sys (mmHg)</th><th>BP Dias (mmHg)</th><th>Heart Rate (/min)</th><th>O2 % BldC Oximetry</th><th>Body Temperature</th><th>Respiratory Rate (/min)</th></tr></thead>
+              <tbody>
+                <tr><td>03/15/2026</td><td>63</td><td>142</td><td>25.2</td><td>128</td><td>78</td><td>76</td><td>98</td><td>98.2</td><td>16</td></tr>
+                <tr><td>11/15/2025</td><td>63</td><td>148</td><td>26.2</td><td>152</td><td>94</td><td>88</td><td>97</td><td>100.4</td><td>18</td></tr>
+                <tr><td>08/20/2025</td><td>63</td><td>140</td><td>24.8</td><td>124</td><td>76</td><td>72</td><td>99</td><td>98.4</td><td>14</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Lab Results" />
+          <title>LAB RESULTS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Test Name</th><th>Result</th><th>Units</th><th>Flag</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>Creatinine [LOINC: 2160-0]</td><td>1.4</td><td>mg/dL</td><td>H</td><td>03/10/2026</td></tr>
+                <tr><td>eGFR [LOINC: 48642-3]</td><td>48</td><td>mL/min/1.73m2</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>Urine Protein/Creatinine Ratio [LOINC: 9318-7]</td><td>850</td><td>mg/g</td><td>H</td><td>03/10/2026</td></tr>
+                <tr><td>C3 Complement [LOINC: 4485-9]</td><td>72</td><td>mg/dL</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>C4 Complement [LOINC: 4498-2]</td><td>10</td><td>mg/dL</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>dsDNA Antibody [LOINC: 5130-0]</td><td>45</td><td>IU/mL</td><td>H</td><td>03/10/2026</td></tr>
+                <tr><td>ESR [LOINC: 30341-2]</td><td>42</td><td>mm/hr</td><td>H</td><td>03/10/2026</td></tr>
+                <tr><td>CRP [LOINC: 1988-5]</td><td>1.8</td><td>mg/dL</td><td>H</td><td>03/10/2026</td></tr>
+                <tr><td>Hemoglobin [LOINC: 718-7]</td><td>10.8</td><td>g/dL</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>Ferritin [LOINC: 2276-4]</td><td>12</td><td>ng/mL</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>Iron [LOINC: 2498-4]</td><td>35</td><td>mcg/dL</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>TIBC [LOINC: 2500-7]</td><td>420</td><td>mcg/dL</td><td>H</td><td>03/10/2026</td></tr>
+                <tr><td>Vitamin D 25-OH [LOINC: 1989-3]</td><td>18</td><td>ng/mL</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>CBC WBC [LOINC: 6690-2]</td><td>3.8</td><td>10*3/uL</td><td>L</td><td>03/10/2026</td></tr>
+                <tr><td>Platelet Count [LOINC: 777-3]</td><td>135</td><td>10*3/uL</td><td>L</td><td>03/10/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Vaccine</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Influenza vaccine 2025-2026</td><td>10/15/2025</td><td>completed</td></tr>
+                <tr><td>COVID-19 Vaccine 2024-2025 (Moderna)</td><td>09/20/2024</td><td>completed</td></tr>
+                <tr><td>Tdap (Boostrix)</td><td>06/15/2018</td><td>completed</td></tr>
+                <tr><td>Hepatitis B series (3 doses)</td><td>01/01/2019</td><td>completed</td></tr>
+                <tr><td>Pneumococcal PCV20 (Prevnar 20)</td><td>08/20/2025</td><td>completed</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>Tobacco: Never smoker. Alcohol: None. Employment: Part-time medical receptionist. Marital Status: Married, 2 children (ages 8 and 12). Bilingual English/Spanish. Exercise: Limited by fatigue, tries yoga 2x/week. Sun exposure: Avoids -- photosensitive. Support: Strong family network.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Insurance" />
+          <title>INSURANCE</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Payer</th><th>Policy Type</th><th>Member ID</th><th>Group</th></tr></thead>
+              <tbody>
+                <tr><td>Virginia Medicaid</td><td>Medicaid</td><td>MCD-223456</td><td>N/A</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11506-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Progress Notes" />
+          <title>PROGRESS NOTES</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Date</th><th>Provider</th><th>Note Type</th><th>Note Text</th><th>Location</th></tr></thead>
+              <tbody>
+                <tr><td>03/15/2026</td><td>Cory Denton, FNP</td><td>Progress Note</td><td>CC: Follow-up SLE, lupus nephritis, CKD.
+HPI: 42yo Hispanic female with SLE and class IV lupus nephritis. Recovered from flare in Nov -- completed pulse methylprednisolone. Currently on maintenance mycophenolate 2g/day + HCQ + prednisone 5mg. Reports improved energy, no joint pain, no rash. Occasional Raynaud episodes in cold weather.
+Labs: Cr 1.4 (stable), eGFR 48, proteinuria improving (850 from 1200). Complements low but stable. dsDNA elevated but trending down.
+PE: Afebrile. No malar rash. Joints -- no synovitis. Lungs clear. CV RRR. No edema.
+Assessment:
+# Lupus nephritis (M32.14): Improving on mycophenolate. Continue current dose.
+# CKD 3a (N18.31): Cr stable 1.4. Continue losartan for nephroprotection.
+# Anemia (D50.9): Hgb 10.8, ferritin 12. Start ferrous sulfate 325mg BID. Recheck in 6 weeks.
+# HTN (I10): BP 128/78 at goal. Continue losartan + amlodipine.
+# Vit D deficiency: Level 18. Continue ergocalciferol 50K weekly.
+Plan: Continue immunosuppression. Add iron. Nephrology follow-up in 6 weeks. Ophthalmology due for HCQ screening (annual). Labs 6 weeks.</td><td>Family Practice Associates of Chesterfield</td></tr>
+                <tr><td>11/15/2025</td><td>Gretchen Lockard, MD</td><td>Acute Visit</td><td>CC: Joint pain, facial rash, fever x 3 days.
+HPI: 42yo with SLE presents with classic flare symptoms. Butterfly rash returned, polyarthritis affecting hands/wrists/knees. Low-grade fever 100.4. Dark urine noted.
+PE: Malar rash present. Synovitis bilateral MCPs, wrists, knees. Oral ulcers x2 on buccal mucosa. Lungs clear. No edema.
+Labs: Cr up from 1.2 to 1.8, proteinuria 1200 mg/g, C3/C4 both low, dsDNA 120 IU/mL, WBC 2.9.
+Assessment: SLE flare with nephritis activity.
+Plan: Pulse methylprednisolone 1g IV x 3 days then taper. Increase mycophenolate to 3g/day temporarily. Urgent nephrology consult. Hold losartan temporarily if Cr continues rising. Weekly labs.</td><td>Family Practice Associates of Chesterfield</td></tr>
+                <tr><td>08/20/2025</td><td>Cory Denton, FNP</td><td>Annual Wellness Visit</td><td>ANNUAL WELLNESS VISIT
+42yo female with SLE.
+Preventive:
+- Cervical cancer: Pap + HPV co-test 2023. Next due 2028.
+- Breast cancer: Mammogram baseline age 40 done 2023. Due 2025 -- ordered.
+- Colorectal: Not yet due (age 42). Will start at 45.
+- Depression: PHQ-9 = 12 (moderate). Continue escitalopram. Counseling referral offered.
+- Bone density: DEXA ordered -- chronic steroid use.
+- Ophthalmology: HCQ screening annual -- due now.
+- Vaccines: Flu given. PCV20 given (immunocompromised).
+Advance Directive: Discussed, patient will complete.</td><td>Family Practice Associates of Chesterfield</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>

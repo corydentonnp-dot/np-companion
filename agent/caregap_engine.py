@@ -290,6 +290,12 @@ def seed_default_rules(app):
     from models.caregap import CareGapRule
 
     with app.app_context():
+        # Fast check: if we already have enough hardcoded rules, skip
+        # the per-rule query loop entirely.
+        existing_count = CareGapRule.query.filter_by(source='hardcoded').count()
+        if existing_count >= len(DEFAULT_RULES):
+            return
+
         for rule_def in DEFAULT_RULES:
             existing = CareGapRule.query.filter_by(
                 gap_type=rule_def['gap_type']

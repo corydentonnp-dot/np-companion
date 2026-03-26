@@ -1,0 +1,635 @@
+{% extends "base.html" %}
+{% block title %}Rules Registry — Admin — CareCompanion{% endblock %}
+{% block page_id %}admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-header__title">Rules Registry</h1>
+    <span class="badge badge--info" id="totalBadge">Loading...</span>
+    <div class="page-header__actions">
+        <a href="/admin" class="btn btn-outline btn-sm">← Admin</a>
+        <a href="/admin/caregap-rules" class="btn btn-outline btn-sm">Care Gap Editor</a>
+        <a href="/admin/med-catalog" class="btn btn-outline btn-sm">Med Catalog</a>
+    </div>
+</div>
+
+<!-- Stats row -->
+<div id="statsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;" id="statMonTotal">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Monitoring Rules</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--success,#28a745);" id="statMonActive">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Mon. Active</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;" id="statCgTotal">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Care Gap Rules</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--success,#28a745);" id="statCgActive">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">CG Active</div>
+    </div>
+    <div class="card" style="padding:12px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--primary,#0d6efd);" id="statSchedules">-</div>
+        <div style="font-size:11px;color:var(--text-secondary);">Active Schedules</div>
+    </div>
+</div>
+
+<!-- Tab bar -->
+<div class="cc-tabs">
+    <button class="cc-tab active" data-tab="monitoring" onclick="switchTab('monitoring')">
+        Monitoring Rules <span class="badge badge--muted" id="tabMonCount">0</span>
+    </button>
+    <button class="cc-tab" data-tab="caregaps" onclick="switchTab('caregaps')">
+        Care Gap Rules <span class="badge badge--muted" id="tabCgCount">0</span>
+    </button>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- Tab 1: Monitoring Rules                     -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-monitoring" class="tab-panel">
+    <div class="action-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <input type="text" id="monSearch" placeholder="Search lab, rxcui, ICD-10, context…"
+               style="flex:1;min-width:200px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);"
+               oninput="loadMonitoringRules()">
+        <select id="monType" onchange="loadMonitoringRules()" style="padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">
+            <option value="">All Types</option>
+            <option value="MEDICATION">Medication</option>
+            <option value="CONDITION">Condition</option>
+            <option value="GENOTYPE">Genotype</option>
+            <option value="REMS">REMS</option>
+        </select>
+        <select id="monSource" onchange="loadMonitoringRules()" style="padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">
+            <option value="">All Sources</option>
+            <option value="MANUAL">Manual</option>
+            <option value="DAILYMED">DailyMed</option>
+            <option value="DRUG_AT_FDA">Drug@FDA</option>
+            <option value="RXCLASS">RxClass</option>
+            <option value="UPTODATE">UpToDate</option>
+            <option value="VSAC">VSAC</option>
+            <option value="REMS">REMS</option>
+            <option value="LLM_EXTRACTED">LLM</option>
+        </select>
+        <select id="monPriority" onchange="loadMonitoringRules()" style="padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">
+            <option value="">All Priorities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="standard">Standard</option>
+            <option value="low">Low</option>
+        </select>
+        <select id="monActive" onchange="loadMonitoringRules()" style="padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">
+            <option value="true">Active Only</option>
+            <option value="">All</option>
+            <option value="false">Inactive Only</option>
+        </select>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="data-table data-table--striped" id="monTable">
+            <thead>
+                <tr>
+                    <th data-sort="lab_name" style="cursor:pointer;">Lab / Test ▿</th>
+                    <th data-sort="trigger_type" style="cursor:pointer;">Type</th>
+                    <th>Trigger</th>
+                    <th data-sort="interval_days" style="cursor:pointer;">Interval</th>
+                    <th data-sort="priority" style="cursor:pointer;">Priority</th>
+                    <th data-sort="source" style="cursor:pointer;">Source</th>
+                    <th>LOINC</th>
+                    <th>CPT</th>
+                    <th>Sched.</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="monBody">
+                <tr><td colspan="11" style="text-align:center;padding:24px;">
+                    <div class="loading-spinner"></div> Loading monitoring rules…
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div id="monCount" style="margin-top:8px;font-size:12px;color:var(--text-secondary);"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- Tab 2: Care Gap Rules                       -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="tab-caregaps" class="tab-panel" style="display:none;">
+    <div class="action-bar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <input type="text" id="cgSearch" placeholder="Search screening name, type, description…"
+               style="flex:1;min-width:200px;padding:6px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);"
+               oninput="loadCareGapRules()">
+        <select id="cgActive" onchange="loadCareGapRules()" style="padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">
+            <option value="true">Active Only</option>
+            <option value="">All</option>
+            <option value="false">Inactive Only</option>
+        </select>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="data-table data-table--striped" id="cgTable">
+            <thead>
+                <tr>
+                    <th>Screening Name</th>
+                    <th>Type</th>
+                    <th>Age Range</th>
+                    <th>Sex</th>
+                    <th>Interval</th>
+                    <th>Billing Code</th>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="cgBody">
+                <tr><td colspan="9" style="text-align:center;padding:24px;">
+                    <div class="loading-spinner"></div> Loading care gap rules…
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div id="cgCount" style="margin-top:8px;font-size:12px;color:var(--text-secondary);"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- Test Trigger Modal                           -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="cc-modal" id="testModal">
+    <div class="cc-modal__backdrop" onclick="closeTestModal()"></div>
+    <div class="cc-modal__dialog cc-modal--md">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title" id="testModalTitle">Test Rule Trigger</h3>
+            <button class="btn-close" onclick="closeTestModal()">&times;</button>
+        </div>
+        <div class="cc-modal__body" id="testModalBody">
+            <!-- Filled dynamically by JS based on rule type -->
+        </div>
+        <div class="cc-modal__footer">
+            <button class="btn btn-outline btn-sm" onclick="closeTestModal()">Close</button>
+            <button class="btn btn-primary btn-sm" id="runTestBtn" onclick="runTest()">Run Test</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- Detail Modal (context/evidence)              -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="cc-modal" id="detailModal">
+    <div class="cc-modal__backdrop" onclick="closeDetailModal()"></div>
+    <div class="cc-modal__dialog cc-modal--md">
+        <div class="cc-modal__header">
+            <h3 class="cc-modal__title" id="detailTitle">Rule Details</h3>
+            <button class="btn-close" onclick="closeDetailModal()">&times;</button>
+        </div>
+        <div class="cc-modal__body" id="detailBody"></div>
+        <div class="cc-modal__footer">
+            <button class="btn btn-outline btn-sm" onclick="closeDetailModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Tab styling handled by global .cc-tabs in main.css */
+
+    .priority-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: capitalize;
+    }
+    .priority-badge.critical { background: var(--danger, #dc3545); color: #fff; }
+    .priority-badge.high { background: var(--warning, #ffc107); color: #000; }
+    .priority-badge.standard { background: var(--color-teal, #17a2b8); color: #fff; }
+    .priority-badge.low { background: var(--bg-tertiary, #6c757d); color: #fff; }
+
+    .type-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .test-result {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+    }
+    .test-result.pass { background: rgba(40, 167, 69, 0.1); border-color: var(--success, #28a745); }
+    .test-result.fail { background: rgba(220, 53, 69, 0.1); border-color: var(--danger, #dc3545); }
+
+    .test-form label {
+        display: block;
+        font-weight: 600;
+        font-size: 12px;
+        margin: 10px 0 4px;
+        color: var(--text-secondary);
+    }
+    .test-form input, .test-form select, .test-form textarea {
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 13px;
+    }
+    .test-form .row-2col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+</style>
+
+<script>
+(function() {
+    'use strict';
+
+    let monRules = [];
+    let cgRules = [];
+    let currentTestRule = null;
+    let currentTestType = null; // 'monitoring' or 'caregap'
+
+    // ── Tab switching ───────────────────────────────────────────
+    window.switchTab = function(tab) {
+        document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('.cc-tab').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + tab).style.display = '';
+        document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
+    };
+
+    // ── Load stats ──────────────────────────────────────────────
+    function loadStats() {
+        fetch('/admin/rules-registry/api/stats')
+            .then(r => r.json())
+            .then(d => {
+                if (!d.success) return;
+                const s = d.data;
+                document.getElementById('statMonTotal').textContent = s.monitoring.total;
+                document.getElementById('statMonActive').textContent = s.monitoring.active;
+                document.getElementById('statCgTotal').textContent = s.care_gaps.total;
+                document.getElementById('statCgActive').textContent = s.care_gaps.active;
+                document.getElementById('statSchedules').textContent = s.active_schedules;
+                document.getElementById('totalBadge').textContent =
+                    (s.monitoring.total + s.care_gaps.total) + ' rules total';
+            })
+            .catch(() => {});
+    }
+
+    // ── Monitoring rules ────────────────────────────────────────
+    window.loadMonitoringRules = function() {
+        const params = new URLSearchParams();
+        const search = document.getElementById('monSearch').value.trim();
+        if (search) params.set('search', search);
+        const type = document.getElementById('monType').value;
+        if (type) params.set('trigger_type', type);
+        const source = document.getElementById('monSource').value;
+        if (source) params.set('source', source);
+        const priority = document.getElementById('monPriority').value;
+        if (priority) params.set('priority', priority);
+        const active = document.getElementById('monActive').value;
+        if (active) params.set('active', active);
+
+        fetch('/admin/rules-registry/api/monitoring-rules?' + params.toString())
+            .then(r => r.json())
+            .then(d => {
+                if (!d.success) { showMonError(d.error); return; }
+                monRules = d.data;
+                renderMonTable(d.data, d.total);
+            })
+            .catch(() => showMonError('Network error'));
+    };
+
+    function showMonError(msg) {
+        document.getElementById('monBody').innerHTML =
+            '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--danger);">' +
+            escHtml(msg) + '</td></tr>';
+    }
+
+    function renderMonTable(rules, total) {
+        const tbody = document.getElementById('monBody');
+        document.getElementById('tabMonCount').textContent = total;
+        document.getElementById('monCount').textContent = total + ' monitoring rule' + (total !== 1 ? 's' : '') + ' shown';
+
+        if (!rules.length) {
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-secondary);">No monitoring rules match your filters.</td></tr>';
+            return;
+        }
+
+        let html = '';
+        for (const r of rules) {
+            const statusCls = r.is_active ? 'badge--success' : 'badge--muted';
+            const statusTxt = r.is_active ? 'Active' : 'Inactive';
+            html += '<tr data-rule-id="' + r.id + '">' +
+                '<td><strong>' + escHtml(r.lab_name) + '</strong>' +
+                (r.clinical_context ? '<br><span style="font-size:11px;color:var(--text-secondary);">' + escHtml(r.clinical_context.substring(0, 80)) + '</span>' : '') +
+                '</td>' +
+                '<td><span class="type-badge">' + escHtml(r.trigger_type) + '</span></td>' +
+                '<td class="mono" style="font-size:12px;">' + escHtml(r.trigger) + '</td>' +
+                '<td style="text-align:center;">' + r.interval_days + 'd</td>' +
+                '<td><span class="priority-badge ' + r.priority + '">' + r.priority + '</span></td>' +
+                '<td style="font-size:12px;">' + escHtml(r.source) + '</td>' +
+                '<td class="mono" style="font-size:11px;">' + escHtml(r.lab_loinc_code) + '</td>' +
+                '<td class="mono" style="font-size:11px;">' + escHtml(r.lab_cpt_code) + '</td>' +
+                '<td style="text-align:center;">' + r.schedule_count + '</td>' +
+                '<td><span class="badge ' + statusCls + '">' + statusTxt + '</span></td>' +
+                '<td style="white-space:nowrap;">' +
+                    '<button class="btn btn-outline btn-sm" onclick="openTestModal(\'monitoring\',' + r.id + ')" title="Test trigger">⚡ Test</button> ' +
+                    '<button class="btn btn-outline btn-sm" onclick="showMonDetail(' + r.id + ')" title="View details">ℹ</button> ' +
+                    '<button class="btn btn-outline btn-sm" onclick="toggleMon(' + r.id + ')" title="Toggle active">' + (r.is_active ? '⏸' : '▶') + '</button>' +
+                '</td>' +
+                '</tr>';
+        }
+        tbody.innerHTML = html;
+    }
+
+    // ── Care gap rules ──────────────────────────────────────────
+    window.loadCareGapRules = function() {
+        const params = new URLSearchParams();
+        const search = document.getElementById('cgSearch').value.trim();
+        if (search) params.set('search', search);
+        const active = document.getElementById('cgActive').value;
+        if (active) params.set('active', active);
+
+        fetch('/admin/rules-registry/api/caregap-rules?' + params.toString())
+            .then(r => r.json())
+            .then(d => {
+                if (!d.success) { showCgError(d.error); return; }
+                cgRules = d.data;
+                renderCgTable(d.data, d.total);
+            })
+            .catch(() => showCgError('Network error'));
+    };
+
+    function showCgError(msg) {
+        document.getElementById('cgBody').innerHTML =
+            '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--danger);">' +
+            escHtml(msg) + '</td></tr>';
+    }
+
+    function renderCgTable(rules, total) {
+        const tbody = document.getElementById('cgBody');
+        document.getElementById('tabCgCount').textContent = total;
+        document.getElementById('cgCount').textContent = total + ' care gap rule' + (total !== 1 ? 's' : '') + ' shown';
+
+        if (!rules.length) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-secondary);">No care gap rules match your filters.</td></tr>';
+            return;
+        }
+
+        let html = '';
+        for (const r of rules) {
+            const statusCls = r.is_active ? 'badge--success' : 'badge--muted';
+            const statusTxt = r.is_active ? 'Active' : 'Inactive';
+            const ageRange = r.min_age + '–' + (r.max_age >= 999 ? '∞' : r.max_age);
+            const sexDisplay = r.sex === 'all' ? 'Any' : (r.sex === 'female' || r.sex === 'F' ? 'Female' : 'Male');
+            const intervalDisplay = r.interval_days ? Math.round(r.interval_days / 365 * 10) / 10 + ' yr' : '—';
+
+            html += '<tr data-rule-id="' + r.id + '">' +
+                '<td><strong>' + escHtml(r.gap_name) + '</strong>' +
+                (r.description ? '<br><span style="font-size:11px;color:var(--text-secondary);">' + escHtml(r.description.substring(0, 100)) + '</span>' : '') +
+                '</td>' +
+                '<td style="font-size:12px;">' + escHtml(r.gap_type) + '</td>' +
+                '<td style="text-align:center;">' + ageRange + '</td>' +
+                '<td style="text-align:center;">' + sexDisplay + '</td>' +
+                '<td style="text-align:center;">' + intervalDisplay + '</td>' +
+                '<td class="mono" style="font-size:11px;">' + escHtml(r.billing_code_pair) + '</td>' +
+                '<td style="font-size:12px;">' + escHtml(r.source) + '</td>' +
+                '<td><span class="badge ' + statusCls + '">' + statusTxt + '</span></td>' +
+                '<td style="white-space:nowrap;">' +
+                    '<button class="btn btn-outline btn-sm" onclick="openTestModal(\'caregap\',' + r.id + ')" title="Test trigger">⚡ Test</button> ' +
+                    '<button class="btn btn-outline btn-sm" onclick="toggleCg(' + r.id + ')" title="Toggle active">' + (r.is_active ? '⏸' : '▶') + '</button>' +
+                '</td>' +
+                '</tr>';
+        }
+        tbody.innerHTML = html;
+    }
+
+    // ── Test trigger modal ──────────────────────────────────────
+    window.openTestModal = function(type, ruleId) {
+        currentTestType = type;
+        currentTestRule = ruleId;
+        const body = document.getElementById('testModalBody');
+
+        if (type === 'monitoring') {
+            const rule = monRules.find(r => r.id === ruleId);
+            const title = rule ? rule.lab_name : 'Rule #' + ruleId;
+            const triggerType = rule ? rule.trigger_type : 'MEDICATION';
+            document.getElementById('testModalTitle').textContent = 'Test: ' + title;
+
+            body.innerHTML =
+                '<div class="test-form">' +
+                '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;">Configure a synthetic patient to test whether this rule fires.</p>' +
+                '<div class="row-2col">' +
+                    '<div><label>Patient Age</label><input type="number" id="testAge" value="55" min="0" max="120"></div>' +
+                    '<div><label>Patient Sex</label><select id="testSex"><option value="F">Female</option><option value="M">Male</option></select></div>' +
+                '</div>' +
+                (triggerType === 'MEDICATION' || triggerType === 'GENOTYPE' || triggerType === 'REMS' ?
+                    '<label>Medications (one per line: name,rxcui)</label>' +
+                    '<textarea id="testMeds" rows="3" placeholder="metformin,6809&#10;lisinopril,29046">' +
+                    (rule && rule.trigger ? rule.trigger + ',' + rule.trigger : '') + '</textarea>'
+                    : '') +
+                (triggerType === 'CONDITION' ?
+                    '<label>Diagnoses (ICD-10 codes, one per line)</label>' +
+                    '<textarea id="testDx" rows="3" placeholder="E11&#10;I10">' +
+                    (rule && rule.trigger ? rule.trigger : '') + '</textarea>'
+                    : '') +
+                '<label>Last Lab Date (leave blank for "never done")</label>' +
+                '<input type="date" id="testLastLab" value="">' +
+                '<div id="testResult"></div>' +
+                '</div>';
+        } else {
+            const rule = cgRules.find(r => r.id === ruleId);
+            const title = rule ? rule.gap_name : 'Rule #' + ruleId;
+            document.getElementById('testModalTitle').textContent = 'Test: ' + title;
+
+            body.innerHTML =
+                '<div class="test-form">' +
+                '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;">Configure a synthetic patient to test whether this care gap rule fires.</p>' +
+                '<div class="row-2col">' +
+                    '<div><label>Patient Age</label><input type="number" id="testAge" value="55" min="0" max="120"></div>' +
+                    '<div><label>Patient Sex</label><select id="testSex"><option value="F">Female</option><option value="M">Male</option></select></div>' +
+                '</div>' +
+                '<label>Diagnoses (ICD-10 codes, comma-separated)</label>' +
+                '<input type="text" id="testCgDx" placeholder="E11, I10, J44">' +
+                '<div id="testResult"></div>' +
+                '</div>';
+        }
+
+        document.getElementById('testModal').classList.add('cc-modal--open');
+    };
+
+    window.closeTestModal = function() {
+        document.getElementById('testModal').classList.remove('cc-modal--open');
+        currentTestRule = null;
+        currentTestType = null;
+    };
+
+    window.runTest = function() {
+        const resultDiv = document.getElementById('testResult');
+        resultDiv.innerHTML = '<div style="padding:12px;text-align:center;"><div class="loading-spinner"></div> Running test…</div>';
+        const btn = document.getElementById('runTestBtn');
+        btn.disabled = true;
+
+        const age = parseInt(document.getElementById('testAge').value) || 55;
+        const sex = document.getElementById('testSex').value;
+
+        let url, payload;
+
+        if (currentTestType === 'monitoring') {
+            url = '/admin/rules-registry/api/test-monitoring-rule/' + currentTestRule;
+            const medsEl = document.getElementById('testMeds');
+            const dxEl = document.getElementById('testDx');
+            const medications = [];
+            const diagnoses = [];
+
+            if (medsEl) {
+                medsEl.value.trim().split('\n').filter(Boolean).forEach(line => {
+                    const parts = line.split(',').map(s => s.trim());
+                    if (parts.length >= 2) {
+                        medications.push({ drug_name: parts[0], rxcui: parts[1] });
+                    } else if (parts[0]) {
+                        medications.push({ drug_name: parts[0], rxcui: parts[0] });
+                    }
+                });
+            }
+            if (dxEl) {
+                dxEl.value.trim().split('\n').filter(Boolean).forEach(line => {
+                    diagnoses.push({ icd10_code: line.trim() });
+                });
+            }
+
+            const lastLab = document.getElementById('testLastLab').value;
+            payload = { medications, diagnoses, age, sex, last_lab_date: lastLab };
+        } else {
+            url = '/admin/rules-registry/api/test-caregap-rule/' + currentTestRule;
+            const dxInput = document.getElementById('testCgDx');
+            const diagnoses = dxInput ? dxInput.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+            payload = { age, sex, diagnoses };
+        }
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })
+        .then(r => r.json())
+        .then(d => {
+            btn.disabled = false;
+            if (!d.success) {
+                resultDiv.innerHTML = '<div class="test-result fail"><strong>Error:</strong> ' + escHtml(d.error) + '</div>';
+                return;
+            }
+            const res = d.data;
+            if (currentTestType === 'monitoring') {
+                const cls = res.matched ? 'pass' : 'fail';
+                const icon = res.matched ? '✅' : '❌';
+                let html = '<div class="test-result ' + cls + '">' +
+                    '<div style="font-size:15px;font-weight:700;margin-bottom:8px;">' + icon + ' ' +
+                    (res.matched ? 'RULE WOULD FIRE' : 'RULE WOULD NOT FIRE') + '</div>';
+                if (res.match_reason) {
+                    html += '<div style="font-size:12px;margin-bottom:4px;"><strong>Reason:</strong> ' + escHtml(res.match_reason) + '</div>';
+                }
+                if (res.due_date) {
+                    html += '<div style="font-size:12px;margin-bottom:4px;"><strong>Next due:</strong> ' + res.due_date +
+                        (res.is_overdue ? ' <span class="badge badge--error">OVERDUE</span>' : ' <span class="badge badge--success">On track</span>') + '</div>';
+                }
+                html += '<div style="font-size:12px;"><strong>Interval:</strong> ' + res.interval_days + ' days · <strong>Priority:</strong> ' + res.priority + '</div>';
+                html += '</div>';
+                resultDiv.innerHTML = html;
+            } else {
+                const cls = res.matched ? 'pass' : 'fail';
+                const icon = res.matched ? '✅' : '❌';
+                let html = '<div class="test-result ' + cls + '">' +
+                    '<div style="font-size:15px;font-weight:700;margin-bottom:8px;">' + icon + ' ' +
+                    (res.matched ? 'GAP WOULD BE FLAGGED' : 'GAP WOULD NOT FLAG') + '</div>';
+                if (res.reasons && res.reasons.length) {
+                    html += '<ul style="margin:8px 0;padding-left:20px;font-size:12px;">';
+                    res.reasons.forEach(r => { html += '<li>' + escHtml(r) + '</li>'; });
+                    html += '</ul>';
+                }
+                if (res.billing_code) {
+                    html += '<div style="font-size:12px;"><strong>Billing:</strong> ' + escHtml(res.billing_code) + '</div>';
+                }
+                html += '</div>';
+                resultDiv.innerHTML = html;
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            resultDiv.innerHTML = '<div class="test-result fail"><strong>Network error</strong></div>';
+        });
+    };
+
+    // ── Detail modal (monitoring) ───────────────────────────────
+    window.showMonDetail = function(ruleId) {
+        const rule = monRules.find(r => r.id === ruleId);
+        if (!rule) return;
+        document.getElementById('detailTitle').textContent = rule.lab_name;
+        let html = '<table style="width:100%;font-size:13px;border-collapse:collapse;">';
+        const rows = [
+            ['Lab Name', rule.lab_name],
+            ['LOINC', rule.lab_loinc_code],
+            ['CPT', rule.lab_cpt_code],
+            ['Trigger Type', rule.trigger_type],
+            ['Trigger Value', rule.trigger],
+            ['Interval', rule.interval_days + ' days'],
+            ['Priority', rule.priority],
+            ['Source', rule.source],
+            ['Confidence', (rule.confidence * 100).toFixed(0) + '%'],
+            ['Active Schedules', rule.schedule_count],
+            ['Clinical Context', rule.clinical_context || '—'],
+        ];
+        if (rule.evidence_url) {
+            rows.push(['Evidence', '<a href="' + escHtml(rule.evidence_url) + '" target="_blank" rel="noopener">' + escHtml(rule.evidence_url) + '</a>']);
+        }
+        for (const [k, v] of rows) {
+            html += '<tr style="border-bottom:1px solid var(--border);">' +
+                '<td style="padding:6px 8px;font-weight:600;white-space:nowrap;color:var(--text-secondary);width:140px;">' + k + '</td>' +
+                '<td style="padding:6px 8px;">' + v + '</td></tr>';
+        }
+        html += '</table>';
+        document.getElementById('detailBody').innerHTML = html;
+        document.getElementById('detailModal').classList.add('cc-modal--open');
+    };
+
+    window.closeDetailModal = function() {
+        document.getElementById('detailModal').classList.remove('cc-modal--open');
+    };
+
+    // ── Toggle active ───────────────────────────────────────────
+    window.toggleMon = function(ruleId) {
+        fetch('/admin/rules-registry/api/toggle-monitoring-rule/' + ruleId, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => { if (d.success) { loadMonitoringRules(); loadStats(); } })
+            .catch(() => {});
+    };
+
+    window.toggleCg = function(ruleId) {
+        fetch('/admin/rules-registry/api/toggle-caregap-rule/' + ruleId, { method: 'POST' })
+            .then(r => r.json())
+            .then(d => { if (d.success) { loadCareGapRules(); loadStats(); } })
+            .catch(() => {});
+    };
+
+    // ── Util ────────────────────────────────────────────────────
+    function escHtml(str) {
+        if (!str) return '';
+        const d = document.createElement('div');
+        d.textContent = String(str);
+        return d.innerHTML;
+    }
+
+    // ── Init ────────────────────────────────────────────────────
+    loadStats();
+    loadMonitoringRules();
+    loadCareGapRules();
+})();
+</script>
+{% endblock %}

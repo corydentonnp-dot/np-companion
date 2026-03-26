@@ -1,0 +1,300 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type='text/xsl' href='CDA.xsl'?>
+<ClinicalDocument xmlns:sdtc="urn:hl7-org:sdtc" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:hl7-org:v3">
+  <realmCode code="US" />
+  <typeId root="2.16.840.1.113883.1.3" extension="POCD_HD000040" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.1" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" extension="2015-08-01" />
+  <templateId root="2.16.840.1.113883.10.20.22.1.2" />
+  <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+  <code code="34133-9" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Summarization of episode note" />
+  <title>Family Practice Associates of Chesterfield Clinical Summary</title>
+  <effectiveTime value="202603251000-0400" />
+  <confidentialityCode code="N" displayName="Normal" codeSystem="2.16.840.1.113883.5.25" codeSystemName="Confidentiality" />
+  <languageCode code="en-US" />
+  <setId root="00000000-0000-0000-0000-000000090005" extension="AmazingCharts" />
+  <versionNumber value="1" />
+  <recordTarget>
+    <patientRole>
+      <id root="2.16.840.1.113883.3.1167.2799" extension="90005" />
+      <addr use="HP">
+        <streetAddressLine>1100 Monument Avenue Apt 4B</streetAddressLine>
+        <city>Richmond</city>
+        <state>VA</state>
+        <postalCode>23220</postalCode>
+        <country nullFlavor="NI" />
+        <useablePeriod xsi:type="IVL_TS"><low value="20260325" /></useablePeriod>
+      </addr>
+      <telecom use="HP" value="tel:+1(804)-555-1005" />
+      <patient>
+        <name use="L">
+          <given>David</given>
+          <family>Chen</family>
+        </name>
+        <administrativeGenderCode code="M" codeSystem="2.16.840.1.113883.5.1" displayName="Male" codeSystemName="AdministrativeGender" />
+        <birthTime value="19911115" />
+        <maritalStatusCode code="S" displayName="Single" codeSystem="2.16.840.1.113883.5.2" />
+        <religiousAffiliationCode nullFlavor="NI" />
+        <raceCode code="2028-9" displayName="Asian" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <ethnicGroupCode code="2186-5" displayName="Not Hispanic or Latino" codeSystem="2.16.840.1.113883.6.238" codeSystemName="Race &amp; Ethnicity - CDC" />
+        <languageCommunication>
+          <languageCode code="en" />
+        </languageCommunication>
+      </patient>
+      <providerOrganization>
+        <id root="2.16.840.1.113883.3.1167" extension="AmazingCharts" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </providerOrganization>
+    </patientRole>
+  </recordTarget>
+  <author>
+    <time value="202603251000-0400" />
+    <assignedAuthor>
+      <id root="2.16.840.1.113883.4.6" extension="1891645123" assigningAuthorityName="National Provider Identifier" />
+      <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      <telecom use="WP" value="tel:+1(804)-423-9913" />
+      <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+      <representedOrganization>
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedOrganization>
+    </assignedAuthor>
+  </author>
+  <custodian>
+    <assignedCustodian>
+      <representedCustodianOrganization>
+        <id root="2.16.840.1.113883.4.6" extension="1306884820" assigningAuthorityName="National Provider Identifier" />
+        <name>Family Practice Associates of Chesterfield</name>
+        <telecom use="WP" value="tel:+1(804)-423-9913" />
+        <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+      </representedCustodianOrganization>
+    </assignedCustodian>
+  </custodian>
+  <documentationOf typeCode="DOC">
+    <serviceEvent classCode="PCPR">
+      <effectiveTime><low value="19911115" /><high value="20260325" /></effectiveTime>
+      <performer typeCode="PRF">
+        <time><low value="20250101" /></time>
+        <assignedEntity>
+          <id extension="1891645123" root="2.16.840.1.113883.4.6" assigningAuthorityName="National Provider Identifier" />
+          <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          <telecom use="WP" value="tel:+1(804)-423-9913" />
+          <assignedPerson><name><given>Cory</given><family>Denton</family><suffix>FNP</suffix></name></assignedPerson>
+          <representedOrganization>
+            <id root="2.16.840.1.113883.3.1167.2799" />
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </representedOrganization>
+        </assignedEntity>
+      </performer>
+    </serviceEvent>
+  </documentationOf>
+  <componentOf>
+    <encompassingEncounter>
+      <id root="00000000-0000-0000-0000-000000090005" extension="1306884820" />
+      <code code="AMB" codeSystem="2.16.840.1.113883.5.4" codeSystemName="ActCode" displayName="Ambulatory" />
+      <effectiveTime><low value="202603251000-0400" /></effectiveTime>
+      <location>
+        <healthCareFacility>
+          <id root="2.16.840.1.113883.19" extension="1306884820" />
+          <location>
+            <name>Family Practice Associates of Chesterfield</name>
+            <addr use="WP"><streetAddressLine>13911 St Francis Blvd, Suite 101</streetAddressLine>
+        <city>Midlothian</city>
+        <state>VA</state>
+        <postalCode>23114</postalCode>
+        <country>US</country></addr>
+          </location>
+        </healthCareFacility>
+      </location>
+    </encompassingEncounter>
+  </componentOf>
+  <component>
+    <structuredBody>
+      <component>
+        <section>
+          <code code="48765-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Allergies and Adverse Reactions" />
+          <title>ALLERGIES AND ADVERSE REACTIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Substance</th><th>Reaction</th><th>Severity</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Amoxicillin [RxNorm: 723]</td><td>Rash</td><td>mild</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="10160-0" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Medications" />
+          <title>MEDICATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Medication</th><th>Generic Name</th><th>Instructions</th><th>Dosage</th><th>Start Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>lisdexamfetamine 50 mg capsule [RxNorm: 854838]</td><td>lisdexamfetamine</td><td>Take 1 capsule by mouth each morning</td><td>50 mg</td><td>09/01/2022</td><td>active</td></tr>
+                <tr><td>escitalopram 20 mg tablet [RxNorm: 352741]</td><td>escitalopram</td><td>Take 1 tablet by mouth daily</td><td>20 mg</td><td>03/15/2023</td><td>active</td></tr>
+                <tr><td>sumatriptan 100 mg tablet [RxNorm: 313197]</td><td>sumatriptan</td><td>Take 1 tablet at onset of migraine, may repeat x1 in 2 hours</td><td>100 mg</td><td>06/01/2020</td><td>active</td></tr>
+                <tr><td>topiramate 50 mg tablet [RxNorm: 38404]</td><td>topiramate</td><td>Take 1 tablet by mouth at bedtime</td><td>50 mg</td><td>01/10/2025</td><td>active</td></tr>
+                <tr><td>melatonin 3 mg tablet</td><td>melatonin</td><td>Take 1 tablet by mouth at bedtime</td><td>3 mg</td><td>09/01/2022</td><td>active</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11450-4" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Problems" />
+          <title>PROBLEMS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Problem</th><th>Problem Status</th><th>Date Started</th><th>Date Resolved</th></tr></thead>
+              <tbody>
+                <tr><td>Attention deficit hyperactivity disorder combined [ICD10: F90.2]</td><td>active</td><td>09/01/2022</td><td></td></tr>
+                <tr><td>Generalized anxiety disorder [ICD10: F41.1]</td><td>active</td><td>03/15/2023</td><td></td></tr>
+                <tr><td>Migraine without aura [ICD10: G43.009]</td><td>active</td><td>06/01/2020</td><td></td></tr>
+                <tr><td>Insomnia [ICD10: G47.00]</td><td>active</td><td>09/01/2022</td><td></td></tr>
+                <tr><td>Seasonal allergic rhinitis [ICD10: J30.2]</td><td>active</td><td>04/01/2019</td><td></td></tr>
+                <tr><td>Acute pharyngitis [ICD10: J02.9]</td><td>resolved</td><td>02/05/2026</td><td>02/15/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="8716-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Vital Signs" />
+          <title>VITAL SIGNS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Encounter</th><th>Height (in)</th><th>Weight (lb)</th><th>BMI (kg/m2)</th><th>BP Sys (mmHg)</th><th>BP Dias (mmHg)</th><th>Heart Rate (/min)</th><th>O2 % BldC Oximetry</th><th>Body Temperature</th><th>Respiratory Rate (/min)</th></tr></thead>
+              <tbody>
+                <tr><td>03/10/2026</td><td>69</td><td>165</td><td>24.4</td><td>118</td><td>74</td><td>68</td><td>99</td><td>98.4</td><td>14</td></tr>
+                <tr><td>09/15/2025</td><td>69</td><td>162</td><td>23.9</td><td>116</td><td>72</td><td>72</td><td>99</td><td>98.6</td><td>14</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="30954-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Lab Results" />
+          <title>LAB RESULTS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Test Name</th><th>Result</th><th>Units</th><th>Flag</th><th>Date</th></tr></thead>
+              <tbody>
+                <tr><td>CBC WBC [LOINC: 6690-2]</td><td>6.8</td><td>10*3/uL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Hemoglobin [LOINC: 718-7]</td><td>15.2</td><td>g/dL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>TSH [LOINC: 3016-3]</td><td>1.8</td><td>mIU/L</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Comprehensive Metabolic Panel [LOINC: 24323-8]</td><td>normal</td><td></td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Vitamin D 25-OH [LOINC: 1989-3]</td><td>42</td><td>ng/mL</td><td>normal</td><td>03/05/2026</td></tr>
+                <tr><td>Lipid Panel [LOINC: 24331-1]</td><td>TC 185, LDL 108, HDL 55, TG 110</td><td></td><td>normal</td><td>03/05/2026</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11369-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Immunizations" />
+          <title>IMMUNIZATIONS</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Vaccine</th><th>Date</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Influenza vaccine 2025-2026</td><td>10/10/2025</td><td>completed</td></tr>
+                <tr><td>COVID-19 Vaccine 2024-2025 (Pfizer)</td><td>09/25/2024</td><td>completed</td></tr>
+                <tr><td>Tdap (Boostrix)</td><td>09/01/2022</td><td>completed</td></tr>
+                <tr><td>Hepatitis B series (3 doses)</td><td>01/01/2010</td><td>completed</td></tr>
+                <tr><td>MMR (2 doses)</td><td>01/01/1992</td><td>completed</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="29762-2" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Social History" />
+          <title>SOCIAL HISTORY</title>
+          <text>Tobacco: Never smoker. Alcohol: Social, 3-4 drinks/weekend. Cannabis: Occasional edibles for sleep. Employment: Software engineer, high-stress startup. Marital Status: Single, lives alone. Exercise: Rock climbing 2x/week, runs 3x/week. Screen time: 10+ hours/day.</text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="48768-6" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Insurance" />
+          <title>INSURANCE</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Payer</th><th>Policy Type</th><th>Member ID</th><th>Group</th></tr></thead>
+              <tbody>
+                <tr><td>Cigna</td><td>Commercial HMO</td><td>CIG-905005</td><td>GRP-TECH-200</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+      <component>
+        <section>
+          <code code="11506-3" codeSystem="2.16.840.1.113883.6.1" codeSystemName="LOINC" displayName="Progress Notes" />
+          <title>PROGRESS NOTES</title>
+          <text>
+            <table xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <thead><tr><th>Date</th><th>Provider</th><th>Note Type</th><th>Note Text</th><th>Location</th></tr></thead>
+              <tbody>
+                <tr><td>03/10/2026</td><td>Cory Denton, FNP</td><td>Progress Note</td><td>CC: ADHD med check, migraine frequency.
+HPI: 34yo male here for scheduled ADHD/anxiety follow-up. Vyvanse 50mg working well for focus. Reports anxiety improved on escitalopram 20mg -- fewer panic episodes. Migraines decreased from 8/month to 3/month since starting topiramate in January. Uses sumatriptan PRN for breakthrough. Sleep improved with melatonin + sleep hygiene.
+Screening: PHQ-9 = 6 (mild). GAD-7 = 8 (mild). ASRS consistent with ongoing ADHD.
+PE: Vitals normal. BP 118/74. Well-appearing, calm affect.
+Assessment:
+# ADHD (F90.2): Stable on Vyvanse 50. No appetite issues, weight stable. Continue.
+# GAD (F41.1): Improved. Continue escitalopram 20.
+# Migraine (G43.009): Topiramate effective. Down to 3/month. Continue.
+# Insomnia (G47.00): Improved with melatonin + sleep hygiene.
+Plan: Continue all meds. Vyvanse Rx (30-day supply, no refills per policy). Return 3 months. Headache diary continue. Consider referral to therapist for CBT if anxiety plateaus.</td><td>Family Practice Associates of Chesterfield</td></tr>
+                <tr><td>09/15/2025</td><td>Cory Denton, FNP</td><td>Annual Wellness Visit</td><td>ANNUAL WELLNESS VISIT
+34yo healthy male.
+Preventive:
+- Depression: PHQ-9 = 8 (mild). On treatment.
+- STI screening: Discussed. Patient declines (monogamous relationship ended, currently abstinent).
+- Testicular self-exam: Counseled.
+- Substance use: AUDIT-C = 3 (low risk). Cannabis occasional -- counseled.
+- Immunizations: Flu given. All up to date.
+- Labs: TSH, CMP, lipids, Vit D -- all normal.</td><td>Family Practice Associates of Chesterfield</td></tr>
+              </tbody>
+            </table>
+          </text>
+        </section>
+      </component>
+    </structuredBody>
+  </component>
+</ClinicalDocument>
