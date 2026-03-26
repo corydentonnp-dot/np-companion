@@ -6,6 +6,62 @@
 
 ---
 
+## CL-133 — Band 3: Service Layer Extraction, Billing Facade Removal, Test/Script Reorg
+**Completed:** 03-27-26 12:00:00 UTC
+
+### B1: Service Layer Extraction (complete)
+- Created 13 new service/utility files extracting helpers from routes and agent/:
+  - `utils/patient_helpers.py` — mrn_display, calc_age, normalize_name/dob
+  - `utils/json_helpers.py` — parse_json_safe
+  - `utils/decorators.py` — require_role (eliminates cross-route import from routes.auth)
+  - `app/services/patient_service.py` — schedule_context, ensure_patient_record, prepopulate_sections
+  - `app/services/diagnosis_service.py` — classify_diagnosis, backfill_icd10_codes, load_icd10_csv
+  - `app/services/medication_enrichment.py` — fetch_rxnorm_api, enrich_rxnorm, enrich_medications
+  - `app/services/caregap_service.py` — get_uspstf_recommendations, auto_evaluate_care_gaps
+  - `app/services/labtrack_service.py` — check_overdue_labs
+  - `app/services/metrics_service.py` — generate_weekly_summary
+  - `app/services/timer_service.py` — RVU_TABLE, EM_TIME_RANGES, detect_anomalies, monthly_stats
+  - `app/services/education_service.py` — build_pricing_paragraph, auto_draft_education_message
+  - `app/services/schedule_service.py` — analyze_schedule_anomalies
+  - `app/services/cs_service.py` — get_overdue_pdmp_patients
+  - `app/services/bonus_calculator.py` extended with `build_deficit_history`
+- Updated caller files:
+  - `routes/patient.py`: reduced from 1874→~1183 lines; service imports added
+  - `routes/intelligence.py`: removed local helpers (_parse_json_safe, _build_pricing_paragraph, auto_draft_education_message); fixed 3 cross-route imports
+  - `routes/dashboard.py`: removed analyze_schedule_anomalies body; fixed cross-route import
+  - `routes/tools.py`: replaced get_overdue_pdmp_patients with import; re-exported for backward compat
+  - `routes/bonus.py`: removed _build_deficit_history body; import from bonus_calculator
+  - `routes/timer.py`: removed RVU_TABLE, EM_TIME_RANGES, _detect_anomalies, _monthly_stats local defs; import from timer_service
+  - `routes/metrics.py`: removed _generate_weekly_summary body; import from metrics_service
+  - `agent_service.py`: updated 3 lazy cross-route imports
+  - `agent/clinical_summary_parser.py`: updated auto_draft_education_message import
+  - 5 files (`admin_rules_registry.py`, `admin_med_catalog.py`, `admin_benchmarks.py`, `campaigns.py`, `medref.py`): updated require_role import to use utils.decorators
+- B1.22: Zero `from routes.` imports remain in routes/ files (only in comments)
+- Test result after B1: **211 passed, 21 warnings**
+
+### B6: Billing Facade Removal
+- `agent_service.py` and `app/services/api_scheduler.py`: replaced `BillingRulesEngine` with `BillingCaptureEngine` from `billing_engine.engine`; updated `.evaluate_patient()` calls to `.evaluate()`
+- `app/services/billing_valueset_map.py` → copied to `billing_engine/valueset_map.py`; callers updated; old file converted to re-export shim
+- `billing_engine/shared.py` and `app/services/monitoring_rule_engine.py` imports updated
+- `app/services/billing_rules.py` retained as backward-compat shim (tests depend on it)
+- Test result after B6: **211 passed, 21 warnings**
+
+### B7: Test Directory Organization
+- Archived `tests/_debug_auth.py`, `tests/_ph16_results.txt`, `tests/_route_results.txt` → `Documents/_archive/`
+- Created `tests/unit/`, `tests/integration/`, `tests/operational/` with `__init__.py`
+- Moved `tools/backup_restore_test.py`, `tools/clinical_summary_test.py`, `tools/connectivity_test.py` → `tests/operational/`
+
+### B8: Scripts/Tools Consolidation
+- Moved from `tools/` to `scripts/`: `deploy_check.py`, `verify_all.py`, `process_guard.py`, `usb_smoke_test.py`, `totp_extractor.py`
+- Archived `tools/emulated_patient_generator/` → `Documents/_archive/` (superceded by `tools/patient_gen/`)
+- `tools/` now contains only: `patient_gen/`, `deploy_report.json`
+- Test result after B7/B8: **211 passed, 21 warnings**
+
+### Infrastructure
+- Rebuilt venv (was created on a different machine — username `coryd` vs `cory`). New venv uses `C:\Program Files\Python311\python.exe`. All requirements reinstalled.
+
+---
+
 ## CL-132 — Overnight Band 2 Checkpoint Verification
 **Completed:** 03-26-26 05:48:05 UTC
 - Ran full checkpoint test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
