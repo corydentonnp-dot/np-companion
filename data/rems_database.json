@@ -1,0 +1,447 @@
+[
+  {
+    "program_name": "iPLEDGE REMS",
+    "status": "active",
+    "medications": ["Isotretinoin (Accutane, Absorica, Amnesteem, Claravis, Myorisan, Zenatane)"],
+    "clinical_area": "Dermatology",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be registered and activated in iPLEDGE",
+      "Female patients of reproductive potential: 2 negative pregnancy tests before starting, monthly pregnancy tests during, 1 month after",
+      "Two forms of contraception required for female patients of reproductive potential",
+      "Monthly authorization required before each prescription fill",
+      "Patient must sign informed consent/patient agreement",
+      "Pharmacy must verify authorization before dispensing",
+      "30-day prescription limit; 7-day pickup window"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test (urine or serum hCG)", "interval": "Monthly (females of reproductive potential)", "priority": "critical"},
+      {"lab": "Fasting lipid panel", "interval": "Before treatment, then as clinically indicated", "priority": "high"},
+      {"lab": "Liver function tests (AST, ALT)", "interval": "Before treatment, then as clinically indicated", "priority": "high"},
+      {"lab": "CBC with differential", "interval": "As clinically indicated", "priority": "standard"}
+    ],
+    "notes": "iPLEDGE applies to ALL isotretinoin products regardless of manufacturer. Program has separate requirements for male patients, females of reproductive potential, and females not of reproductive potential."
+  },
+  {
+    "program_name": "Opioid Analgesic REMS (ER/LA)",
+    "status": "active",
+    "medications": [
+      "Extended-release/Long-acting opioid analgesics (class-wide)",
+      "Includes: OxyContin, MS Contin, Duragesic (fentanyl patch), Opana ER, Nucynta ER, Hysingla ER, Xtampza ER, methadone, Embeda, morphine sulfate ER, hydromorphone ER"
+    ],
+    "clinical_area": "Pain Management",
+    "requirement_types": ["PATIENT_COUNSELING"],
+    "requirements": [
+      "Manufacturers must make training available to prescribers (CE/CME-based education)",
+      "Prescriber training covers: proper patient selection, dosing, monitoring, and counseling",
+      "Patient counseling required on risks, safe use, storage, and disposal",
+      "Provide Medication Guide to patient with each dispensing",
+      "Training is available but NOT mandatory for prescribers (voluntary)"
+    ],
+    "monitoring_labs": [],
+    "notes": "The Opioid Analgesic REMS is primarily an education-based program. It does NOT require prescriber certification or patient enrollment in a registry. However, best practice includes screening with PDMP, urine drug testing, and opioid risk tools (ORT, SOAPP-R). Individual state laws may impose additional requirements."
+  },
+  {
+    "program_name": "TIRF REMS Access Program",
+    "status": "active",
+    "medications": [
+      "Transmucosal immediate-release fentanyl products",
+      "Actiq (fentanyl citrate oral transmucosal lozenge)",
+      "Fentora (fentanyl buccal tablet)",
+      "Abstral (fentanyl sublingual tablet)",
+      "Lazanda (fentanyl nasal spray)",
+      "Subsys (fentanyl sublingual spray) — removed from market but REMS still active for generics"
+    ],
+    "clinical_area": "Pain Management / Oncology",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber MUST be enrolled in TIRF REMS Access program",
+      "Only for opioid-TOLERANT patients with breakthrough cancer pain (or chronic pain if already on around-the-clock opioids)",
+      "Patient must sign Patient-Prescriber Agreement",
+      "Pharmacy must be enrolled in TIRF REMS",
+      "Outpatient use only — different requirements for inpatient",
+      "Prescriber must counsel patient on risks, proper use, storage, disposal"
+    ],
+    "monitoring_labs": [],
+    "notes": "TIRF products are NOT interchangeable. Each product has its own dosing titration. Prescribers must verify opioid tolerance before prescribing. Opioid tolerance defined as: taking ≥60 mg oral morphine/day, ≥25 mcg/hr transdermal fentanyl, ≥30 mg oral oxycodone/day, or equianalgesic dose of another opioid for ≥1 week."
+  },
+  {
+    "program_name": "Clozapine REMS",
+    "status": "removed_2025",
+    "status_detail": "FDA removed the Clozapine REMS effective June 13, 2025. ANC monitoring is still recommended as standard of care but is no longer federally mandated through a REMS program.",
+    "medications": ["Clozapine (Clozaril, FazaClo, Versacloz, generic)"],
+    "clinical_area": "Psychiatry",
+    "requirement_types": ["LAB_MONITORING", "REGISTRY_ENROLLMENT"],
+    "requirements": [
+      "REMS REMOVED June 13, 2025 — registry enrollment no longer required",
+      "ANC monitoring STILL RECOMMENDED as standard of care:",
+      "- First 6 months: ANC weekly",
+      "- Months 6-12: ANC every 2 weeks (if ANC ≥ 1500/µL in general population, ≥ 1000/µL in BEN population)",
+      "- After 12 months: ANC monthly (if continuously maintained)",
+      "Clozapine should be discontinued if ANC < 1000/µL (general) or < 500/µL (BEN)",
+      "Benign Ethnic Neutropenia (BEN): lower ANC thresholds apply; discuss with hematology",
+      "Although REMS removed, pharmacies may still require ANC before dispensing per institutional policy"
+    ],
+    "monitoring_labs": [
+      {"lab": "ANC (Absolute Neutrophil Count) via CBC with differential", "interval": "Weekly × 6 months → Biweekly × 6 months → Monthly", "priority": "critical"},
+      {"lab": "Fasting glucose / HbA1c", "interval": "Baseline, then at 4 months, then annually", "priority": "high"},
+      {"lab": "Fasting lipid panel", "interval": "Baseline, then at 4 months, then annually", "priority": "high"},
+      {"lab": "Troponin / CRP (if myocarditis suspected)", "interval": "As clinically indicated", "priority": "critical"}
+    ],
+    "notes": "Even though the REMS was removed, clozapine carries serious risks including agranulocytosis (cumulative incidence ~0.8%), myocarditis/cardiomyopathy, seizures, severe constipation/ileus, and metabolic syndrome. Continue monitoring as standard of care. Some pharmacies and health systems may maintain their own monitoring requirements. Document monitoring decisions in the chart."
+  },
+  {
+    "program_name": "Thalomid REMS (Thalidomide)",
+    "status": "active",
+    "medications": ["Thalidomide (Thalomid)"],
+    "clinical_area": "Oncology / Dermatology",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be registered and certified in Thalomid REMS",
+      "Female patients of reproductive potential: pregnancy test 10-14 days prior and within 24 hours before starting",
+      "Weekly pregnancy testing during first 4 weeks, then every 4 weeks (regular cycles) or every 2 weeks (irregular cycles)",
+      "Two forms of contraception required, beginning 4 weeks before therapy",
+      "Male patients: must use latex condoms during any sexual contact — thalidomide is present in semen",
+      "Patient must sign informed consent acknowledging teratogenicity",
+      "28-day prescription limit; no automatic refills; no telephone prescriptions",
+      "Pharmacy must be registered; must verify authorization before dispensing"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test (serum β-hCG, sensitivity ≥ 25 mIU/mL)", "interval": "Weekly × 4 weeks, then monthly", "priority": "critical"},
+      {"lab": "CBC", "interval": "As clinically indicated", "priority": "standard"},
+      {"lab": "Peripheral neuropathy assessment", "interval": "Monthly clinical assessment", "priority": "high"}
+    ],
+    "notes": "Thalidomide is a known human teratogen. Even a single dose during pregnancy can cause severe birth defects or fetal death. The REMS is one of the most restrictive programs in existence. Prescribers must counsel patients that thalidomide must NEVER be shared and unused capsules must be returned to the pharmacy."
+  },
+  {
+    "program_name": "Revlimid REMS (Lenalidomide)",
+    "status": "active",
+    "medications": ["Lenalidomide (Revlimid)"],
+    "clinical_area": "Oncology (Multiple Myeloma, MDS, Mantle Cell Lymphoma)",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be registered and certified in Revlimid REMS",
+      "Structurally similar to thalidomide — same teratogenicity risk",
+      "Female patients of reproductive potential: 2 negative pregnancy tests before starting",
+      "Weekly pregnancy testing during first 4 weeks, then monthly (regular cycles) or every 2 weeks (irregular cycles)",
+      "Two forms of contraception required",
+      "Male patients: must use latex condoms — lenalidomide is present in semen",
+      "28-day prescription limit; patient survey required before each cycle",
+      "Pharmacy must be certified"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test (serum β-hCG)", "interval": "Weekly × 4 weeks, then monthly", "priority": "critical"},
+      {"lab": "CBC with differential", "interval": "Weekly × first 8 weeks, then monthly", "priority": "critical"},
+      {"lab": "CMP (hepatic & renal function)", "interval": "Monthly", "priority": "high"}
+    ],
+    "notes": "Lenalidomide also carries risk of deep vein thrombosis (DVT) and pulmonary embolism (PE). Thromboprophylaxis recommended. Second primary malignancies have been observed. Monitor for tumor lysis syndrome in patients with high tumor burden."
+  },
+  {
+    "program_name": "Pomalyst REMS (Pomalidomide)",
+    "status": "active",
+    "medications": ["Pomalidomide (Pomalyst)"],
+    "clinical_area": "Oncology (Multiple Myeloma)",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Same structure as Thalomid/Revlimid REMS — prescriber certification, pregnancy testing, contraception",
+      "Female patients of reproductive potential: 2 negative pregnancy tests before starting",
+      "Weekly pregnancy testing during first 4 weeks, then monthly",
+      "Two forms of contraception required",
+      "Male patients: latex condoms required",
+      "28-day prescription limit"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test (serum β-hCG)", "interval": "Weekly × 4 weeks, then monthly", "priority": "critical"},
+      {"lab": "CBC with differential", "interval": "Weekly × first 8 weeks, then monthly", "priority": "critical"}
+    ],
+    "notes": "Pomalidomide is a thalidomide analogue. All teratogenicity warnings apply. Also carries thromboembolism risk — thromboprophylaxis recommended."
+  },
+  {
+    "program_name": "Xyrem and Xywav REMS",
+    "status": "active",
+    "medications": ["Sodium oxybate (Xyrem)", "Calcium, magnesium, potassium, and sodium oxybates (Xywav)"],
+    "clinical_area": "Neurology / Sleep Medicine (Narcolepsy, Idiopathic Hypersomnia)",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be enrolled in Xyrem/Xywav REMS",
+      "Only available through the certified central pharmacy (Jazz Pharmaceuticals central pharmacy)",
+      "Patient must be enrolled in the REMS program",
+      "No samples, starter packs, or alternative distribution",
+      "Maximum 1-month supply per shipment",
+      "Patient counseling on: CNS depression, respiratory depression, abuse potential (Schedule III controlled substance — contains GHB)"
+    ],
+    "monitoring_labs": [],
+    "notes": "Sodium oxybate is the sodium salt of GHB (gamma-hydroxybutyrate). It carries risks of CNS/respiratory depression especially with other CNS depressants or alcohol. The central pharmacy distribution model is designed to minimize diversion. Xywav has lower sodium content than Xyrem."
+  },
+  {
+    "program_name": "TOUCH Prescribing Program (Natalizumab)",
+    "status": "active",
+    "medications": ["Natalizumab (Tysabri)"],
+    "clinical_area": "Neurology (Multiple Sclerosis, Crohn's Disease)",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "PATIENT_COUNSELING", "LAB_MONITORING"],
+    "requirements": [
+      "Prescriber must be enrolled in TOUCH program",
+      "Patient must be enrolled and complete enrollment/re-enrollment questionnaire",
+      "Infusion center must be enrolled and certified",
+      "Administered only by IV infusion in a certified infusion center",
+      "Patient must be observed for ≥1 hour after each infusion",
+      "Assessment for signs/symptoms of PML before each infusion",
+      "JC virus antibody testing before and periodically during treatment",
+      "Brain MRI at or within 3 months of starting treatment"
+    ],
+    "monitoring_labs": [
+      {"lab": "JC virus antibody test (anti-JCV antibody index)", "interval": "Before starting, then every 6 months", "priority": "critical"},
+      {"lab": "Brain MRI", "interval": "Baseline, then at least annually (more frequently if JCV antibody positive)", "priority": "critical"},
+      {"lab": "CBC with differential", "interval": "Periodically during treatment", "priority": "high"},
+      {"lab": "LFTs", "interval": "Periodically during treatment", "priority": "standard"}
+    ],
+    "notes": "Natalizumab carries risk of PML (progressive multifocal leukoencephalopathy), an often fatal opportunistic brain infection. Risk increases with: JCV antibody positivity (especially index > 1.5), treatment duration > 2 years, and prior immunosuppressant use. If PML is suspected, immediately withhold natalizumab and initiate diagnostic workup."
+  },
+  {
+    "program_name": "Lemtrada REMS (Alemtuzumab)",
+    "status": "active",
+    "medications": ["Alemtuzumab (Lemtrada)"],
+    "clinical_area": "Neurology (Multiple Sclerosis)",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "LAB_MONITORING", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be enrolled in Lemtrada REMS",
+      "Healthcare facility must be enrolled and equipped to manage infusion reactions and autoimmune complications",
+      "Patient must be enrolled in patient monitoring program",
+      "Monitoring required for 48 MONTHS after last infusion course",
+      "Monthly blood and urine monitoring throughout the 48-month monitoring period"
+    ],
+    "monitoring_labs": [
+      {"lab": "CBC with differential", "interval": "Monthly for 48 months after last dose", "priority": "critical"},
+      {"lab": "Serum creatinine", "interval": "Monthly for 48 months after last dose", "priority": "critical"},
+      {"lab": "Urinalysis with microscopy", "interval": "Monthly for 48 months after last dose", "priority": "critical"},
+      {"lab": "TSH", "interval": "Every 3 months for 48 months after last dose", "priority": "high"}
+    ],
+    "notes": "Alemtuzumab causes prolonged lymphocyte depletion. Serious autoimmune conditions can develop months to years after treatment including: immune thrombocytopenic purpura (ITP), anti-glomerular basement membrane disease (Goodpasture syndrome), and thyroid disorders. The 48-month monitoring period is one of the longest post-treatment monitoring requirements of any REMS."
+  },
+  {
+    "program_name": "Tikosyn REMS (Dofetilide)",
+    "status": "active",
+    "medications": ["Dofetilide (Tikosyn)"],
+    "clinical_area": "Cardiology (Atrial Fibrillation/Flutter)",
+    "requirement_types": ["REGISTRY_ENROLLMENT"],
+    "requirements": [
+      "Prescriber must complete a Tikosyn education program and be registered",
+      "Treatment must be INITIATED (or re-initiated) in a hospital setting with continuous ECG monitoring for ≥3 days",
+      "Pharmacy must verify prescriber registration before dispensing",
+      "Hospital pharmacy must stock Tikosyn to supply the first prescription",
+      "Dose must be individualized based on CrCl and QTc response"
+    ],
+    "monitoring_labs": [
+      {"lab": "12-lead ECG (QTc measurement)", "interval": "2-3 hours after each dose during initiation, then periodically", "priority": "critical"},
+      {"lab": "Serum creatinine / CrCl (Cockcroft-Gault)", "interval": "Before initiation, then every 3 months", "priority": "critical"},
+      {"lab": "Potassium and Magnesium levels", "interval": "Before initiation, then periodically", "priority": "high"}
+    ],
+    "notes": "Dofetilide can cause dose-dependent QTc prolongation and torsades de pointes. The REMS requires in-hospital initiation because the highest risk period for QTc prolongation is the first 3 days. Contraindicated if CrCl < 20 mL/min. Must avoid QTc-prolonging drug interactions (verapamil, cimetidine, ketoconazole, trimethoprim, etc.)."
+  },
+  {
+    "program_name": "Vigabatrin REMS (Sabril)",
+    "status": "active",
+    "medications": ["Vigabatrin (Sabril, Vigadrone)"],
+    "clinical_area": "Neurology (Infantile Spasms, Refractory Complex Partial Seizures)",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "LAB_MONITORING", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber, pharmacy, and patient must all be enrolled in Vigabatrin REMS (SHARE program)",
+      "Baseline visual field testing before or within 4 weeks of starting",
+      "Vision assessment every 3 months during treatment",
+      "Patient/caregiver counseling on risk of permanent vision loss",
+      "Prescriber must assess risk vs. benefit periodically"
+    ],
+    "monitoring_labs": [
+      {"lab": "Visual field testing (perimetry)", "interval": "Baseline, then every 3 months during treatment", "priority": "critical"},
+      {"lab": "Visual acuity testing", "interval": "Baseline, then every 3 months", "priority": "high"}
+    ],
+    "notes": "Vigabatrin causes permanent bilateral concentric visual field constriction in 30% or more of patients. Vision loss is typically not reversible even after drug discontinuation. In infants with infantile spasms, visual field testing is not possible — ophthalmologic assessment (ERG) recommended. Adults should be weighed off vigabatrin if no meaningful seizure reduction after 3 months."
+  },
+  {
+    "program_name": "Addyi REMS (Flibanserin)",
+    "status": "active",
+    "medications": ["Flibanserin (Addyi)"],
+    "clinical_area": "Women's Health (Hypoactive Sexual Desire Disorder)",
+    "requirement_types": ["PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be certified in Addyi REMS",
+      "Patient must be counseled on: risk of hypotension and syncope with alcohol use",
+      "Patient must be assessed for potential interactions with CYP3A4 inhibitors",
+      "Pharmacy must be certified and must counsel patient at each dispensing"
+    ],
+    "monitoring_labs": [],
+    "notes": "Flibanserin interacts dangerously with alcohol (severe hypotension and syncope). Also interacts with strong/moderate CYP3A4 inhibitors. Indicated only for premenopausal women with acquired, generalized hypoactive sexual desire disorder. Contraindicated with alcohol use, hepatic impairment, and CYP3A4 inhibitors."
+  },
+  {
+    "program_name": "Lotronex REMS (Alosetron)",
+    "status": "active",
+    "medications": ["Alosetron (Lotronex, generic)"],
+    "clinical_area": "Gastroenterology (IBS-D in Women)",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be enrolled in Lotronex Prescribing Program",
+      "Only for women with severe diarrhea-predominant IBS (IBS-D) who have failed conventional therapy",
+      "Patient must sign Patient-Physician Agreement",
+      "Starting dose must be 0.5 mg BID; may increase to 1 mg BID after 4 weeks if needed",
+      "Discontinue immediately if constipation or signs of ischemic colitis develop"
+    ],
+    "monitoring_labs": [],
+    "notes": "Alosetron carries risk of serious GI adverse effects including ischemic colitis and serious complications of constipation, which have resulted in hospitalization, blood transfusion, surgery, and death. Patients should be counseled on warning signs and when to seek immediate medical attention."
+  },
+  {
+    "program_name": "Mycophenolate REMS",
+    "status": "active",
+    "medications": ["Mycophenolate mofetil (CellCept, generic)", "Mycophenolic acid (Myfortic)"],
+    "clinical_area": "Transplant / Rheumatology / Nephrology",
+    "requirement_types": ["PATIENT_COUNSELING", "PREGNANCY_TEST"],
+    "requirements": [
+      "Primarily a communication-based REMS (Medication Guide distribution)",
+      "Female patients of reproductive potential: negative pregnancy test before starting",
+      "Effective contraception required during treatment and for 6 weeks after stopping",
+      "Patient must receive and acknowledge Medication Guide",
+      "Prescriber should counsel on: pregnancy risks, infection risk, lymphoma risk"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test", "interval": "Before initiation", "priority": "critical"},
+      {"lab": "CBC with differential", "interval": "Weekly × first month, twice monthly × months 2-3, then monthly × first year", "priority": "high"},
+      {"lab": "CMP (renal and hepatic function)", "interval": "Periodically", "priority": "standard"}
+    ],
+    "notes": "Mycophenolate is a known teratogen (FDA Pregnancy Category D / Category X in some formulations). First-trimester exposure associated with increased risk of spontaneous abortion and congenital malformations (ear, facial, cardiac, renal). The REMS focuses on pregnancy prevention communication rather than registry enrollment."
+  },
+  {
+    "program_name": "Bosentan REMS (Tracleer)",
+    "status": "active",
+    "medications": ["Bosentan (Tracleer)"],
+    "clinical_area": "Pulmonology / Cardiology (Pulmonary Arterial Hypertension)",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT", "LAB_MONITORING"],
+    "requirements": [
+      "Prescriber and pharmacy must be enrolled",
+      "Female patients of reproductive potential: negative pregnancy test before starting and monthly thereafter",
+      "Effective contraception required during treatment and for 1 month after",
+      "Monthly LFT monitoring: AST/ALT must be checked before and monthly during treatment",
+      "Dispense only through specialty/enrolled pharmacies"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test", "interval": "Monthly (females of reproductive potential)", "priority": "critical"},
+      {"lab": "AST and ALT (liver function)", "interval": "Before treatment, then monthly", "priority": "critical"},
+      {"lab": "Hemoglobin/Hematocrit", "interval": "Baseline, at 1 and 3 months, then quarterly", "priority": "high"}
+    ],
+    "notes": "Bosentan is an endothelin receptor antagonist. Hepatotoxicity risk (elevated aminotransferases) — dose reduction or discontinuation required if AST/ALT > 3× ULN. Also decreases hemoglobin (usually within first few weeks). Known teratogen. Drug interactions: strong CYP3A4 inhibitor — affects cyclosporine, hormonal contraceptives (reduced efficacy), glyburide."
+  },
+  {
+    "program_name": "Ambrisentan REMS (Letairis)",
+    "status": "active",
+    "medications": ["Ambrisentan (Letairis)"],
+    "clinical_area": "Pulmonology / Cardiology (Pulmonary Arterial Hypertension)",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT"],
+    "requirements": [
+      "Prescriber must be enrolled in Letairis REMS (LEAP program)",
+      "Female patients of reproductive potential: negative pregnancy test before starting and monthly thereafter",
+      "Effective contraception required",
+      "Dispense only through certified pharmacies enrolled in LEAP"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test", "interval": "Monthly (females of reproductive potential)", "priority": "critical"},
+      {"lab": "Hemoglobin/Hematocrit", "interval": "Baseline, at 1 month, then periodically", "priority": "high"},
+      {"lab": "LFTs", "interval": "As clinically indicated (lower hepatotoxicity risk than bosentan)", "priority": "standard"}
+    ],
+    "notes": "Ambrisentan is an endothelin receptor antagonist like bosentan but more selective (ETA). Lower hepatotoxicity risk than bosentan — routine monthly LFT monitoring no longer required, but still recommended at baseline. Teratogenic — pregnancy prevention is the primary REMS focus."
+  },
+  {
+    "program_name": "Macitentan REMS (Opsumit)",
+    "status": "active",
+    "medications": ["Macitentan (Opsumit)"],
+    "clinical_area": "Pulmonology / Cardiology (Pulmonary Arterial Hypertension)",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT"],
+    "requirements": [
+      "Prescriber must be enrolled in Opsumit REMS",
+      "Female patients of reproductive potential: negative pregnancy test before starting and monthly thereafter",
+      "Effective contraception required during and for 1 month after treatment",
+      "Dispense only through certified pharmacies"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test", "interval": "Monthly (females of reproductive potential)", "priority": "critical"},
+      {"lab": "Hemoglobin/Hematocrit", "interval": "Baseline, then as clinically indicated", "priority": "standard"},
+      {"lab": "LFTs", "interval": "As clinically indicated", "priority": "standard"}
+    ],
+    "notes": "Macitentan is a dual endothelin receptor antagonist. Teratogenic — contraindicated in pregnancy. Less hepatotoxicity than bosentan. Decreases hemoglobin — monitor if anemia develops. Do not use with strong CYP3A4 inhibitors."
+  },
+  {
+    "program_name": "Mifepristone REMS (Mifeprex)",
+    "status": "active",
+    "medications": ["Mifepristone 200 mg (Mifeprex) — for medical termination of pregnancy"],
+    "clinical_area": "Obstetrics / Reproductive Health",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be certified in Mifeprex REMS",
+      "Must be able to date pregnancies accurately (ultrasound if needed)",
+      "Must be able to provide or arrange for surgical intervention if incomplete termination or emergency",
+      "Patient must sign Patient Agreement Form",
+      "Dispensed directly to patient by or under supervision of certified prescriber — not through retail pharmacies",
+      "Follow-up assessment required within 7-14 days to confirm complete termination"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy confirmation and gestational dating", "interval": "Before treatment", "priority": "critical"},
+      {"lab": "Rh typing", "interval": "Before treatment", "priority": "high"},
+      {"lab": "Follow-up assessment (clinical exam or serum hCG)", "interval": "7-14 days after mifepristone administration", "priority": "critical"}
+    ],
+    "notes": "Mifeprex is approved for termination of intrauterine pregnancy through 70 days (10 weeks) gestation. Used in combination with misoprostol. Risk of serious infection (including fatal cases of Clostridium sordellii). Rh testing and Rh immunoglobulin may be needed. This REMS is separate from the Korlym REMS for mifepristone 300 mg used in Cushing syndrome."
+  },
+  {
+    "program_name": "Korlym REMS (Mifepristone for Cushing Syndrome)",
+    "status": "active",
+    "medications": ["Mifepristone 300 mg (Korlym) — for Cushing syndrome hyperglycemia"],
+    "clinical_area": "Endocrinology",
+    "requirement_types": ["PREGNANCY_TEST", "REGISTRY_ENROLLMENT", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be certified in Korlym REMS",
+      "Female patients: negative pregnancy test before starting, MUST use non-hormonal contraception",
+      "NOTE: Mifepristone blocks progesterone — hormonal contraception will NOT work",
+      "Pregnancy testing before each prescription refill",
+      "Dispense only from certified pharmacy",
+      "Patient must sign Patient-Prescriber Agreement"
+    ],
+    "monitoring_labs": [
+      {"lab": "Pregnancy test", "interval": "Before treatment and before each refill", "priority": "critical"},
+      {"lab": "Potassium level", "interval": "Before treatment, within 1-2 weeks, and periodically", "priority": "high"},
+      {"lab": "TSH / Free T4", "interval": "Baseline, then as clinically indicated", "priority": "standard"},
+      {"lab": "Blood glucose", "interval": "Regularly during treatment", "priority": "high"}
+    ],
+    "notes": "Korlym mifepristone 300mg is DIFFERENT from Mifeprex mifepristone 200mg. Korlym is for endogenous Cushing syndrome with hyperglycemia/glucose intolerance. It blocks cortisol receptors — adrenal insufficiency can occur. Key interaction: mifepristone blocks progesterone, so hormonal contraception is ineffective and pregnancy tests may be unreliable. Use non-hormonal contraception ONLY."
+  },
+  {
+    "program_name": "Juxtapid REMS (Lomitapide)",
+    "status": "active",
+    "medications": ["Lomitapide (Juxtapid)"],
+    "clinical_area": "Cardiology / Lipidology (Homozygous Familial Hypercholesterolemia)",
+    "requirement_types": ["REGISTRY_ENROLLMENT", "LAB_MONITORING", "PATIENT_COUNSELING"],
+    "requirements": [
+      "Prescriber must be certified in Juxtapid REMS",
+      "Only for homozygous familial hypercholesterolemia (HoFH) — NOT for general LDL lowering",
+      "Patient must be enrolled in Juxtapid REMS registry",
+      "Liver function monitoring: LFTs before treatment, then per schedule",
+      "Advise patients to take daily vitamin E and essential fatty acid supplements"
+    ],
+    "monitoring_labs": [
+      {"lab": "ALT, AST, alkaline phosphatase, total bilirubin", "interval": "Before treatment, then monthly × first year, then every 3 months", "priority": "critical"},
+      {"lab": "Hepatic fat assessment (MRI or CT)", "interval": "Before treatment, annually, then at discontinuation", "priority": "high"}
+    ],
+    "notes": "Lomitapide inhibits microsomal triglyceride transfer protein (MTP). Causes hepatic fat accumulation (steatosis) — long-term consequences unknown. Hepatotoxicity risk — dose adjustment or discontinuation required if ALT > 5× ULN. Contraindicated in pregnancy and with moderate/strong CYP3A4 inhibitors. Very restricted patient population (HoFH only)."
+  },
+  {
+    "program_name": "Entereg REMS (Alvimopan)",
+    "status": "active",
+    "medications": ["Alvimopan (Entereg)"],
+    "clinical_area": "Surgery / GI (Post-operative Ileus)",
+    "requirement_types": ["REGISTRY_ENROLLMENT"],
+    "requirements": [
+      "Hospital must be enrolled in Entereg REMS",
+      "HOSPITAL USE ONLY — patients must NOT receive more than 15 doses",
+      "NOT available through outpatient pharmacies",
+      "Maximum treatment duration: 7 days (in-hospital)",
+      "Not for patients who have received therapeutic doses of opioids for > 7 consecutive days before surgery"
+    ],
+    "monitoring_labs": [],
+    "notes": "Alvimopan is a peripherally acting mu-opioid receptor antagonist. Used to accelerate GI recovery after bowel resection surgery. Long-term use (beyond the surgical admission) was associated with higher risk of myocardial infarction in clinical trials — hence the strict hospital-only restriction."
+  }
+]

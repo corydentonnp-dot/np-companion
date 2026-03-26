@@ -1,0 +1,76 @@
+[
+  {
+    "version": "1.1.5",
+    "date": "2026-03-25",
+    "highlights": [
+      "Patient chart header redesigned — patient name, MRN, age, and DOB are now prominently displayed at the top",
+      "Medications and Diagnoses widgets now use tab-style filters (Active / Inactive / All) instead of dropdowns",
+      "Click a medication status badge to inactivate it — a 5-second undo window lets you cancel the change",
+      "Double-click a medication's dose or frequency to edit it directly in the table",
+      "ICD-10 code lookup now shows results as you type, with local billing codes matching instantly",
+      "Edited medications show a warning icon so you know which values differ from the original EHR data"
+    ]
+  },
+  {
+    "version": "1.1.4",
+    "date": "2026-03-23",
+    "highlights": [
+      "New Admin Rules Registry — see ALL monitoring and care gap rules in one unified, searchable page",
+      "Trigger testing: configure a synthetic patient and test whether any rule would fire",
+      "Filter monitoring rules by type, source, priority, and active status",
+      "Toggle rules active/inactive directly from the registry"
+    ]
+  },
+  {
+    "version": "1.1.3",
+    "date": "2026-03-23",
+    "highlights": [
+      "New Medication Monitoring Catalog in Admin — browse all monitored medications, override intervals, and track coverage gaps",
+      "Monitoring Calendar now has a 'Why?' button explaining why each test is scheduled",
+      "New medications are automatically added to the catalog when clinical summaries are imported",
+      "Scenario testing for monitoring rules — verify accuracy with built-in test cases"
+    ]
+  },
+  {
+    "version": "1.1.2",
+    "date": "2026-06-15",
+    "highlights": [
+      "VSAC dynamic value sets for billing code validation",
+      "Pre-visit billing overnight job with dashboard badges",
+      "Patient education → delayed message integration",
+      "Cache staleness indicators on API-powered pages",
+      "Configurable spell check confidence threshold"
+    ]
+  },
+  {
+    "version": "1.1.1",
+    "date": "2026-05-20",
+    "highlights": [
+      "16 billing rule categories with provider toggle controls",
+      "5 clinical intelligence widgets on patient chart",
+      "Care gap → billing bridge integration",
+      "Drug recall scanning with Pushover alerts"
+    ]
+  },
+  {
+    "version": "1.1.0",
+    "date": "2026-04-10",
+    "highlights": [
+      "Full API layer: RxNorm, OpenFDA, NLM, UMLS, ICD-10",
+      "Medication reference page with FDA label data",
+      "Clinical spell check with fuzzy matching",
+      "Lab tracking with trend visualization"
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-03-01",
+    "highlights": [
+      "Initial release: MRN reader, inbox monitor, scheduler",
+      "Patient chart viewer with CDA XML parsing",
+      "Time logging with idle detection",
+      "On-call note management",
+      "Pushover notification integration"
+    ]
+  }
+]

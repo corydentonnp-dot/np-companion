@@ -2,11 +2,22 @@
 # File location in project: carecompanion/.gitignore (project root, alongside app.py and config.py)
 # config.py is excluded because it contains sensitive machine-specific credentials and secrets
 
-# Sensitive config
-config.py
-
-# Runtime data (database, session files, backups)
-data/
+# Runtime data -- selective exclusions
+# SQLite databases are binary and cause unsolvable merge conflicts -- always exclude
+data/*.db
+data/*.sqlite
+# Machine-specific runtime state
+data/active_user.json
+data/active_chart.json
+# Noisy / large output directories
+data/logs/
+data/backups/
+data/clinical_summaries/
+# Log files inside data/
+data/server.log
+data/server_test.log
+data/test_results.txt
+# JSON reference files (help_guide, rems_database, etc.) ARE tracked -- they sync between computers
 
 # Python cache and compiled files
 __pycache__/
@@ -25,7 +36,7 @@ venv/
 # Session cookies / serialized data
 *.pkl
 
-# Log files
+# Log files (top-level and nested)
 *.log
 
 # Generated output

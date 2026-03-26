@@ -1,0 +1,967 @@
+{
+  "categories": [
+    {
+      "id": "daily-workflow",
+      "name": "Daily Workflow",
+      "icon": "☀",
+      "description": "Tools for starting your day, preparing for patients, and managing your schedule."
+    },
+    {
+      "id": "patient-care",
+      "name": "Patient Care",
+      "icon": "🩺",
+      "description": "Patient chart access, care gap tracking, lab monitoring, and clinical decision support."
+    },
+    {
+      "id": "clinical-tools",
+      "name": "Clinical Tools",
+      "icon": "🔧",
+      "description": "Calculators, screening tools, medication references, and documentation helpers."
+    },
+    {
+      "id": "billing-coding",
+      "name": "Billing & Coding",
+      "icon": "💰",
+      "description": "Visit billing, coding assistance, and revenue tracking."
+    },
+    {
+      "id": "communication",
+      "name": "Communication",
+      "icon": "💬",
+      "description": "Inbox, messages, on-call management, and referral coordination."
+    },
+    {
+      "id": "references",
+      "name": "References & Resources",
+      "icon": "📚",
+      "description": "Clinical references, REMS database, reportable disease guide, and external resources."
+    },
+    {
+      "id": "admin",
+      "name": "Settings & Administration",
+      "icon": "⚙",
+      "description": "Account settings, practice configuration, user management, and system administration."
+    },
+    {
+      "id": "ui-ux",
+      "name": "UI & UX Enhancements",
+      "description": "Phase 44 interface improvements: split view, floating widgets, smart bookmarks, and more."
+    }
+  ],
+  "features": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard",
+      "category": "daily-workflow",
+      "url": "/dashboard",
+      "description": "Your home screen showing a snapshot of today's key information: recent patients, pending tasks, care gap alerts, upcoming ticklers, and quick-access links to your most-used features.",
+      "how_it_works": "The dashboard automatically refreshes when you log in. Widgets display real-time data pulled from your patient roster, care gaps, inbox, and other modules. Click any card or link to jump directly to that feature.",
+      "steps": [
+        "Log in to CareCompanion — the dashboard loads automatically.",
+        "Review the summary cards for any items needing attention (care gaps, pending orders, overdue ticklers).",
+        "Click any card to jump directly to the related feature.",
+        "Use the sidebar or top menu to navigate to other areas."
+      ],
+      "tips": [
+        "The dashboard is your landing page after every login.",
+        "Notification badges on sidebar items update in real time."
+      ]
+    },
+    {
+      "id": "morning-briefing",
+      "name": "Morning Briefing",
+      "category": "daily-workflow",
+      "url": "/briefing",
+      "description": "A comprehensive pre-clinic summary that pulls together your day's schedule, patient care gaps, pending labs, billing opportunities, and action items — all in one place so you can prepare before your first patient.",
+      "how_it_works": "The morning briefing aggregates data from your schedule, care gap engine, lab tracking, and billing modules. It highlights patients with open care gaps, overdue screenings, flagged lab results, and billing opportunities for the day.",
+      "steps": [
+        "Open Morning Briefing from the View menu or sidebar.",
+        "Review the schedule section to see today's patients.",
+        "Check the 'Attention Needed' section for patients with open care gaps or flagged results.",
+        "Review billing opportunities for potential revenue capture.",
+        "Use the briefing to plan your approach for each patient visit."
+      ],
+      "tips": [
+        "Best used first thing in the morning before your first patient.",
+        "The commute mode version is a simplified view designed for quick review on mobile."
+      ]
+    },
+    {
+      "id": "daily-summary",
+      "name": "Daily Provider Summary",
+      "category": "daily-workflow",
+      "url": "/daily-summary",
+      "description": "A printable one-page (front and back) summary listing each scheduled patient with their appointment time, name, DOB, MRN, visit type, open care gaps, labs due, flagged results, and REMS medication alerts. Designed to be carried during clinic for at-a-glance reference.",
+      "how_it_works": "The summary pulls today's schedule and cross-references each patient against care gaps, recent lab results (last 90 days), monitoring schedules (due within 30 days), and active REMS program entries. Color-coded borders highlight patients needing extra attention.",
+      "steps": [
+        "Navigate to Daily Summary (View menu or type 'Daily Summary' in the Command Palette with Ctrl+K).",
+        "The current date's summary loads automatically. Use the date picker to view a different day.",
+        "Review each patient card — care gaps show as colored tags, flagged labs appear with warning icons.",
+        "Click 'Print' to generate a compact printable version optimized for one page front and back.",
+        "Carry the printout during clinic for quick reference between patients."
+      ],
+      "tips": [
+        "Red borders indicate patients with abnormal or critical lab results.",
+        "Purple borders indicate patients on REMS medications requiring monitoring.",
+        "Blue borders indicate new patients.",
+        "The summary bar at the top shows total patients, care gaps, flagged results, and REMS alerts."
+      ]
+    },
+    {
+      "id": "rooming-sheet",
+      "name": "MA/Rooming Staff Sheet",
+      "category": "daily-workflow",
+      "url": "/daily-summary/rooming",
+      "description": "A printable sheet for medical assistants and rooming staff that lists each patient with specific rooming tasks, screening tools to administer, and forms to prepare based on their visit type and open care gaps.",
+      "how_it_works": "For each scheduled patient, the system determines which screening instruments are needed based on their open care gaps (e.g., PHQ-9 for depression screening, AUDIT-C for alcohol screening) and which rooming tasks apply based on the visit type (e.g., advance directives review for annual wellness visits). Age-based screening additions are also included automatically.",
+      "steps": [
+        "Navigate to Daily Summary, then click 'Rooming Sheet' or go directly to the rooming URL.",
+        "Review the per-patient cards showing rooming tasks (left) and screening instruments (right).",
+        "Click 'Print' to generate the printable version.",
+        "Distribute to MA/rooming staff before clinic begins.",
+        "Staff can check off tasks as completed during rooming."
+      ],
+      "tips": [
+        "Screening tools are mapped to care gaps — PHQ-2/PHQ-9 for depression, GAD-7 for anxiety, AUDIT-C for alcohol, DAST-10 for substance use, etc.",
+        "Visit type determines base rooming tasks — Annual Wellness Visits include HRA forms, immunization review, and advance directive discussion.",
+        "Age-based additions are automatic — patients 65+ get fall risk and cognitive screening."
+      ]
+    },
+    {
+      "id": "commute-briefing",
+      "name": "Commute Mode",
+      "category": "daily-workflow",
+      "url": "/briefing/commute",
+      "description": "A simplified, mobile-friendly version of the Morning Briefing designed for quick review during your commute. Shows key highlights without full detail.",
+      "how_it_works": "Displays the same data as the Morning Briefing but in a condensed, easy-to-scan format optimized for smaller screens.",
+      "steps": [
+        "Open Commute Mode from the View menu.",
+        "Scroll through the condensed view of today's schedule and alerts.",
+        "Tap any item for more detail."
+      ]
+    },
+    {
+      "id": "patient-chart",
+      "name": "Patient Chart",
+      "category": "patient-care",
+      "url": "/patient/<mrn>",
+      "description": "The central hub for each patient's clinical information. View demographics, diagnoses, medications, lab results, care gaps, specialist referrals, risk scores, monitoring schedules, and clinical notes — all in one place. Features Chrome-style tabs for navigation and inline editing for medications.",
+      "how_it_works": "When you open a patient chart (by searching for a patient or clicking from a list), the system loads their data from the database. Widgets on the chart page show different aspects of the patient's record. You can customize the widget layout, filter medications and diagnoses by status, and edit medication details directly in the table.",
+      "steps": [
+        "Search for a patient using the search bar at the top of any page, or click a patient name from any list.",
+        "The patient chart loads with configurable widgets for demographics, problems, medications, labs, care gaps, and more.",
+        "Use the Active/Inactive/All tabs on the Medications and Diagnoses widgets to filter by status.",
+        "Double-click a medication's dose or frequency to edit it inline. Press Enter to save or Escape to cancel.",
+        "Click a medication's status badge to inactivate it — you have 5 seconds to click 'undo' before it takes effect.",
+        "Use the ICD-10 Lookup button to search for diagnosis codes. Start typing and results appear automatically.",
+        "Use the gear icon in the header to customize widget layout."
+      ],
+      "tips": [
+        "Widget layout is saved per patient — arrange widgets in the order most useful for that patient's care.",
+        "Risk scores and clinical calculators are accessible from the patient chart.",
+        "Lab results are color-coded: normal (green), abnormal (yellow), critical (red).",
+        "Edited medications show a yellow warning icon to indicate they differ from the original EHR data.",
+        "ICD-10 search matches local billing priority codes instantly, then searches the NIH database for additional results."
+      ]
+    },
+    {
+      "id": "patient-roster",
+      "name": "My Patients",
+      "category": "patient-care",
+      "url": "/patients",
+      "description": "Your full patient roster with search and filter capabilities. See all patients assigned to you, with quick access to their charts, care gaps, and recent activity.",
+      "how_it_works": "Displays all patients in the system with search, sort, and filter options. Click any patient to open their full chart.",
+      "steps": [
+        "Click 'My Patients' in the sidebar.",
+        "Use the search bar to find a specific patient by name or MRN.",
+        "Click a patient row to open their chart.",
+        "Use filters to narrow the list by criteria like care gap status or visit date."
+      ]
+    },
+    {
+      "id": "care-gaps",
+      "name": "Care Gaps",
+      "category": "patient-care",
+      "url": "/caregap",
+      "description": "Tracks preventive care and screening gaps across your patient panel. Shows which patients are due for screenings, vaccinations, labs, and other quality measures — helping ensure nothing falls through the cracks.",
+      "how_it_works": "The care gap engine continuously evaluates each patient against a configurable set of rules (based on age, sex, diagnoses, and last completion date). Gaps are categorized by type and urgency. You can address gaps directly from this view, mark them as completed, or dismiss them with a documented reason.",
+      "steps": [
+        "Open Care Gaps from the sidebar.",
+        "Review the list of patients with open gaps, sorted by priority.",
+        "Click a patient to see their specific gaps and the recommended actions.",
+        "Mark a gap as 'Addressed' when you've completed the screening or intervention.",
+        "Use 'Print Handout' to generate a patient-facing summary of their care gaps."
+      ],
+      "tips": [
+        "Care gap rules are configurable by an admin under Admin > Care Gap Rules.",
+        "Dismissing a care gap requires selecting a reason — this is tracked for audit purposes.",
+        "The care gap print handout is designed to give to patients during their visit."
+      ]
+    },
+    {
+      "id": "preventive-gaps",
+      "name": "Preventive Gaps",
+      "category": "patient-care",
+      "url": "/care-gaps/preventive",
+      "description": "A focused view of preventive care gaps across your entire patient panel, organized by screening type. Useful for population health management and quality measure tracking.",
+      "how_it_works": "Aggregates care gap data across all patients and groups them by preventive measure type, giving you a bird's-eye view of your panel's compliance with preventive care standards."
+    },
+    {
+      "id": "lab-tracking",
+      "name": "Lab Track",
+      "category": "patient-care",
+      "url": "/labtrack",
+      "description": "Tracks pending and completed lab orders across your patient panel. See which labs have been ordered, which results are back, and which are overdue — helping ensure timely follow-up on all lab work.",
+      "how_it_works": "Lab Track pulls lab order and result data, showing a timeline of each patient's lab work. Overdue labs are flagged, and new results are highlighted for review.",
+      "steps": [
+        "Open Lab Track from the sidebar.",
+        "Review the list of patients with pending or recent lab work.",
+        "Click a patient to see their full lab history.",
+        "Flag results that need follow-up or mark as reviewed."
+      ]
+    },
+    {
+      "id": "monitoring-calendar",
+      "name": "Monitoring Calendar",
+      "category": "patient-care",
+      "url": "/monitoring/calendar",
+      "description": "A calendar view of all scheduled monitoring activities — lab draws, follow-up visits, medication checks, and other recurring clinical tasks. Helps you see what's coming up so nothing gets missed.",
+      "how_it_works": "The monitoring calendar aggregates all active monitoring schedules across your patients. Each entry shows the patient, the test or task due, the due date, and the priority level. Overdue items are highlighted. Click the Why? button on any row to see exactly why that monitoring is scheduled — including the rule source, interval, and any overrides.",
+      "steps": [
+        "Open Monitoring Calendar from the sidebar.",
+        "Review the calendar view showing upcoming monitoring due dates.",
+        "Click any entry to see patient details and the specific monitoring requirement.",
+        "Click the 'Why?' button on any row to see the rule explanation, interval, and override details.",
+        "Use the calendar to plan your week's monitoring follow-ups."
+      ]
+    },
+    {
+      "id": "orders",
+      "name": "Orders",
+      "category": "patient-care",
+      "url": "/orders",
+      "description": "Manage and track clinical orders. View pending, active, and completed orders across your patient panel.",
+      "how_it_works": "The orders module shows all clinical orders organized by status. You can track where each order is in its lifecycle, from creation through completion."
+    },
+    {
+      "id": "clinical-calculators",
+      "name": "Clinical Calculators",
+      "category": "clinical-tools",
+      "url": "/calculators",
+      "description": "A library of validated clinical calculators for risk assessment, dosing, and clinical decision support. Includes tools like CHA₂DS₂-VASc, MELD, Wells criteria, ASCVD risk, BMI, CrCl, and many more.",
+      "how_it_works": "Select a calculator from the library, enter the required clinical values, and get an instant result with interpretation guidance. Results can be saved to a patient's chart for documentation. Score history is tracked over time.",
+      "steps": [
+        "Open Clinical Calculators from the References menu or use Ctrl+Shift+K.",
+        "Browse or search for the calculator you need.",
+        "Enter the clinical values in the form.",
+        "Review the calculated result and clinical interpretation.",
+        "If viewing from a patient chart, the result is automatically saved to their score history."
+      ],
+      "tips": [
+        "Calculators are also accessible from each patient's chart under 'Risk Tools'.",
+        "Score history lets you track trends over time (e.g., worsening MELD score).",
+        "Some calculators can auto-populate values from the patient's chart data."
+      ]
+    },
+    {
+      "id": "med-reference",
+      "name": "Medication Reference",
+      "category": "clinical-tools",
+      "url": "/medref",
+      "description": "A local medication reference database with drug information, interactions, dosing guidelines, and formulary notes. Includes a guideline review feature to flag medications that may need reassessment.",
+      "how_it_works": "Search for any medication to see its key information. The guideline review tab highlights medications in your patients' records that may need updating based on current guidelines.",
+      "steps": [
+        "Open Med Reference from the Tools menu.",
+        "Search for a medication by name.",
+        "Review drug details including dosing, interactions, and formulary notes.",
+        "Check the Guideline Review section for medications that may need reassessment."
+      ]
+    },
+    {
+      "id": "note-reformatter",
+      "name": "Note Reformatter",
+      "category": "clinical-tools",
+      "url": "/reformatter",
+      "description": "Takes unstructured or poorly formatted clinical notes and reformats them into a clean, standardized SOAP or visit note format. Useful for cleaning up imported notes or standardizing documentation.",
+      "how_it_works": "Paste in a clinical note and the reformatter parses the content, identifies sections (subjective, objective, assessment, plan), and outputs a clean, organized version.",
+      "steps": [
+        "Open Note Reformatter from the Tools menu.",
+        "Paste the clinical note text into the input area.",
+        "Select the desired output format.",
+        "Click 'Reformat' to process the note.",
+        "Review and copy the reformatted output."
+      ]
+    },
+    {
+      "id": "cs-tracker",
+      "name": "Controlled Substance Tracker",
+      "category": "clinical-tools",
+      "url": "/cs-tracker",
+      "description": "Tracks controlled substance prescriptions, PDMP checks, urine drug screens (UDS), and treatment agreements for patients on controlled substances. Helps maintain compliance with prescribing regulations.",
+      "how_it_works": "For each patient on controlled substances, the tracker monitors: last PDMP check date, UDS compliance, treatment agreement status, and prescription counts. Alerts appear when checks are overdue.",
+      "steps": [
+        "Open CS Tracker from the Tools menu.",
+        "Review the patient list showing controlled substance prescribing status.",
+        "Check for overdue PDMP checks or UDS tests.",
+        "Click a patient to record a PDMP check, UDS result, or update their status.",
+        "Use the calculator to check morphine milligram equivalents (MME)."
+      ],
+      "tips": [
+        "PDMP checks and UDS results are date-stamped for compliance tracking.",
+        "The MME calculator helps assess total opioid burden.",
+        "Deactivate patients who are no longer on controlled substances."
+      ]
+    },
+    {
+      "id": "patient-generator",
+      "name": "Patient Generator",
+      "category": "clinical-tools",
+      "url": "/patient-generator",
+      "description": "Creates realistic test patient records for training, demonstration, and testing purposes. Generated patients include demographics, diagnoses, medications, and lab results.",
+      "how_it_works": "Configure the parameters (age range, conditions, medication count) and generate one or more test patients with realistic clinical data. Test patients are clearly flagged and can be deleted when no longer needed."
+    },
+    {
+      "id": "dot-phrases",
+      "name": "Dot Phrases",
+      "category": "clinical-tools",
+      "url": "/tools/dot-phrases",
+      "description": "A library of reusable text snippets (dot phrases) for common documentation patterns. Type a shortcut to insert pre-written text into notes, saving time on repetitive documentation.",
+      "how_it_works": "Create and manage your personal library of text snippets. Each phrase has a shortcut trigger (like '.hpi' or '.pe') and the full text it expands to. Phrases can be shared with other users or imported/exported.",
+      "steps": [
+        "Open Dot Phrases from the Tools menu.",
+        "Browse existing phrases or create a new one.",
+        "To create: enter a shortcut name, the full text, and optionally a category.",
+        "Use the export/import feature to share phrases with colleagues."
+      ],
+      "tips": [
+        "Organize phrases by category for easier browsing.",
+        "Usage counts help track which phrases you use most.",
+        "Shared phrases appear in all users' libraries."
+      ]
+    },
+    {
+      "id": "macros",
+      "name": "Macro Library",
+      "category": "clinical-tools",
+      "url": "/tools/macros",
+      "description": "Record and replay sequences of actions to automate repetitive tasks. Macros can capture multi-step workflows and replay them with a single click.",
+      "how_it_works": "Use the macro recorder to capture a sequence of actions (clicks, form entries, navigation steps). Save the recording as a named macro. Run it later to replay the entire sequence automatically.",
+      "steps": [
+        "Open Macro Library from the Tools menu.",
+        "Click 'Record New Macro' to start recording.",
+        "Perform the actions you want to automate.",
+        "Stop recording and name your macro.",
+        "Run the macro anytime to replay the recorded steps."
+      ],
+      "tips": [
+        "Preview a macro before running it to verify the steps.",
+        "Macros can be exported and shared with other users.",
+        "Duplicate a macro to create variations without re-recording."
+      ]
+    },
+    {
+      "id": "result-templates",
+      "name": "Result Templates",
+      "category": "clinical-tools",
+      "url": "/tools/templates",
+      "description": "Pre-built templates for common result communications (normal labs, abnormal findings, referral results). Helps standardize how results are communicated to patients.",
+      "how_it_works": "Select a template, fill in the patient-specific values, and generate a standardized result communication. Templates can be customized, shared, and version-tracked.",
+      "steps": [
+        "Open Result Templates from the Tools menu.",
+        "Select a template category (e.g., normal labs, abnormal results).",
+        "Choose the specific template and fill in patient-specific details.",
+        "Review the generated communication and send or save it."
+      ]
+    },
+    {
+      "id": "timer",
+      "name": "Visit Timer",
+      "category": "billing-coding",
+      "url": "/timer",
+      "description": "Tracks time spent with patients for time-based billing codes. Automatically logs start and stop times, calculates total face-to-face and non-face-to-face time, and suggests the appropriate billing level.",
+      "how_it_works": "Start the timer when you begin a patient encounter. The timer tracks elapsed time and categorizes it into face-to-face vs. total time. When you stop the timer, it suggests the appropriate E/M billing code based on time thresholds.",
+      "steps": [
+        "Open the Timer from the sidebar.",
+        "Select or search for the patient.",
+        "Click 'Start' when the encounter begins.",
+        "Click 'Stop' when the encounter ends.",
+        "Review the suggested billing code and adjust if needed.",
+        "Confirm to log the billing entry."
+      ],
+      "tips": [
+        "The timer tracks both face-to-face and total time for accurate billing.",
+        "Time thresholds follow current CMS E/M guidelines.",
+        "You can pause and resume if the encounter is interrupted."
+      ]
+    },
+    {
+      "id": "coding-helper",
+      "name": "Coding Helper",
+      "category": "billing-coding",
+      "url": "/coding",
+      "description": "Search for ICD-10 codes, view code specificity requirements, create code pairs, and save frequently used codes. Includes a specificity guide to help capture the most specific code available.",
+      "how_it_works": "Search for diagnoses by keyword or code. The tool shows matching ICD-10 codes with their descriptions, specificity level, and any related codes. You can save favorites and create commonly paired code combinations.",
+      "steps": [
+        "Open Coding Helper from the Tools menu.",
+        "Search for a diagnosis by keyword or ICD-10 code.",
+        "Review the matching codes and select the most specific one.",
+        "Click the star icon to save as a favorite for quick access.",
+        "Use the Specificity tab to check if a more specific code is available."
+      ],
+      "tips": [
+        "Always select the most specific code available — the specificity guide helps identify when a more precise code exists.",
+        "Code pairs let you pre-link commonly associated diagnoses for faster entry.",
+        "Favorite codes appear at the top of your search results."
+      ]
+    },
+    {
+      "id": "bonus-tracker",
+      "name": "Bonus Tracker",
+      "category": "billing-coding",
+      "url": "/bonus",
+      "description": "Tracks your production metrics against bonus thresholds. See your current production, projected trajectory, and what's needed to reach your next bonus tier.",
+      "how_it_works": "The bonus tracker pulls billing data and compares it against configurable bonus thresholds. A projection algorithm estimates your likely production based on current pace and remaining workdays.",
+      "steps": [
+        "Open Bonus Tracker from the sidebar.",
+        "Review your current production total and the next threshold.",
+        "Check the projection to see if you're on pace.",
+        "Use the calibration tool to fine-tune the bonus formula to match your contract."
+      ]
+    },
+    {
+      "id": "billing-phrases",
+      "name": "Billing Phrases",
+      "category": "billing-coding",
+      "url": "/settings/phrases",
+      "description": "Pre-built documentation phrases that support billing justification. Quick-insert phrases for medical decision making, time documentation, and other billing-relevant note elements."
+    },
+    {
+      "id": "campaigns",
+      "name": "Revenue Campaigns",
+      "category": "billing-coding",
+      "url": "/campaigns",
+      "description": "Create and track revenue optimization campaigns targeting specific billing opportunities (e.g., AWV completion drive, chronic care management enrollment). See ROI projections and progress toward goals.",
+      "how_it_works": "Define campaign targets, track participating patients, and measure the revenue impact over time. The system ranks campaigns by projected ROI to help prioritize efforts."
+    },
+    {
+      "id": "metrics",
+      "name": "Practice Metrics",
+      "category": "billing-coding",
+      "url": "/metrics",
+      "description": "Comprehensive practice analytics showing patient volumes, billing trends, care gap closure rates, and other key performance indicators. Includes weekly summary reports.",
+      "how_it_works": "Metrics aggregate data across all modules to produce charts and summary statistics. Weekly reports compare current performance to previous periods."
+    },
+    {
+      "id": "inbox",
+      "name": "Inbox",
+      "category": "communication",
+      "url": "/inbox",
+      "description": "Your clinical message inbox. View and manage patient messages, inter-office communications, and system notifications in one place.",
+      "how_it_works": "Messages are organized by type and priority. Unread messages appear at the top with visual indicators. Click a message to read, reply, or take action."
+    },
+    {
+      "id": "messages",
+      "name": "Delayed Messages",
+      "category": "communication",
+      "url": "/messages",
+      "description": "Schedule messages to be sent at a future date and time. Useful for follow-up reminders, appointment confirmations, or communications that need to go out at a specific time.",
+      "how_it_works": "Compose a message, set the delivery date and time, and the system queues it for automatic delivery at the scheduled time."
+    },
+    {
+      "id": "oncall",
+      "name": "On-Call Manager",
+      "category": "communication",
+      "url": "/oncall",
+      "description": "Manage on-call patient encounters, callbacks, and handoffs. Track after-hours calls, document dispositions, and generate handoff summaries for the next provider.",
+      "how_it_works": "Create on-call notes for each after-hours encounter. Track callback status, document the clinical situation and disposition, and generate a structured handoff report for the incoming provider.",
+      "steps": [
+        "Open On-Call from the sidebar (the badge shows pending callback count).",
+        "Click 'New' to create an on-call note for a new encounter.",
+        "Fill in the patient information, clinical situation, and your assessment.",
+        "Track callback status — mark callbacks as completed when done.",
+        "At shift end, generate a handoff summary for the next on-call provider.",
+        "Share the handoff via a secure link or print."
+      ],
+      "tips": [
+        "The pending callback badge on the sidebar updates in real time.",
+        "Handoff links expire after a set time for security.",
+        "Export individual on-call notes for your records."
+      ]
+    },
+    {
+      "id": "tickler",
+      "name": "Tickler Reminders",
+      "category": "communication",
+      "url": "/tickler",
+      "description": "A reminder system for clinical follow-ups that don't fit into the standard monitoring calendar. Set custom reminders for specific dates — 'call patient about MRI results next Tuesday', 'recheck potassium in 3 days', etc.",
+      "how_it_works": "Create a tickler with a patient, date, and description. The system notifies you on the due date. Overdue ticklers escalate in visibility. Complete or snooze ticklers as needed.",
+      "steps": [
+        "Open Tickler from the Tools menu.",
+        "Click 'Add Reminder' to create a new tickler.",
+        "Enter the patient, due date, and a description of what needs to happen.",
+        "Review your active ticklers — overdue items appear first.",
+        "Mark as complete when done, or snooze to a later date."
+      ]
+    },
+    {
+      "id": "referrals",
+      "name": "Referral Tracker",
+      "category": "communication",
+      "url": "/referral",
+      "description": "Track outgoing referrals from creation through consultation receipt. See which referrals are pending, which consultations have been received, and which need follow-up.",
+      "how_it_works": "Generate a referral, track its status, and mark it when the consultation report is received. Pending referrals that haven't been returned are flagged for follow-up.",
+      "steps": [
+        "Open Referral Tracker from the Tools menu.",
+        "Click 'Generate Referral' to create a new one.",
+        "Fill in the specialist, reason for referral, and clinical details.",
+        "Track the referral status — pending, sent, received.",
+        "Mark as received when the consultation report comes back."
+      ]
+    },
+    {
+      "id": "prior-auth",
+      "name": "Prior Authorization Tool",
+      "category": "communication",
+      "url": "/pa",
+      "description": "Generate, track, and manage prior authorization requests. Create PA letters from templates, track approval status, and manage appeals for denied authorizations.",
+      "how_it_works": "Select a PA template (or start from scratch), fill in the clinical justification, and generate a formal PA letter. Track the PA through submission, pending, approved, or denied status. If denied, use the appeal workflow.",
+      "steps": [
+        "Open PA Tool from the Tools menu.",
+        "Click 'Generate PA' to start a new prior authorization.",
+        "Select the medication or procedure requiring authorization.",
+        "Fill in the clinical justification and supporting documentation.",
+        "Generate the PA letter and submit to the payer.",
+        "Track the status and initiate an appeal if denied."
+      ],
+      "tips": [
+        "The PA Library stores previously used templates for reuse.",
+        "Share successful PA templates with your team.",
+        "Appeal letters are pre-populated with the original clinical justification."
+      ]
+    },
+    {
+      "id": "notifications",
+      "name": "Notifications",
+      "category": "communication",
+      "url": "/notifications",
+      "description": "View and manage all system notifications. Notifications are generated by various modules when items need your attention — overdue tasks, new results, care gap alerts, and system messages.",
+      "how_it_works": "Notifications are prioritized (P1 critical, P2 standard, P3 informational). P1 notifications require acknowledgment. All notifications can be marked as read individually or in bulk.",
+      "tips": [
+        "The notification bell in the header shows unread count.",
+        "P1 (critical) notifications appear prominently and require acknowledgment.",
+        "Configure notification preferences in Settings to control what generates alerts."
+      ]
+    },
+    {
+      "id": "eod-checker",
+      "name": "End-of-Day Checker",
+      "category": "daily-workflow",
+      "url": "/tools/eod",
+      "description": "A checklist to run before leaving for the day. Verifies that all of today's patients have been billed, results reviewed, callbacks completed, and tasks addressed — so nothing carries over unintentionally.",
+      "how_it_works": "The EOD checker scans your day's activity and flags any items that appear incomplete: unbilled encounters, unsigned notes, pending callbacks, unread results, and overdue ticklers."
+    },
+    {
+      "id": "rems-reference",
+      "name": "REMS Medication Database",
+      "category": "references",
+      "url": "/reference/rems",
+      "description": "A searchable reference of all FDA REMS (Risk Evaluation and Mitigation Strategy) program medications. Shows which drugs require REMS enrollment, what monitoring labs are needed, reporting requirements, and program-specific obligations for prescribers.",
+      "how_it_works": "Search or browse the database of 22+ REMS programs. Each entry lists the medications covered, clinical area, requirement types (enrollment, lab monitoring, patient counseling), specific monitoring labs with intervals, and clinical notes.",
+      "steps": [
+        "Open REMS Database from the References menu or navigate to /reference/rems.",
+        "Use the search bar to find a specific medication or program.",
+        "Review the program card showing requirements, monitoring labs, and clinical notes.",
+        "Print the page for offline reference if needed."
+      ],
+      "tips": [
+        "Programs marked 'Removed' (like Clozapine REMS as of June 2025) still show recommended monitoring as standard of care.",
+        "Monitoring labs show priority levels and recommended intervals.",
+        "The database covers iPLEDGE, Opioid ER/LA REMS, TIRF, TOUCH (Tysabri), Lemtrada, Tikosyn, and many more."
+      ]
+    },
+    {
+      "id": "reportable-diseases",
+      "name": "Reportable Disease Guide",
+      "category": "references",
+      "url": "/reference/reportable-diseases",
+      "description": "A clinical reference for reportable infectious diseases. Shows which conditions must be reported, the required timeframe, who to report to, what information to include, and your specific obligations as a provider.",
+      "how_it_works": "Search or browse the database of 30+ reportable conditions. Each entry shows whether the condition is nationally notifiable, the reporting timeframe (immediate, 24 hours, per state schedule), the reporting agency, and a provider obligation checklist.",
+      "steps": [
+        "Open Reportable Disease Guide from the References menu or navigate to /reference/reportable-diseases.",
+        "Search for a condition by name or browse by category.",
+        "Review the reporting requirements, timeframe, and provider obligations.",
+        "Follow the obligation checklist for the specific condition.",
+        "Print for office reference if needed."
+      ],
+      "tips": [
+        "Red 'URGENT' badges indicate conditions requiring immediate (same-day) reporting.",
+        "Latent TB (LTBI) is NOT nationally notifiable — reporting requirements vary by state. Check your state health department.",
+        "Always report active TB, measles, and meningococcal disease immediately.",
+        "Antimicrobial-resistant organisms (C. auris, CRE, CRAB) require reporting in many jurisdictions."
+      ]
+    },
+    {
+      "id": "external-references",
+      "name": "External Clinical References",
+      "category": "references",
+      "description": "Quick links to external clinical resources opened in new browser tabs: UpToDate, MDCalc, DynaMed, Epocrates, PubMed, USPSTF recommendations, CDC guidelines, AHA/ACC guidelines, MedlinePlus (English and Spanish), ICD-10 lookup, and CMS Fee Schedule.",
+      "how_it_works": "Access these from the References menu in the top menu bar. Each link opens in a new browser tab.",
+      "tips": [
+        "All external links open in new tabs so you don't lose your place.",
+        "MedlinePlus is available in both English and Spanish for patient education.",
+        "USPSTF links go directly to the recommendation statements for screening guidelines."
+      ]
+    },
+    {
+      "id": "ccm-registry",
+      "name": "CCM Registry",
+      "category": "patient-care",
+      "url": "/ccm",
+      "description": "Chronic Care Management registry for tracking patients enrolled in CCM programs. Manage care plans, track monthly contact requirements, and document CCM activities for billing.",
+      "how_it_works": "The CCM registry lists enrolled patients with their care plan status, last contact date, and monthly time tracking. Ensures you meet the minimum contact and documentation requirements for CCM billing."
+    },
+    {
+      "id": "tcm-watch",
+      "name": "TCM Watch",
+      "category": "patient-care",
+      "url": "/intelligence/tcm",
+      "description": "Transitional Care Management tracker. Monitors patients recently discharged from the hospital who are eligible for TCM services, tracks the required follow-up visit deadline, and helps capture TCM billing.",
+      "how_it_works": "The system identifies recently discharged patients and tracks the deadline for the required follow-up visit (7 or 14 days depending on complexity). Alerts notify you as deadlines approach."
+    },
+    {
+      "id": "staff-billing",
+      "name": "Staff Billing Tasks",
+      "category": "billing-coding",
+      "url": "/intelligence/staff-billing",
+      "description": "A task list for staff members involved in billing workflows. Shows billable items that need attention — charge capture, coding verification, claims submission follow-up, and denial management."
+    },
+    {
+      "id": "settings",
+      "name": "Account Settings",
+      "category": "admin",
+      "url": "/settings/account",
+      "description": "Manage your personal account: display name, password, theme preferences (light/dark mode, font, accent color), notification preferences, lock timeout, and feature access levels.",
+      "how_it_works": "Changes to your settings take effect immediately. Theme changes update the entire interface in real time. Notification preferences control which events generate alerts for you.",
+      "steps": [
+        "Open Settings from the File menu or sidebar footer.",
+        "Update your display name, password, or other account details.",
+        "Choose your preferred theme (light/dark), font, and accent color.",
+        "Configure notification preferences to control alert types.",
+        "Set your lock timeout for security."
+      ]
+    },
+    {
+      "id": "keyboard-shortcuts",
+      "name": "Keyboard Shortcuts",
+      "category": "admin",
+      "description": "Quick keyboard shortcuts for common actions throughout the app.",
+      "how_it_works": "Press the listed key combination from any page to trigger the action.",
+      "tips": [
+        "Ctrl+K — Open Command Palette (search and navigate to any page or feature).",
+        "Ctrl+B — Toggle the sidebar.",
+        "Ctrl+Shift+B — Toggle the bookmarks bar.",
+        "Ctrl+Shift+K — Open Clinical Calculators.",
+        "? — Show keyboard shortcuts help.",
+        "Escape — Close any open menu, modal, or palette.",
+        "F5 — Refresh the page."
+      ]
+    },
+    {
+      "id": "command-palette",
+      "name": "Command Palette",
+      "category": "admin",
+      "description": "A quick-access search bar (like VS Code's command palette) that lets you navigate to any page or feature by typing its name. Press Ctrl+K from anywhere to open it.",
+      "how_it_works": "Press Ctrl+K, start typing the name of a feature or page, and select from the filtered results to navigate directly there. Much faster than clicking through menus.",
+      "tips": [
+        "Type any part of a feature name — the search is fuzzy.",
+        "Results are categorized (Pages, Tools, Admin, Help) for easy scanning.",
+        "This is often the fastest way to navigate the app."
+      ]
+    },
+    {
+      "id": "bookmarks",
+      "name": "Bookmarks Bar",
+      "category": "admin",
+      "description": "A customizable bookmarks bar below the menu for quick access to your most-used pages. Practice bookmarks (set by admin) are shared with all users. Personal bookmarks are your own.",
+      "how_it_works": "Click the '+' button on the bookmarks bar to add a personal bookmark. Admins can add practice-wide bookmarks that appear for everyone. Reorder personal bookmarks by dragging.",
+      "tips": [
+        "Toggle the bookmarks bar with Ctrl+Shift+B.",
+        "Practice bookmarks are managed by your admin and appear for all users.",
+        "Personal bookmarks are private to your account."
+      ]
+    },
+    {
+      "id": "admin-dashboard",
+      "name": "Practice Overview (Admin)",
+      "category": "admin",
+      "url": "/admin",
+      "description": "Admin-only dashboard showing practice-wide statistics, user activity, system health, and configuration status. The central admin hub for managing the practice instance.",
+      "admin_only": true
+    },
+    {
+      "id": "user-management",
+      "name": "User Management (Admin)",
+      "category": "admin",
+      "url": "/admin/users",
+      "description": "Manage user accounts: approve new registrations, assign roles (MA, Provider, Admin), reset passwords, activate/deactivate accounts, and manage feature access levels.",
+      "admin_only": true
+    },
+    {
+      "id": "configuration",
+      "name": "Configuration (Admin)",
+      "category": "admin",
+      "url": "/admin/config",
+      "description": "System configuration editor for advanced settings. Manage feature flags, integration settings, and system parameters.",
+      "admin_only": true
+    },
+    {
+      "id": "caregap-rules",
+      "name": "Care Gap Rules (Admin)",
+      "category": "admin",
+      "url": "/admin/caregap-rules",
+      "description": "Configure the rules that drive the care gap engine. Define which screenings and preventive measures are tracked, their eligibility criteria (age, sex, diagnoses), and how often they should recur.",
+      "admin_only": true
+    },
+    {
+      "id": "updates",
+      "name": "System Updates (Admin)",
+      "category": "admin",
+      "url": "/admin/updates",
+      "description": "Check for and apply system updates. Scan for available updates, review changelogs, and apply updates with automatic backup and restart.",
+      "admin_only": true
+    },
+    {
+      "id": "med-catalog",
+      "name": "Medication Monitoring Catalog (Admin)",
+      "category": "admin",
+      "url": "/admin/med-catalog",
+      "description": "Master control panel for medication monitoring rules. View the full catalog of monitored medications, manage override intervals, analyze coverage gaps, run scenario tests, and track parser drift.",
+      "how_it_works": "The catalog links medications to their monitoring rules (which labs to order and how often). It auto-populates when new medications are parsed from clinical summaries. Admins can override default intervals at the user or practice level, review coverage gaps for unmapped medications, and run bulk scenario tests to verify rules.",
+      "steps": [
+        "Open Admin > Medication Catalog from the admin dashboard.",
+        "Browse or search the medication catalog to see monitoring rules.",
+        "Click Override on any medication to adjust the monitoring interval.",
+        "Use the Coverage tab to find medications without monitoring rules.",
+        "Use the Testing tab to run scenario tests and verify rule accuracy.",
+        "Use the Diffs tab to review changes detected by the parser."
+      ],
+      "tips": [
+        "User overrides take priority over practice overrides, which take priority over rule defaults.",
+        "The Explorer tab lets you look up any medication and see its full normalization chain.",
+        "New medications are automatically added to the catalog when clinical summaries are parsed."
+      ],
+      "admin_only": true
+    },
+    {
+      "id": "rules-registry",
+      "name": "Rules Registry (Admin)",
+      "category": "admin",
+      "url": "/admin/rules-registry",
+      "description": "Unified view of ALL monitoring rules and care gap rules in one searchable, filterable page with trigger testing.",
+      "how_it_works": "Displays every monitoring rule and care gap rule in flat, searchable tables. Filter monitoring rules by type, source, priority, and active status. Test any rule against a synthetic patient to see if it would fire. Toggle rules active or inactive directly.",
+      "steps": [
+        "Open Admin > Rules Registry from the admin dashboard.",
+        "Use the Monitoring Rules tab to browse or search monitoring rules.",
+        "Use filter dropdowns to narrow by type, source, priority, or status.",
+        "Click Test on any rule to configure a synthetic patient and see pass/fail results.",
+        "Use the Care Gap Rules tab to browse or search care gap rules.",
+        "Click the toggle button to activate or deactivate any rule."
+      ],
+      "tips": [
+        "You can search monitoring rules by lab name, RXCUI, ICD-10 code, or clinical context.",
+        "The stats row at the top shows aggregate counts across all rule types.",
+        "Use this page to quickly find and verify rules rather than navigating individual medication entries."
+      ],
+      "admin_only": true
+    },
+    {
+      "id": "context-subpanel",
+      "name": "Context Sub-Panel",
+      "category": "ui-ux",
+      "description": "Collapsible side panel on every page with page-specific filters, stats, quick actions, and Quick Nav cross-links to related pages.",
+      "how_it_works": "Each page has a 220px panel at the left edge of the content area. Click the chevron (‹/›) to collapse.",
+      "steps": [
+        "Navigate to any non-dashboard page",
+        "Find the context panel on the left side",
+        "Click ‹ to collapse, › to expand",
+        "Use Quick Nav links at the bottom to jump to related pages"
+      ],
+      "tips": [
+        "Panel state is remembered per page via localStorage",
+        "Dashboard shows full sidebar without a sub-panel"
+      ]
+    },
+    {
+      "id": "popup-taskbar",
+      "name": "Popup Taskbar",
+      "category": "ui-ux",
+      "description": "Modals minimize to a bottom taskbar when you click outside them, preserving all form data so you can return to them later.",
+      "how_it_works": "Click outside a modal to minimize it to the taskbar at the bottom. Click the tab to restore, click X on the tab to discard.",
+      "steps": [
+        "Open any non-blocking modal",
+        "Click outside the modal",
+        "See it minimize to the taskbar tab",
+        "Click the tab to restore with all data intact"
+      ],
+      "tips": [
+        "Security modals (HIPAA, lock, P1) cannot be minimized",
+        "Click a link while a modal is open to follow the link and minimize the modal"
+      ]
+    },
+    {
+      "id": "split-view",
+      "name": "Split View",
+      "category": "ui-ux",
+      "description": "View two pages side-by-side within the same window. Compare patients, view a chart alongside care gaps, and more.",
+      "how_it_works": "Ctrl+Click any link to open it in the split pane, or click the split view button in the header.",
+      "steps": [
+        "Ctrl+Click any link to open it in split view",
+        "Or click the split icon button ⊟ in the header bar",
+        "Drag the divider between panes to resize",
+        "Click X on the secondary pane header to close split view"
+      ],
+      "tips": [
+        "Split view is disabled on screens narrower than 1024px",
+        "Each pane retains its own URL and content",
+        "Sets split_max_panes preference in Settings"
+      ]
+    },
+    {
+      "id": "pip-widgets",
+      "name": "Picture-in-Picture Widgets",
+      "category": "ui-ux",
+      "description": "Pop out any patient chart widget into a floating window that persists as you navigate to different pages.",
+      "how_it_works": "Click the ⧉ pop-out icon on any widget header to detach it into a floating, draggable, resizable window.",
+      "steps": [
+        "Open a patient chart",
+        "Click ⧉ on any widget header (Medications, Diagnoses, etc.)",
+        "Drag the floating window to position it",
+        "Navigate to another page — the widget stays visible",
+        "Click − to minimize, × to close"
+      ],
+      "tips": [
+        "Multiple pip windows can be open simultaneously",
+        "Resize by dragging the bottom-right corner",
+        "Double-click the title bar to restore a minimized window"
+      ]
+    },
+    {
+      "id": "smart-bookmarks",
+      "name": "Smart Bookmarks with Folders",
+      "category": "ui-ux",
+      "description": "Chrome-style bookmarks bar with drag-to-add and nested folders. Drag any link to the bookmarks bar to pin it.",
+      "how_it_works": "Drag any link from the sidebar, sub-panel, or page content to the bookmarks bar. Organize into folders with right-click.",
+      "steps": [
+        "Drag any link to the bookmarks bar to add it",
+        "Right-click the bookmarks bar to create a folder",
+        "Drag a bookmark into a folder to organize",
+        "Click a folder to expand its contents"
+      ],
+      "tips": [
+        "Folders support one level of nesting (Chrome-style)",
+        "Bookmarks persist across sessions via user preferences"
+      ]
+    },
+    {
+      "id": "breadcrumb-trail",
+      "name": "Breadcrumb Trail",
+      "category": "ui-ux",
+      "description": "Thin strip below the bookmarks bar showing your last 5 visited pages as clickable chips with contextual badges.",
+      "how_it_works": "Navigate between pages and the breadcrumb trail updates automatically with clickable history chips.",
+      "steps": [
+        "Navigate between pages normally",
+        "See the breadcrumb trail below the bookmarks bar",
+        "Click any chip to go back to that page",
+        "Contextual badges show patient names, gap counts, etc."
+      ],
+      "tips": [
+        "Breadcrumbs are stored in sessionStorage — cleared when you close the tab",
+        "Duplicates are moved to the front rather than duplicated"
+      ]
+    },
+    {
+      "id": "type-ahead-filter",
+      "name": "Type-Ahead Filtering",
+      "category": "ui-ux",
+      "description": "On any list page, just start typing to instantly filter visible items — no need to click a search box first.",
+      "how_it_works": "When no input field is focused, keystrokes activate the type-ahead filter and show a floating badge with the current filter text.",
+      "steps": [
+        "Navigate to any list page (patients, lab track, notifications, etc.)",
+        "Start typing without clicking anything",
+        "Watch items filter instantly",
+        "Press Escape to clear the filter"
+      ],
+      "tips": [
+        "Press Backspace to remove the last typed character",
+        "Filter is case-insensitive and matches anywhere in the row text"
+      ]
+    },
+    {
+      "id": "page-transitions",
+      "name": "Page Transitions",
+      "category": "ui-ux",
+      "description": "Smooth animated transitions when navigating between pages. Choose from 5 presets: None, Fade, Slide, Zoom, or Subtle.",
+      "how_it_works": "Go to Settings and select a transition preset. The preference saves across sessions.",
+      "steps": [
+        "Go to Settings",
+        "Find the Page Transitions section",
+        "Click a preset button (None, Fade, Slide, Zoom, Subtle)",
+        "Navigate between pages to see the animation"
+      ],
+      "tips": [
+        "Transitions are 150-200ms — fast enough to not impede clinical workflow",
+        "The Subtle preset combines a gentle fade with a 4px vertical slide"
+      ]
+    },
+    {
+      "id": "engine-benchmarks",
+      "name": "Engine Benchmarks (Admin)",
+      "category": "admin",
+      "url": "/admin/benchmarks",
+      "description": "Run correctness and performance benchmarks against the billing engine (26 detectors), care gap engine (25+ USPSTF rules), and medication monitoring engine. Uses 18 synthetic patient profiles covering Medicare, Medicaid, Commercial, pediatric, pregnant, dual-eligible, REMS medications, and polypharmacy scenarios.",
+      "how_it_works": "The benchmark suite runs each of the 18 synthetic patients through each clinical engine and verifies: (1) the right billing codes, care gaps, and monitoring rules are detected, (2) codes that should NOT appear are absent, and (3) each engine completes within its performance threshold. Results are saved to the database so you can compare runs over time and spot regressions. The CLI test file and the admin page use the same underlying runner — results are identical.",
+      "steps": [
+        "Open Admin > Engine Benchmarks from the admin dashboard or the admin dropdown menu.",
+        "Click Run All Engines to benchmark billing, care gaps, and monitoring together, or use the individual engine buttons to test one at a time.",
+        "Review the results table: each row shows the patient profile, engine tested, pass/fail status, execution time in milliseconds, and what was found vs expected.",
+        "Click any failed row to see the explanation — which codes were missing or unexpected.",
+        "Scroll to the History section to see previous benchmark runs with timestamps, pass rates, and total duration.",
+        "Click a previous run to reload its full results for comparison.",
+        "To run from the command line instead, use: venv\\Scripts\\python.exe tests\\test_benchmarks.py",
+        "Use --engine billing, --engine caregap, or --engine monitoring to test a single engine.",
+        "Use --save to persist CLI results to the database (viewable in the admin page history)."
+      ],
+      "tips": [
+        "The first billing run in a session may be slower (cold start loads all 26 detectors). Subsequent runs are much faster due to caching.",
+        "Performance thresholds are configurable in config.py: BENCHMARK_BILLING_MAX_MS (default 2500ms), BENCHMARK_CAREGAP_MAX_MS (200ms), BENCHMARK_MONITORING_MAX_MS (300ms).",
+        "Run benchmarks after changing any billing detector, care gap rule, or monitoring rule to verify nothing broke.",
+        "The 18 patient profiles cover edge cases like dual-eligible (Medicare+Medicaid), REMS medications (clozapine, warfarin), pregnancy exclusions, pediatric well-child visits, post-discharge TCM windows, and maximum-complexity polypharmacy.",
+        "All patient data is synthetic — no real PHI is used. Profiles are defined in tests/benchmark_fixtures.py.",
+        "If a benchmark fails, it usually means a detector changed behavior. Check the explanation field for exactly which codes were expected vs found."
+      ],
+      "admin_only": true
+    },
+    {
+      "id": "chart-flag",
+      "name": "AC Chart Detection Flag",
+      "category": "intelligence",
+      "url": null,
+      "description": "When a patient chart is open in Amazing Charts, a small popup appears in the bottom-left corner of the CareCompanion web UI showing the patient name, age, sex, and DOB. If the patient has a CareCompanion record, a link opens their chart directly.",
+      "how_it_works": "The agent polls every 3 seconds using Windows EnumWindows to detect open AC chart subprocess windows. The chart title contains the patient name, MRN, DOB, age, sex, and portal status. This data is written to a local JSON file, which the web UI polls every 5 seconds. If a chart is detected, the flag widget slides in from the left. When the chart closes, the flag auto-dismisses.",
+      "steps": [
+        "Open a patient chart in Amazing Charts.",
+        "Within a few seconds, a popup appears in the bottom-left corner of CareCompanion showing the patient name and demographics.",
+        "If the patient exists in CareCompanion, click 'Open in CareCompanion' to jump to their chart.",
+        "Click the X button to dismiss the flag for that patient. It will reappear if you open a different patient.",
+        "The flag automatically disappears when you close the chart in AC."
+      ],
+      "tips": [
+        "The flag works even when AC is behind the browser window — it uses Windows API window enumeration, not foreground detection.",
+        "Dismissing a flag only hides it for that specific patient's MRN. Opening a new patient will show a fresh flag.",
+        "The feature can be disabled via CHART_FLAG_ENABLED = False in config.py.",
+        "Polling stops when the browser tab is hidden to save resources."
+      ],
+      "admin_only": false
+    }
+  ]
+}

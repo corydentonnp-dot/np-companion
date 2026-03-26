@@ -216,20 +216,21 @@
     // Commit message includes file name and timestamp.
     "gitdoc.commitMessageFormat": "Auto-save: {filename} ({date})",
 
-    // Never auto-commit these -- they're high-churn runtime files
-    // that would pollute commit history with noise.
+    // Never auto-commit these -- SQLite databases are binary (merge conflicts),
+    // and active_*.json are machine-specific runtime state.
     "gitdoc.excludePattern": [
         "**/*.log",
         "**/data/logs/**",
         "**/data/backups/**",
         "**/data/clinical_summaries/**",
+        "**/data/*.db",
+        "**/data/*.sqlite",
         "**/pytest_output.txt",
         "**/test_out.txt",
         "**/__pycache__/**",
         "**/*.pyc",
         "**/data/active_user.json",
-        "**/data/active_chart.json",
-        "**/data/changelog.json"
+        "**/data/active_chart.json"
     ],
 
     // Show GitDoc enabled/disabled state in the VS Code status bar.

@@ -1,0 +1,514 @@
+[
+  {
+    "condition": "Tuberculosis — Active Disease",
+    "category": "Respiratory / Mycobacterial",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours of suspicion or diagnosis",
+    "report_to": "Local health department (then forwarded to state and CDC)",
+    "what_to_report": "Patient demographics, suspected/confirmed diagnosis, AFB smear/culture results, chest X-ray findings, drug susceptibility results when available, treatment regimen started",
+    "provider_obligations": [
+      "Report immediately upon clinical suspicion — do NOT wait for culture confirmation",
+      "Initiate respiratory isolation and airborne precautions",
+      "Obtain sputum AFB smears × 3 (collected 8-24 hours apart)",
+      "Begin empiric anti-TB treatment (RIPE: Rifampin, Isoniazid, Pyrazinamide, Ethambutol)",
+      "Ensure patient completes full course of treatment (Directly Observed Therapy preferred)",
+      "Report drug resistance when susceptibility results are available",
+      "Contact investigation — health department will coordinate, but provider should identify close contacts"
+    ],
+    "notes": "All forms of active TB (pulmonary AND extrapulmonary) are reportable in every US state. Report on clinical suspicion, not just confirmed cases. The health department will conduct contact investigations and may assume case management."
+  },
+  {
+    "condition": "Tuberculosis — Latent TB Infection (LTBI)",
+    "category": "Respiratory / Mycobacterial",
+    "nationally_notifiable": false,
+    "reporting_timeframe": "Varies by state — many states do NOT require reporting of LTBI",
+    "report_to": "Local/state health department (if required in your jurisdiction)",
+    "what_to_report": "Positive TST or IGRA result, patient demographics, risk factors, treatment plan",
+    "provider_obligations": [
+      "IMPORTANT: LTBI reporting requirements vary significantly by state",
+      "Some states (e.g., California, New York) require LTBI reporting; many states do NOT",
+      "Check your state health department website for specific requirements",
+      "Regardless of reporting: treat LTBI to prevent progression to active disease",
+      "Preferred LTBI regimens: 3HP (isoniazid + rifapentine weekly × 12 weeks), 4R (rifampin daily × 4 months), 6H or 9H (isoniazid daily × 6 or 9 months)",
+      "Rule out active TB before starting LTBI treatment (CXR, symptoms review, sputum if symptomatic)",
+      "Monitor for hepatotoxicity: baseline LFTs if risk factors, then monthly if on INH",
+      "Ensure treatment completion — untreated LTBI has 5-10% lifetime risk of progression to active TB"
+    ],
+    "notes": "This was the user's specific question. Key points: (1) Active TB is ALWAYS reportable. (2) LTBI reporting varies by state. (3) Treatment of LTBI is standard of care regardless of reporting requirements. (4) If the patient was never treated for latent TB, initiating treatment is strongly recommended. (5) Contact your local health department if unsure — they can advise on reporting requirements and may provide treatment support."
+  },
+  {
+    "condition": "HIV/AIDS",
+    "category": "Sexually Transmitted / Blood-borne",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24-72 hours (varies by state; 24 hours for acute HIV)",
+    "report_to": "Local/state health department confidential surveillance",
+    "what_to_report": "Patient demographics, HIV test results (antibody, antigen, viral load, CD4), stage of disease (acute, chronic, AIDS), risk factors",
+    "provider_obligations": [
+      "Report all newly diagnosed HIV cases (including previously undiagnosed)",
+      "Report new AIDS diagnoses (CD4 < 200 or AIDS-defining illness)",
+      "Ensure linkage to HIV care (viral suppression is public health priority)",
+      "Offer partner notification services (patient can notify or health department can assist)",
+      "Discuss PrEP for seronegative partners",
+      "Report is CONFIDENTIAL — name-based surveillance is standard in all states"
+    ],
+    "notes": "All 50 states and DC require name-based HIV reporting. Reports are handled confidentially. CDC surveillance uses de-identified data. Providers should also report perinatal HIV exposure."
+  },
+  {
+    "condition": "Hepatitis A (acute)",
+    "category": "Hepatic / Enteric",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, symptom onset date, HAV IgM result, risk factors (travel, food exposure, MSM, drug use, homelessness)",
+    "provider_obligations": [
+      "Report positive HAV IgM immediately",
+      "Identify potential source (travel, food exposure, contacts)",
+      "Post-exposure prophylaxis: HAV vaccine or IG for close contacts within 14 days",
+      "Exclude food handlers from work until cleared by health department"
+    ],
+    "notes": "Outbreaks among people experiencing homelessness and people who use drugs have been increasing. Vaccination is the best prevention. HAV vaccine is now recommended for ALL children aged 12-23 months and for adults at risk."
+  },
+  {
+    "condition": "Hepatitis B (acute and chronic)",
+    "category": "Hepatic / Blood-borne",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24-72 hours for acute; chronic reporting varies by state",
+    "report_to": "Local health department",
+    "what_to_report": "HBsAg, anti-HBc IgM (for acute), HBeAg, HBV DNA, ALT, risk factors",
+    "provider_obligations": [
+      "Report acute HBV (positive HBsAg + IgM anti-HBc OR clinical syndrome with HBsAg)",
+      "Report chronic HBV — many states now require reporting of all HBsAg-positive results",
+      "Vaccinate susceptible household and sexual contacts",
+      "HBV-positive pregnant women: ensure newborn receives HBV vaccine + HBIG within 12 hours of birth",
+      "Screen for hepatocellular carcinoma per guidelines (AFP + ultrasound every 6 months for cirrhosis)"
+    ],
+    "notes": "Universal adult HBV vaccination now recommended by ACIP (for all adults 19-59; 60+ with risk factors). Perinatal HBV prevention is critical — all pregnant women should be screened for HBsAg."
+  },
+  {
+    "condition": "Hepatitis C (acute and chronic)",
+    "category": "Hepatic / Blood-borne",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 72 hours for acute; chronic reporting varies by state",
+    "report_to": "Local health department",
+    "what_to_report": "Anti-HCV, HCV RNA, risk factors, genotype if available",
+    "provider_obligations": [
+      "Report new positive HCV RNA results",
+      "Distinguish acute from chronic if possible (acute: recent seroconversion, elevated ALT, symptoms within 6 months of exposure)",
+      "Link to treatment — direct-acting antivirals (DAAs) cure > 95% of cases",
+      "Screen all adults 18+ at least once (USPSTF Grade B recommendation)",
+      "Screen all pregnant women during each pregnancy"
+    ],
+    "notes": "Universal one-time HCV screening now recommended for all adults 18-79. Baby boomers (born 1945-1965) have the highest prevalence. Treatment with DAAs is curative and cost-effective. Ongoing risk behaviors warrant periodic re-screening."
+  },
+  {
+    "condition": "Syphilis (all stages)",
+    "category": "Sexually Transmitted",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours (primary, secondary, early latent) to 72 hours (late latent, tertiary)",
+    "report_to": "Local health department STD program",
+    "what_to_report": "Patient demographics, stage of syphilis, RPR/VDRL titer, confirmatory test (FTA-ABS or TP-PA), treatment given, sexual contacts",
+    "provider_obligations": [
+      "Report ALL stages: primary, secondary, early latent, late latent, tertiary, congenital",
+      "Treat per CDC STI guidelines (Bicillin LA IM for most stages)",
+      "Primary/Secondary/Early latent: Benzathine penicillin G 2.4M units IM × 1",
+      "Late latent/Tertiary: Benzathine penicillin G 2.4M units IM weekly × 3 weeks",
+      "Neurosyphilis: IV aqueous penicillin G for 10-14 days",
+      "Report sexual contacts for partner notification (health department assists)",
+      "Screen ALL pregnant women at first prenatal visit; re-screen in third trimester and at delivery in high-prevalence areas",
+      "Congenital syphilis: report newborn immediately; requires specialized neonatal evaluation"
+    ],
+    "notes": "Syphilis cases are at historic highs in the US (2024). Congenital syphilis has increased dramatically — missed prenatal screening is the primary cause. The Jarisch-Herxheimer reaction can occur after treatment (fever, rigors 6-12 hours post-injection — reassure patient). Follow RPR/VDRL titers to confirm treatment response."
+  },
+  {
+    "condition": "Gonorrhea",
+    "category": "Sexually Transmitted",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 72 hours (or per state regulation)",
+    "report_to": "Local health department STD program",
+    "what_to_report": "Patient demographics, anatomic site tested, test method (NAAT, culture), susceptibility results if culture performed, treatment given",
+    "provider_obligations": [
+      "Report all positive NAAT and culture results",
+      "Treat per CDC STI guidelines: Ceftriaxone 500 mg IM × 1 (1g IM if weight ≥ 150 kg)",
+      "If cephalosporin allergy: Gentamicin 240 mg IM + Azithromycin 2g PO",
+      "Test of cure: recommended only for pharyngeal gonorrhea (re-test 7-14 days after treatment)",
+      "Re-screen in 3 months for reinfection",
+      "Expedited partner therapy (EPT) where legally permitted",
+      "Concurrent chlamydia treatment: if chlamydia not excluded, treat presumptively"
+    ],
+    "notes": "Antimicrobial resistance is a major concern. Culture with susceptibility testing recommended if treatment failure suspected. Pharyngeal gonorrhea is harder to treat — test of cure required. Dual therapy (with azithromycin) is no longer routinely recommended unless chlamydia co-infection suspected."
+  },
+  {
+    "condition": "Chlamydia",
+    "category": "Sexually Transmitted",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 72 hours (or per state regulation)",
+    "report_to": "Local health department STD program",
+    "what_to_report": "Patient demographics, anatomic site tested, test method (NAAT), treatment given",
+    "provider_obligations": [
+      "Report all positive results",
+      "Treat per CDC STI guidelines: Doxycycline 100 mg BID × 7 days (preferred)",
+      "Alternative: Azithromycin 1g PO × 1 (less preferred due to lower efficacy for rectal infection)",
+      "In pregnancy: Azithromycin 1g PO × 1 (doxycycline contraindicated)",
+      "Re-screen in 3 months for reinfection",
+      "Expedited partner therapy (EPT) where legally permitted",
+      "Screen annually: all sexually active women < 25, older women with risk factors, MSM"
+    ],
+    "notes": "Chlamydia is the most commonly reported STI in the US. Most infections are asymptomatic — screening is essential. Doxycycline is now preferred over azithromycin for treatment (better efficacy, especially for rectal infection). Untreated chlamydia can cause PID, ectopic pregnancy, and infertility."
+  },
+  {
+    "condition": "COVID-19",
+    "category": "Respiratory / Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours (may vary; some jurisdictions accept electronic lab reporting)",
+    "report_to": "Local/state health department",
+    "what_to_report": "Patient demographics, test type (PCR, antigen), result, symptom onset date, hospitalization status, vaccination status",
+    "provider_obligations": [
+      "Laboratory reporting of positive results is generally automated through electronic lab reporting (ELR)",
+      "Report hospitalized cases and deaths",
+      "Prescribe antiviral treatment (Paxlovid) for high-risk patients within 5 days of symptom onset",
+      "Recommend updated COVID-19 vaccination per current CDC guidance",
+      "Isolation guidance per current CDC recommendations"
+    ],
+    "notes": "COVID-19 reporting requirements have evolved. Most jurisdictions rely on electronic lab reporting (ELR) for positive test results. Provider obligations focus on treatment and prevention rather than manual reporting in most settings. Check current state requirements."
+  },
+  {
+    "condition": "Measles (Rubeola)",
+    "category": "Respiratory / Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "IMMEDIATELY — within hours of suspicion (do not wait for lab confirmation)",
+    "report_to": "Local health department (URGENT)",
+    "what_to_report": "Patient demographics, symptom onset date, rash onset date, vaccination history, travel history, exposure settings",
+    "provider_obligations": [
+      "Report IMMEDIATELY on clinical suspicion — this is a public health emergency",
+      "Isolate patient (airborne precautions — negative pressure room if available)",
+      "Obtain measles IgM and measles RNA PCR (throat swab and urine)",
+      "Identify all contacts — exposure is defined as being in same airspace up to 2 hours after infectious patient left",
+      "Post-exposure prophylaxis for susceptible contacts: MMR vaccine within 72 hours or IG within 6 days",
+      "Measles is infectious from 4 days before to 4 days after rash onset"
+    ],
+    "notes": "Measles is one of the most contagious diseases known (R0 = 12-18). Airborne transmission — can remain infectious in air for up to 2 hours after patient leaves. Even if rare in the US, outbreaks occur from international importation. One unvaccinated case can trigger massive public health response. Report immediately."
+  },
+  {
+    "condition": "Pertussis (Whooping Cough)",
+    "category": "Respiratory / Bacterial",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours of suspicion",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, symptom onset date, cough duration, vaccination history, pertussis PCR/culture result, close contacts (especially infants)",
+    "provider_obligations": [
+      "Report suspected cases immediately — do not wait for PCR confirmation",
+      "Obtain nasopharyngeal swab for pertussis PCR",
+      "Treat with azithromycin (500 mg day 1, then 250 mg days 2-5) — treatment is most effective if started within first 3 weeks of cough",
+      "Post-exposure prophylaxis with azithromycin for close contacts, especially household contacts and infants < 12 months",
+      "Exclude from school/work for 5 days after starting appropriate antibiotic",
+      "Ensure Tdap vaccination is up to date for patient and contacts"
+    ],
+    "notes": "Pertussis can be fatal in young infants. Maternal Tdap vaccination during each pregnancy (weeks 27-36) is the most effective strategy to prevent neonatal pertussis. Classic 'whoop' may be absent in adults and adolescents — suspect in anyone with cough > 2 weeks. PCR is most sensitive in first 3 weeks of illness."
+  },
+  {
+    "condition": "Influenza-associated hospitalization and pediatric mortality",
+    "category": "Respiratory / Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 72 hours of hospitalization or death",
+    "report_to": "Local/state health department",
+    "what_to_report": "Patient demographics, influenza type/subtype, hospitalization details, vaccination status, outcomes",
+    "provider_obligations": [
+      "Report laboratory-confirmed influenza hospitalizations",
+      "Report ALL influenza-associated pediatric deaths (< 18 years)",
+      "Routine outpatient influenza cases generally do NOT require individual reporting",
+      "Start antiviral treatment (oseltamivir) within 48 hours of symptom onset for high-risk patients",
+      "Recommend annual influenza vaccination"
+    ],
+    "notes": "Outpatient influenza is tracked through sentinel surveillance systems, not individual case reports. Individual reporting is required for hospitalizations and all pediatric deaths."
+  },
+  {
+    "condition": "Mpox (Monkeypox)",
+    "category": "Viral / Poxvirus",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours of suspicion",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, symptom onset, lesion description/photos (with consent), sexual history/risk factors, vaccination status",
+    "provider_obligations": [
+      "Report suspected cases immediately",
+      "Obtain lesion swab for orthopoxvirus PCR",
+      "Initiate treatment with tecovirimat (TPOXX) for severe cases or immunocompromised patients",
+      "Advise isolation until all lesions have crusted and new skin has formed",
+      "Discuss JYNNEOS vaccination for at-risk contacts (post-exposure prophylaxis within 4 days, or up to 14 days for reduced risk)"
+    ],
+    "notes": "Mpox became nationally notifiable in 2022. Primary spread through direct skin-to-skin contact. Higher risk among MSM population during outbreaks. JYNNEOS vaccine is available for pre-exposure and post-exposure prophylaxis."
+  },
+  {
+    "condition": "Meningococcal Disease (Neisseria meningitidis)",
+    "category": "Bacterial / Invasive",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "IMMEDIATELY — within hours",
+    "report_to": "Local health department (URGENT)",
+    "what_to_report": "Patient demographics, clinical presentation, specimen source, serogroup if available, vaccination history, close contacts",
+    "provider_obligations": [
+      "Report immediately — public health emergency requiring rapid contact tracing",
+      "Initiate empiric antibiotics immediately (ceftriaxone IV/IM)",
+      "Post-exposure chemoprophylaxis for close contacts within 24 hours: Ciprofloxacin 500 mg PO × 1 (adults), Rifampin 600 mg BID × 2 days, or Ceftriaxone 250 mg IM × 1",
+      "Close contacts include: household members, daycare contacts, anyone with direct exposure to oral secretions in past 7 days",
+      "MenACWY and/or MenB vaccination for contacts as appropriate"
+    ],
+    "notes": "Meningococcal disease can progress from well to dead within hours. Immediate antibiotic treatment and aggressive supportive care are essential. Chemoprophylaxis for close contacts must be given within 24 hours of case identification. Report immediately — do not wait for culture confirmation."
+  },
+  {
+    "condition": "Salmonellosis",
+    "category": "Enteric / Bacterial",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24-72 hours of positive culture or NAAT",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, specimen type, Salmonella serotype/species, onset date, food exposure history, travel history",
+    "provider_obligations": [
+      "Report positive stool culture or NAAT",
+      "Most cases are self-limited — antibiotics not routinely needed",
+      "Treat with antibiotics if: bacteremia, severe illness, age < 12 months, age > 50, immunocompromised, prosthetic joints/vascular grafts",
+      "If antibiotic indicated: fluoroquinolone, azithromycin, or TMP-SMX based on susceptibilities",
+      "Obtain travel and food exposure history for outbreak investigation",
+      "Exclude food handlers and healthcare/childcare workers until diarrhea resolves (and per local rules)"
+    ],
+    "notes": "Salmonella is one of the most common foodborne pathogens. Most cases resolve in 4-7 days. NAAT-positive cases should still be reported even without culture. Health department may request additional stool specimens for whole genome sequencing to detect outbreaks."
+  },
+  {
+    "condition": "Shigellosis",
+    "category": "Enteric / Bacterial",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24-72 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, specimen type, Shigella species, onset date, daycare/institutional exposure",
+    "provider_obligations": [
+      "Report positive culture or NAAT",
+      "Treat to shorten illness and reduce transmission: ciprofloxacin, azithromycin, or ceftriaxone",
+      "NOTE: Antimicrobial resistance is INCREASING — obtain susceptibilities",
+      "Exclude from daycare/school/food handling until diarrhea resolved and per local health department guidance",
+      "Emphasize hand hygiene — very low infectious dose (10-100 organisms)"
+    ],
+    "notes": "Shigella is highly contagious with an extremely low infectious dose. Outbreaks common in childcare settings, institutions, and MSM communities. XDR (extensively drug-resistant) Shigella is an emerging threat."
+  },
+  {
+    "condition": "E. coli O157:H7 / STEC (Shiga toxin-producing E. coli)",
+    "category": "Enteric / Bacterial",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, specimen type, Shiga toxin test result, E. coli serotype, onset date, food/animal exposure history",
+    "provider_obligations": [
+      "Report immediately — rapid reporting enables outbreak detection",
+      "Monitor for hemolytic uremic syndrome (HUS): check CBC, BMP, LDH, reticulocyte count, peripheral smear",
+      "DO NOT treat with antibiotics — may INCREASE risk of HUS",
+      "Supportive care; avoid anti-motility agents",
+      "Hospitalize if signs of HUS (declining platelets, rising creatinine, anemia, schistocytes)",
+      "Exclude from childcare/food handling until 2 consecutive negative stool cultures ≥ 24 hours apart"
+    ],
+    "notes": "STEC (especially E. coli O157:H7) can cause life-threatening hemolytic uremic syndrome, especially in children < 5 years. Antibiotics are CONTRAINDICATED — they may increase Shiga toxin release. Obtain food and animal exposure history for outbreak investigation."
+  },
+  {
+    "condition": "Legionellosis (Legionnaires' Disease / Pontiac Fever)",
+    "category": "Respiratory / Bacterial",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, Legionella test results (urinary antigen, culture, PCR), onset date, hospitalization status, recent travel, water exposure (hot tubs, fountains, cooling towers, hospital)",
+    "provider_obligations": [
+      "Report all positive Legionella tests immediately",
+      "Obtain travel and water exposure history for the 14 days before symptom onset",
+      "Treat with azithromycin or fluoroquinolone (levofloxacin preferred for severe disease)",
+      "Notify health department about any healthcare-associated cases — triggers facility water investigation"
+    ],
+    "notes": "Legionellosis is acquired from contaminated water aerosols (not person-to-person). Clusters in hospitals, hotels, and long-term care facilities require urgent investigation of water systems. Urinary antigen test only detects serogroup 1 (70-80% of cases) — culture or PCR needed for other serogroups."
+  },
+  {
+    "condition": "Mumps",
+    "category": "Respiratory / Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, parotitis onset date, vaccination history, exposure setting (college, sports team, etc.)",
+    "provider_obligations": [
+      "Report suspected and confirmed cases",
+      "Obtain mumps IgM and mumps RT-PCR (buccal swab)",
+      "Isolate patient for 5 days after parotitis onset",
+      "A third dose of MMR may be recommended during outbreaks for those with 2 prior doses"
+    ],
+    "notes": "Mumps outbreaks still occur, often in college/university settings, even among vaccinated individuals. Vaccine effectiveness wanes over time. Complications include orchitis (in post-pubertal males), oophoritis, pancreatitis, and rarely sensorineural hearing loss."
+  },
+  {
+    "condition": "Rubella and Congenital Rubella Syndrome",
+    "category": "Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, rash onset date, pregnancy status, rubella IgM result, vaccination history, travel history",
+    "provider_obligations": [
+      "Report immediately — rubella in pregnancy can cause devastating congenital defects",
+      "Obtain rubella IgM and IgG",
+      "Isolate patient for 7 days after rash onset",
+      "If pregnant and rubella immune status unknown: test immediately; if non-immune, provide counseling about exposure risks",
+      "Congenital rubella syndrome (CRS): report any infant with compatible findings and maternal rubella exposure"
+    ],
+    "notes": "Rubella is rare in the US due to vaccination but still occurs globally. The critical public health concern is congenital rubella syndrome (deafness, cataracts, heart defects, intellectual disability). All women of childbearing age should have documented rubella immunity."
+  },
+  {
+    "condition": "Varicella (Chickenpox) — Deaths Only",
+    "category": "Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 72 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Varicella deaths are nationally notifiable; outbreak reporting of non-fatal cases varies by state",
+    "provider_obligations": [
+      "Report varicella deaths to health department",
+      "Many states also require reporting of individual cases or outbreaks",
+      "Treat with acyclovir/valacyclovir for: adults, immunocompromised, pregnant women, neonates, complicated cases",
+      "Post-exposure: Varicella vaccine within 3-5 days or VZIG for high-risk exposures (immunocompromised, pregnant, neonates)"
+    ],
+    "notes": "Varicella case reporting requirements vary significantly by state. Check your local requirements. Varicella deaths are nationally notifiable. Outbreaks in schools/institutions should always be reported."
+  },
+  {
+    "condition": "Rabies (Human)",
+    "category": "Viral / Zoonotic",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "IMMEDIATELY upon suspicion",
+    "report_to": "Local health department AND state epidemiologist",
+    "what_to_report": "Patient demographics, animal exposure details, bite site, animal species, capture status, PEP treatment given",
+    "provider_obligations": [
+      "Report any suspected human rabies case IMMEDIATELY",
+      "Report animal bites with rabies risk to local animal control / health department",
+      "Post-exposure prophylaxis (PEP): wound care + rabies immune globulin (RIG) + rabies vaccine series",
+      "PEP should be given as soon as possible after exposure — there is no time limit if exposure confirmed",
+      "Previously unvaccinated: RIG + vaccine on days 0, 3, 7, 14",
+      "Previously vaccinated: vaccine only on days 0 and 3 (no RIG needed)",
+      "Do NOT delay PEP while awaiting animal observation results if species is high-risk (bat, raccoon, skunk, fox)"
+    ],
+    "notes": "Rabies is nearly 100% fatal once clinical symptoms develop. PEP is virtually 100% effective if given before symptom onset. Bat exposures are the leading cause of human rabies in the US — PEP may be recommended even without a clear bite (bats can inflict wounds that go unnoticed). When in doubt about exposure, call your state health department for consultation."
+  },
+  {
+    "condition": "Lyme Disease",
+    "category": "Vector-borne / Bacterial",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 72 hours (or per state regulation)",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, clinical presentation (erythema migrans, arthritis, neurologic, cardiac), laboratory results (serology), county of likely exposure",
+    "provider_obligations": [
+      "Report confirmed and probable cases per CDC surveillance case definition",
+      "Early localized Lyme: Doxycycline 100 mg BID × 10-21 days",
+      "Lyme arthritis: Doxycycline 100 mg BID × 28 days",
+      "Neurologic Lyme (meningitis, facial palsy): Doxycycline 100-200 mg BID × 14-21 days or Ceftriaxone IV × 14-28 days",
+      "Erythema migrans is diagnostic — treat clinically without waiting for serology",
+      "Two-tier serology (ELISA then Western blot, or two EIA) for other presentations"
+    ],
+    "notes": "Lyme disease is the most common vector-borne disease in the US. Reporting helps track geographic spread of Ixodes tick-borne diseases. County of likely exposure is important for surveillance. Erythema migrans (expanding bull's-eye rash) is a clinical diagnosis — serology may be negative early."
+  },
+  {
+    "condition": "West Nile Virus",
+    "category": "Vector-borne / Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24-72 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, clinical presentation (fever, neuroinvasive disease), lab results (WNV IgM in serum or CSF, PRNT), county of likely exposure",
+    "provider_obligations": [
+      "Report all confirmed and probable cases",
+      "Obtain WNV IgM (serum and CSF if meningitis/encephalitis suspected)",
+      "No specific antiviral treatment — supportive care",
+      "Neuroinvasive disease (meningitis, encephalitis, acute flaccid paralysis) has significant morbidity/mortality"
+    ],
+    "notes": "Most WNV infections are asymptomatic (~80%) or cause mild febrile illness. Neuroinvasive disease occurs in < 1% of infections but can be severe or fatal, especially in elderly and immunocompromised. Peak transmission: June-October."
+  },
+  {
+    "condition": "Malaria",
+    "category": "Parasitic / Vector-borne",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours",
+    "report_to": "Local/state health department",
+    "what_to_report": "Patient demographics, Plasmodium species, parasitemia level, travel history (country, dates, chemoprophylaxis used), treatment given",
+    "provider_obligations": [
+      "Report all confirmed malaria cases — nearly all US cases are imported",
+      "Identify Plasmodium species urgently (P. falciparum can be fatal)",
+      "Obtain thick and thin blood smears AND rapid malaria antigen test",
+      "Treat based on species, severity, and chloroquine resistance patterns of travel region",
+      "P. falciparum or severe malaria: IV artesunate (available from CDC) is treatment of choice",
+      "Contact CDC Malaria Hotline (770-488-7788) for treatment guidance and artesunate access"
+    ],
+    "notes": "Malaria can progress rapidly to severe disease and death, especially P. falciparum. This is a medical emergency. CDC maintains a 24/7 Malaria Hotline for treatment consultation. Locally acquired malaria cases (no travel history) require URGENT investigation — report immediately."
+  },
+  {
+    "condition": "Dengue",
+    "category": "Vector-borne / Viral",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 72 hours",
+    "report_to": "Local health department",
+    "what_to_report": "Patient demographics, travel history, symptom onset date, lab results (NS1 antigen, IgM/IgG, RT-PCR)",
+    "provider_obligations": [
+      "Report all confirmed and probable cases",
+      "Obtain dengue NS1 antigen (first 7 days) and/or IgM (after day 4)",
+      "Monitor for warning signs of severe dengue: abdominal pain, persistent vomiting, fluid accumulation, mucosal bleeding, hepatomegaly, rising hematocrit with falling platelets",
+      "Avoid aspirin and NSAIDs (bleeding risk)",
+      "Supportive care with IV fluids for severe cases"
+    ],
+    "notes": "Dengue is increasingly reported in the US, including locally acquired cases in Florida, Texas, and other southern states. Second dengue infection with a different serotype carries higher risk of severe/hemorrhagic dengue. Report all cases to support mosquito surveillance and control efforts."
+  },
+  {
+    "condition": "Anthrax",
+    "category": "Bacterial / Bioterrorism Agent",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "IMMEDIATELY — potential bioterrorism agent",
+    "report_to": "Local health department AND FBI/law enforcement if bioterrorism suspected",
+    "what_to_report": "Patient demographics, clinical form (cutaneous, inhalation, GI, injection), exposure history, laboratory results",
+    "provider_obligations": [
+      "Report IMMEDIATELY — anthrax is a CDC Category A bioterrorism agent",
+      "Initiate treatment immediately: Ciprofloxacin or doxycycline + 1-2 additional agents for systemic disease",
+      "Consider anthrax antitoxin (raxibacumab or obiltoxaximab) for inhalation anthrax",
+      "Notify law enforcement if no natural exposure source identified",
+      "Post-exposure prophylaxis: Ciprofloxacin or doxycycline × 60 days + 3-dose anthrax vaccine series"
+    ],
+    "notes": "Anthrax is rare in the US but is a critical bioterrorism threat. Inhalation anthrax has > 85% mortality without treatment. Classic presentation: widened mediastinum on CXR, hemorrhagic mediastinal lymphadenitis. Cutaneous anthrax (painless black eschar) is less deadly but still requires urgent treatment and reporting."
+  },
+  {
+    "condition": "Botulism",
+    "category": "Bacterial / Toxin-mediated",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "IMMEDIATELY — single case is a public health emergency",
+    "report_to": "Local/state health department IMMEDIATELY; state will contact CDC for antitoxin",
+    "what_to_report": "Patient demographics, clinical presentation, suspected source (food, wound, infant), time course of symptom development",
+    "provider_obligations": [
+      "Report IMMEDIATELY — a single case of foodborne botulism could indicate a contaminated food product",
+      "Contact state health department for botulism antitoxin (BAT) — available only from CDC stockpile",
+      "Clinical diagnosis is sufficient to initiate treatment — do not wait for lab confirmation",
+      "Descending symmetric paralysis (cranial nerves first, then limbs, then respiratory)",
+      "Infant botulism: constipation → poor feeding → weak cry → floppy baby — contact California Infant Botulism Program for BabyBIG"
+    ],
+    "notes": "Botulism antitoxin must be given as early as possible — effectiveness diminishes with time. CDC provides antitoxin 24/7 via state health departments. Key clinical distinction from Guillain-Barré: botulism is DESCENDING paralysis; GBS is ASCENDING. Foodborne botulism: investigate source immediately to prevent additional cases."
+  },
+  {
+    "condition": "Candida auris",
+    "category": "Fungal / Healthcare-Associated",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24 hours",
+    "report_to": "Local/state health department and infection control",
+    "what_to_report": "Patient demographics, specimen source, antifungal susceptibility results, healthcare facility, prior healthcare exposures",
+    "provider_obligations": [
+      "Report all confirmed C. auris isolates immediately",
+      "Implement contact precautions (gown + gloves) and dedicated equipment",
+      "Screen contacts who shared the same room or unit",
+      "Treatment: echinocandins (micafungin, caspofungin, anidulafungin) are first-line",
+      "NOTE: C. auris is frequently multidrug-resistant — susceptibility testing is critical",
+      "Disinfect with EPA-registered products effective against C. auris (many standard disinfectants are NOT effective)"
+    ],
+    "notes": "Candida auris is an emerging, often multidrug-resistant fungal pathogen with high mortality (30-60%). It persists on environmental surfaces and medical equipment. Standard disinfectants may not be effective — chlorine-based products (bleach) are recommended. C. auris is often misidentified by conventional lab methods — MALDI-TOF or molecular testing needed for accurate identification."
+  },
+  {
+    "condition": "Carbapenem-Resistant Organisms (CRE, CRAB, CRPA)",
+    "category": "Bacterial / Antimicrobial Resistance",
+    "nationally_notifiable": true,
+    "reporting_timeframe": "Within 24-72 hours (varies by state)",
+    "report_to": "Local/state health department and infection control",
+    "what_to_report": "Patient demographics, organism identified, carbapenemase gene (if tested), specimen source, healthcare exposures",
+    "provider_obligations": [
+      "Report carbapenem-resistant Enterobacterales (CRE), Acinetobacter baumannii (CRAB), and Pseudomonas aeruginosa (CRPA)",
+      "Implement contact precautions",
+      "ID-guided antibiotic therapy — ceftazidime-avibactam, meropenem-vaborbactam, or cefiderocol depending on mechanism",
+      "Screen contacts in healthcare settings per infection control protocols"
+    ],
+    "notes": "Carbapenem-resistant organisms are CDC 'Urgent Threat' level. These organisms have limited treatment options and high mortality. Carbapenemase-producing organisms (CPOs) can transfer resistance genes to other bacteria. Report to enable public health tracking and infection control interventions."
+  }
+]
