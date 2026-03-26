@@ -448,7 +448,7 @@ class MonitoringRuleEngine:
         OIDs successfully refreshed.
         """
         try:
-            from app.services.billing_valueset_map import PREVENTIVE_VSAC_OIDS
+            from billing_engine.valueset_map import PREVENTIVE_VSAC_OIDS  # B6.7
             from app.services.api.umls import UMLSService
             from models.api_cache import VsacValueSetCache
         except ImportError as exc:

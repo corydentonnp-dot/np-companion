@@ -33,7 +33,7 @@ def get_vsac_codes(category: str) -> set:
         if category in _vsac_code_cache:
             return _vsac_code_cache[category]
     try:
-        from app.services.billing_valueset_map import get_vsac_icd10_codes
+        from billing_engine.valueset_map import get_vsac_icd10_codes  # B6.7
         codes = set(get_vsac_icd10_codes(category))
     except Exception:
         codes = set()

@@ -495,10 +495,10 @@ def _run_billing_rules(db, target_date):
         from models.patient import PatientRecord
         from models.billing import BillingOpportunity
         from app.services.api.cms_pfs import CMSPhysicianFeeScheduleService
-        from app.services.billing_rules import BillingRulesEngine
+        from billing_engine.engine import BillingCaptureEngine  # B6
 
         cms_svc = CMSPhysicianFeeScheduleService(db)
-        engine = BillingRulesEngine(db, cms_pfs_service=cms_svc)
+        engine = BillingCaptureEngine(db, cms_pfs_service=cms_svc)
 
         scheduled = (
             db.session.query(Schedule)
@@ -561,7 +561,7 @@ def _run_billing_rules(db, target_date):
                 BillingOpportunity.status == "pending",
             ).delete(synchronize_session=False)
 
-            opportunities = engine.evaluate_patient(patient_data)
+            opportunities = engine.evaluate(patient_data)
             for opp in opportunities:
                 db.session.add(opp)
                 created_count += 1

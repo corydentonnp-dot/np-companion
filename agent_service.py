@@ -649,8 +649,8 @@ class AgentService:
                     if not appts:
                         continue
 
-                    from app.services.billing_rules import BillingRulesEngine
-                    engine = BillingRulesEngine(db)
+                    from billing_engine.engine import BillingCaptureEngine  # B6
+                    engine = BillingCaptureEngine(db)
 
                     for appt in appts:
                         mrn = appt.patient_mrn or ""
@@ -831,7 +831,7 @@ class AgentService:
                         except Exception as cg_exc:
                             logger.debug("Calculator care gaps creation skipped: %s", cg_exc)
 
-                        opps = engine.evaluate_patient(patient_data)
+                        opps = engine.evaluate(patient_data)
                         for opp in opps:
                             # Avoid duplicates: skip if same type already exists for this patient/date
                             existing = BillingOpportunity.query.filter_by(
