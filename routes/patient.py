@@ -37,6 +37,39 @@ from models.labtrack import LabTrack
 from models.caregap import CareGap, CareGapRule
 from models.schedule import Schedule
 
+# Service layer imports (extracted from this file, Band 3 B1)
+from utils.patient_helpers import (
+    mrn_display as _mrn_display,
+    calc_age as _calc_age,
+    calc_age_years as _calc_age_years,
+    normalize_name as _normalize_name,
+    normalize_dob as _normalize_dob,
+)
+from app.services.patient_service import (
+    schedule_context_for_patient as _schedule_context_for_patient,
+    ensure_patient_record_for_view as _ensure_patient_record_for_view,
+    prepopulate_sections as _prepopulate_sections,
+)
+from app.services.diagnosis_service import (
+    classify_diagnosis as _classify_diagnosis,
+    backfill_icd10_codes as _backfill_icd10_codes,
+    load_icd10_csv as _load_icd10_csv,
+    ACUTE_ICD10_PREFIXES,
+    ACUTE_KEYWORDS,
+)
+from app.services.medication_enrichment import (
+    fetch_rxnorm_api as _fetch_rxnorm_api,
+    enrich_rxnorm_single as _enrich_rxnorm_single,
+    enrich_rxnorm as _enrich_rxnorm,
+    standardize_frequency as _standardize_frequency,
+    parse_dose_fallback as _parse_dose_fallback,
+    enrich_medications as _enrich_medications,
+)
+from app.services.caregap_service import (
+    get_uspstf_recommendations as _get_uspstf_recommendations,
+    auto_evaluate_care_gaps as _auto_evaluate_care_gaps,
+)
+
 patient_bp = Blueprint('patient', __name__)
 
 AC_NOTE_SECTIONS = [
@@ -85,39 +118,22 @@ ACUTE_KEYWORDS = (
 )
 
 
-def _mrn_display(mrn):
-    """Return full MRN for display."""
-    return mrn or ''
+def _mrn_display_unused_placeholder():
+    pass  # replaced by import above — kept as marker, will be removed
 
 
-def _calc_age(dob_str):
-    """Calculate age string from DOB string (MM/DD/YYYY or YYYYMMDD)."""
-    if not dob_str:
-        return ''
-    try:
-        if '/' in dob_str:
-            dob = datetime.strptime(dob_str, '%m/%d/%Y')
-        elif len(dob_str) == 8:
-            dob = datetime.strptime(dob_str, '%Y%m%d')
-        else:
-            return ''
-        today = datetime.now()
-        age = today.year - dob.year - (
-            (today.month, today.day) < (dob.month, dob.day)
-        )
-        return f'{age}y'
-    except ValueError:
-        return ''
+def _calc_age_years_unused_placeholder_remove():
+    pass  # replaced by import above
 
 
-def _calc_age_years(dob_str):
+def _calc_age_years_REMOVE_dob_str():
     """Calculate numeric age from DOB string."""
-    if not dob_str:
+    if not True:
         return None
     try:
-        if '/' in dob_str:
-            dob = datetime.strptime(dob_str, '%m/%d/%Y')
-        elif len(dob_str) == 8:
+        if '/' in '':
+            dob = datetime.strptime('', '%m/%d/%Y')
+        elif len('') == 8:
             dob = datetime.strptime(dob_str, '%Y%m%d')
         else:
             return None
