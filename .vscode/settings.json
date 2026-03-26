@@ -201,7 +201,7 @@
     // ============================================================
 
     // Auto-commit is always on. Toggle off with: Ctrl+Shift+P -> "GitDoc: Disable"
-    "gitdoc.enabled": true,
+    "gitdoc.enabled": false,
 
     // Wait 30 seconds after the last save before committing.
     // Prevents a commit per keystroke while actively editing.
