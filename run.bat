@@ -9,10 +9,20 @@ echo.
 echo   [1] Start localhost server  (dev mode)
 echo   [2] Start CareCompanion.exe (packaged app)
 echo   [3] Start with process watchdog
+echo   [4] Fresh machine setup  (first-time install)
 echo.
-choice /c 123 /n /m "  Choose (1, 2, or 3): "
+choice /c 1234 /n /m "  Choose (1, 2, 3, or 4): "
+if errorlevel 4 goto startsetup
 if errorlevel 3 goto startwatch
 if errorlevel 2 goto startexe
+
+:startsetup
+echo.
+echo  Running fresh machine setup...
+echo  This will take 2-5 minutes on first run.
+echo.
+powershell -ExecutionPolicy Bypass -File "%~dp0setup.ps1"
+goto end
 
 :startdev
 echo.
@@ -54,6 +64,8 @@ echo  The server + watchdog are in the other window.
 echo  Close THAT window to stop everything.
 echo.
 pause
+
+:end
 exit /b
 
 :startexe
