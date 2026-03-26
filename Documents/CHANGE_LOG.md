@@ -6,6 +6,33 @@
 
 ---
 
+## CL-135 — Remediation Audit: 3 Passes Complete
+**Completed:** 03-27-26 13:00:00 UTC
+
+### Audit Pass 1 (Line-by-Line Verification)
+- All Band 1 files verified: Claude/ gone, migrations/seeds/ created, model files created (api_cache, controlled_substance, prior_auth, referral, coding)
+- All Band 2 files verified: .github/instructions/ = 1 file, .github/prompts/ = 9 files, COMMANDS.md gone, qa/ dir gone, TESTING_GUIDE.md present
+- All Band 3 files verified: service files created, cross-route imports = 0, scripts moved, tools cleaned
+- All Band 4 files verified: Anti-Sprawl section in copilot-instructions.md, DESIGN_CONSTITUTION.md exists, lint_sprawl.py exists
+- .gitignore: Claude/ and audit_pw*.png entries confirmed
+
+### Audit Pass 2 (Structural Verification)
+- dev_guide: 13 files (11 permanent + 2 overnight artifacts), 0 subdirectories ✅
+- init.prompt.md: 168 lines (max 500) ✅
+- ACTIVE_PLAN.md: 69 lines (max 1200) ✅
+- CareCompanion.agent.md: 56 lines (max 80) ✅
+- Cross-route imports: 0 ✅
+- Cleaned 16 audit_pw*.png files from root → moved to Documents/_archive/screenshots/
+
+### Audit Pass 3 (Integration Verification)
+- Flask started (PID 13352), port 5000 confirmed
+- GET /login → 200 OK ✅
+- GET /dashboard (unauthenticated) → 302 redirect to login (auth working) ✅
+- Prior Playwright screenshots confirm dashboard, patients, inbox, timer, billing pages all loaded
+- 211 tests pass ✅
+
+---
+
 ## CL-134 — Band 4: Anti-Sprawl Guardrails, Design Constitution, Sprawl Linter
 **Completed:** 03-27-26 12:30:00 UTC
 

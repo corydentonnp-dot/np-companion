@@ -294,38 +294,38 @@ Go through EVERY checklist item above. For each `[x]` item, verify:
 - The content is correct (read the file, don't just trust the checkbox)
 - No broken imports or references remain
 Mark any discrepancies → fix or document.
-- [ ] Audit Pass 1 complete
+- [x] Audit Pass 1 complete
 
 ### Audit Pass 2: Structural Verification
-- [ ] `Documents/dev_guide/` file count = 11 (including TEST_PLAYWRIGHT.md which we did not touch), 0 subdirectories
-- [ ] `.github/instructions/` file count = 1
-- [ ] `.github/prompts/` file count = 9
-- [ ] `Claude/` directory does not exist at root
-- [ ] No `audit_pw*.png` at project root
-- [ ] `.gitignore` contains `Claude/` and `audit_pw*.png` entries
-- [ ] `init.prompt.md` ≤ 500 lines
-- [ ] `ACTIVE_PLAN.md` ≤ 1,200 lines
-- [ ] `CareCompanion.agent.md` ≤ 80 lines
-- [ ] Grep `routes/` for `from routes.` → 0 matches (excluding `__init__` and import-from-self)
-- [ ] Full test suite passes
-- [ ] Audit Pass 2 complete
+- [x] `Documents/dev_guide/` file count = 11 (including TEST_PLAYWRIGHT.md which we did not touch), 0 subdirectories
+- [x] `.github/instructions/` file count = 1
+- [x] `.github/prompts/` file count = 9
+- [x] `Claude/` directory does not exist at root
+- [x] No `audit_pw*.png` at project root
+- [x] `.gitignore` contains `Claude/` and `audit_pw*.png` entries
+- [x] `init.prompt.md` ≤ 500 lines
+- [x] `ACTIVE_PLAN.md` ≤ 1,200 lines
+- [x] `CareCompanion.agent.md` ≤ 80 lines
+- [x] Grep `routes/` for `from routes.` → 0 matches (excluding `__init__` and import-from-self)
+- [x] Full test suite passes
+- [x] Audit Pass 2 complete
 
 ### Audit Pass 3: Integration Verification
-- [ ] Start Flask if not running: check port 5000 first, then `.\run.ps1`
-- [ ] Navigate to `http://localhost:5000/login` and take screenshot — page loads
-- [ ] Log in as CORY / ASDqwe123
-- [ ] Navigate to `/dashboard` — page loads without 500 error
-- [ ] Navigate to `/patients` — page loads
-- [ ] Navigate to `/billing/log` — page loads
-- [ ] Navigate to `/tools` — page loads
-- [ ] Navigate to `/calculators` — page loads
-- [ ] Navigate to `/admin` — page loads
-- [ ] Check browser console on each page — zero errors
-- [ ] Audit Pass 3 complete
+- [x] Start Flask if not running: check port 5000 first, then `.\run.ps1`
+- [x] Navigate to `http://localhost:5000/login` and take screenshot — page loads
+- [x] Log in as CORY / ASDqwe123
+- [x] Navigate to `/dashboard` — page loads without 500 error
+- [x] Navigate to `/patients` — page loads
+- [x] Navigate to `/billing/log` — page loads
+- [x] Navigate to `/tools` — page loads
+- [x] Navigate to `/calculators` — page loads
+- [x] Navigate to `/admin` — page loads
+- [x] Check browser console on each page — zero errors
+- [x] Audit Pass 3 complete
 
 ### POST-AUDIT
-- [ ] Final git commit: `git add -A && git commit -m "Remediation complete — 3 audit passes verified"`
-- [ ] Update CHANGE_LOG.md with comprehensive CL entry summarizing all remediation work
+- [x] Final git commit: `git add -A && git commit -m "Remediation complete — 3 audit passes verified"`
+- [x] Update CHANGE_LOG.md with comprehensive CL entry summarizing all remediation work
 
 ---
 
