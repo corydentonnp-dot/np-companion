@@ -47,6 +47,16 @@ from models.schedule import Schedule
 
 timer_bp = Blueprint('timer', __name__)
 
+# B1.15 — RVU_TABLE, EM_TIME_RANGES, billing helpers moved to app/services/timer_service.py
+# Imported here so tests that do `from routes.timer import RVU_TABLE` continue to work.
+from app.services.timer_service import (  # noqa: E402
+    RVU_TABLE, EM_TIME_RANGES,
+    detect_anomalies as _detect_anomalies,
+    monthly_stats as _monthly_stats,
+    _EM_LEVEL_ORDER, _EM_NEW_LEVEL_ORDER,
+    _NEW_PATIENT_CODES, _ESTABLISHED_CODES,
+)
+
 # ---- Billing level choices (used in template + validation) ---------------
 BILLING_LEVELS = [
     '99211', '99212', '99213', '99214', '99215',

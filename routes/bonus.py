@@ -18,6 +18,7 @@ from app.services.bonus_calculator import (
     project_first_bonus_quarter,
     calculate_opportunity_impact,
     current_quarter_status,
+    build_deficit_history as _build_deficit_history,  # B1.20
 )
 
 logger = logging.getLogger(__name__)
@@ -207,47 +208,6 @@ def bonus_confirm_threshold():
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers (moved to app/services/bonus_calculator.py — B1.20)
 # ---------------------------------------------------------------------------
-
-def _build_deficit_history(receipts: dict, threshold: float,
-                           deficit_resets_annually: bool) -> list:
-    """Build quarter-by-quarter deficit timeline from receipt data."""
-    if not receipts:
-        return []
-
-    # Group receipts by quarter
-    quarters = {}
-    for key, val in receipts.items():
-        try:
-            y, m = int(key[:4]), int(key[5:])
-            q = (m - 1) // 3 + 1
-            q_key = (y, q)
-            quarters.setdefault(q_key, 0.0)
-            quarters[q_key] += val
-        except (ValueError, IndexError):
-            continue
-
-    if not quarters:
-        return []
-
-    history = []
-    cum_deficit = 0.0
-
-    for (y, q) in sorted(quarters.keys()):
-        if deficit_resets_annually and q == 1 and history:
-            cum_deficit = 0.0
-
-        result = calculate_quarterly_bonus(quarters[(y, q)], threshold, cum_deficit)
-        cum_deficit = result["new_deficit"]
-
-        history.append({
-            "quarter": f"{y}-Q{q}",
-            "receipts": round(quarters[(y, q)], 2),
-            "gross_surplus": round(result["gross_surplus"], 2),
-            "bonus_amount": round(result["bonus_amount"], 2),
-            "cumulative_deficit": round(cum_deficit, 2),
-            "exceeded": result["exceeded"],
-        })
-
-    return history
+# _build_deficit_history is imported above from bonus_calculator
