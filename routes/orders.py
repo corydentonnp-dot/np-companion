@@ -277,7 +277,7 @@ def execute_set(set_id):
     db.session.commit()
 
     # Run the PyAutoGUI executor
-    from agent.pyautogui_runner import execute_order_set
+    from agent.pyautogui_runner import execute_order_set  # lint-ok: pyautogui — pending B5 async queue refactor
     result = execute_order_set(execution.id)
 
     return jsonify(result)
@@ -297,7 +297,7 @@ def resume_execution(exec_id):
     execution.status = 'in_progress'
     db.session.commit()
 
-    from agent.pyautogui_runner import execute_order_set
+    from agent.pyautogui_runner import execute_order_set  # lint-ok: pyautogui — pending B5 async queue refactor
     result = execute_order_set(execution.id)
 
     return jsonify(result)

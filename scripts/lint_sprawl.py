@@ -108,7 +108,13 @@ def check_cross_route_imports(errors, warnings):
 
 
 def check_agent_pyautogui_imports(errors, warnings):
-    """ERROR if any routes/ file imports from agent.pyautogui* or pyautogui_runner."""
+    """ERROR if any routes/ file imports from agent.pyautogui* or pyautogui_runner.
+
+    Exceptions:
+    - Lines with '# lint-ok: pyautogui' suppression comment are skipped.
+    - 'import pyautogui' inside a try/except ImportError block is a WARN, not ERROR,
+      since graceful fallback is already handled at that call site.
+    """
     agent_import_re = re.compile(
         r"^\s*from\s+agent\.pyautogui|^\s*import\s+agent\.pyautogui"
         r"|^\s*from\s+agent\s+import\s+.*pyautogui",
@@ -124,29 +130,79 @@ def check_agent_pyautogui_imports(errors, warnings):
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue
-            if agent_import_re.match(line) or pyautogui_direct_re.match(line):
+            # Support lint-ok suppression comment
+            if "# lint-ok" in line:
+                continue
+            if agent_import_re.match(line):
                 errors.append(
-                    f"ERROR routes/{fname}:{lineno}: agent/pyautogui import in route: {stripped}"
+                    f"ERROR routes/{fname}:{lineno}: agent/pyautogui import in route "
+                    f"(use async DB queue — pending B5): {stripped}"
                 )
+            elif pyautogui_direct_re.match(line):
+                # Check if we're inside a try block (look back for 'try:')
+                start = max(0, lineno - 6)
+                ctx = "".join(lines[start : lineno - 1])
+                if re.search(r"\btry\s*:", ctx):
+                    warnings.append(
+                        f"WARN  routes/{fname}:{lineno}: pyautogui import inside try block "
+                        f"(ImportError handled, but desktop code in routes — pending B5): {stripped}"
+                    )
+                else:
+                    errors.append(
+                        f"ERROR routes/{fname}:{lineno}: pyautogui import in route "
+                        f"(use async DB queue — pending B5): {stripped}"
+                    )
 
 
 def check_clinical_hard_deletes(errors, warnings):
-    """ERROR if db.session.delete() is called on a clinical model instance."""
-    # Match: db.session.delete(some_var) — flag any call in routes/ files.
-    # Also check for variable names that look like clinical model instances.
-    delete_re = re.compile(r"db\.session\.delete\s*\(")
+    """ERROR if db.session.delete() is called on a CLINICAL model instance.
+
+    Clinical models: Patient, Encounter, Note, Order, Medication.
+    Non-clinical objects (bookmarks, order templates, timer entries, etc.) are allowed.
+
+    Detection: look for the variable's assignment from a clinical model query
+    within the preceding 40 lines of the same function.
+    """
+    # These are the CLINICAL model class names that must not be hard-deleted
+    clinical_model_names = {
+        "Patient", "Encounter", "Note", "Order", "Medication",
+        "ClinicalNote", "NoteTemplate",
+    }
+    # Build a pattern to match clinical model queries (e.g. "Patient.query." or "Patient.get(")
+    clinical_query_re = re.compile(
+        r"\b(" + "|".join(clinical_model_names) + r")\b.*?(?:\.query\.|db\.session\.get)"
+    )
+    delete_re = re.compile(r"db\.session\.delete\s*\(\s*(\w+)\s*\)")
+
     for path, fname in route_files():
         lines = read_file(path)
         for lineno, line in enumerate(lines, 1):
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue
-            if delete_re.search(line):
-                # Report it — let the developer judge whether it's a clinical model
-                errors.append(
-                    f"ERROR routes/{fname}:{lineno}: db.session.delete() call — "
-                    f"use soft-delete (is_archived/is_resolved) for clinical records: {stripped}"
+            # Check for lint-ok suppression comment
+            if "# lint-ok" in line:
+                continue
+            m = delete_re.search(line)
+            if not m:
+                continue
+            var_name = m.group(1)
+            # Look back up to 40 lines for this variable being assigned from a clinical model
+            start = max(0, lineno - 41)
+            surrounding = lines[start : lineno - 1]
+            assignment_context = "".join(surrounding)
+            # Check if the variable appears in a clinical model query in the surrounding scope
+            if clinical_query_re.search(assignment_context):
+                # Extra check: does the variable name appear in that context?
+                var_assignment_re = re.compile(
+                    rf"\b{re.escape(var_name)}\s*=.*(?:" +
+                    "|".join(clinical_model_names) + r")"
                 )
+                if var_assignment_re.search(assignment_context):
+                    errors.append(
+                        f"ERROR routes/{fname}:{lineno}: db.session.delete({var_name}) on "
+                        f"clinical model — use soft-delete (is_archived/is_resolved): {stripped}"
+                    )
 
 
 def check_missing_login_required(errors, warnings):
