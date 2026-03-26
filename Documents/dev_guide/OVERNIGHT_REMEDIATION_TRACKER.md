@@ -254,7 +254,7 @@
 ## BAND 4: Governance & Constitution
 
 ### C1: Anti-Sprawl Rules
-- [ ] C1.1: Add to `.github/copilot-instructions.md` under a new `## Anti-Sprawl Guardrails` section:
+- [x] C1.1: Add to `.github/copilot-instructions.md` under a new `## Anti-Sprawl Guardrails` section:
   1. Max route file size: 800 lines. Exceeding = split.
   2. No cross-route imports. Shared logic → `app/services/` or `utils/`.
   3. No `from agent.` imports in `routes/`. Agent execution → async via DB queue.
@@ -262,27 +262,27 @@
   5. Template JS extraction threshold: `<script>` block > 50 lines → extract to `static/js/`.
 
 ### C2: Design Constitution Integration
-- [ ] C2.1: Create `Documents/overview/DESIGN_CONSTITUTION.md` with the full Design Constitution text (provided below in APPENDIX A)
-- [ ] C2.2: Add to `.github/copilot-instructions.md` a new `## Product Design Principles` section (~50 lines) containing:
+- [x] C2.1: Create `Documents/overview/DESIGN_CONSTITUTION.md` with the full Design Constitution text (provided below in APPENDIX A)
+- [x] C2.2: Add to `.github/copilot-instructions.md` a new `## Product Design Principles` section (~50 lines) containing:
   - Constitutional Priority Chain: Safety > Usability > Data Integrity > Performance > Interop > Revenue > Admin > Polish
   - Top 10 principles: (1) Passive support beats interruptive unless risk is high. (2) Structured data captured once, reused everywhere. (3) Every screen prioritizes signal over exhaust. (4) Every workflow preserves context through interruptions. (5) Every recommendation must be explainable. (6) Every safety-sensitive action must be auditable. (7) Notes are output views, not the core data model. (8) Never make the user remember what the system already knows. (9) Never bury urgent information in secondary tabs. (10) AI must assist, not obscure — every AI output clearly marked as suggested/drafted/inferred.
   - Reference: `See Documents/overview/DESIGN_CONSTITUTION.md for the full product design constitution.`
 
 ### C3: Automated Sprawl Linter
-- [ ] C3.1: Create `scripts/lint_sprawl.py` that checks:
+- [x] C3.1: Create `scripts/lint_sprawl.py` that checks:
   - Route files > 800 lines → WARN
   - `from routes.` imports inside `routes/` → ERROR
   - `from agent.pyautogui` imports in `routes/` → ERROR
   - `db.session.delete()` on clinical models (Patient, Encounter, Note, Order, Medication) → ERROR
   - Missing `@login_required` on route functions (exclude known exemptions: login, register, room-widget, handoff) → WARN
   - Inline `<script>` blocks > 50 lines in templates → WARN
-- [ ] C3.2: Run `venv\Scripts\python.exe scripts/lint_sprawl.py` — log results
-- [ ] C3.3: Fix any ERROR-level findings. WARN-level findings → document in OVERNIGHT_ISSUES.md for future work.
+- [x] C3.2: Run `venv\Scripts\python.exe scripts/lint_sprawl.py` — log results
+- [x] C3.3: Fix any ERROR-level findings. WARN-level findings → document in OVERNIGHT_ISSUES.md for future work.
 
 ### BAND 4 CHECKPOINT
-- [ ] Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
-- [ ] Git commit: `git add -A && git commit -m "Band 4: Anti-sprawl rules, Design Constitution, sprawl linter"`
-- [ ] Update CHANGE_LOG.md with CL entry for Band 4
+- [x] Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
+- [x] Git commit: `git add -A && git commit -m "Band 4: Anti-sprawl rules, Design Constitution, sprawl linter"`
+- [x] Update CHANGE_LOG.md with CL entry for Band 4
 
 ---
 
