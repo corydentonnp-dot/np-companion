@@ -42,6 +42,13 @@ Use `app.test_client()` for integration tests. Use the test patient (MRN 62815, 
 - Run the new test file specifically.
 - Report pass/fail counts.
 
+### 4.1 Playwright MCP Coverage (UI Flows)
+- For any UI-facing feature, include a browser validation block using Playwright MCP tools.
+- Validate at least one happy-path interaction and one visible error/empty-state path.
+- Capture evidence with snapshots/screenshots for key states.
+- Keep Playwright checks scoped to changed routes to control runtime.
+- If Playwright cannot run, report that gap explicitly and list manual fallback checks.
+
 ### 5. Output
 - List all test cases written with descriptions.
 - Report coverage gaps that still need manual testing.

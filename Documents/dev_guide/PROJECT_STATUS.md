@@ -468,6 +468,17 @@ Chrome 136 compatibility, manual schedule entry, paste-from-OCR, and AC data col
 | R7 | Technical | 64 migration files — complexity risk on fresh installs; recursion risk if migrations call create_app() | Low | All migrations idempotent; recursion guard in `_run_pending_migrations`; all migrations now use `def run_migration(app, db)` pattern; consolidation planned for SaaS | Copilot | Mitigating |
 | R8 | Operational | Orphaned Python processes (100-300) crash machine | Critical | CL-122: Process watchdog with `--watch` mode (30s CSV logging, parent-chain origin tagging); agent spawn guard (PID file + port 5001 check); run.bat pre-flight cleanup; auto-kill at 95% CPU for 3 min sustained | Copilot | Mitigating |
 
+## Bug Inventory
+
+> Consolidated from the retired qa/ bug inventory. Track open defects here.
+
+| ID | Severity | Component | Description | Status | Owner | Notes |
+|----|----------|-----------|-------------|--------|-------|-------|
+| BUG-001 | High | Logging, data handling | Missing centralized PHI scrubbing utility was identified in QA. | Closed | Copilot | Resolved via `utils/phi_scrubber.py` in CL-126. Continue enforcing usage in new logging paths. |
+| BUG-002 | Medium | Bonus model/business rule | `deficit_resets_annually` rule needs business confirmation for correct financial behavior. | Open | User | Confirm expected annual reset behavior with practice leadership and align projection logic. |
+| BUG-003 | Medium | NetPractice scraper | Placeholder selector markers require instance-specific customization. | Open | User | `scrapers/netpractice.py` still has CUSTOMIZE markers for live DOM selectors. |
+| BUG-004 | Low | Test infrastructure | Legacy non-pytest test pattern remains in many test files. | Open | Copilot | Continue incremental migration to pytest-style tests. |
+
 ### Closed Risks
 *None yet.*
 

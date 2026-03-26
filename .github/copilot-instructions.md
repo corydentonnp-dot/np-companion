@@ -466,17 +466,17 @@ Only these files may exist in `Documents/dev_guide/`. Any content that doesn't f
 
 | File | Purpose |
 |------|---------|
-| `ACTIVE_PLAN.md` | Current sprint / work-in-progress plan |
-| `CARECOMPANION_DEVELOPMENT_GUIDE.md` | Phase-by-phase feature specs (the "bible") |
-| `PROJECT_STATUS.md` | Build state, Feature Registry, dependency list |
-| `API_INTEGRATION_PLAN.md` | All external API specs, caching, billing rules |
-| `AC_INTERFACE_REFERENCE_V4.md` | Amazing Charts UI ground truth |
-| `AC_PATIENT_INFO_GUIDE.md` | AC patient data extraction reference |
-| `AC_RETROACTIVE_UPDATE_GUIDE.md` | AC retroactive chart update procedures |
-| `DEPLOYMENT_GUIDE.md` | Build, transfer, install, update workflow |
-| `SETUP_GUIDE.md` | Dev environment setup + troubleshooting |
-| `SAAS_PLAN.md` | Future SaaS migration planning |
-| `UI_OVERHAUL.md` | 9-system UI/UX overhaul plan |
+| `ACTIVE_PLAN.md` | Current sprint / WIP |
+| `PROJECT_STATUS.md` | Build state, Feature Registry, Bug Inventory, Risk Register |
+| `CARECOMPANION_DEVELOPMENT_GUIDE.md` | Feature specs |
+| `AC_INTERFACE_REFERENCE_V4.md` | AC ground truth + patient data extraction |
+| `API_INTEGRATION_PLAN.md` | External API specs |
+| `DEPLOYMENT_GUIDE.md` | Build/deploy procedures |
+| `SETUP_GUIDE.md` | Dev environment setup + second machine |
+| `SAAS_PLAN.md` | SaaS migration plan |
+| `UI_OVERHAUL.md` | UI overhaul plan |
+| `TESTING_GUIDE.md` | Testing strategy, conventions, coverage, test data |
+| `TEST_PLAYWRIGHT.md` | Playwright MCP browser testing phases & checklists |
 
 ### Rules
 
@@ -494,6 +494,38 @@ When a plan or feature doc is fully implemented:
 3. Archive the completed file to `Documents/_archive/dev_guide_retired/` with a dated note at top.
 4. Remove references to the archived file from `init.prompt.md` and `PROJECT_STATUS.md`.
 5. This workflow is **not optional** — execute it automatically when a feature reaches "Complete."
+
+---
+
+## Commands & Agents Quick Reference
+
+### Custom Agent
+
+| Command | Description |
+|---------|-------------|
+| `@CareCompanion` | Full product team autopilot agent (audit -> plan -> execute). |
+
+### Slash Commands
+
+| Command | Role | What It Does |
+|---------|------|--------------|
+| `/keep-working` | All | Finds highest-priority next task and continues execution |
+| `/sprint-review` | PM | Audits sprint progress and updates next-step plan |
+| `/compliance-audit` | Security/CTO | Combined HIPAA, OWASP, and SaaS-readiness audit |
+| `/tech-debt` | CTO | Finds duplication, dead code, and structural drift |
+| `/test-plan` | QA Lead | Builds test plans with integration/edge/auth/isolation coverage |
+| `/risk-report` | Risk Manager | Reviews active risks and mitigation priorities |
+| `/session-close` | All | Runs end-of-session documentation and reconciliation |
+| `/git` | DevOps | Performs safe pull/push workflows without destructive commands |
+
+### File-Scoped Instructions
+
+| Scope | Applies To | What It Enforces |
+|-------|-----------|------------------|
+| Models | `models/**/*.py` | Soft-delete, scoping, UTC timestamp patterns |
+| Routes | `routes/**/*.py` | Auth decorators, JSON shape, safe error handling |
+| Agent | `agent/**/*.py` | Desktop boundary, OCR/UIA safety, PHI-safe logging |
+| Adapters | `adapters/**/*.py` | BaseAdapter boundary and EHR-agnostic transformation |
 
 ---
 

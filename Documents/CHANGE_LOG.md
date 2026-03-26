@@ -6,6 +6,95 @@
 
 ---
 
+## CL-131 — Overnight Band 2 A5/A6 Prompt Consolidation and Commands Fold
+**Completed:** 03-26-26 05:43:09 UTC
+- Prompt consolidation completed in `.github/prompts/`:
+  - Added: `session-close.prompt.md`, `git.prompt.md`, `compliance-audit.prompt.md`
+  - Trimmed: `find-improvements.prompt.md`
+  - Updated: `test-plan.prompt.md` with Playwright MCP UI-validation guidance
+  - Removed superseded prompts: `check_your_work.prompt.md`, `eod.prompt.md`, `pull_from_git.prompt.md`, `push_to_git.prompt.md`, `security-audit.prompt.md`, `saas-check.prompt.md`
+- Final prompt directory reduced from 12 to 9 files.
+- Folded command reference content into `.github/copilot-instructions.md` under `## Commands & Agents Quick Reference`.
+- Updated `Approved File Whitelist` table in `.github/copilot-instructions.md` to the canonical 11-file set including `TESTING_GUIDE.md` and `TEST_PLAYWRIGHT.md`.
+- Deleted legacy `.github/COMMANDS.md` after fold.
+- Verification:
+  - `.github/prompts/` count: 9
+  - `.github/COMMANDS.md` exists: False
+  - no orphaned references to deleted prompt filenames in `.github/copilot-instructions.md`
+
+---
+
+## CL-130 — Overnight Band 2 A4 ACTIVE_PLAN Trim and Archive
+**Completed:** 03-26-26 05:40:04 UTC
+- Archived full historical ACTIVE_PLAN content to:
+  - `Documents/_archive/ACTIVE_PLAN_completed_032626.md`
+- Replaced `Documents/dev_guide/ACTIVE_PLAN.md` with a current-work-only plan containing:
+  - active remediation bands
+  - pending platform/UX tasks
+  - verification gates
+- Validation: `ACTIVE_PLAN.md` line count now 69 (target <= 1200).
+
+---
+
+## CL-129 — Overnight Band 2 A3 Consolidation (QA Dissolution + Doc Folding)
+**Completed:** 03-26-26 05:38:41 UTC
+- Created `Documents/dev_guide/TESTING_GUIDE.md` by consolidating the retired `Documents/dev_guide/qa/` planning files into a single canonical testing document.
+- Folded bug inventory content into `Documents/dev_guide/PROJECT_STATUS.md` under a new `## Bug Inventory` section after the Risk Register.
+- Folded second-machine transfer/setup guidance into `Documents/dev_guide/SETUP_GUIDE.md` under `## Second Machine / Computer 2 Setup`.
+- Added `## Patient Data Extraction` section to `Documents/dev_guide/AC_INTERFACE_REFERENCE_V4.md` to absorb AC patient extraction guidance.
+- Archived retired docs with archive headers:
+  - `Documents/_archive/dev_guide_retired/chat_transfer.md`
+  - `Documents/_archive/dev_guide_retired/AC_PATIENT_INFO_GUIDE.md`
+- Removed dissolved QA directory content and directory:
+  - deleted all files from `Documents/dev_guide/qa/`
+  - deleted `Documents/dev_guide/qa/logs/`
+  - deleted `Documents/dev_guide/qa/`
+- Validation:
+  - `Documents/dev_guide/TESTING_GUIDE.md` line count: 299 (target <= 1200)
+
+---
+
+## CL-128 — Overnight Band 2 A2 Instruction Consolidation (4 to 1)
+**Completed:** 03-26-26 05:34:42 UTC
+- Consolidated instruction files in `.github/instructions/` into one standards file.
+- Added `.github/instructions/coding-standards.instructions.md` with unified sections:
+  - Models
+  - Routes
+  - Agent and desktop automation
+  - Adapters
+  - Testing
+- Removed legacy files:
+  - `.github/instructions/adapters.instructions.md`
+  - `.github/instructions/agent-boundary.instructions.md`
+  - `.github/instructions/models.instructions.md`
+  - `.github/instructions/routes.instructions.md`
+- Verification: `.github/instructions/` now contains exactly one file (`coding-standards.instructions.md`).
+
+---
+
+## CL-127 — Overnight Band 2 A1 Context Dedup (Instruction Surface Reduction)
+**Completed:** 03-26-26 05:33:27 UTC
+- Completed Band 2 A1 instruction deduplication to remove duplicated always-on guidance.
+- Trimmed `init.prompt.md` from 967 lines to 168 lines and kept only required sections:
+  - Project overview
+  - Key documents table
+  - Tech stack table
+  - Folder structure
+  - Feature catalog (Phases 1-9)
+  - AC shortcut reference
+  - Clinical summary XML sections
+- Trimmed `.github/agents/CareCompanion.agent.md` from 145 lines to 56 lines and kept only:
+  - YAML frontmatter (including tools list)
+  - Autopilot protocol (Phases 1-4)
+  - Plan-only mode note
+  - Reference line to `.github/copilot-instructions.md` for full rules
+- Validation checks:
+  - `init.prompt.md` line count <= 500: PASS (168)
+  - `.github/agents/CareCompanion.agent.md` line count <= 80: PASS (56)
+  - Duplicate section headers in `init.prompt.md` (HIPAA/Process/Flask/Agent/SaaS): none found
+
+---
+
 ## CL-126 — Overnight Band 1 Remediation (Cleanup, Model Reorg, Migration Housekeeping)
 **Completed:** 03-26-26 05:29:36 UTC
 - Completed Band 1 cleanup and structural reorganization tasks from the overnight tracker.

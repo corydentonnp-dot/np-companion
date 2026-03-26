@@ -76,42 +76,42 @@
 
 ### BAND 1 CHECKPOINT
 - [x] Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
-- [ ] Git commit: `git add -A && git commit -m "Band 1: Root cleanup, archive cleanup, model reorg, migration housekeeping"`
-- [ ] Update CHANGE_LOG.md with CL entry for Band 1
+- [x] Git commit: `git add -A && git commit -m "Band 1: Root cleanup, archive cleanup, model reorg, migration housekeeping"`
+- [x] Update CHANGE_LOG.md with CL entry for Band 1
 
 ---
 
 ## BAND 2: Structural Docs (no code risk)
 
 ### A1: Always-On Context Dedup
-- [ ] A1.1: Read FULL `init.prompt.md` — identify all sections duplicated in `copilot-instructions.md`
-- [ ] A1.2: Read FULL `.github/copilot-instructions.md` — identify all sections duplicated in `init.prompt.md`
-- [ ] A1.3: Strip from `init.prompt.md`: HIPAA section, Process & Resource Management, Flask Patterns, Agent Architecture, AC Automation, OCR Rules, Frontend patterns, NetPractice/Playwright, API Integration, Multi-User, Notifications, Testing, Never Commit, Dev Admin, SaaS-Ready rules, Product Thinking, QA Discipline, Security & Compliance, Risk Register Protocol, Strategic Decision Log, PM Discipline, Document Management, Session Workflow, Feature Registry Maintenance, Mid-Session Discipline. Keep ONLY: Project Overview, Key Documents table, Tech Stack table, folder structure, feature catalog (Phases 1-9), AC shortcuts, clinical summary sections.
-- [ ] A1.4: Target: `init.prompt.md` ≤ 500 lines
-- [ ] A1.5: Read `.github/agents/CareCompanion.agent.md` — strip duplicated Identity & Roles table and Hard Rules section. Replace with: `> **Full rules:** See `.github/copilot-instructions.md` for HIPAA, tech constraints, process management, and all operational rules.`
-- [ ] A1.6: Keep in CareCompanion.agent.md ONLY: YAML frontmatter, Autopilot Protocol (Phases 1-4), the tools list
-- [ ] A1.7: Grep `init.prompt.md` and `copilot-instructions.md` for shared section headers (HIPAA, Process, Flask, Agent, SaaS) — verify 0 duplicates remain
-- [ ] A1.8: Verify — `init.prompt.md` ≤ 500 lines, `CareCompanion.agent.md` ≤ 80 lines
+- [x] A1.1: Read FULL `init.prompt.md` — identify all sections duplicated in `copilot-instructions.md`
+- [x] A1.2: Read FULL `.github/copilot-instructions.md` — identify all sections duplicated in `init.prompt.md`
+- [x] A1.3: Strip from `init.prompt.md`: HIPAA section, Process & Resource Management, Flask Patterns, Agent Architecture, AC Automation, OCR Rules, Frontend patterns, NetPractice/Playwright, API Integration, Multi-User, Notifications, Testing, Never Commit, Dev Admin, SaaS-Ready rules, Product Thinking, QA Discipline, Security & Compliance, Risk Register Protocol, Strategic Decision Log, PM Discipline, Document Management, Session Workflow, Feature Registry Maintenance, Mid-Session Discipline. Keep ONLY: Project Overview, Key Documents table, Tech Stack table, folder structure, feature catalog (Phases 1-9), AC shortcuts, clinical summary sections.
+- [x] A1.4: Target: `init.prompt.md` ≤ 500 lines
+- [x] A1.5: Read `.github/agents/CareCompanion.agent.md` — strip duplicated Identity & Roles table and Hard Rules section. Replace with: `> **Full rules:** See `.github/copilot-instructions.md` for HIPAA, tech constraints, process management, and all operational rules.`
+- [x] A1.6: Keep in CareCompanion.agent.md ONLY: YAML frontmatter, Autopilot Protocol (Phases 1-4), the tools list
+- [x] A1.7: Grep `init.prompt.md` and `copilot-instructions.md` for shared section headers (HIPAA, Process, Flask, Agent, SaaS) — verify 0 duplicates remain
+- [x] A1.8: Verify — `init.prompt.md` ≤ 500 lines, `CareCompanion.agent.md` ≤ 80 lines
 
 ### A2: Instructions Consolidation (4 → 1)
-- [ ] A2.1: Read all 4 instruction files:
+- [x] A2.1: Read all 4 instruction files:
   - `.github/instructions/adapters.instructions.md`
   - `.github/instructions/agent-boundary.instructions.md`
   - `.github/instructions/models.instructions.md`
   - `.github/instructions/routes.instructions.md`
-- [ ] A2.2: Create `.github/instructions/coding-standards.instructions.md` with YAML frontmatter `applyTo: "**/*.py"` and sections: ## Models, ## Routes, ## Agent & Desktop Automation, ## Adapters, ## Testing
-- [ ] A2.3: Delete `adapters.instructions.md`
-- [ ] A2.4: Delete `agent-boundary.instructions.md`
-- [ ] A2.5: Delete `models.instructions.md`
-- [ ] A2.6: Delete `routes.instructions.md`
-- [ ] A2.7: Verify — `.github/instructions/` has exactly 1 file
+- [x] A2.2: Create `.github/instructions/coding-standards.instructions.md` with YAML frontmatter `applyTo: "**/*.py"` and sections: ## Models, ## Routes, ## Agent & Desktop Automation, ## Adapters, ## Testing
+- [x] A2.3: Delete `adapters.instructions.md`
+- [x] A2.4: Delete `agent-boundary.instructions.md`
+- [x] A2.5: Delete `models.instructions.md`
+- [x] A2.6: Delete `routes.instructions.md`
+- [x] A2.7: Verify — `.github/instructions/` has exactly 1 file
 
 ### A3-rest: qa/ Dissolution
-- [ ] A3.5: Read ALL files in `Documents/dev_guide/qa/`:
+- [x] A3.5: Read ALL files in `Documents/dev_guide/qa/`:
   - `TEST_PLAN.md`, `TESTING_CONVENTIONS.md`, `TESTING_CHEAT_SHEET.md`
   - `TESTING_SESSION_OPENER.md`, `COVERAGE_MAP.md`, `TEST_DATA_CATALOG.md`
   - `ENVIRONMENT_SETUP.md`, `USER_TESTING_CHECKLIST.md`, `FILE_TO_BLOCKS.md`, `BUG_INVENTORY.md`
-- [ ] A3.6: Create `Documents/dev_guide/TESTING_GUIDE.md` by merging content from all 10 qa/ files (NOT from TEST_PLAYWRIGHT.md — leave that file untouched). Structure:
+- [x] A3.6: Create `Documents/dev_guide/TESTING_GUIDE.md` by merging content from all 10 qa/ files (NOT from TEST_PLAYWRIGHT.md — leave that file untouched). Structure:
   1. ## Overview & Strategy (from TEST_PLAN.md)
   2. ## Testing Conventions (from TESTING_CONVENTIONS.md)
   3. ## Environment Setup (from ENVIRONMENT_SETUP.md)
@@ -123,45 +123,45 @@
   9. ## File-to-Test Block Map (from FILE_TO_BLOCKS.md)
   10. ## Playwright Testing — see `TEST_PLAYWRIGHT.md` for the full Playwright MCP testing guide.
   Target: ≤ 1,200 lines.
-- [ ] A3.7: Read `Documents/dev_guide/qa/BUG_INVENTORY.md` — fold ALL content into `Documents/dev_guide/PROJECT_STATUS.md` under a new `## Bug Inventory` section (add after Risk Register)
-- [ ] A3.8: Read `Documents/dev_guide/chat_transfer.md` — fold content into `Documents/dev_guide/SETUP_GUIDE.md` as a new `## Second Machine / Computer 2 Setup` section at the end
-- [ ] A3.9: Archive `Documents/dev_guide/chat_transfer.md` to `Documents/_archive/dev_guide_retired/`
-- [ ] A3.10: Read `Documents/dev_guide/AC_PATIENT_INFO_GUIDE.md` — fold content into `Documents/dev_guide/AC_INTERFACE_REFERENCE_V4.md` as a new `## Patient Data Extraction` section at the end
-- [ ] A3.11: Archive `Documents/dev_guide/AC_PATIENT_INFO_GUIDE.md` to `Documents/_archive/dev_guide_retired/`
-- [ ] A3.12: Delete ALL files in `Documents/dev_guide/qa/`
-- [ ] A3.13: Delete `Documents/dev_guide/qa/logs/` directory (if exists)
-- [ ] A3.14: Delete `Documents/dev_guide/qa/` directory itself
-- [ ] A3.15: Verify — `Documents/dev_guide/` has exactly 10 files: ACTIVE_PLAN.md, PROJECT_STATUS.md, CARECOMPANION_DEVELOPMENT_GUIDE.md, AC_INTERFACE_REFERENCE_V4.md, API_INTEGRATION_PLAN.md, DEPLOYMENT_GUIDE.md, SETUP_GUIDE.md, SAAS_PLAN.md, UI_OVERHAUL.md, TESTING_GUIDE.md. Zero subdirectories (except TEST_PLAYWRIGHT.md — wait, that's 11. TEST_PLAYWRIGHT.md stays as-is since we cannot touch it. Final count = 11 files, 0 subdirectories).
+- [x] A3.7: Read `Documents/dev_guide/qa/BUG_INVENTORY.md` — fold ALL content into `Documents/dev_guide/PROJECT_STATUS.md` under a new `## Bug Inventory` section (add after Risk Register)
+- [x] A3.8: Read `Documents/dev_guide/chat_transfer.md` — fold content into `Documents/dev_guide/SETUP_GUIDE.md` as a new `## Second Machine / Computer 2 Setup` section at the end
+- [x] A3.9: Archive `Documents/dev_guide/chat_transfer.md` to `Documents/_archive/dev_guide_retired/`
+- [x] A3.10: Read `Documents/dev_guide/AC_PATIENT_INFO_GUIDE.md` — fold content into `Documents/dev_guide/AC_INTERFACE_REFERENCE_V4.md` as a new `## Patient Data Extraction` section at the end
+- [x] A3.11: Archive `Documents/dev_guide/AC_PATIENT_INFO_GUIDE.md` to `Documents/_archive/dev_guide_retired/`
+- [x] A3.12: Delete ALL files in `Documents/dev_guide/qa/`
+- [x] A3.13: Delete `Documents/dev_guide/qa/logs/` directory (if exists)
+- [x] A3.14: Delete `Documents/dev_guide/qa/` directory itself
+- [S] A3.15: Verify — `Documents/dev_guide/` has exactly 10 files: ACTIVE_PLAN.md, PROJECT_STATUS.md, CARECOMPANION_DEVELOPMENT_GUIDE.md, AC_INTERFACE_REFERENCE_V4.md, API_INTEGRATION_PLAN.md, DEPLOYMENT_GUIDE.md, SETUP_GUIDE.md, SAAS_PLAN.md, UI_OVERHAUL.md, TESTING_GUIDE.md. Zero subdirectories (except TEST_PLAYWRIGHT.md — wait, that's 11. TEST_PLAYWRIGHT.md stays as-is since we cannot touch it. Final count = 11 files, 0 subdirectories). (Skipped: overnight execution artifacts `OVERNIGHT_REMEDIATION_TRACKER.md` and `OVERNIGHT_ISSUES.md` must remain in place until session end protocol.)
 
 ### A4: ACTIVE_PLAN.md Trim
-- [ ] A4.1: Read full `Documents/dev_guide/ACTIVE_PLAN.md` — identify completed phases (Parts 0 through 6)
-- [ ] A4.2: Create `Documents/_archive/ACTIVE_PLAN_completed_032626.md` — move all completed parts there with header: `# Archived Completed Phases — 03-26-26`
-- [ ] A4.3: Keep in ACTIVE_PLAN.md ONLY: title, any active/in-progress work, Part 7 (if active), and any pending tasks
-- [ ] A4.4: Verify — ACTIVE_PLAN.md ≤ 1,200 lines
+- [x] A4.1: Read full `Documents/dev_guide/ACTIVE_PLAN.md` — identify completed phases (Parts 0 through 6)
+- [x] A4.2: Create `Documents/_archive/ACTIVE_PLAN_completed_032626.md` — move all completed parts there with header: `# Archived Completed Phases — 03-26-26`
+- [x] A4.3: Keep in ACTIVE_PLAN.md ONLY: title, any active/in-progress work, Part 7 (if active), and any pending tasks
+- [x] A4.4: Verify — ACTIVE_PLAN.md ≤ 1,200 lines
 
 ### A5: Prompt Consolidation (12 → 8)
-- [ ] A5.1: Read `.github/prompts/check_your_work.prompt.md` and `.github/prompts/eod.prompt.md`
-- [ ] A5.2: Create `.github/prompts/session-close.prompt.md` — merge both, trim redundancy, target ~400 lines
-- [ ] A5.3: Delete `check_your_work.prompt.md` and `eod.prompt.md`
-- [ ] A5.4: Read `.github/prompts/pull_from_git.prompt.md` and `.github/prompts/push_to_git.prompt.md`
-- [ ] A5.5: Create `.github/prompts/git.prompt.md` — merge both, target ~40 lines
-- [ ] A5.6: Delete `pull_from_git.prompt.md` and `push_to_git.prompt.md`
-- [ ] A5.7: Read `.github/prompts/security-audit.prompt.md` and `.github/prompts/saas-check.prompt.md`
-- [ ] A5.8: Create `.github/prompts/compliance-audit.prompt.md` — merge both, target ~70 lines
-- [ ] A5.9: Delete `security-audit.prompt.md` and `saas-check.prompt.md`
-- [ ] A5.10: Read `.github/prompts/find-improvements.prompt.md` — trim from ~620 to ~300 lines (cut verbose examples, keep audit phase checklists)
-- [ ] A5.11: Add Playwright MCP reference to `.github/prompts/test-plan.prompt.md` (~5 lines about using Playwright for UI testing)
-- [ ] A5.12: Verify — `.github/prompts/` has exactly 8 files: session-close, git, compliance-audit, find-improvements, keep-working, sprint-review, risk-report, tech-debt, test-plan. (That's 9 — recount: session-close, git, compliance-audit, find-improvements, keep-working, sprint-review, risk-report, tech-debt, test-plan = 9. Correction: keep all 9, the merges reduce from 12 to 9.)
-- [ ] A5.13: Verify — no orphaned references to deleted prompt filenames in COMMANDS.md or copilot-instructions.md
+- [x] A5.1: Read `.github/prompts/check_your_work.prompt.md` and `.github/prompts/eod.prompt.md`
+- [x] A5.2: Create `.github/prompts/session-close.prompt.md` — merge both, trim redundancy, target ~400 lines
+- [x] A5.3: Delete `check_your_work.prompt.md` and `eod.prompt.md`
+- [x] A5.4: Read `.github/prompts/pull_from_git.prompt.md` and `.github/prompts/push_to_git.prompt.md`
+- [x] A5.5: Create `.github/prompts/git.prompt.md` — merge both, target ~40 lines
+- [x] A5.6: Delete `pull_from_git.prompt.md` and `push_to_git.prompt.md`
+- [x] A5.7: Read `.github/prompts/security-audit.prompt.md` and `.github/prompts/saas-check.prompt.md`
+- [x] A5.8: Create `.github/prompts/compliance-audit.prompt.md` — merge both, target ~70 lines
+- [x] A5.9: Delete `security-audit.prompt.md` and `saas-check.prompt.md`
+- [x] A5.10: Read `.github/prompts/find-improvements.prompt.md` — trim from ~620 to ~300 lines (cut verbose examples, keep audit phase checklists)
+- [x] A5.11: Add Playwright MCP reference to `.github/prompts/test-plan.prompt.md` (~5 lines about using Playwright for UI testing)
+- [x] A5.12: Verify — `.github/prompts/` has exactly 8 files: session-close, git, compliance-audit, find-improvements, keep-working, sprint-review, risk-report, tech-debt, test-plan. (That's 9 — recount: session-close, git, compliance-audit, find-improvements, keep-working, sprint-review, risk-report, tech-debt, test-plan = 9. Correction: keep all 9, the merges reduce from 12 to 9.)
+- [x] A5.13: Verify — no orphaned references to deleted prompt filenames in COMMANDS.md or copilot-instructions.md
 
 ### A6-final: COMMANDS.md Fold
-- [ ] A6.10: Read `.github/COMMANDS.md` fully
-- [ ] A6.11: Fold its content into `.github/copilot-instructions.md` under a new `## Commands & Agents Quick Reference` section
-- [ ] A6.12: Delete `.github/COMMANDS.md`
-- [ ] A6.13: Verify — no COMMANDS.md at `.github/`
+- [x] A6.10: Read `.github/COMMANDS.md` fully
+- [x] A6.11: Fold its content into `.github/copilot-instructions.md` under a new `## Commands & Agents Quick Reference` section
+- [x] A6.12: Delete `.github/COMMANDS.md`
+- [x] A6.13: Verify — no COMMANDS.md at `.github/`
 
 ### Whitelist Update
-- [ ] WL.1: Update the `Approved File Whitelist` table in `.github/copilot-instructions.md` to list exactly these files:
+- [x] WL.1: Update the `Approved File Whitelist` table in `.github/copilot-instructions.md` to list exactly these files:
   | File | Purpose |
   |------|---------|
   | ACTIVE_PLAN.md | Current sprint / WIP |

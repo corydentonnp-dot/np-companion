@@ -1,3 +1,9 @@
+# Archived on 03-26-26 05:37:32 UTC
+
+Consolidated into Documents/dev_guide/AC_INTERFACE_REFERENCE_V4.md under 'Patient Data Extraction'.
+
+---
+
 # AC Patient Info Guide — Clinical Summary Pipeline
 
 **CareCompanion Documentation**
@@ -742,3 +748,4 @@ data/np_session.pkl         ← NetPractice session cookies
 | :---- |
 
 ---
+

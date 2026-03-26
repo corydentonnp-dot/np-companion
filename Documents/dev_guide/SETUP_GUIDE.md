@@ -395,3 +395,80 @@ If False, check network connectivity and share permissions.
 | Kill stuck process | `Get-Process python \| Stop-Process -Force` |
 | Restart | Double-click `restart.bat` |
 | Backup database | Automatic nightly; manual: copy `data/carecompanion.db` |
+
+---
+
+## Second Machine / Computer 2 Setup
+
+Use this flow to bring a second Windows workstation online with the same codebase
+and tooling.
+
+### Install prerequisites (in order)
+
+1. Python 3.11 (enable "Add Python to PATH" during install)
+2. Git for Windows
+3. Node.js LTS (required for Playwright tooling)
+4. VS Code
+
+### Clone and initialize project
+
+```powershell
+cd C:\Users\coryd\Documents
+git clone https://github.com/corydentonnp-dot/np-companion.git NP_Companion
+cd NP_Companion
+python -m venv venv
+venv\Scripts\pip install -r requirements.txt
+```
+
+Run all migration scripts:
+
+```powershell
+Get-ChildItem migrations\*.py | Sort-Object Name | ForEach-Object {
+   Write-Host "Running $($_.Name)..."
+   venv\Scripts\python.exe $_.FullName
+}
+```
+
+Open in VS Code:
+
+```powershell
+code .
+```
+
+### VS Code and Copilot setup
+
+1. Install recommended extensions when prompted.
+2. Sign in with the same GitHub account used on primary machine.
+3. Reload window once after extension install.
+4. Verify Copilot Agent mode is available.
+
+### Playwright MCP readiness
+
+- Ensure `.vscode/mcp.json` is present from repo sync.
+- In Copilot Agent mode, verify Playwright browser tools are listed.
+- First Playwright call may download browser binaries automatically.
+
+### Run application
+
+```powershell
+.\run.ps1
+```
+
+Then browse to `http://localhost:5000/login` and sign in.
+
+### Sync expectations
+
+Shared via Git:
+- code, templates, routes, docs, MCP configuration
+
+Machine-local only:
+- `data/carecompanion.db`
+- local virtual environment directory
+
+### Validation checklist for Computer 2
+
+1. App launches on port 5000.
+2. Login works for admin user.
+3. Copilot Agent mode available.
+4. Playwright MCP browser tools visible.
+5. Repo can pull latest changes without conflicts.

@@ -3457,3 +3457,80 @@ green dot button, Search Clinical Diagnoses window and process name,
 Lookup Dx button layout, Orders window (full tab list and order format),
 Write Orders button location, Task Manager process counts for all AC states,
 and complete AC window title reference. Total images processed: 55+.*
+
+---
+
+## Patient Data Extraction
+
+This section consolidates the former AC_PATIENT_INFO_GUIDE into the AC
+interface ground-truth document.
+
+### Purpose
+
+Clinical Summary XML export is the primary structured data source for patient
+chart hydration in CareCompanion. It reduces navigation burden in AC by
+collecting medications, diagnoses, allergies, vitals, labs, immunizations,
+demographics, and social history in one parseable payload.
+
+### Two-phase export workflow
+
+Phase 1 - chart preparation for all scheduled patients:
+1. Search patient in AC Patient List by ID.
+2. Verify name before opening chart.
+3. Open chart and apply Visit Template -> Procedure Visit -> Companion.
+4. Save and close chart with Ctrl+S.
+
+Phase 2 - XML export for all scheduled patients:
+1. Confirm AC is on home screen (no chart windows open).
+2. Select patient chart row from inbox (single-click).
+3. Open Patient menu and choose Export Clinical Summary.
+4. Select Full Patient Record and export.
+
+Critical rule: never export while any patient chart window is open.
+
+### File naming convention
+
+`ClinicalSummary_PatientId_[MRN]_[YYYYMMDD]_[HHMMSS].xml`
+
+### XML standard and namespaces
+
+- Standard: HL7 CDA / C-CDA R2.1
+- Primary namespace: `urn:hl7-org:v3`
+- Additional namespaces in examples: `sdtc`, `xsi`
+
+### Core extraction map
+
+Demographics (header):
+- MRN, name, DOB, sex, address, telecom
+
+Structured sections:
+- Medications (LOINC 10160-0)
+- Allergies (LOINC 48765-2)
+- Problems/diagnoses (LOINC 11450-4)
+- Vitals (LOINC 8716-3)
+- Results/labs (LOINC 30954-2)
+- Immunizations (LOINC 11369-6)
+- Social history (LOINC 29762-2)
+
+Narrative sections:
+- Progress notes (LOINC 11506-3)
+- Plan of care (LOINC 18776-5)
+- Reason for visit (LOINC 29299-5)
+
+### Empty/null handling expectations
+
+- Use section-level `nullFlavor` checks where present.
+- Support negation patterns for sections like allergies or immunizations.
+- Treat missing optional entries as empty values, not parser failures.
+
+### Storage and refresh expectations
+
+- Parsed data is upserted into patient-adjacent tables by MRN and section keys.
+- Re-import should update existing rows when source values change.
+- XML files are retained locally and cleaned by scheduled retention policy.
+
+### Display linkage
+
+Patient Chart View consumes parsed XML data for medication, lab, diagnosis,
+allergy, immunization, and vitals tabs. Narrative note prep remains editable
+and can be sent back to AC through automation workflows.

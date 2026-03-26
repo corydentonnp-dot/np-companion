@@ -6,7 +6,10 @@
 
 ## Issues
 
-(none yet)
+- **ISSUE-001 (Process/Docs):** A3.15 exact `Documents/dev_guide/` file-count verification deferred.
+	- **Reason:** `OVERNIGHT_REMEDIATION_TRACKER.md` and `OVERNIGHT_ISSUES.md` are required live artifacts for the active overnight run and cannot be archived/deleted mid-session.
+	- **Action:** Re-run A3.15 at session-end protocol after tracker/issues are archived.
+	- **Status:** Open (deferred)
 
 ---
 
