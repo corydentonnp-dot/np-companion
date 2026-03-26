@@ -191,33 +191,857 @@ Run this checklist:
 
 ---
 
-## PART 3 — 16-Phase Audit Plan
+## PART 3 — Comprehensive Interactive Element Audit
+
+> **Protocol:** For each item, attempt it. If it fails, try once more. If it fails again, log it and move on. Never let two failed attempts block forward progress.
+> **2-Strike Rule:** Every task gets exactly 2 attempts. Log failure with element ID, URL, and error message, then continue.
+> **Test Credentials:** `CORY` / `ASDqwe123` | Test MRN: `62815` | Test MRN (rich): `90001`
 
 ---
 
-### PW-1: Login & Account Flows
+### PW-0: Global Navigation (base.html — runs on EVERY page)
 
-**URLs:**
-- `/login`
-- `/register`
-- `/onboarding`
-- `/settings`
-- `/settings/account`
-- `/settings/notifications`
+**URL:** Any page while logged in
 
-**Check Items:**
-- [ ] Login form renders with correct labels and placeholder text
-- [ ] Password show/hide toggle works
-- [ ] Sign In button shows loading state on submit
-- [ ] Invalid credentials show error message (not a 500)
-- [ ] Rate limiting activates after 5 failed attempts (lockout message appears)
-- [ ] `next` redirect param is validated — external URLs are rejected
-- [ ] Register page (if active) completes flow without errors
-- [ ] Settings page loads all tabs: Profile, Account, Notifications, Appearance
-- [ ] Notification settings save and persist on reload
-- [ ] Account page shows correct role label
-- [ ] No console errors on any of these pages
-- [ ] Dark mode renders correctly on all pages
+**Sidebar links — test each navigates correctly:**
+- [ ] CareCompanion logo → `/dashboard`
+- [ ] Dashboard → `/dashboard`
+- [ ] Patients → `/patients`
+- [ ] Inbox → `/inbox`
+- [ ] Timer → `/timer`
+- [ ] Billing → `/billing/log`
+- [ ] Care Gaps → `/caregap`
+- [ ] Orders → `/orders`
+- [ ] Lab Track → `/labtrack`
+- [ ] On-Call → `/oncall`
+- [ ] Tools → `/tools`
+- [ ] Calculators → `/calculators`
+- [ ] Metrics → `/metrics`
+- [ ] Bonus → `/bonus`
+- [ ] Messages → `/messages`
+- [ ] Notifications → `/notifications`
+- [ ] Settings → `/settings`
+- [ ] Admin (admin-only) → `/admin`
+
+**Header / Global Controls:**
+- [ ] Dark mode toggle switches theme and persists on reload
+- [ ] Auto-lock timer displays and counts down
+- [ ] Agent status indicator shows correct state
+- [ ] Priority 1 badge (if visible) links to relevant page
+- [ ] User display name shown in header
+
+**Console check after navigation:**
+- [ ] Zero `SyntaxError` or `TypeError` errors
+- [ ] Zero 404s for static assets
+
+---
+
+### PW-1: Login & Authentication
+
+**URL:** `/login`
+
+**Form: Login (POST /login)**
+- [ ] Username field (`#username`) — type `CORY`, verify accepted
+- [ ] Password field (`#password`) — type `ASDqwe123`, verify accepted
+- [ ] Password show/hide toggle button — click, verify password becomes visible; click again, hidden
+- [ ] Sign In button — click with valid creds → should redirect to `/dashboard`
+- [ ] Sign In button shows "Signing in…" loading state while submitting (disable + text change)
+
+**Error handling:**
+- [ ] Submit with blank username → error message appears (not 500)
+- [ ] Submit with wrong password → "Invalid credentials" message appears
+- [ ] Submit wrong password 5× → lockout message appears (rate limiting)
+- [ ] Add `?next=http://evil.com` to URL → after login, redirects to `/dashboard` not external URL
+
+**URL:** `/register`
+- [ ] Registration form renders (or shows "disabled" message if not active)
+- [ ] If active: username, password, confirm password, role fields present
+- [ ] Submit with mismatched passwords → validation error
+
+**URL:** `/onboarding`
+- [ ] Onboarding wizard renders step 1
+- [ ] Next button advances to step 2
+
+**URL:** `/settings` (profile section)
+
+**Form: Profile (POST /settings/profile)**
+- [ ] Display name field — edit, save → persists on reload
+- [ ] Email field — edit, save → persists on reload
+- [ ] Username field — read-only (cannot change)
+- [ ] Role field — read-only
+
+**Form: Change Password (POST /settings/password)**
+- [ ] Current password field
+- [ ] New password field
+- [ ] Confirm password field
+- [ ] Submit with wrong current password → error message
+- [ ] Submit with mismatched new passwords → validation error
+- [ ] Submit with valid inputs → success flash message
+
+**Form: Set PIN (POST /settings/pin)**
+- [ ] 4-digit PIN input
+- [ ] Set PIN button → success message
+
+**URL:** `/settings/account`
+- [ ] Account page loads with correct role label
+- [ ] Any editable fields present → test save
+
+**URL:** `/settings/notifications`
+- [ ] Notification settings form renders
+- [ ] Toggle each notification type checkbox
+- [ ] Save button → success flash message
+- [ ] Reload page → verify saved state persists
+
+---
+
+### PW-2: Dashboard
+
+**URL:** `/dashboard`
+
+**Schedule widget:**
+- [ ] "Yesterday ←" button → updates schedule to previous day
+- [ ] "Today" button → resets to today
+- [ ] "→ Tomorrow" button → shows next day's schedule
+- [ ] Grid/Table view toggle → switches layout, persists in localStorage on reload
+- [ ] "Add to Schedule" button → opens add patient modal
+  - [ ] MRN search typeahead — type `62815`, verify patient appears in dropdown
+  - [ ] Keyboard nav: ArrowDown selects, Enter confirms
+  - [ ] Submit → patient added to schedule
+  - [ ] Duplicate MRN on same day → error (not silent duplicate)
+- [ ] Scrape Tomorrow button → changes to "Scraping…" state; resets after 60s timeout
+- [ ] Drag-and-drop patient card to reorder (if grid mode)
+- [ ] Patient row click → navigates to patient chart
+
+**Widgets:**
+- [ ] Tier toggles (Action / Awareness / Review) → collapse/expand sections
+- [ ] "Accept high-priority billing" batch button → fires request
+- [ ] Dismiss anomaly button → hides anomaly card
+- [ ] My Patients "All" tab → shows all imported patients
+- [ ] My Patients "Claimed" tab → shows only claimed patients
+- [ ] TCM alert dismiss button (X) → banner dismissed
+- [ ] Manage Widgets button (header) → opens widget management UI
+
+**Agent / polling:**
+- [ ] Agent status indicator updates → verify no console errors from polling (10s interval)
+- [ ] Priority 1 badge count matches visible P1 patients
+
+---
+
+### PW-3: Patient Roster
+
+**URL:** `/patients`
+
+**Roster:**
+- [ ] "All Patients" tab → shows all imported patients
+- [ ] "My Patients" tab → shows only claimed patients
+- [ ] Search field (`#roster-search`) — type partial name → list filters live
+- [ ] Search by MRN — type `62815` → correct patient shown
+- [ ] Column sort: Name header click → sorts A→Z; click again → Z→A
+- [ ] Column sort: DOB header → sorts chronologically
+- [ ] Patient row click → navigates to `/patient/62815`
+
+**URL:** `/patient/62815`
+
+**Chart header:**
+- [ ] Patient name, DOB, MRN, age, sex all visible
+- [ ] Portal status badge visible
+- [ ] Cell phone displayed
+
+**Tabs — click each, verify content loads:**
+- [ ] Overview tab → medications, problems, allergies visible
+- [ ] Labs tab → lab results list or "none on file"
+- [ ] Billing tab → billing opportunities for this patient
+- [ ] Notes tab → progress notes list
+- [ ] Calculators tab → calculator widget
+
+**Inline actions:**
+- [ ] "Claim Patient" button → POST, patient now shows in "My Patients"
+- [ ] "Edit Demographics" toggle → reveals inline form with name/DOB/phone/email fields
+  - [ ] Edit a field, save → data updates
+  - [ ] Cancel → reverts to original
+- [ ] ICD-10 Lookup button → opens modal
+  - [ ] Search field — type "diabetes" → results appear
+  - [ ] Click result → code populated in field
+  - [ ] Close modal → modal dismissed
+- [ ] "Add Diagnosis" button → opens ICD-10 lookup modal
+- [ ] "Copy Diagnoses" button → opens column picker modal
+  - [ ] Select columns via checkboxes
+  - [ ] Copy → clipboard contains formatted text
+- [ ] Medication item double-click → inline edit activates
+- [ ] Medication filter tabs (Active / Inactive / All) → filters list
+- [ ] Chart view mode dropdown → change to Compact → layout updates
+
+**URL:** `/patient/62815/detail`
+- [ ] Refresh button → reloads patient info card
+- [ ] "View full chart" link → navigates to `/patient/62815`
+
+**Unknown MRN:**
+- [ ] Navigate to `/patient/00000` → 404 or empty state (not 500)
+
+---
+
+### PW-4: Inbox
+
+**URL:** `/inbox`
+
+**Tabs:**
+- [ ] Inbox tab → message list loads
+- [ ] Held Items tab → held messages list
+- [ ] Audit Log tab → audit entries list
+- [ ] Digest tab → digest period buttons visible
+
+**Per message:**
+- [ ] Click message row → detail view expands
+- [ ] Hold button → hold reason dropdown appears
+  - [ ] Select hold reason from dropdown
+  - [ ] Confirm → message moves to Held Items tab
+- [ ] Resolve button → POST, message removed from inbox
+- [ ] Unread count badge matches visible unread items
+
+**Digest tab:**
+- [ ] 8h button → digest for last 8 hours loads
+- [ ] 24h button → digest for last 24 hours
+- [ ] 72h button → digest for last 72 hours
+- [ ] 168h button → weekly digest
+
+**Polling:**
+- [ ] Wait 60s without action → `/api/inbox-status` is called, no console errors
+
+---
+
+### PW-5: Timer
+
+**URL:** `/timer`
+
+**Session controls:**
+- [ ] "I'm Leaving" / "Back at Desk" F2F toggle → POST `/api/timer/f2f-toggle`, state updates
+- [ ] Active session shows elapsed time counter ticking
+- [ ] Complex flag button → toggles visual prominence of session
+- [ ] Billing level dropdown (per session) — select 99214 → saves, persists on reload
+- [ ] Visit type selector — select Telehealth → updates session type
+- [ ] Delete session button → confirmation prompt → confirmed → session removed
+- [ ] Note prompt button → prompt or modal appears
+
+**Manual Entry:**
+- [ ] "Manual Entry" toggle button → reveals hidden form
+  - [ ] Patient MRN field — type `62815`
+  - [ ] Call time datetime field
+  - [ ] End time datetime field
+  - [ ] Submit → new session appears in list
+  - [ ] Close toggle → form hides
+
+**E&M Calculator widget:**
+- [ ] Collapsible toggle → expands/collapses calculator
+- [ ] MDM complexity dropdown → select Moderate
+- [ ] Total minutes input → enter 25
+- [ ] Calculate → result appears
+
+**AWV Checklist:**
+- [ ] If AWV visit type selected → checklist appears
+- [ ] Checklist items checkable
+
+**Polling:**
+- [ ] Status updates every 3s → no console errors
+
+**URL:** `/timer/room-widget` (no login required)
+- [ ] Widget loads WITHOUT authentication (no redirect to login)
+- [ ] Room states visible
+- [ ] Room toggle endpoint responding
+
+---
+
+### PW-6: Billing Suite
+
+**URL:** `/billing/log`
+
+**Filters:**
+- [ ] Start date input — enter 01/01/2026
+- [ ] End date input — enter 03/31/2026
+- [ ] Billing level dropdown — select 99214
+- [ ] Submit filter → table updates
+- [ ] Clear filters → table resets
+
+**Table:**
+- [ ] Column header sort: Date → sorts chronologically
+- [ ] Column header sort: Amount → sorts numerically
+- [ ] Row detail toggle (expand button) → reveals detail row
+- [ ] "Why?" / anomaly badge → opens anomaly side panel
+  - [ ] Side panel opens with guidance text
+  - [ ] Close panel button → panel dismisses
+- [ ] Patient name link → navigates to patient chart
+- [ ] Rationale textarea (per session) → type text, submit → saved
+
+**URL:** `/billing/review`
+- [ ] Each pending claim row visible
+- [ ] Capture button (per row) → POST, row removed from pending
+- [ ] Dismiss button (per row) → POST, row removed
+
+**URL:** `/billing/em-calculator`
+- [ ] MDM complexity dropdown → select all options in sequence
+- [ ] Total minutes input → type 30
+- [ ] Calculate button → recommended code appears
+
+**URL:** `/billing/monthly`
+- [ ] Month picker → select previous month → charts update
+- [ ] Previous month navigation button → charts update
+- [ ] Next month navigation button → charts update
+- [ ] 3 charts render (not blank): E&M distribution, prior month comparison, 6-month trend
+
+**URL:** `/billing/opportunity-report`
+- [ ] Month selector → change month → report refreshes
+- [ ] Charts render (not blank)
+
+**URL:** `/billing/benchmarks`
+- [ ] Month navigation buttons → data updates
+- [ ] Benchmark toggle checkbox → shows/hides comparison lines on chart
+- [ ] Chart renders 7-month trend
+
+**URL:** `/billing/why-not`
+- [ ] Missed opportunity list renders or "none" message
+
+**URL:** `/billing/monthly-revenue`
+- [ ] Revenue chart renders (not blank canvas)
+
+---
+
+### PW-7: Care Gaps
+
+**URL:** `/caregap`
+
+**Navigation:**
+- [ ] Date navigation: "← Yesterday" button → shows previous day's gaps
+- [ ] "Today" button → resets to today
+- [ ] "Tomorrow →" button → shows next day
+
+**Per gap:**
+- [ ] Gap row expand toggle → reveals detail
+- [ ] "Address Now" button → reveals documentation form
+  - [ ] Pre-filled documentation textarea visible
+  - [ ] "Mark Addressed" submit → gap moves to addressed section
+  - [ ] Cancel button → form hides
+- [ ] "Copy Doc" button → clipboard copy + modal/feedback appears
+- [ ] "Decline" button → POST, gap marked declined
+- [ ] "N/A" button → POST, gap marked not applicable
+
+**URL:** `/caregap/panel`
+- [ ] Summary tab → summary counts visible
+- [ ] Spreadsheet tab → full patient table visible
+- [ ] Claimed tab → claimed-only patients visible
+- [ ] Filter form: min_age=40, max_age=65, sex=Female → submit → table filters
+- [ ] Clear filters link → table resets
+- [ ] CSV Export button (full names) → file downloads
+- [ ] Outreach link per gap type → navigates to outreach view
+
+**URL:** `/caregap/outreach` (or `/caregap/panel/outreach?gap_type=...`)
+- [ ] Patient list renders
+- [ ] View Gaps link per patient → navigates to patient care gap view
+- [ ] Export CSV button → file downloads
+
+**URL:** `/caregap/patient/62815`
+- [ ] "Personalized" toggle → filters to relevant gaps
+- [ ] "All Applicable" toggle → shows all gaps
+- [ ] Print Patient Handout link → opens print view
+- [ ] Address Now / Copy Doc / Decline / N/A buttons (same as daily view)
+- [ ] "Reopen" button (on addressed gaps) → reopens gap
+
+---
+
+### PW-8: Orders & Order Sets
+
+**URL:** `/orders`
+
+**Order set cards:**
+- [ ] "New Order Set" button → opens builder modal
+  - [ ] Search field — type "CBC" → items appear in list
+  - [ ] Click item → moves to selected panel
+  - [ ] Click again → removed from selected
+  - [ ] "Clear all" button → selection cleared
+  - [ ] Category tabs (All, Recent, Favorites) → filter items
+  - [ ] Execute button → opens execution confirmation
+    - [ ] Confirmation checkbox — check it
+    - [ ] Execute button → fires POST `/orders/{id}/execute`
+    - [ ] Cancel button → modal closes
+  - [ ] Close modal → builder dismissed
+- [ ] Edit button (per existing set) → opens builder with set pre-loaded
+- [ ] Share/Unshare button (per set) → toggle icon updates
+- [ ] Delete button (per set) → confirm prompt → delete confirmed → set removed
+- [ ] History link (per set) → history modal opens
+  - [ ] Past executions listed
+  - [ ] Close modal → dismissed
+
+**Interrupted banner (if present):**
+- [ ] Resume button → reopens interrupted set
+- [ ] Dismiss button → banner disappears
+
+**URL:** `/orders/master`
+- [ ] Order list table renders
+- [ ] Add Order form: order_name, order_tab, category fields → fill all → submit → new row appears
+- [ ] Delete button (per order) → confirm → order removed
+
+---
+
+### PW-9: Lab Track
+
+**URL:** `/labtrack`
+
+**Add Tracking form:**
+- [ ] MRN field — type `62815`
+- [ ] Lab name field — type "CBC" → autocomplete suggestions appear → select one
+- [ ] Interval field — type `90` (days)
+- [ ] Panel dropdown — select a panel
+- [ ] Submit → new tracking row appears in list
+- [ ] "Seed Standard Panels" button → POST, standard panels added for patient
+
+**Lab Reference Modal:**
+- [ ] Open lab reference button → modal appears
+- [ ] Filter/search in modal → results narrow
+- [ ] Select lab → populates lab name field
+- [ ] Close modal → dismissed
+
+**Patient rows:**
+- [ ] Click patient row → navigates to `/labtrack/62815`
+
+**URL:** `/labtrack/62815`
+- [ ] Lab tracking rows visible for patient
+- [ ] Edit button (per row) → reveals edit form
+  - [ ] Interval days field — change value
+  - [ ] Threshold fields (critical_low, alert_low, alert_high, critical_high) — enter values
+  - [ ] Notes textarea — type text
+  - [ ] Save Changes → form submits, row updates
+- [ ] "+ Result" button (per row) → reveals add result form
+  - [ ] Result value field — type `11.2`
+  - [ ] Result date field — select today
+  - [ ] Add Result→ submits, new result appears in trend
+- [ ] Trend chart renders for each lab (not blank canvas)
+- [ ] Alert/critical threshold lines visible on chart
+
+---
+
+### PW-10: On-Call
+
+**URL:** `/oncall`
+
+**Filters:**
+- [ ] All status link → shows all notes
+- [ ] Pending link → filters to pending
+- [ ] Entered link → filters to entered
+- [ ] Not Needed link → filters to not-needed
+
+**Per note:**
+- [ ] Note expansion toggle → reveals detail
+- [ ] Callback Done button (if pending callback) → POST, callback marked complete
+
+**Buttons:**
+- [ ] "New Call" button / link → navigates to `/oncall/new`
+- [ ] "Handoff" button → generates/navigates to handoff page
+
+**URL:** `/oncall/new`
+
+**New Note form (POST /oncall/new):**
+- [ ] Chief complaint field + microphone button → speak or type → text populated
+- [ ] Call time datetime field → set to specific time
+- [ ] Patient identifier field → type test identifier
+- [ ] Recommendation textarea + microphone button → type text
+- [ ] Note content textarea + microphone button → type text
+- [ ] Callback promised radio: select "Yes" → callback_by datetime field appears
+  - [ ] Set callback_by to a future time
+  - [ ] Select "No" → callback_by field hides
+- [ ] Documentation status radio: select "Pending"
+- [ ] Save Note button → submits form → redirects to oncall list
+- [ ] Back link → navigates to `/oncall`
+
+**URL:** `/oncall/<id>` (first available note)
+- [ ] Note detail renders
+- [ ] Edit Note expandable `<details>` → click → edit form reveals
+  - [ ] Chief complaint, recommendation, note content all editable
+  - [ ] Save Changes → form submits, note updates
+- [ ] Mark Entered button (if applicable) → POST, status updates
+- [ ] Callback Done button (if applicable) → POST
+- [ ] Export for AC link → navigates to export view
+
+**URL:** `/oncall/handoff/<token>` (public, no auth)
+- [ ] Page loads WITHOUT login redirect
+- [ ] Handoff summary renders
+- [ ] Print button → triggers browser print (window.print())
+
+---
+
+### PW-11: Clinical Tools
+
+**URL:** `/tools`
+- [ ] All tool cards visible
+- [ ] Each card click → navigates to correct sub-page:
+  - [ ] ICD-10 Coding → `/coding`
+  - [ ] Prior Auth → `/pa`
+  - [ ] Med Reference → `/medref`
+  - [ ] Tickler → `/tickler`
+  - [ ] Referral → `/referral`
+  - [ ] Reformatter → `/reformatter`
+
+**URL:** `/coding`
+- [ ] Search field (`#code-search`) — type "hypertension" → results appear (debounced 300ms)
+- [ ] Star/favorite button (per result) → POST `/coding/favorite`, icon toggles
+- [ ] Copy button (per result) → clipboard copy, feedback shown
+- [ ] "Specify" button (per result) → fetches more specific codes
+- [ ] Click favorited code → searches it again
+
+**URL:** `/pa`
+- [ ] MRN field — type `62815`, lookup button → patient fields populated
+- [ ] Drug name autocomplete — type "metformin" → suggestions appear → select one
+- [ ] Payer dropdown — select a payer
+- [ ] ICD-10 code field → open lookup modal → search → select code
+- [ ] Payer Contact Details `<details>` element → click header → expands
+- [ ] Add Failed Alternative button → new input row appears
+  - [ ] Type alternative drug name
+  - [ ] Add another → second row appears
+  - [ ] × button → row removed
+- [ ] Clinical justification textarea → type text
+- [ ] Generate PA button → POST `/pa/generate`, narrative appears in output panel
+- [ ] Copy Narrative button → clipboard copy
+- [ ] Submit PA button → POST `/pa`
+- [ ] History button → PA history modal opens
+  - [ ] Past PAs listed with timeline
+  - [ ] Close modal
+- [ ] Approve/Deny/Appeal buttons (on existing PAs) → status updates
+
+**URL:** `/pa/library`
+- [ ] Shared PA records visible
+- [ ] Import button (per record) → POST `/pa/{id}/import`, PA copied to my list
+
+**URL:** `/reformatter`
+- [ ] Step 1: Paste Note textarea → paste test clinical note text
+- [ ] API validation checkbox → toggle on/off
+- [ ] Process button → submits, advances to Step 2
+- [ ] Step 2: Flagged items appear
+  - [ ] "Keep" button (per flag) → flag resolved as keep
+  - [ ] "Add to Template" button (per flag) → flag resolved as add
+  - [ ] "Discard" button (per flag) → flag resolved as discard
+  - [ ] Next button → advances to Step 3
+- [ ] Step 3: Reformatted text in textarea
+  - [ ] Copy button → clipboard copy
+  - [ ] Submit button → POST `/reformatter/submit`
+- [ ] Step indicator pills 1 / 2 / 3 → clickable to jump back
+
+**URL:** `/dot-phrases`
+- [ ] Search field (`#search-input`) — type partial phrase → list filters live
+- [ ] Category tabs (All, Custom, HPI, etc.) — click each → list filters
+- [ ] "Export as AHK" link → file downloads
+- [ ] "+ Add Dot Phrase" button → modal opens
+  - [ ] Abbreviation field — type `.test`
+  - [ ] Category dropdown — select category
+  - [ ] Expansion textarea — type expansion text
+  - [ ] Placeholder buttons ({patient_name}, {date}, {provider_name}) → insert at cursor
+  - [ ] Preview updates live as you type
+  - [ ] Save button → modal closes, new phrase appears in list
+- [ ] Edit button (per phrase) → modal opens pre-filled
+  - [ ] Edit text → Save → phrase updates
+- [ ] Delete button (per phrase) → confirm prompt → phrase removed
+- [ ] Import button → import modal opens
+  - [ ] Paste AHK hotstrings in textarea
+  - [ ] Import → phrases added
+  - [ ] Cancel → modal closes
+
+**URL:** `/macros`
+- [ ] Macros list renders
+- [ ] Search or filter works
+- [ ] Add macro → form works
+- [ ] Delete macro → confirm → removed
+
+**URL:** `/rems-reference` (or `/rems`)
+- [ ] Drug list or search renders
+- [ ] Search field — type drug name → filters list
+- [ ] Drug card click → detail view expands
+
+**URL:** `/reportable-diseases` (or `/reportable-diseases-reference`)
+- [ ] Disease list renders
+- [ ] Search field → filters list
+
+**URL:** `/result-templates` (or `/tools/templates`)
+- [ ] Tab navigation: My Templates / Shared / System → each shows content
+- [ ] Category filter dropdown → filters list
+- [ ] "+ New Template" button → modal opens
+  - [ ] Name field — type name
+  - [ ] Category dropdown — select
+  - [ ] Template body textarea — type text with `{placeholder}`
+  - [ ] Save → modal closes, template in list
+- [ ] Preview button (eye icon, per template) → preview modal opens
+  - [ ] Close → dismissed
+- [ ] Edit button (pencil, per template) → modal opens pre-filled
+- [ ] Share/Unshare button (lock icon) → toggle
+- [ ] Delete (trash icon) → confirm → removed
+- [ ] Fork button (shared/system templates) → POST, copy added to My Templates
+- [ ] Mark Legally Reviewed button → POST, flag set
+
+**URL:** `/medref`
+- [ ] Drug search input — type "lisinopril" → drug card populates in right panel
+- [ ] Clear button → right panel clears
+- [ ] Quick filter: Pregnancy toggle → shows pregnancy safety info
+- [ ] Quick filter: Renal toggle → shows renal dosing info
+- [ ] Quick filter: Hepatic toggle → shows hepatic info
+- [ ] FDA label sections (collapsible headers) → click to expand/collapse
+- [ ] Pricing card → async-loads with Fresh/Aging/Stale badge
+- [ ] Recent search history links → click → same drug card loads
+
+**URL:** `/tickler`
+- [ ] Tickler cards visible (or empty state)
+- [ ] "+ Add Tickler" button → modal opens
+  - [ ] Patient display field — type patient name
+  - [ ] MRN field (optional) — type `62815`
+  - [ ] Due date picker → select tomorrow
+  - [ ] Priority dropdown → select Urgent
+  - [ ] Assigned To dropdown → select user
+  - [ ] Recurring checkbox → check → recurrence_days field appears
+    - [ ] Type `30` (monthly)
+    - [ ] Uncheck → field hides
+  - [ ] Notes textarea → type text
+  - [ ] Add Tickler button → POST, card appears in list
+- [ ] Complete button (per card) → POST `/tickler/{id}/complete`, card removed
+- [ ] Snooze button (per card) → prompt for days → POST `/tickler/{id}/snooze`, card updates due date
+
+**URL:** `/referral`
+- [ ] Specialty dropdown (`#ref-specialty`) → select Cardiology
+- [ ] Dynamic specialty fields appear based on selection
+- [ ] Reason field → type reason
+- [ ] Patient description field → type description
+- [ ] Urgency dropdown → select Urgent
+- [ ] Relevant history textarea → type text
+- [ ] Findings textarea → type text
+- [ ] Medications textarea → type text
+- [ ] Generate Letter button → spinner → letter text appears in right panel
+- [ ] Copy button → clipboard copy, feedback shown
+- [ ] Mark Received button (per existing referral in log) → POST `/referral/{id}/received`
+
+---
+
+### PW-12: Calculators
+
+**URL:** `/calculators`
+- [ ] Search field (`#calc-search`) — type "bmi" → BMI card visible, others hidden
+- [ ] Clear search → all cards visible
+- [ ] Category tabs (All, Cardiology, Infectious, Pediatric, etc.) → each filters correctly
+- [ ] Calculator card click → navigates to correct detail page
+
+**URL:** `/calculators/bmi`
+- [ ] Height field — type `68` (inches)
+- [ ] Weight field — type `185` (lbs)
+- [ ] Calculate button → BMI result appears
+- [ ] Valid result: should be ~28.1
+- [ ] Clear/Reset → fields clear
+
+**URL:** `/calculators/egfr`
+- [ ] Age, sex, creatinine, race fields → fill in values
+- [ ] Calculate → eGFR result appears
+
+**URL:** `/calculators/chads2`
+- [ ] Checkbox items (CHF, HTN, Age≥75, Diabetes, Stroke/TIA) → check several
+- [ ] Score updates automatically or on Calculate click
+
+**URL:** `/calculators/wells-dvt`
+- [ ] Checkbox items → check several
+- [ ] Calculate → pre-test probability result appears
+
+**URL:** `/calculators/heart-score`
+- [ ] Dropdown/radio items for each HEART component
+- [ ] Calculate → score + risk category appears
+
+**URL:** `/calculators/gcs`
+- [ ] Eye/Verbal/Motor response dropdowns → select options
+- [ ] Total GCS score calculated
+
+**URL:** `/calculators/apgar`
+- [ ] 5 component dropdowns/radios → select each
+- [ ] Total APGAR calculated
+
+**For all remaining calculators** (`wells-pe`, `qtc`, `map`, `ibw`, `corrected-calcium`, `sofa`, `curb65`, `alvarado`, `pediatric-dosing`, `steroid-taper`, `phenytoin`, `warfarin`):
+- [ ] Page renders with all input fields labeled
+- [ ] Known-good inputs → Calculate → result appears (not blank, not 500)
+- [ ] Invalid input (letters in number field) → validation error shown
+- [ ] "Save result" (if present) → POST, result saved to history
+
+---
+
+### PW-13: Admin Panel
+
+**URL:** `/admin` (admin account required)
+- [ ] All sub-section cards visible and linked
+- [ ] Non-admin account → should be redirected (403 or to dashboard)
+
+**URL:** `/admin/users`
+- [ ] User list renders with roles visible
+- [ ] Role change dropdown → select new role → confirm password field appears
+  - [ ] Enter admin password → submit → role updates
+- [ ] AI toggle button (per user) → POST, toggle state flips
+- [ ] Deactivate button (per user) → mode selection appears
+  - [ ] "Deactivate now" option selected
+  - [ ] Confirm → user deactivated
+- [ ] Reset Password button (per user) → temp password field shown → Send button
+- [ ] Change Username button (per user) → hidden form reveals
+  - [ ] New username + confirm password → submit → username updates
+
+**URL:** `/admin/audit-log`
+- [ ] Audit entries render
+- [ ] No PHI visible in log entries (check: no real names, MRNs only hashed)
+
+**URL:** `/admin/db-health`
+- [ ] DB health check loads table counts
+- [ ] No error states
+
+**URL:** `/admin/feature-flags` (or equivalent)
+- [ ] Feature flag list renders
+- [ ] Toggle a flag → POST, state updates
+
+**URL:** `/admin/backup`
+- [ ] Backup trigger button → POST, success message (file created)
+- [ ] List of existing backups visible
+
+**URL:** `/admin/api-cache`
+- [ ] Cached entries table renders
+- [ ] Purge all / purge expired buttons → POST, cache cleared
+- [ ] Row count updates after purge
+
+**URL:** `/admin/notification-test`
+- [ ] Test notification button → POST, Pushover message sent (check phone)
+
+**URL:** `/admin/reformat-log`
+- [ ] Discarded items log renders
+- [ ] Each entry shows item content (not PHI) and discard reason
+
+**URL:** `/admin/claim-rules`
+- [ ] Billing rule list renders
+- [ ] Each rule shows code, description, enabled state
+
+**URL:** `/admin/config`
+- [ ] All config sections render (Screen & OCR, Notifications, Inbox, Timer, etc.)
+- [ ] Bool select → change True→False → Save → persists on reload
+- [ ] Number input → change value → Save → persists
+- [ ] Cancel link → returns to admin dashboard without saving
+
+---
+
+### PW-14: Monitoring, Briefing & Messaging
+
+**URL:** `/monitoring-calendar`
+- [ ] Calendar grid renders with correct month
+- [ ] Month navigation (previous/next) → calendar updates
+- [ ] Day cell click → detail for that day loads
+
+**URL:** `/morning-briefing`
+- [ ] Page loads with today's sections
+- [ ] All data cards render (not blank)
+
+**URL:** `/commute-briefing`
+- [ ] Page loads with patient/task summary
+- [ ] All sections present
+
+**URL:** `/notifications`
+- [ ] Notification history list renders
+- [ ] Mark as read button (per notification) → POST, read_at timestamp set → visual state changes
+
+**URL:** `/messages`
+- [ ] Conversation list renders (or empty state)
+- [ ] Click conversation → message thread loads
+- [ ] "New Message" button / link → navigates to `/messages/new`
+
+**URL:** `/messages/new`
+- [ ] Recipient field — search for user → autocomplete appears
+- [ ] Subject field — type subject
+- [ ] Body textarea → type message
+- [ ] Send button → POST, message sent → redirects to thread
+- [ ] Cancel → back to messages list
+
+---
+
+### PW-15: Metrics & Benchmarks
+
+**URL:** `/metrics`
+- [ ] Page loads with chart containers (not blank `<canvas>`)
+- [ ] Line/bar charts render actual data (not empty axes)
+- [ ] Date range filter (if present) → change range → charts update
+- [ ] Export button (if present) → file downloads
+- [ ] MA role check: log in as MA → should be redirected
+
+**URL:** `/metrics/weekly`
+- [ ] Weekly drill-down renders
+- [ ] Week navigation buttons → previous/next week → data updates
+
+**URL:** `/benchmarks`
+- [ ] Benchmark comparison data renders (or "insufficient data" message)
+- [ ] Month selector (if present) → change → data refreshes
+
+**URL:** `/bonus`
+- [ ] All 7 bonus sections render
+- [ ] Confirm threshold button → POST `/bonus/confirm-threshold`
+- [ ] CCM calculator: CCM count input → change number → result updates dynamically
+- [ ] Monthly receipt form: month input + amount input → Submit → receipt added to table
+- [ ] Quick nav links (Timer, Billing Tasks, CCM Registry) → navigate correctly
+
+---
+
+### PW-16: Cross-Cutting Checks
+
+**A. Dark Mode — Full Pass**
+- [ ] Toggle dark mode (settings or top nav)
+- [ ] Navigate each critical page: dashboard, patient chart, billing, inbox, admin, tools
+- [ ] No white flash on navigation
+- [ ] No unreadable text (white on white / black on black)
+- [ ] Buttons, badges, modals all visible in dark
+- [ ] Charts readable on dark background
+- [ ] Toggle back to light → layout correct
+
+**B. Mobile Viewport (375×812)**
+
+*Use Playwright: resize browser to 375×812 before starting this section*
+- [ ] Dashboard: no horizontal scroll, all widgets stack vertically
+- [ ] Patient chart: tabs accessible, no overflow
+- [ ] Billing log: table scrolls horizontally (not clipped)
+- [ ] Inbox: message list usable
+- [ ] Calculators: form fits viewport
+- [ ] Navigation menu: accessible (hamburger or collapsible)
+- [ ] Modals: fit within viewport
+
+**C. Auth Enforcement**
+- [ ] Log out → navigate to `/dashboard` → redirected to `/login?next=/dashboard`
+- [ ] Navigate to `/patients` → redirected to login
+- [ ] Navigate to `/billing/log` → redirected to login
+- [ ] Navigate to `/admin` → redirected to login (or 403)
+- [ ] After login with `next` param → redirected to originally intended page
+- [ ] `/timer/room-widget` → loads WITHOUT login
+- [ ] `/oncall/handoff/<token>` → loads WITHOUT login
+
+**D. Flash Messages**
+- [ ] Trigger a success action (save settings) → green flash message appears
+- [ ] Trigger a validation error → red/orange flash appears
+- [ ] Flash messages visible in dark mode
+- [ ] Flash message dismisses on next navigation
+
+**E. Console Cleanliness — Final Pass**
+
+*Navigate each page, open browser console, verify:*
+- [ ] `/dashboard` → zero errors
+- [ ] `/patient/62815` → zero errors
+- [ ] `/billing/log` → zero errors
+- [ ] `/inbox` → zero errors
+- [ ] `/admin` → zero errors
+- [ ] `/tools` → zero errors
+- [ ] Zero 404s for any `.css`, `.js`, or image assets
+- [ ] Zero "Unexpected token '<'" (HTML parsed as JSON)
+- [ ] Zero failed fetch calls
+
+**F. Static Assets**
+- [ ] Favicon appears in browser tab on every page
+- [ ] All CSS files load (check Network tab, no 404)
+- [ ] All JS files load (no 404)
+- [ ] No mixed-content warnings
+
+**G. Sortable Table Headers**
+- [ ] Patient roster: Name, DOB headers → click sorts, click again reverses
+- [ ] Billing log: Date, Amount, Code → click sorts
+- [ ] Lab track: Date, Type, Status → click sorts
+- [ ] Sort arrow indicator toggles direction
+
+**H. API Polling Behavior**
+- [ ] While logged in: `/api/notifications-status`, `/api/agent-status`, `/api/setup-status` all return 200 with JSON (not 302 HTML redirect)
+- [ ] On login page (data-user-id="0"): polling is suppressed — verify no console errors from polling calls
 
 ---
 
