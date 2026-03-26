@@ -1476,7 +1476,7 @@ def run_tests():
                 print("  FAIL  check_escalations not callable")
 
             # --- 15e. Shared PA model columns exist (22.8) ---
-            from models.tools import PriorAuthorization
+            from models.prior_auth import PriorAuthorization
             pa_cols = ['is_shared', 'shared_by_user_id', 'forked_from_id', 'approval_rate']
             all_pa = all(hasattr(PriorAuthorization, c) for c in pa_cols)
             if all_pa:

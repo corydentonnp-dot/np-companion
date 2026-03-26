@@ -7,7 +7,7 @@ structured lookup data from a specific public health / medical API,
 reducing redundant network calls and enabling offline access.
 
 Existing cache models live elsewhere:
-  - RxNormCache, Icd10Cache  → models/patient.py
+    - RxNormCache, Icd10Cache  → this file
   - BillingRuleCache          → models/billing.py
 
 This file adds the remaining 10 structured caches specified in the
@@ -16,6 +16,53 @@ API Integration Plan.
 
 from datetime import datetime, timezone
 from models import db
+
+
+class Icd10Cache(db.Model):
+    """
+    Global ICD-10 lookup cache — stores diagnosis name → ICD-10 code
+    mappings verified via the NIH Clinical Tables API. Shared across
+    all users and patients to avoid redundant API calls.
+    """
+    __tablename__ = 'icd10_cache'
+
+    id = db.Column(db.Integer, primary_key=True)
+    diagnosis_name_lower = db.Column(db.String(300), nullable=False, unique=True, index=True)
+    icd10_code = db.Column(db.String(20), nullable=False)
+    icd10_description = db.Column(db.String(300), default='')
+    source = db.Column(db.String(20), default='nih_api')
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def __repr__(self):
+        return f'<Icd10Cache {self.diagnosis_name_lower} -> {self.icd10_code}>'
+
+
+class RxNormCache(db.Model):
+    """
+    Global RxNorm lookup cache — stores RXCUI → structured drug info
+    from the NIH RxNorm API. Shared across all users to avoid
+    redundant API calls.
+    """
+    __tablename__ = 'rxnorm_cache'
+
+    id = db.Column(db.Integer, primary_key=True)
+    rxcui = db.Column(db.String(20), nullable=False, unique=True, index=True)
+    brand_name = db.Column(db.String(300), default='')
+    generic_name = db.Column(db.String(300), default='')
+    dose_strength = db.Column(db.String(100), default='')
+    dose_form = db.Column(db.String(100), default='')
+    route = db.Column(db.String(100), default='')
+    tty = db.Column(db.String(20), default='')
+    ndc = db.Column(db.String(20), default='')
+    source = db.Column(db.String(20), default='rxnorm_api')
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def __repr__(self):
+        return f'<RxNormCache {self.rxcui} -> {self.generic_name or self.brand_name}>'
 
 
 # ── RxClass (NIH RxNav) ────────────────────────────────────────────

@@ -227,53 +227,6 @@ class PatientNoteDraft(db.Model):
     def __repr__(self):
         return f'<PatientNoteDraft {self.id} mrn={self.mrn or ""}>'
 
-
-class Icd10Cache(db.Model):
-    """
-    Global ICD-10 lookup cache — stores diagnosis name → ICD-10 code
-    mappings verified via the NIH Clinical Tables API.  Shared across
-    all users and patients to avoid redundant API calls.
-    """
-    __tablename__ = 'icd10_cache'
-
-    id = db.Column(db.Integer, primary_key=True)
-    diagnosis_name_lower = db.Column(db.String(300), nullable=False, unique=True, index=True)
-    icd10_code = db.Column(db.String(20), nullable=False)
-    icd10_description = db.Column(db.String(300), default='')
-    source = db.Column(db.String(20), default='nih_api')  # 'nih_api'
-    created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
-    )
-
-    def __repr__(self):
-        return f'<Icd10Cache {self.diagnosis_name_lower} → {self.icd10_code}>'
-
-
-class RxNormCache(db.Model):
-    """
-    Global RxNorm lookup cache — stores RXCUI → structured drug info
-    from the NIH RxNorm API.  Shared across all users to avoid
-    redundant API calls.  Mirrors the Icd10Cache pattern.
-    """
-    __tablename__ = 'rxnorm_cache'
-
-    id = db.Column(db.Integer, primary_key=True)
-    rxcui = db.Column(db.String(20), nullable=False, unique=True, index=True)
-    brand_name = db.Column(db.String(300), default='')
-    generic_name = db.Column(db.String(300), default='')
-    dose_strength = db.Column(db.String(100), default='')   # e.g. "20 mg"
-    dose_form = db.Column(db.String(100), default='')        # e.g. "tablet"
-    route = db.Column(db.String(100), default='')             # e.g. "oral"
-    tty = db.Column(db.String(20), default='')                # term type: SCD, BN, IN
-    ndc = db.Column(db.String(20), default='')                # first NDC from RxNorm
-    source = db.Column(db.String(20), default='rxnorm_api')
-    created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
-    )
-
-    def __repr__(self):
-        return f'<RxNormCache {self.rxcui} → {self.generic_name or self.brand_name}>'
-
 class PatientLabResult(db.Model):
     """Lab result from parsed Clinical Summary XML."""
     __tablename__ = 'patient_lab_results'

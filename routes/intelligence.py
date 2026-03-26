@@ -27,8 +27,9 @@ from flask_login import login_required, current_user
 from models import db
 from models.patient import (
     PatientRecord, PatientMedication, PatientDiagnosis,
-    PatientAllergy, PatientImmunization, RxNormCache,
+    PatientAllergy, PatientImmunization,
 )
+from models.api_cache import RxNormCache
 
 
 def _parse_json_safe(text):

@@ -944,7 +944,7 @@
     {
       "id": "chart-flag",
       "name": "AC Chart Detection Flag",
-      "category": "intelligence",
+      "category": "patient-care",
       "url": null,
       "description": "When a patient chart is open in Amazing Charts, a small popup appears in the bottom-left corner of the CareCompanion web UI showing the patient name, age, sex, and DOB. If the patient has a CareCompanion record, a link opens their chart directly.",
       "how_it_works": "The agent polls every 3 seconds using Windows EnumWindows to detect open AC chart subprocess windows. The chart title contains the patient name, MRN, DOB, age, sex, and portal status. This data is written to a local JSON file, which the web UI polls every 5 seconds. If a chart is detected, the flag widget slides in from the left. When the chart closes, the flag auto-dismisses.",

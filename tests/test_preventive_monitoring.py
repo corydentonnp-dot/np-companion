@@ -115,7 +115,7 @@ def run_tests():
     # ==================================================================
     print('[6/25] Condition-driven: E11 diabetes rules...')
     try:
-        src = _read('migrations/seed_monitoring_rules.py')
+        src = _read('migrations/seeds/seed_monitoring_rules.py')
         # Count E11 condition rules
         e11_count = src.count("'E11', 'CONDITION'")
         assert e11_count >= 4, f'Expected ≥4 E11 rules, found {e11_count}'
@@ -133,7 +133,7 @@ def run_tests():
     # ==================================================================
     print('[7/25] Genotype: abacavir HLA-B*5701...')
     try:
-        src = _read('migrations/seed_monitoring_rules.py')
+        src = _read('migrations/seeds/seed_monitoring_rules.py')
         assert 'GENOTYPE' in src, 'Missing GENOTYPE trigger_type'
         assert '51714-8' in src, 'Missing HLA-B*5701 LOINC code'
         assert 'abacavir' in src.lower(), 'Missing abacavir reference'
@@ -207,7 +207,7 @@ def run_tests():
     # ==================================================================
     print('[12/25] REMS: Clozapine weekly ANC...')
     try:
-        src = _read('migrations/seed_monitoring_rules.py')
+        src = _read('migrations/seeds/seed_monitoring_rules.py')
         assert 'clozapine' in src.lower(), 'Missing clozapine rule'
         assert 'REMS' in src, 'Missing REMS trigger_type'
         # Check model has required fields
@@ -255,7 +255,7 @@ def run_tests():
     # ==================================================================
     print('[15/25] VSAC: Preventive screening rules...')
     try:
-        src = _read('migrations/seed_monitoring_rules.py')
+        src = _read('migrations/seeds/seed_monitoring_rules.py')
         assert 'PREVENTIVE_SEED_RULES' in src
         # Count VSAC rules
         vsac_count = src.count("'VSAC'")

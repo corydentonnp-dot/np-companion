@@ -188,7 +188,7 @@ def run_tests():
     # ==================================================================
     print('[9/15] Seeded routing rules...')
     try:
-        src = _read('migrations/seed_staff_routing_rules.py')
+        src = _read('migrations/seeds/seed_staff_routing_rules.py')
         assert 'RULES' in src
         # Verify all 7 roles are represented
         for role in ['ma', 'nurse', 'front_desk', 'referral_coordinator', 'biller', 'provider', 'office_manager']:

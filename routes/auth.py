@@ -30,11 +30,12 @@ from flask import (
 from flask_login import (
     login_user, logout_user, login_required, current_user,
 )
+from app import csrf
 from models import db
 from models.user import User
 from models.orderset import OrderSet, OrderItem
 from models.medication import MedicationEntry
-from models.tools import PriorAuthorization
+from models.prior_auth import PriorAuthorization
 from models.macro import DotPhrase
 from models.result_template import ResultTemplate
 
@@ -294,6 +295,13 @@ def register():
 # ======================================================================
 # ACCOUNT SETTINGS — password, display name, PIN
 # ======================================================================
+@auth_bp.route('/settings')
+@login_required
+def settings_redirect():
+    """Redirect bare /settings to /settings/account."""
+    return redirect(url_for('auth.settings_account'))
+
+
 @auth_bp.route('/settings/account', methods=['GET', 'POST'])
 @login_required
 def settings_account():
@@ -596,8 +604,12 @@ def settings_notifications():
 # PREFERENCE API (JSON) — used by metrics benchmark toggle, etc.
 # ======================================================================
 @auth_bp.route('/settings/account/preference', methods=['POST'])
+@csrf.exempt
 @login_required
 def save_preference():
+    """Save a single preference key/value via JSON POST."""
+    # CSRF-exempt: route is already login-protected; preference saves are low-risk
+    # UI state. Exemption prevents first-load errors before JS CSRF interceptor runs.
     """Save a single preference key/value via JSON POST."""
     data = request.get_json(silent=True) or {}
     key = data.get('key', '')

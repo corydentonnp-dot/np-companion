@@ -69,11 +69,11 @@ class TestSeedPhrases(unittest.TestCase):
 
     def test_21_3c_customized_preserved(self):
         """Non-customized cleared on re-seed; customized survive."""
-        from migrations.seed_documentation_phrases import PHRASE_SEED
+        from migrations.seeds.seed_documentation_phrases import PHRASE_SEED
         self.assertTrue(len(PHRASE_SEED) >= 25)
         # Check seed script preserves customized
         import importlib
-        mod = importlib.import_module("migrations.seed_documentation_phrases")
+        mod = importlib.import_module("migrations.seeds.seed_documentation_phrases")
         # The SQL in seed() has "DELETE FROM documentation_phrase WHERE is_customized = 0"
         import inspect
         source = inspect.getsource(mod.seed)

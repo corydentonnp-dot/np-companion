@@ -66,7 +66,8 @@ def practice_overview():
     from models.patient import PatientRecord, PatientDiagnosis
     from models.caregap import CareGap
     from models.labtrack import LabTrack
-    from models.tools import ControlledSubstanceEntry, ReferralLetter
+    from models.controlled_substance import ControlledSubstanceEntry
+    from models.referral import ReferralLetter
     from models.billing import BillingOpportunity
 
     # Aggregate metrics

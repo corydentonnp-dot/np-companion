@@ -8,7 +8,7 @@ Routes for the Tools module:
 - F26: Prior Authorization Generator (/pa)
 
 Dependencies:
-- models/tools.py (ControlledSubstanceEntry, CodeFavorite, CodePairing, PriorAuthorization)
+- models/controlled_substance.py, models/coding.py, models/prior_auth.py, models/referral.py
 - app/services/api/rxnorm.py (RxNormService)
 - app/services/api/icd10.py (ICD10Service)
 - app/services/api/rxclass.py (RxClassService)
@@ -22,10 +22,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 
 from models import db
-from models.tools import (
-    ControlledSubstanceEntry, CodeFavorite, CodePairing, PriorAuthorization,
-    ReferralLetter,
-)
+from models.controlled_substance import ControlledSubstanceEntry
+from models.coding import CodeFavorite, CodePairing
+from models.prior_auth import PriorAuthorization
+from models.referral import ReferralLetter
 from models.tickler import Tickler
 from models.user import User
 from models.notification import Notification, NOTIFICATION_TEMPLATES

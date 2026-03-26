@@ -42,16 +42,20 @@ from models.notification import Notification
 from models.patient import (
     PatientVitals, PatientRecord, PatientMedication,
     PatientDiagnosis, PatientAllergy, PatientImmunization,
-    PatientNoteDraft, PatientSpecialist, Icd10Cache, RxNormCache,
+    PatientNoteDraft, PatientSpecialist,
     PatientLabResult, PatientSocialHistory,
 )
 from models.billing import BillingOpportunity, BillingRuleCache, BillingRule, DiagnosisRevenueProfile, StaffRoutingRule, DocumentationPhrase, OpportunitySuppression, ClosedLoopStatus, BillingCampaign, PayerCoverageMatrix
 from models.bonus import BonusTracker
 from models.tcm import TCMWatchEntry
 from models.ccm import CCMEnrollment, CCMTimeEntry
-from models.tools import ControlledSubstanceEntry, CodeFavorite, CodePairing, PriorAuthorization, ReferralLetter
+from models.controlled_substance import ControlledSubstanceEntry
+from models.coding import CodeFavorite, CodePairing
+from models.prior_auth import PriorAuthorization
+from models.referral import ReferralLetter
 from models.result_template import ResultTemplate
 from models.api_cache import (
+    Icd10Cache, RxNormCache,
     RxClassCache, FdaLabelCache, FaersCache, RecallCache,
     LoincCache, UmlsCache, HealthFinderCache, PubmedCache,
     MedlinePlusCache, CdcImmunizationCache, VsacValueSetCache,

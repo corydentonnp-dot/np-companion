@@ -6,6 +6,37 @@
 
 ---
 
+## CL-126 — Overnight Band 1 Remediation (Cleanup, Model Reorg, Migration Housekeeping)
+**Completed:** 03-26-26 05:29:36 UTC
+- Completed Band 1 cleanup and structural reorganization tasks from the overnight tracker.
+- Root/archive cleanup:
+  - Moved root utility files to `scripts/` (`_check_tables.py`, `_verify_viis.py`, `check_templates.py`)
+  - Archived `Claude/` notes to `Documents/_archive/`, removed root `Claude/` directory
+  - Added ignore rules for `Claude/` and `audit_pw*.png` in `.gitignore`
+  - Created `Documents/_archive/screenshots/` and `Documents/_archive/data_exports/`, moved archive `.png`/`.csv` files, removed obsolete archive artifacts
+- Dev-guide archival cleanup:
+  - Archived `Documents/dev_guide/PROJECT_AUDIT_032426.md` and `Documents/dev_guide/AC_RETROACTIVE_UPDATE_GUIDE.md` to `Documents/_archive/dev_guide_retired/` with archive header notes
+  - Removed duplicate `Documents/dev_guide/qa/FEATURE_REGISTRY.md`
+- Migration housekeeping:
+  - Created `migrations/seeds/` and moved the three seed scripts under it
+  - Added `migrations/APPLIED.md` with per-migration latest commit timestamps from git history
+  - Updated seed-script references in tests and comments to new `migrations/seeds/` paths
+- Model reorganization (B4):
+  - Moved `Icd10Cache` and `RxNormCache` from `models/patient.py` to `models/api_cache.py`
+  - Split legacy `models/tools.py` into dedicated modules:
+    - `models/controlled_substance.py`
+    - `models/prior_auth.py`
+    - `models/referral.py`
+    - `models/coding.py`
+  - Updated imports in `models/__init__.py`, routes, and tests; removed `models/tools.py`
+  - Fixed dependent route imports (`routes/patient.py`, `routes/intelligence.py`) after cache model relocation
+- Test stability fixes surfaced during Band 1 validation:
+  - Added `utils/phi_scrubber.py` to satisfy PHI scrubbing test contract
+  - Corrected `data/help_guide.json` `chart-flag` category to a valid category id (`patient-care`)
+- Verification: `venv\Scripts\python.exe -m pytest tests/ -x -q` now passes (`221 passed`).
+
+---
+
 ## CL-125 — TEST_PLAYWRIGHT.md v3.0: Pass 3 — Real-Life Workflow Testing
 **Completed:** 03-26-26 08:15:00 UTC
 - Added Pass 3 — Real-Life Workflow Testing with 16 new end-to-end scenario phases (PW-26 through PW-41):

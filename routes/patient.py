@@ -29,9 +29,10 @@ from sqlalchemy.orm import joinedload
 from models.patient import (
     PatientRecord, PatientVitals, PatientMedication,
     PatientDiagnosis, PatientAllergy, PatientImmunization,
-    PatientNoteDraft, PatientSpecialist, Icd10Cache, RxNormCache,
+    PatientNoteDraft, PatientSpecialist,
     PatientEncounterNote,
 )
+from models.api_cache import Icd10Cache, RxNormCache
 from models.labtrack import LabTrack
 from models.caregap import CareGap, CareGapRule
 from models.schedule import Schedule
@@ -908,12 +909,16 @@ def chart(mrn):
 @login_required
 def enrich_patient_data(mrn):
     """Run full API enrichment (RxNorm + ICD-10) for a patient."""
-    medications = PatientMedication.query.filter_by(
-        user_id=current_user.id, mrn=mrn
-    ).all()
-    _enrich_medications(medications, cache_only=False)
-    _backfill_icd10_codes(current_user.id, mrn, cache_only=False)
-    return jsonify({'success': True})
+    try:
+        medications = PatientMedication.query.filter_by(
+            user_id=current_user.id, mrn=mrn
+        ).all()
+        _enrich_medications(medications, cache_only=False)
+        _backfill_icd10_codes(current_user.id, mrn, cache_only=False)
+        return jsonify({'success': True})
+    except Exception as e:
+        current_app.logger.error('enrich_patient_data error for %s: %s', mrn[-4:] if len(mrn) > 4 else '??', str(e))
+        return jsonify({'success': False, 'error': 'Enrichment skipped'}), 200
 
 
 # ======================================================================
