@@ -21,7 +21,7 @@ from flask_login import current_user, login_required
 from models import db
 from models.monitoring import MonitoringRule, MonitoringSchedule
 from models.caregap import CareGapRule
-from routes.auth import require_role
+from utils.decorators import require_role  # B1 — moved from routes.auth
 
 logger = logging.getLogger(__name__)
 

@@ -241,7 +241,7 @@ def review_needed():
     flagged (guideline_review_flag=True) or whose RxNorm RXCUI has a
     non-active history status (obsolete / remapped / retired).
     """
-    from routes.auth import require_role
+    from utils.decorators import require_role  # B1 — moved from routes.auth
     from models.medication import MedicationEntry
 
     # Accessible to providers and admins

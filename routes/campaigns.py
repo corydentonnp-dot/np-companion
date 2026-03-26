@@ -19,7 +19,7 @@ from models import db
 from models.billing import (
     BillingCampaign, BillingOpportunity, ClosedLoopStatus,
 )
-from routes.auth import require_role
+from utils.decorators import require_role  # B1 — moved from routes.auth
 
 logger = logging.getLogger(__name__)
 

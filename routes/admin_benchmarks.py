@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
-from routes.auth import require_role
+from utils.decorators import require_role  # B1 — moved from routes.auth
 
 admin_benchmarks_bp = Blueprint('admin_benchmarks', __name__)
 

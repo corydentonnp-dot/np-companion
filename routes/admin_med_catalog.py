@@ -23,7 +23,7 @@ from models.monitoring import (
     MonitoringEvaluationLog, MonitoringRuleTestResult, MonitoringRuleDiff,
     MonitoringSchedule,
 )
-from routes.auth import require_role
+from utils.decorators import require_role  # B1 — moved from routes.auth
 
 logger = logging.getLogger(__name__)
 
