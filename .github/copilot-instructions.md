@@ -579,3 +579,36 @@ When any feature moves to ✅ Complete:
    ```
 2. Update the Feature Registry row.
 3. If the feature had a dedicated plan section in ACTIVE_PLAN.md, mark it ✅ Done with the same timestamp.
+
+---
+
+## Anti-Sprawl Guardrails
+
+> **These rules apply to all code changes, every session.** Enforced by `scripts/lint_sprawl.py`.
+
+1. **Max route file size: 800 lines.** If a route file exceeds 800 lines, it must be split before adding more code to it. Extract helpers to `app/services/` or `utils/`.
+2. **No cross-route imports.** Never `from routes.X import` inside any `routes/` file. Shared logic belongs in `app/services/` or `utils/`.
+3. **No `from agent.` imports in `routes/`.** Agent execution must be async via DB queue. Desktop automation code never enters the web layer.
+4. **Service layer mandate.** Any function called from 2 or more route files must live in `app/services/` or `utils/`, not in a route file.
+5. **Template JS extraction threshold.** Any `<script>` block exceeding 50 lines in a Jinja template must be extracted to `static/js/`.
+
+---
+
+## Product Design Principles
+
+> **For the full Design Constitution, see `Documents/overview/DESIGN_CONSTITUTION.md`.**
+
+### Constitutional Priority Chain
+Safety > Usability > Data Integrity > Performance > Interoperability > Revenue > Admin > Polish
+
+### Core Principles
+1. **Passive support beats interruptive** unless risk is high.
+2. **Structured data captured once, reused everywhere.** No re-entry.
+3. **Every screen prioritizes signal over exhaust.** Dense clarity, not noise.
+4. **Every workflow preserves context through interruptions.** Draft state is sacred.
+5. **Every recommendation must be explainable.** Show why it fired, what triggered it, what happens if ignored.
+6. **Every safety-sensitive action must be auditable.** Author, timestamp, context — always.
+7. **Notes are output views, not the core data model.** Structured data first.
+8. **Never make the user remember what the system already knows.** Surface it.
+9. **Never bury urgent information in secondary tabs.** Critical = visible.
+10. **AI must assist, not obscure.** Every AI output clearly marked as suggested/drafted/inferred.

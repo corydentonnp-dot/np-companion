@@ -186,68 +186,68 @@
 ## BAND 3: Code Architecture — Service Layer (requires testing)
 
 ### B1: Service Layer Extraction
-- [ ] B1.1: Read `routes/patient.py` fully — map every `def _` function and its callers
-- [ ] B1.2: Read `agent_service.py` — find all `from routes.` imports
-- [ ] B1.3: Read `agent/clinical_summary_parser.py` — find `from routes.intelligence import auto_draft_education_message`
-- [ ] B1.4: Create `utils/patient_helpers.py` — extract: `_calc_age()`, `_calc_age_years()`, `_normalize_name()`, `_normalize_dob()`, `_mrn_display()`
-- [ ] B1.5: Create `app/services/patient_service.py` — extract: `_prepopulate_sections()`, `_schedule_context_for_patient()`, `_ensure_patient_record_for_view()`
-- [ ] B1.6: Create `app/services/diagnosis_service.py` — extract: `_classify_diagnosis()`, `_backfill_icd10_codes()`, `_load_icd10_csv()`
-- [ ] B1.7: Create `app/services/medication_enrichment.py` — extract: `_enrich_rxnorm()`, `_enrich_rxnorm_single()`, `_fetch_rxnorm_api()`, `_standardize_frequency()`, `_parse_dose_fallback()`, `_enrich_medications()`
-- [ ] B1.8: Create `app/services/caregap_service.py` — extract: `_get_uspstf_recommendations()`, `_auto_evaluate_care_gaps()`
-- [ ] B1.9: Update ALL imports in `routes/patient.py` to reference new service/util locations
-- [ ] B1.10: Run tests — `venv\Scripts\python.exe -m pytest tests/ -x -q`
-- [ ] B1.11: Create `app/services/labtrack_service.py` — extract `check_overdue_labs()` from `routes/labtrack.py`
-- [ ] B1.12: Update import in `agent_service.py`: `from routes.labtrack import check_overdue_labs` → `from app.services.labtrack_service import check_overdue_labs`
-- [ ] B1.13: Create `app/services/metrics_service.py` — extract `_generate_weekly_summary()` from `routes/metrics.py`
-- [ ] B1.14: Update import in `agent_service.py`: `from routes.metrics import _generate_weekly_summary` → `from app.services.metrics_service import generate_weekly_summary`
-- [ ] B1.15: Create `app/services/timer_service.py` — extract `_monthly_stats()` and `RVU_TABLE` from `routes/timer.py`
-- [ ] B1.16: Update import in `agent_service.py`: `from routes.timer import _monthly_stats, RVU_TABLE` → `from app.services.timer_service import monthly_stats, RVU_TABLE`
-- [ ] B1.17: Create `app/services/education_service.py` — extract `auto_draft_education_message()` from `routes/intelligence.py`
-- [ ] B1.18: Update import in `agent/clinical_summary_parser.py`: `from routes.intelligence import auto_draft_education_message` → `from app.services.education_service import auto_draft_education_message`
-- [ ] B1.19: Move `_parse_json_safe()` from `routes/intelligence.py` to `utils/json_helpers.py` (or existing utils file)
-- [ ] B1.20: Grep entire codebase for `from routes.intelligence import`, `from routes.dashboard import`, `from routes.tools import`, `from routes.bonus import` — extract any cross-route helpers found: `analyze_schedule_anomalies` (dashboard), `get_overdue_pdmp_patients` (tools), `_build_deficit_history` (bonus) into appropriate service files
-- [ ] B1.21: Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
-- [ ] B1.22: Grep ALL files in `routes/` for `from routes.` — must find 0 cross-route imports
-- [ ] B1.23: Grep ALL files in `routes/` for `from agent.pyautogui` — document count (will be fixed in B5)
+- [x] B1.1: Read `routes/patient.py` fully — map every `def _` function and its callers
+- [x] B1.2: Read `agent_service.py` — find all `from routes.` imports
+- [x] B1.3: Read `agent/clinical_summary_parser.py` — find `from routes.intelligence import auto_draft_education_message`
+- [x] B1.4: Create `utils/patient_helpers.py` — extract: `_calc_age()`, `_calc_age_years()`, `_normalize_name()`, `_normalize_dob()`, `_mrn_display()`
+- [x] B1.5: Create `app/services/patient_service.py` — extract: `_prepopulate_sections()`, `_schedule_context_for_patient()`, `_ensure_patient_record_for_view()`
+- [x] B1.6: Create `app/services/diagnosis_service.py` — extract: `_classify_diagnosis()`, `_backfill_icd10_codes()`, `_load_icd10_csv()`
+- [x] B1.7: Create `app/services/medication_enrichment.py` — extract: `_enrich_rxnorm()`, `_enrich_rxnorm_single()`, `_fetch_rxnorm_api()`, `_standardize_frequency()`, `_parse_dose_fallback()`, `_enrich_medications()`
+- [x] B1.8: Create `app/services/caregap_service.py` — extract: `_get_uspstf_recommendations()`, `_auto_evaluate_care_gaps()`
+- [x] B1.9: Update ALL imports in `routes/patient.py` to reference new service/util locations
+- [x] B1.10: Run tests — `venv\Scripts\python.exe -m pytest tests/ -x -q`
+- [x] B1.11: Create `app/services/labtrack_service.py` — extract `check_overdue_labs()` from `routes/labtrack.py`
+- [x] B1.12: Update import in `agent_service.py`: `from routes.labtrack import check_overdue_labs` → `from app.services.labtrack_service import check_overdue_labs`
+- [x] B1.13: Create `app/services/metrics_service.py` — extract `_generate_weekly_summary()` from `routes/metrics.py`
+- [x] B1.14: Update import in `agent_service.py`: `from routes.metrics import _generate_weekly_summary` → `from app.services.metrics_service import generate_weekly_summary`
+- [x] B1.15: Create `app/services/timer_service.py` — extract `_monthly_stats()` and `RVU_TABLE` from `routes/timer.py`
+- [x] B1.16: Update import in `agent_service.py`: `from routes.timer import _monthly_stats, RVU_TABLE` → `from app.services.timer_service import monthly_stats, RVU_TABLE`
+- [x] B1.17: Create `app/services/education_service.py` — extract `auto_draft_education_message()` from `routes/intelligence.py`
+- [x] B1.18: Update import in `agent/clinical_summary_parser.py`: `from routes.intelligence import auto_draft_education_message` → `from app.services.education_service import auto_draft_education_message`
+- [x] B1.19: Move `_parse_json_safe()` from `routes/intelligence.py` to `utils/json_helpers.py` (or existing utils file)
+- [x] B1.20: Grep entire codebase for `from routes.intelligence import`, `from routes.dashboard import`, `from routes.tools import`, `from routes.bonus import` — extract any cross-route helpers found: `analyze_schedule_anomalies` (dashboard), `get_overdue_pdmp_patients` (tools), `_build_deficit_history` (bonus) into appropriate service files
+- [x] B1.21: Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
+- [x] B1.22: Grep ALL files in `routes/` for `from routes.` — must find 0 cross-route imports
+- [x] B1.23: Grep ALL files in `routes/` for `from agent.pyautogui` — document count (will be fixed in B5)
 
 ### B6: Billing Facade Removal
-- [ ] B6.1: Read `app/services/billing_rules.py` — confirm it's a thin wrapper
-- [ ] B6.2: Grep entire codebase for `BillingRulesEngine` — list all callers
-- [ ] B6.3: Grep entire codebase for `from app.services.billing_rules import` — list all callers
-- [ ] B6.4: For each caller, replace `BillingRulesEngine` with `BillingCaptureEngine` from `billing_engine/engine.py`
-- [ ] B6.5: Delete `app/services/billing_rules.py`
-- [ ] B6.6: Read `app/services/` — find `billing_valueset_map.py`
-- [ ] B6.7: Move `billing_valueset_map.py` to `billing_engine/valueset_map.py`
-- [ ] B6.8: Update all imports of `billing_valueset_map`
-- [ ] B6.9: Run tests: `venv\Scripts\python.exe -m pytest tests/ -x -q`
+- [x] B6.1: Read `app/services/billing_rules.py` — confirm it's a thin wrapper
+- [x] B6.2: Grep entire codebase for `BillingRulesEngine` — list all callers
+- [x] B6.3: Grep entire codebase for `from app.services.billing_rules import` — list all callers
+- [x] B6.4: For each caller, replace `BillingRulesEngine` with `BillingCaptureEngine` from `billing_engine/engine.py`
+- [S] B6.5: Delete `app/services/billing_rules.py` (Kept as backward-compat shim; 5 test files import BillingRulesEngine from it)
+- [x] B6.6: Read `app/services/` — find `billing_valueset_map.py`
+- [x] B6.7: Move `billing_valueset_map.py` to `billing_engine/valueset_map.py`
+- [x] B6.8: Update all imports of `billing_valueset_map`
+- [x] B6.9: Run tests: `venv\Scripts\python.exe -m pytest tests/ -x -q`
 
 ### B7: Test Directory Organization
-- [ ] B7.1: Delete or move `tests/_debug_auth.py` to `Documents/_archive/`
-- [ ] B7.2: Delete or move `tests/_ph16_results.txt` to `Documents/_archive/`
-- [ ] B7.3: Delete or move `tests/_route_results.txt` to `Documents/_archive/`
-- [ ] B7.4: Create `tests/unit/` directory with empty `__init__.py`
-- [ ] B7.5: Create `tests/integration/` directory with empty `__init__.py`
-- [ ] B7.6: Create `tests/operational/` directory with empty `__init__.py`
-- [ ] B7.7: Move operational tests: `tools/backup_restore_test.py`, `tools/clinical_summary_test.py`, `tools/connectivity_test.py` → `tests/operational/`
-- [ ] B7.8: Do NOT move other test files yet (incremental, future sessions)
-- [ ] B7.9: Run tests — verify pytest still discovers and runs all tests
+- [x] B7.1: Delete or move `tests/_debug_auth.py` to `Documents/_archive/`
+- [x] B7.2: Delete or move `tests/_ph16_results.txt` to `Documents/_archive/`
+- [x] B7.3: Delete or move `tests/_route_results.txt` to `Documents/_archive/`
+- [x] B7.4: Create `tests/unit/` directory with empty `__init__.py`
+- [x] B7.5: Create `tests/integration/` directory with empty `__init__.py`
+- [x] B7.6: Create `tests/operational/` directory with empty `__init__.py`
+- [x] B7.7: Move operational tests: `tools/backup_restore_test.py`, `tools/clinical_summary_test.py`, `tools/connectivity_test.py` → `tests/operational/`
+- [x] B7.8: Do NOT move other test files yet (incremental, future sessions)
+- [x] B7.9: Run tests — verify pytest still discovers and runs all tests
 
 ### B8: Scripts/Tools Consolidation
-- [ ] B8.1: Move `tools/deploy_check.py` to `scripts/`
-- [ ] B8.2: Move `tools/verify_all.py` to `scripts/`
-- [ ] B8.3: Move `tools/process_guard.py` to `scripts/`
-- [ ] B8.4: Move `tools/usb_smoke_test.py` to `scripts/`
-- [ ] B8.5: Move `tools/totp_extractor.py` to `scripts/`
-- [ ] B8.6: Audit `tools/emulated_patient_generator/` vs `tools/patient_gen/`:
+- [x] B8.1: Move `tools/deploy_check.py` to `scripts/`
+- [x] B8.2: Move `tools/verify_all.py` to `scripts/`
+- [x] B8.3: Move `tools/process_guard.py` to `scripts/`
+- [x] B8.4: Move `tools/usb_smoke_test.py` to `scripts/`
+- [x] B8.5: Move `tools/totp_extractor.py` to `scripts/`
+- [x] B8.6: Audit `tools/emulated_patient_generator/` vs `tools/patient_gen/`:
   - Read both directories, compare files
   - If one is a superset, archive the other to `Documents/_archive/`
   - If unclear, document in OVERNIGHT_ISSUES.md and skip
-- [ ] B8.7: Verify — `tools/` contains only: `emulated_patient_generator/` or `patient_gen/` (whichever survived), and `deploy_report.json`
+- [x] B8.7: Verify — `tools/` contains only: `emulated_patient_generator/` or `patient_gen/` (whichever survived), and `deploy_report.json`
 
 ### BAND 3 CHECKPOINT
-- [ ] Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
-- [ ] Git commit: `git add -A && git commit -m "Band 3: Service extraction, billing facade removal, test/script reorg"`
-- [ ] Update CHANGE_LOG.md with CL entry for Band 3
+- [x] Run full test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
+- [x] Git commit: `git add -A && git commit -m "Band 3: Service extraction, billing facade removal, test/script reorg"`
+- [x] Update CHANGE_LOG.md with CL entry for Band 3
 
 ---
 
