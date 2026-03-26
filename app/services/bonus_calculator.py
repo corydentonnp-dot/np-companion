@@ -259,3 +259,64 @@ def current_quarter_status(tracker) -> dict:
         "days_remaining": days_remaining,
         "business_days_remaining": business_days_remaining,
     }
+
+
+def build_deficit_history(receipts: dict, threshold: float,
+                          deficit_resets_annually: bool) -> list:
+    """Build quarter-by-quarter deficit timeline from receipt data.
+
+    Extracted from routes/bonus.py (Band 3 B1.20) so intelligence.py
+    can import it without a cross-route dependency.
+
+    Parameters
+    ----------
+    receipts : dict
+        {"YYYY-MM": amount, ...}
+    threshold : float
+        Quarterly threshold.
+    deficit_resets_annually : bool
+        Whether cumulative deficit resets to 0 each January.
+
+    Returns
+    -------
+    list of dicts with keys: quarter, receipts, gross_surplus,
+    bonus_amount, cumulative_deficit, exceeded.
+    """
+    if not receipts:
+        return []
+
+    # Group receipts by quarter
+    quarters = {}
+    for key, val in receipts.items():
+        try:
+            y, m = int(key[:4]), int(key[5:])
+            q = (m - 1) // 3 + 1
+            q_key = (y, q)
+            quarters.setdefault(q_key, 0.0)
+            quarters[q_key] += val
+        except (ValueError, IndexError):
+            continue
+
+    if not quarters:
+        return []
+
+    history = []
+    cum_deficit = 0.0
+
+    for (y, q) in sorted(quarters.keys()):
+        if deficit_resets_annually and q == 1 and history:
+            cum_deficit = 0.0
+
+        result = calculate_quarterly_bonus(quarters[(y, q)], threshold, cum_deficit)
+        cum_deficit = result["new_deficit"]
+
+        history.append({
+            "quarter": f"{y}-Q{q}",
+            "receipts": round(quarters[(y, q)], 2),
+            "gross_surplus": round(result["gross_surplus"], 2),
+            "bonus_amount": round(result["bonus_amount"], 2),
+            "cumulative_deficit": round(cum_deficit, 2),
+            "exceeded": result["exceeded"],
+        })
+
+    return history
