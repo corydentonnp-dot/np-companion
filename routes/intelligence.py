@@ -32,15 +32,7 @@ from models.patient import (
 from models.api_cache import RxNormCache
 
 
-def _parse_json_safe(text):
-    """Parse a JSON string; return empty list on failure."""
-    if not text:
-        return []
-    try:
-        result = json.loads(text)
-        return result if isinstance(result, list) else []
-    except (json.JSONDecodeError, TypeError):
-        return []
+from utils.json_helpers import parse_json_safe as _parse_json_safe  # B1.19
 from models.schedule import Schedule
 
 logger = logging.getLogger(__name__)
@@ -1347,136 +1339,12 @@ def patient_education(mrn):
 
 
 # ======================================================================
-# Phase 27 — Education pricing paragraph helper
+# Phase 27 / Phase 10 — Education helpers moved to app/services/education_service.py
 # ======================================================================
-def _build_pricing_paragraph(drug_name):
-    """
-    Build a pricing information paragraph for a drug.
-    Returns a string paragraph or empty string if no pricing found.
-    Reusable by both send_education_to_patient (27.1) and Trigger 2 new-med
-    detection (27.2).
-    """
-    if not drug_name:
-        return ''
-    try:
-        from app.services.pricing_service import PricingService
-        svc = PricingService(db)
-        pricing = svc.get_pricing(
-            rxcui=None, ndc=None,
-            drug_name=drug_name.split()[0],
-            strength=None,
-        )
-        parts = []
-        if pricing.get('source') == 'cost_plus' and pricing.get('price_monthly_estimate') is not None:
-            parts.append(
-                f"Pricing information: This medication may be available at Cost Plus Drugs pharmacy "
-                f"for approximately ${pricing['price_monthly_estimate']:.2f}/month. "
-                f"Visit: {pricing.get('direct_url', 'https://costplusdrugs.com')}"
-            )
-        elif pricing.get('source') == 'goodrx' and pricing.get('price_monthly_estimate') is not None:
-            parts.append(
-                f"Pricing information: You may be able to save on this medication using a GoodRx discount. "
-                f"Estimated price: ${pricing['price_monthly_estimate']:.2f}/month. "
-                f"Visit: {pricing.get('direct_url', 'https://www.goodrx.com')}"
-            )
-        programs = pricing.get('assistance_programs') or []
-        if programs:
-            prog = programs[0]
-            parts.append(
-                f"Financial assistance may be available for this medication. "
-                f"Visit {prog.get('application_url', '')} for eligibility information."
-            )
-        return '\n'.join(parts)
-    except Exception:
-        return ''
-
-
-# ======================================================================
-# Phase 10 — Trigger 2: Auto-draft education for new medications
-# ======================================================================
-def auto_draft_education_message(user_id, mrn, new_meds):
-    """
-    Create draft DelayedMessage records for each new medication detected.
-    Called from clinical_summary_parser._trigger_new_med_education().
-    Does NOT auto-send — creates drafts for provider review.
-
-    Parameters
-    ----------
-    user_id : int
-    mrn : str
-    new_meds : list[dict]
-        Each: {'drug_name': str, 'rxcui': str, 'start_date': str}
-
-    Returns
-    -------
-    int
-        Number of drafts created.
-    """
-    from models.message import DelayedMessage
-    from models.notification import Notification
-
-    if not new_meds:
-        return 0
-
-    record = PatientRecord.query.filter_by(user_id=user_id, mrn=mrn).first()
-    recipient = record.patient_name if record and record.patient_name else mrn
-
-    # Check for existing pending drafts to avoid duplicates
-    existing_pending = DelayedMessage.query.filter_by(
-        user_id=user_id, status='pending',
-    ).all()
-    existing_drug_names = set()
-    for msg in existing_pending:
-        content_lower = (msg.message_content or '').lower()
-        if 'new medication education' in content_lower:
-            # Extract drug name from "Regarding: <drug_name>" line
-            for line in (msg.message_content or '').split('\n'):
-                if line.startswith('Regarding: '):
-                    existing_drug_names.add(line[len('Regarding: '):].strip().lower())
-
-    drafts_created = 0
-    for med in new_meds:
-        drug_name = med.get('drug_name', '').strip()
-        if not drug_name:
-            continue
-        # Skip if a draft already exists for this drug
-        if drug_name.lower() in existing_drug_names:
-            continue
-
-        body_parts = [f"New Medication Education: {drug_name}"]
-        body_parts.append(f"Regarding: {drug_name}")
-        if med.get('start_date'):
-            body_parts.append(f"Started: {med['start_date']}")
-
-        # Append pricing paragraph
-        pricing_para = _build_pricing_paragraph(drug_name)
-        if pricing_para:
-            body_parts.append(f"\n{pricing_para}")
-
-        body_parts.append("\n— Auto-drafted by CareCompanion (review before sending)")
-
-        draft = DelayedMessage(
-            user_id=user_id,
-            recipient_identifier=recipient,
-            message_content="\n".join(body_parts),
-            scheduled_send_at=datetime.now(timezone.utc),
-            status='pending',
-        )
-        db.session.add(draft)
-        drafts_created += 1
-
-    if drafts_created > 0:
-        # Create a notification for the provider (HIPAA-safe: MRN last 4 only)
-        mrn_tail = mrn
-        notif = Notification(
-            user_id=user_id,
-            message=f"📋 {drafts_created} new medication education draft{'s' if drafts_created != 1 else ''} created for {mrn_tail}",
-            priority=2,
-        )
-        db.session.add(notif)
-        db.session.commit()
-
-    return drafts_created
+from app.services.education_service import (  # B1.17
+    build_pricing_paragraph as _build_pricing_paragraph,
+    auto_draft_education_message,
+)
 
 
 # ======================================================================
@@ -1695,14 +1563,14 @@ def morning_briefing():
         logger.debug('P3 notification query failed: %s', e)
 
     # F4c: Schedule anomaly analysis — overlap count for briefing
-    from routes.dashboard import analyze_schedule_anomalies
+    from app.services.schedule_service import analyze_schedule_anomalies  # B1.20
     anomalies = analyze_schedule_anomalies(appointments)
     overlap_count = sum(1 for a in anomalies if a.get('type') == 'schedule_overlap')
 
     # F25a: PDMP overdue count for briefing
     pdmp_overdue_count = 0
     try:
-        from routes.tools import get_overdue_pdmp_patients
+        from app.services.cs_service import get_overdue_pdmp_patients  # B1.20
         pdmp_overdue_count = len(get_overdue_pdmp_patients(current_user.id))
     except Exception:
         pass
@@ -1718,7 +1586,7 @@ def morning_briefing():
             bonus_status = current_quarter_status(tracker)
             receipts = tracker.get_receipts()
             if receipts:
-                from routes.bonus import _build_deficit_history
+                from app.services.bonus_calculator import build_deficit_history as _build_deficit_history  # B1.20
                 deficit_history = _build_deficit_history(
                     receipts, tracker.quarterly_threshold or 105000.0,
                     tracker.deficit_resets_annually)
