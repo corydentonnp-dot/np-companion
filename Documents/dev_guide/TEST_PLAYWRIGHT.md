@@ -1,7 +1,7 @@
 # CareCompanion — Playwright MCP Browser Testing Guide
 
-**Version:** 2.0 — 03-26-26
-**Purpose:** Step-by-step guide for AI-driven browser testing via Playwright MCP. **Pass 1** (PW-0 through PW-22): functional audit of every interactive element. **Pass 2** (PW-23 through PW-25): visual/UX audit for aesthetics, hierarchy, balance, and theme resilience.
+**Version:** 3.0 — 03-26-26
+**Purpose:** Step-by-step guide for AI-driven browser testing via Playwright MCP. **Pass 1** (PW-0 through PW-22): functional audit of every interactive element. **Pass 2** (PW-23 through PW-25): visual/UX audit for aesthetics, hierarchy, balance, and theme resilience. **Pass 3** (PW-26 through PW-41): real-life end-to-end workflow testing with unattended overnight session support.
 
 ---
 
@@ -1762,6 +1762,855 @@ Run these checks AFTER completing PW-1 through PW-15.
 
 ---
 
+## PASS 3 — Real-Life Workflow Testing (Unattended / Overnight)
+
+> **Run this AFTER Pass 1 and Pass 2 are complete.** Pass 1 confirms every button works. Pass 2 confirms the UI looks right. Pass 3 confirms the **entire application works end-to-end** by simulating real clinical workflows — uploading patient data, managing care gaps, running billing, creating on-call handoffs, and more.
+>
+> **Key difference from Pass 1:** Pass 1 clicks a button and checks if it responds. Pass 3 performs a complete workflow (e.g., upload XML → verify parsed data → address a care gap created from that data → verify billing opportunity generated) and validates the full chain of cause and effect.
+>
+> **Designed for unattended 8-12 hour overnight sessions.** Every phase snapshots the database before starting and restores after completing. Copilot operates autonomously with strict safety guardrails — no code edits, no destructive operations, no external notifications.
+
+---
+
+### Unattended Session Safety Protocol
+
+These rules are **mandatory** for any Pass 3 execution. They protect the database, prevent real notifications, and ensure the codebase is untouched.
+
+#### Pre-Flight Checklist (run before starting ANY Pass 3 phase)
+
+```
+1. Verify Flask is running on port 5000:
+   Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue
+
+2. Snapshot the database:
+   venv\Scripts\python.exe scripts/db_snapshot.py --action snapshot
+
+3. Seed test data (if not already seeded):
+   Navigate to /admin/tools → click "Seed Test Data" button
+   Or: POST http://localhost:5000/admin/tools/seed-test-data
+
+4. Verify Pushover notifications are DISABLED:
+   Open config.py → confirm PUSHOVER_USER_KEY = "" and PUSHOVER_API_TOKEN = ""
+   If keys are set, temporarily blank them for the overnight run.
+
+5. Verify AC_MOCK_MODE:
+   Open config.py → confirm AC_MOCK_MODE = True (or False is OK — Pass 3 never triggers AC automation)
+
+6. Verify test patient exists:
+   Navigate to /patient/62815 → should show patient chart (upload XML first if empty)
+```
+
+#### Per-Phase Snapshot/Restore Cycle
+
+Every PW phase in Pass 3 follows this pattern:
+
+```
+[SNAPSHOT] → venv\Scripts\python.exe scripts/db_snapshot.py --action snapshot
+[EXECUTE]  → Run all steps in the phase
+[VERIFY]   → Check expected state changes
+[RESTORE]  → venv\Scripts\python.exe scripts/db_snapshot.py --action restore
+```
+
+**Exception:** PW-41 (Cross-Workflow Integration) does NOT restore after completing. It leaves the final state intact so the user can inspect results in the morning.
+
+#### Heartbeat Logging
+
+During unattended execution, write a timestamp to `data/test_heartbeat.txt` every 5 minutes:
+
+```
+Set-Content -Path data/test_heartbeat.txt -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC') - Phase PW-XX in progress"
+```
+
+The user can check this file remotely (or on return) to verify the session is still running and which phase it reached.
+
+#### Max-Error Abort Rule
+
+- If **5 consecutive test steps fail** within a single phase → **stop that phase**, log the failures, restore DB, and move to the next phase.
+- If **3 entire phases fail in a row** → **stop the entire Pass 3 run**, restore DB, and log a summary of what succeeded and what failed.
+- Never retry a failed step more than twice (consistent with the 2-strike rule from Pass 1).
+
+#### Hard Safety Rules (Override Everything)
+
+| Rule | Detail |
+|------|--------|
+| **No code edits** | Never modify `.py`, `.html`, `.css`, `.js`, or config files during Pass 3. Read-only interaction only. |
+| **No destructive admin tools** | Never call `purge-reimport-xml`, `sever-all-patients`, or `clear-test-data` during unattended runs. |
+| **No raw SQL** | Never execute `DELETE FROM`, `DROP TABLE`, or any raw SQL. All data changes go through Flask routes. |
+| **Test data only** | Only interact with MRN `62815` and seeded patients `90001`-`90015`. Never touch real patient data. |
+| **No external notifications** | Pushover keys must be empty. If a workflow triggers a notification path, verify it was suppressed (no HTTP call made). |
+| **No git operations** | Never commit, push, stash, or branch during Pass 3. The codebase stays frozen. |
+| **No file creation** | Never create new files (scripts, fixtures, helpers). Use only existing routes and tools. |
+
+#### Recovery Procedure
+
+If something goes wrong during an unattended run:
+
+```
+1. Restore database to last snapshot:
+   venv\Scripts\python.exe scripts/db_snapshot.py --action restore
+
+2. List all available snapshots:
+   venv\Scripts\python.exe scripts/db_snapshot.py --action list
+
+3. Verify application still works:
+   Navigate to localhost:5000/login → login → dashboard loads
+
+4. Check heartbeat file for last successful phase:
+   Get-Content data/test_heartbeat.txt
+```
+
+#### Morning Review Checklist
+
+After an overnight run, the user should check:
+
+- [ ] `data/test_heartbeat.txt` — what phase was last active?
+- [ ] Copilot Chat history — scroll through to see pass/fail per phase
+- [ ] `data/backups/snapshots/` — verify snapshots were created (one per phase)
+- [ ] Database state — if PW-41 ran, inspect the final state at `/dashboard`, `/billing/log`, `/caregap/62815`
+- [ ] Console output — any unhandled errors or crashes?
+
+---
+
+### Overnight Run Orchestration
+
+To start a full Pass 3 unattended run, paste this into Copilot Chat (Agent mode):
+
+> *"Run Pass 3 of TEST_PLAYWRIGHT.md. Execute phases PW-26 through PW-41 sequentially. Before each phase, snapshot the database. After each phase, verify results then restore the database (except PW-41 — leave that state intact). Write a heartbeat timestamp to data/test_heartbeat.txt every 5 minutes. If 5 consecutive steps fail in a phase, skip to the next. If 3 phases fail in a row, stop and log a summary. Never edit any code files. Only interact with test patients (MRN 62815, 90001-90015)."*
+
+For a single phase:
+
+> *"Run PW-27 from Pass 3 of TEST_PLAYWRIGHT.md. Snapshot DB first, execute all steps, verify results, then restore DB."*
+
+---
+
+### PW-26: Login & Auth Lifecycle
+
+> **Goal:** Verify the complete authentication cycle — successful login, failed login, rate limiting, logout, session persistence — as a real user would experience during a clinical day.
+
+**Pre-condition:** DB snapshot taken. Flask running on port 5000.
+
+**26-A. Successful Login**
+- [ ] Navigate to `/login`
+- [ ] Fill username `CORY`, password `ASDqwe123`
+- [ ] Click Sign In → verify redirect to `/dashboard`
+- [ ] Verify URL is `/dashboard` (not `/login`)
+- [ ] Screenshot dashboard — confirm it rendered with content
+
+**26-B. Session Persistence**
+- [ ] From dashboard, navigate to `/patients` → verify page loads (not redirected to login)
+- [ ] Navigate to `/timer` → verify page loads
+- [ ] Navigate to `/billing/log` → verify page loads
+- [ ] Navigate to `/admin` → verify admin panel loads (CORY is admin)
+
+**26-C. Logout**
+- [ ] Navigate to `/logout` → verify redirect to `/login`
+- [ ] Navigate to `/dashboard` → verify redirect to `/login` (session cleared)
+
+**26-D. Failed Login**
+- [ ] Navigate to `/login`
+- [ ] Fill username `CORY`, password `wrongpassword`
+- [ ] Click Sign In → verify stays on `/login`
+- [ ] Verify flash message contains "Invalid" (case-insensitive)
+
+**26-E. Rate Limiting**
+- [ ] Submit wrong password 4 more times (total 5 failed attempts)
+- [ ] On 5th failure, verify lockout message appears (mentions "locked" or "attempts")
+- [ ] Wait 10 seconds, then login with correct password → verify it works (lockout is temporary)
+
+**26-F. Re-login & Verify**
+- [ ] Login with `CORY` / `ASDqwe123` → verify dashboard loads
+- [ ] Verify user display name appears in header
+
+**Verification:** All 6 sub-steps pass. No 500 errors. Rate limiting engages at 5 attempts and releases.
+
+---
+
+### PW-27: XML Patient Upload & Parse
+
+> **Goal:** Upload a CDA XML clinical summary and verify all 6 clinical sections are parsed and displayed on the patient chart. This is the foundation for many downstream workflows (care gaps, billing, lab tracking).
+
+**Pre-condition:** DB snapshot taken. Demo XML file exists at `Documents/demo_patients/ClinicalSummary_PatientId_62815_20260317_142334.xml`.
+
+**27-A. Upload XML**
+- [ ] Login as CORY
+- [ ] Navigate to `/patient/62815`
+- [ ] Find the "Upload XML" button or file input
+- [ ] Upload `Documents/demo_patients/ClinicalSummary_PatientId_62815_20260317_142334.xml`
+- [ ] Verify success response (flash message or JSON `{"success": true}`)
+
+**27-B. Verify Medications Populated**
+- [ ] Navigate to `/patient/62815`
+- [ ] Click the Overview or Medications tab
+- [ ] Verify at least 1 medication is listed (not "No medications on file")
+- [ ] Screenshot the medications section
+
+**27-C. Verify Diagnoses Populated**
+- [ ] On the same patient chart, check the Diagnoses/Problems section
+- [ ] Verify at least 1 diagnosis with an ICD-10 code is listed
+- [ ] Verify diagnoses are classified as Acute or Chronic
+
+**27-D. Verify Allergies Populated**
+- [ ] Check the Allergies section
+- [ ] Verify at least 1 allergy is listed (or "NKDA" if the XML has none)
+
+**27-E. Verify Immunizations Populated**
+- [ ] Check the Immunizations section
+- [ ] Verify at least 1 immunization record is listed
+
+**27-F. Verify Vitals Populated**
+- [ ] Check the Vitals section
+- [ ] Verify at least 1 set of vitals (BP, HR, weight, etc.) is listed
+
+**27-G. Verify Care Gaps Auto-Evaluated**
+- [ ] Navigate to `/caregap/62815`
+- [ ] Verify care gap entries exist (the upload triggers `_auto_evaluate_care_gaps()`)
+- [ ] Screenshot the care gaps page — should show open gaps based on patient demographics/diagnoses
+
+**Verification:** Patient chart at `/patient/62815` shows data in all 6 clinical sections. Care gaps page shows auto-evaluated gaps. No 500 errors during upload.
+
+**Safety note:** The upload route does `DELETE` existing clinical data before re-importing. This is why DB snapshot is critical before this phase.
+
+---
+
+### PW-28: Inbox Lifecycle
+
+> **Goal:** Verify the inbox hold/resolve workflow. Inbox items are normally created by the agent OCR scanner — for testing, we use seeded data from `seed_test_data`.
+
+**Pre-condition:** DB snapshot taken. Test data seeded via `/admin/tools/seed-test-data`.
+
+**28-A. View Inbox**
+- [ ] Login as CORY
+- [ ] Navigate to `/inbox`
+- [ ] Verify the inbox page loads without errors
+- [ ] Check if any items are listed. If empty, note this and skip to verification step.
+- [ ] Screenshot the inbox
+
+**28-B. Check API Status**
+- [ ] Navigate to `/api/inbox-status` (or fetch via Playwright)
+- [ ] Verify JSON response has `total_unresolved`, `critical`, `held` fields
+- [ ] Note the counts for comparison after hold/resolve
+
+**28-C. Hold an Item** (if items exist)
+- [ ] Click on the first inbox item to expand it
+- [ ] Click the "Hold" button
+- [ ] Enter a hold reason (e.g., "Awaiting lab results")
+- [ ] Confirm → verify item moves to Held Items tab
+- [ ] Click the "Held Items" tab → verify the held item appears there
+
+**28-D. Resolve an Item** (if items exist)
+- [ ] Navigate back to the Inbox tab
+- [ ] Click on an item (different from the held one)
+- [ ] Click "Resolve" → verify item disappears from the inbox list
+- [ ] Check `/api/inbox-status` → verify `total_unresolved` decreased by 1
+
+**28-E. Verify Digest**
+- [ ] Click the "Digest" tab
+- [ ] Click the "24h" button → verify digest content loads (or "no items" message)
+
+**Verification:** Hold moves item to held tab. Resolve removes item from inbox. API counts reflect changes. No 500 errors.
+
+---
+
+### PW-29: Timer & Manual Entry
+
+> **Goal:** Create a manual time entry, verify it appears in the timer list and billing log, and annotate it with an E&M level.
+
+**Pre-condition:** DB snapshot taken.
+
+**29-A. Create Manual Entry**
+- [ ] Login as CORY
+- [ ] Navigate to `/timer`
+- [ ] Click "Manual Entry" toggle to reveal the form
+- [ ] Fill in:
+  - Patient MRN: `62815`
+  - Start time: today at 09:00
+  - End time: today at 09:30
+  - Visit type: `office_visit`
+- [ ] Submit → verify new 30-minute session appears in the timer list
+- [ ] Screenshot the timer page showing the new entry
+
+**29-B. Annotate E&M Level**
+- [ ] Find the new entry in the timer list
+- [ ] Select billing level `99214` from the dropdown (or click annotate)
+- [ ] Verify the level is saved (persists on page reload)
+
+**29-C. Verify in Billing Log**
+- [ ] Navigate to `/billing/log`
+- [ ] Verify the entry for MRN 62815 appears with:
+  - Correct date (today)
+  - Duration approximately 30 minutes
+  - Billing level 99214
+- [ ] Screenshot the billing log showing the entry
+
+**29-D. Verify Timer Status API**
+- [ ] Navigate to (or fetch) `/api/timer-status`
+- [ ] Verify JSON response returns without errors
+
+**Verification:** Manual entry created, annotated with 99214, visible in timer list AND billing log. No 500 errors.
+
+---
+
+### PW-30: E&M Calculator
+
+> **Goal:** Verify the E&M billing calculator returns correct code recommendations for known inputs.
+
+**Pre-condition:** DB snapshot taken.
+
+**30-A. Navigate to Calculator**
+- [ ] Login as CORY
+- [ ] Navigate to `/billing/em-calculator`
+- [ ] Verify the form renders with MDM dropdown and minutes input
+
+**30-B. Calculate — Moderate MDM, 35 Minutes**
+- [ ] Select MDM complexity: `Moderate`
+- [ ] Enter total minutes: `35`
+- [ ] Click Calculate
+- [ ] Verify result shows:
+  - MDM-based code (should be `99214`)
+  - Time-based code (35 min → should be `99215`)
+  - RVU values for comparison
+- [ ] Screenshot the result
+
+**30-C. Calculate — Low MDM, 15 Minutes**
+- [ ] Select MDM complexity: `Low`
+- [ ] Enter total minutes: `15`
+- [ ] Click Calculate
+- [ ] Verify result shows `99213` for MDM-based
+- [ ] Verify time-based recommendation
+
+**30-D. Calculate — High MDM, 55 Minutes**
+- [ ] Select MDM complexity: `High`
+- [ ] Enter total minutes: `55`
+- [ ] Click Calculate
+- [ ] Verify result shows `99215` for MDM-based
+- [ ] Verify time-based comparison
+
+**30-E. JSON Endpoint**
+- [ ] POST to `/billing/em-calculate-json` with `{"mdm_level": "moderate", "total_minutes": 35}`
+- [ ] Verify JSON response contains `suggested_code`, `rvu`, and comparison data
+
+**Verification:** Calculator returns differentiated MDM-based and time-based recommendations. JSON endpoint matches form results. No 500 errors.
+
+---
+
+### PW-31: Care Gap Lifecycle
+
+> **Goal:** Find an open care gap, address it with documentation, verify the status change, then reopen it.
+
+**Pre-condition:** DB snapshot taken. Patient 62815 has care gaps (run PW-27 first, or ensure XML was uploaded previously).
+
+**31-A. View Open Gaps**
+- [ ] Login as CORY
+- [ ] Navigate to `/caregap/62815`
+- [ ] Verify at least one open gap is listed
+- [ ] Note the gap name and ID for tracking
+- [ ] Screenshot the open gaps list
+
+**31-B. Address a Gap**
+- [ ] Click "Address Now" on the first open gap
+- [ ] Verify the documentation form appears
+- [ ] Enter documentation snippet: `"Discussed with patient. AWV performed today. Screening ordered."`
+- [ ] Submit → verify the gap status changes to "Addressed"
+- [ ] Verify the gap moves from the Open section to the Addressed section
+
+**31-C. Verify Status Change**
+- [ ] Reload `/caregap/62815`
+- [ ] Confirm the addressed gap shows with a checkmark or "Addressed" badge
+- [ ] Verify the documentation snippet is visible in the gap detail
+
+**31-D. Reopen the Gap**
+- [ ] Find the addressed gap
+- [ ] Click "Reopen" button (or change status to "open")
+- [ ] Verify the gap returns to the Open section
+- [ ] Reload page to confirm persistence
+
+**31-E. Decline a Gap**
+- [ ] Find a different open gap
+- [ ] Click "Decline" → verify status changes to "Declined"
+- [ ] Click "N/A" on another gap → verify status changes to "Not Applicable"
+
+**Verification:** Address changes gap to "addressed" with documentation snippet. Reopen reverts to "open". Decline and N/A set correct statuses. All changes persist on reload. No 500 errors.
+
+---
+
+### PW-32: Order Set CRUD
+
+> **Goal:** Create an order set, add items, execute it (mock mode), view history, and clean up.
+
+**Pre-condition:** DB snapshot taken.
+
+**32-A. Create Order Set**
+- [ ] Login as CORY
+- [ ] Navigate to `/orders`
+- [ ] Click "New Order Set" → builder modal opens
+- [ ] Enter name: `E2E Test AWV Orders`
+- [ ] Select visit type: `AWV`
+- [ ] Save → verify the order set appears in the list
+
+**32-B. Add Items**
+- [ ] Click Edit on `E2E Test AWV Orders`
+- [ ] Add item: `CBC` (Labs tab)
+- [ ] Add item: `CMP` (Labs tab)
+- [ ] Add item: `TSH` (Labs tab)
+- [ ] Verify all 3 items appear in the order set
+- [ ] Screenshot the order set with items
+
+**32-C. Execute Order Set**
+- [ ] Click Execute on the order set
+- [ ] Verify execution confirmation or status indicator appears
+- [ ] Note: In mock mode, this creates an `OrderExecution` record without triggering AC automation
+
+**32-D. View History**
+- [ ] Navigate to `/orders/<id>/history` (or click History button)
+- [ ] Verify at least 1 execution record exists with timestamp
+- [ ] Verify items are listed in the execution record
+
+**32-E. Clean Up**
+- [ ] Navigate back to `/orders`
+- [ ] Click Delete on `E2E Test AWV Orders`
+- [ ] Confirm deletion → verify the order set is removed from the list
+
+**Verification:** Order set created with 3 items, executed, history recorded, and deleted. No 500 errors.
+
+---
+
+### PW-33: On-Call Handoff
+
+> **Goal:** Create an on-call note, generate a shareable handoff link, verify it works without authentication, and verify de-identification.
+
+**Pre-condition:** DB snapshot taken.
+
+**33-A. Create On-Call Note**
+- [ ] Login as CORY
+- [ ] Navigate to `/oncall/new`
+- [ ] Fill in:
+  - Call time: today at 22:30
+  - Patient identifier: `Knee pain patient` (NOT an MRN — HIPAA)
+  - Chief complaint: `Acute knee pain after fall`
+  - Recommendation: `Ice, elevate, ibuprofen 600mg. Follow up in AM if not improving.`
+  - Callback promised: Yes
+  - Documentation status: `pending`
+- [ ] Submit → verify redirect to `/oncall` or note detail page
+- [ ] Verify the note appears in the on-call list
+
+**33-B. Generate Handoff Link**
+- [ ] Navigate to `/oncall/handoff`
+- [ ] Click "Share Handoff" button
+- [ ] Verify a link is generated with a token (URL like `/oncall/handoff/<token>`)
+- [ ] Copy the handoff URL
+
+**33-C. Verify Unauthenticated Access**
+- [ ] Open the handoff URL in a **new browser context** (no cookies/session)
+- [ ] Verify the page loads WITHOUT requiring login
+- [ ] Verify the handoff summary is visible with chief complaints and statuses
+
+**33-D. Verify De-Identification**
+- [ ] On the handoff page, verify:
+  - [ ] No patient MRNs are displayed
+  - [ ] No full patient names are displayed
+  - [ ] Only clinical shorthand identifiers are shown (e.g., "Knee pain patient")
+  - [ ] Chief complaints and recommendations are visible
+- [ ] Screenshot the handoff page
+
+**33-E. Update Note Status**
+- [ ] Return to authenticated session
+- [ ] Navigate to the on-call note
+- [ ] Change status from `pending` to `entered`
+- [ ] Verify status update persists on reload
+
+**Verification:** Note created, handoff link generated, accessible without auth, de-identified content only, status updates work. No 500 errors. No PHI leakage on handoff page.
+
+---
+
+### PW-34: Lab Tracking & Alerts
+
+> **Goal:** Add lab tracking for a patient, record results at normal/alert/critical levels, and verify threshold detection and trend data.
+
+**Pre-condition:** DB snapshot taken. Patient 62815 exists.
+
+**34-A. Add Lab Tracking**
+- [ ] Login as CORY
+- [ ] Navigate to `/labtrack`
+- [ ] Click "Add Tracking" or "Add Lab"
+- [ ] Fill in:
+  - MRN: `62815`
+  - Lab name: `HbA1c`
+  - Interval: `90` days
+  - Alert high: `7.0`
+  - Critical high: `10.0`
+- [ ] Submit → verify tracking entry created
+- [ ] Navigate to `/labtrack/62815` → verify HbA1c tracking appears
+
+**34-B. Add Normal Result**
+- [ ] Find the HbA1c tracking entry
+- [ ] Click "Add Result"
+- [ ] Enter value: `6.2`, date: today
+- [ ] Submit → verify result appears with normal styling (no alert)
+
+**34-C. Add Alert-Level Result**
+- [ ] Add another result: value `8.5`, date: today
+- [ ] Verify result appears with alert/warning styling (value exceeds `alert_high` of 7.0)
+
+**34-D. Add Critical Result**
+- [ ] Add another result: value `12.0`, date: today
+- [ ] Verify flash message contains "CRITICAL VALUE" (value exceeds `critical_high` of 10.0)
+- [ ] Screenshot the flash message or alert indicator
+- [ ] Note: If Pushover keys are empty (as required by pre-flight), no external notification is sent
+
+**34-E. Verify Trend Data**
+- [ ] Navigate to `/labtrack/62815/trend/HbA1c` (or click the trend chart)
+- [ ] Verify JSON response contains 3 data points: 6.2, 8.5, 12.0
+- [ ] Verify trend direction is "rising"
+- [ ] If chart renders, verify all 3 points are plotted
+
+**Verification:** Lab tracking created. Normal, alert, and critical results recorded with appropriate visual indicators. Trend endpoint returns all 3 data points. Critical flash message displayed. No 500 errors.
+
+---
+
+### PW-35: Schedule & Dashboard Integration
+
+> **Goal:** Add a schedule entry and verify it appears on the dashboard, in the schedule API, and in patient search.
+
+**Pre-condition:** DB snapshot taken.
+
+**35-A. Add Schedule Entry**
+- [ ] Login as CORY
+- [ ] POST to `/api/schedule/add` (via Playwright evaluate or via the dashboard "Add to Schedule" modal):
+  ```json
+  {
+    "patient_name": "TEST, DEMO",
+    "patient_mrn": "62815",
+    "appointment_time": "09:00",
+    "appointment_date": "<today's date YYYY-MM-DD>",
+    "visit_type": "Office Visit",
+    "duration_minutes": 15
+  }
+  ```
+- [ ] Verify success response
+
+**35-B. Verify Dashboard Shows Appointment**
+- [ ] Navigate to `/dashboard`
+- [ ] Verify the schedule section shows an appointment for MRN 62815 at 09:00
+- [ ] Verify patient name "TEST, DEMO" is visible
+- [ ] Screenshot the dashboard schedule section
+
+**35-C. Verify Schedule API**
+- [ ] Navigate to (or fetch) `/api/schedule?date=<today>`
+- [ ] Verify JSON response includes an entry with MRN `62815`
+- [ ] Verify `appointment_time` and `visit_type` match what was submitted
+
+**35-D. Verify Patient Search**
+- [ ] Navigate to (or fetch) `/api/patient-search?q=62815`
+- [ ] Verify JSON response includes a result for MRN 62815
+- [ ] Verify response contains patient name
+
+**35-E. Verify Duplicate Detection**
+- [ ] POST the same schedule entry again (same MRN + date)
+- [ ] Verify error response about duplicate appointment
+
+**Verification:** Schedule entry created, visible on dashboard, returned by API, patient searchable. Duplicate detection works. No 500 errors.
+
+---
+
+### PW-36: Notification Lifecycle
+
+> **Goal:** Send notifications at different priority levels, verify delivery via API, acknowledge a P1 alert, and verify read-all functionality.
+
+**Pre-condition:** DB snapshot taken. Logged in as admin (CORY).
+
+**36-A. Send P1 Notification**
+- [ ] POST to `/admin/send-notification`:
+  ```json
+  {
+    "user_id": 1,
+    "message": "E2E Test: Critical lab result for patient",
+    "priority": 1
+  }
+  ```
+- [ ] Verify success response
+
+**36-B. Verify P1 Appears**
+- [ ] Navigate to (or fetch) `/api/notifications/p1`
+- [ ] Verify the notification appears with message "E2E Test: Critical lab result for patient"
+- [ ] Verify `priority` is 1
+
+**36-C. Acknowledge P1**
+- [ ] POST to `/api/notifications/<id>/acknowledge`
+- [ ] Verify success response
+- [ ] Fetch `/api/notifications/p1` again → verify the notification is no longer in the P1 list
+
+**36-D. Send P2 Notification**
+- [ ] POST to `/admin/send-notification`:
+  ```json
+  {
+    "user_id": 1,
+    "message": "E2E Test: New lab results available",
+    "priority": 2
+  }
+  ```
+- [ ] Verify success response
+
+**36-E. Read All**
+- [ ] POST to `/api/notifications/read-all`
+- [ ] Verify success response
+- [ ] Fetch `/api/notifications` → verify all notifications have `is_read: true`
+
+**36-F. Verify Counts**
+- [ ] Fetch `/api/notifications/p3-count`
+- [ ] Verify count reflects current unread state (should be 0 after read-all)
+
+**Verification:** P1 notification sent and received. Acknowledgment removes from P1 list. Read-all marks all read. Counts accurate. No 500 errors.
+
+---
+
+### PW-37: CCM Enrollment & Billing
+
+> **Goal:** Enroll a patient in Chronic Care Management, log time entries to meet the 20-minute billing threshold, verify the billing roster, then disenroll.
+
+**Pre-condition:** DB snapshot taken. Patient 62815 exists.
+
+**37-A. Enroll Patient**
+- [ ] Login as CORY
+- [ ] Navigate to `/ccm/registry`
+- [ ] Click "Enroll" or navigate to enrollment form
+- [ ] Fill in:
+  - MRN: `62815`
+  - Consent method: `verbal`
+  - Conditions: HTN (I10), T2DM (E11.9)
+- [ ] Submit → verify enrollment created with status `active`
+
+**37-B. Log Time — First Entry**
+- [ ] Find the enrollment for MRN 62815
+- [ ] Click "Log Time"
+- [ ] Enter: 15 minutes, activity type: `care_coordination`, staff: `CORY`, description: `Reviewed medications with pharmacy`
+- [ ] Submit → verify response shows `monthly_total: 15`
+
+**37-C. Log Time — Second Entry**
+- [ ] Log another entry: 10 minutes, activity type: `care_coordination`, description: `Follow-up call to patient`
+- [ ] Submit → verify response shows `monthly_total: 25` (15 + 10 = 25, above 20-min threshold)
+
+**37-D. Verify Billing Roster**
+- [ ] Navigate to `/ccm/billing-roster`
+- [ ] Verify patient 62815 appears in the billable list (monthly_total >= 20 minutes)
+- [ ] Verify estimated revenue shows `$62` (per CCM billing rate)
+- [ ] Screenshot the billing roster
+
+**37-E. Verify Monthly Summary**
+- [ ] Navigate to `/ccm/<enrollment_id>/monthly-summary`
+- [ ] Verify JSON or page shows 2 time entries totaling 25 minutes
+
+**37-F. Disenroll**
+- [ ] Click "Disenroll" for MRN 62815
+- [ ] Confirm → verify status changes to `disenrolled`
+- [ ] Verify patient no longer appears on active enrollment list at `/ccm/registry`
+
+**Verification:** Patient enrolled, 25 minutes logged across 2 entries, billing roster includes patient at $62, monthly summary shows entries, disenrollment works. No 500 errors.
+
+---
+
+### PW-38: Delayed Messages
+
+> **Goal:** Create a delayed message scheduled for the future, verify it appears in the pending list, then cancel it.
+
+**Pre-condition:** DB snapshot taken.
+
+**38-A. Create Delayed Message**
+- [ ] Login as CORY
+- [ ] Navigate to `/messages/new`
+- [ ] Fill in:
+  - Recipient identifier: `62815`
+  - Message content: `Follow-up reminder: please return for fasting labs`
+  - Scheduled send at: tomorrow at 08:00 (future datetime)
+- [ ] Submit → verify redirect to `/messages` with success flash
+
+**38-B. Verify Pending**
+- [ ] Navigate to `/messages`
+- [ ] Verify the new message appears with status `pending`
+- [ ] Verify scheduled time shows tomorrow at 08:00
+- [ ] Screenshot the messages list
+
+**38-C. Verify API**
+- [ ] Fetch `/api/messages/pending`
+- [ ] Verify JSON includes the new message with correct scheduled time
+
+**38-D. Cancel Message**
+- [ ] Click "Cancel" on the pending message
+- [ ] Confirm → verify status changes to `cancelled`
+- [ ] Verify the message still shows in the list but with `cancelled` status
+- [ ] Fetch `/api/messages/pending` → verify cancelled message is NOT included
+
+**Verification:** Message created with future schedule, appears as pending, cancellation changes status. API reflects changes. No 500 errors.
+
+---
+
+### PW-39: Clinical Tools Suite
+
+> **Goal:** Exercise the main clinical tools — controlled substance tracker, ICD-10 coding helper, clinical calculators, and prior authorization generator.
+
+**Pre-condition:** DB snapshot taken.
+
+**39-A. Controlled Substance Tracker — Add Entry**
+- [ ] Navigate to `/cs-tracker`
+- [ ] Click "Add Entry" or "Add Prescription"
+- [ ] Fill in:
+  - Drug name: `Oxycodone 5mg`
+  - MRN: `62815`
+  - DEA Schedule: `II`
+- [ ] Submit → verify entry created
+
+**39-B. CS Tracker — Record Fill**
+- [ ] Find the Oxycodone entry
+- [ ] Click "Record Fill" (or similar)
+- [ ] Enter fill date: today
+- [ ] Submit → verify fill recorded, next fill date calculated
+
+**39-C. CS Tracker — PDMP Check**
+- [ ] Click "PDMP Check" on the entry
+- [ ] Verify PDMP check date updates to today
+- [ ] Verify no errors (the check records a date, not an actual PDMP query)
+
+**39-D. ICD-10 Coding Search**
+- [ ] Navigate to `/coding`
+- [ ] Search for `hypertension` → verify results include I10 and related codes
+- [ ] Click on `I10 - Essential (primary) hypertension` → verify code detail appears
+
+**39-E. ICD-10 Add Favorite**
+- [ ] Click "Add to Favorites" on the I10 code
+- [ ] Verify it appears in the favorites section
+- [ ] Reload page → verify favorite persists
+
+**39-F. Calculator — BMI**
+- [ ] Navigate to `/calculators/bmi` (or `/calculators` then click BMI)
+- [ ] Enter height: `66` inches, weight: `180` lbs
+- [ ] Click Compute → verify BMI result is approximately `29.1` (overweight)
+- [ ] Verify interpretation text appears (e.g., "Overweight")
+
+**39-G. Prior Authorization — Generate**
+- [ ] Navigate to `/pa`
+- [ ] Click "Generate New PA" (or similar)
+- [ ] Fill in required fields (medication, diagnosis, insurance info)
+- [ ] Submit → verify PA letter generated with clinical justification text
+- [ ] Screenshot the generated PA
+
+**Verification:** CS entry created with fill and PDMP check. ICD-10 search returns results, favorites saved. BMI calculator returns correct value. PA letter generated. No 500 errors.
+
+---
+
+### PW-40: Admin Operations
+
+> **Goal:** Verify admin panel access, user management, configuration, and test data seeding.
+
+**Pre-condition:** DB snapshot taken. Logged in as CORY (admin role).
+
+**40-A. Admin Panel Access**
+- [ ] Navigate to `/admin`
+- [ ] Verify admin dashboard loads with system stats
+- [ ] Screenshot the admin panel
+
+**40-B. User Management**
+- [ ] Navigate to `/admin/users`
+- [ ] Verify user list shows at least CORY with admin role
+- [ ] Verify role badges are displayed correctly
+- [ ] Note: Do NOT change any user roles or passwords during unattended testing
+
+**40-C. System Configuration**
+- [ ] Navigate to `/admin/config`
+- [ ] Verify configuration form loads with current settings
+- [ ] Note: Do NOT save any config changes during unattended testing — view only
+
+**40-D. Care Gap Rules**
+- [ ] Navigate to `/admin/caregap-rules`
+- [ ] Verify rules list loads with at least 5 rules
+- [ ] Verify each rule shows: name, criteria, age range, frequency
+
+**40-E. Admin Tools Page**
+- [ ] Navigate to `/admin/tools`
+- [ ] Verify the tools page loads with seed/clear buttons
+- [ ] Click "Seed Test Data" → verify success message
+- [ ] Navigate to `/patients` → verify seeded patients appear (MRN 90001-90015 range)
+
+**40-F. Verify Seeded Data**
+- [ ] Navigate to `/patient/90001` → verify chart loads with clinical data
+- [ ] Navigate to `/patient/90005` → verify chart loads
+- [ ] Navigate to `/caregap` → verify care gaps exist for seeded patients
+
+**Verification:** Admin panel, user list, config, and tools pages all load. Test data seeded and visible across patient roster, charts, and care gaps. No 500 errors. No config changes persisted.
+
+---
+
+### PW-41: Cross-Workflow Integration (Full Clinical Day Simulation)
+
+> **Goal:** Simulate a complete clinical day workflow, chaining multiple features together to verify they interact correctly. This is the integration test — each step depends on the previous step's state.
+>
+> **IMPORTANT:** This phase does NOT restore the database after completion. The final state is left intact for morning inspection.
+
+**Pre-condition:** DB snapshot taken (for safety, in case manual restore is needed). Test data seeded.
+
+**41-A. Morning Login**
+- [ ] Navigate to `/login`
+- [ ] Login as `CORY` / `ASDqwe123`
+- [ ] Verify redirect to `/dashboard`
+- [ ] Screenshot: "Morning dashboard state"
+
+**41-B. Review Schedule**
+- [ ] On the dashboard, check today's schedule
+- [ ] Add patient 62815 to today's schedule at 10:00 (Office Visit) if not present
+- [ ] Verify the appointment appears
+
+**41-C. Open Patient Chart**
+- [ ] Click on patient 62815 in the schedule (or navigate to `/patient/62815`)
+- [ ] Verify chart loads with clinical data
+- [ ] Screenshot: "Patient chart at start of visit"
+
+**41-D. Review Care Gaps**
+- [ ] Navigate to `/caregap/62815`
+- [ ] Review open care gaps
+- [ ] Address one gap with documentation: `"Discussed during office visit. AWV components completed."`
+- [ ] Verify gap status changes to "addressed"
+
+**41-E. Create Timer Entry**
+- [ ] Navigate to `/timer`
+- [ ] Create manual entry: MRN 62815, 10:00-10:40 (40 min), office_visit
+- [ ] Verify entry appears in timer list
+
+**41-F. Annotate Billing**
+- [ ] Annotate the timer entry with billing level `99215` (40 min + moderate MDM)
+- [ ] Verify annotation saved
+
+**41-G. Check Billing Log**
+- [ ] Navigate to `/billing/log`
+- [ ] Verify the entry for MRN 62815 today shows:
+  - Duration: ~40 min
+  - Level: 99215
+- [ ] Screenshot: "Billing log after annotation"
+
+**41-H. Create On-Call Note**
+- [ ] Navigate to `/oncall/new`
+- [ ] Create note: "Follow-up call patient" / "Check lab results from this morning" / Callback: Yes
+- [ ] Verify note created
+
+**41-I. Generate Handoff**
+- [ ] Navigate to `/oncall/handoff`
+- [ ] Generate handoff link
+- [ ] Verify link is generated
+
+**41-J. Logout**
+- [ ] Navigate to `/logout`
+- [ ] Verify redirect to login page
+- [ ] Screenshot: "End of clinical day"
+
+**41-K. Final State Verification (leave DB as-is)**
+- [ ] Re-login as CORY
+- [ ] Navigate to `/dashboard` → verify schedule shows today's patients
+- [ ] Navigate to `/billing/log` → verify today's billing entry exists
+- [ ] Navigate to `/caregap/62815` → verify addressed gap persists
+- [ ] Navigate to `/oncall` → verify on-call note exists
+- [ ] Screenshot: "Final verification — all workflow artifacts present"
+
+**Verification:** The full chain — login → schedule → patient → care gap → timer → billing → on-call → handoff → logout — completes without errors. All state changes persist across the workflow. DB is left intact for user inspection.
+
+---
+
 ## PART 4 — Phase Completion Tracker
 
 Mark each phase ✅ as it is completed and verified.
@@ -1794,11 +2643,28 @@ Mark each phase ✅ as it is completed and verified.
 | PW-23 | 2 | Information Hierarchy Audit | ⬜ Not Started | — |
 | PW-24 | 2 | Visual Balance & Spacing | ⬜ Not Started | — |
 | PW-25 | 2 | Theme Resilience Matrix | ⬜ Not Started | — |
+| PW-26 | 3 | Login & Auth Lifecycle | ⬜ Not Started | — |
+| PW-27 | 3 | XML Patient Upload & Parse | ⬜ Not Started | — |
+| PW-28 | 3 | Inbox Lifecycle | ⬜ Not Started | — |
+| PW-29 | 3 | Timer & Manual Entry | ⬜ Not Started | — |
+| PW-30 | 3 | E&M Calculator | ⬜ Not Started | — |
+| PW-31 | 3 | Care Gap Lifecycle | ⬜ Not Started | — |
+| PW-32 | 3 | Order Set CRUD | ⬜ Not Started | — |
+| PW-33 | 3 | On-Call Handoff | ⬜ Not Started | — |
+| PW-34 | 3 | Lab Tracking & Alerts | ⬜ Not Started | — |
+| PW-35 | 3 | Schedule & Dashboard Integration | ⬜ Not Started | — |
+| PW-36 | 3 | Notification Lifecycle | ⬜ Not Started | — |
+| PW-37 | 3 | CCM Enrollment & Billing | ⬜ Not Started | — |
+| PW-38 | 3 | Delayed Messages | ⬜ Not Started | — |
+| PW-39 | 3 | Clinical Tools Suite | ⬜ Not Started | — |
+| PW-40 | 3 | Admin Operations | ⬜ Not Started | — |
+| PW-41 | 3 | Cross-Workflow Integration | ⬜ Not Started | — |
 
 **Pass 1** = Functional (click every button, verify every route)
 **Pass 2** = Visual/UX (screenshot-based aesthetic evaluation)
+**Pass 3** = Real-Life Workflow (end-to-end scenario simulation, unattended overnight support)
 
-**Progress:** 0/26 phases complete
+**Progress:** 0/42 phases complete
 
 ---
 
@@ -1818,6 +2684,11 @@ Mark each phase ✅ as it is completed and verified.
 | Hierarchy check | *"Screenshot the dashboard at 1920x1080. Is the schedule visible without scrolling? Is the P1 badge visible?"* |
 | Theme test | *"Switch to the Ocean theme, then screenshot the dashboard, patient chart, and billing log"* |
 | Balance check | *"Screenshot the patient chart. Are medication and diagnosis sections evenly weighted? Any blank voids?"* |
+| Upload XML & verify | *"Run PW-27: Upload the demo XML for MRN 62815, then verify all 6 clinical sections are populated on the patient chart"* |
+| Workflow test | *"Run PW-31: Navigate to care gaps for 62815, address one gap with documentation, verify status changes, then reopen it"* |
+| Full clinical day | *"Run PW-41: Simulate a full clinical day — login, schedule, patient chart, care gap, timer, billing, on-call, logout"* |
+| Overnight run | *"Run Pass 3 phases PW-26 through PW-41 sequentially. Snapshot DB before each, restore after each except PW-41."* |
+| Single workflow | *"Run PW-34 from Pass 3: Add HbA1c tracking for 62815, record normal/alert/critical results, verify trend data"* |
 
 ### Key Test Credentials
 - **Admin login:** `CORY` / `ASDqwe123`

@@ -6,6 +6,39 @@
 
 ---
 
+## CL-125 — TEST_PLAYWRIGHT.md v3.0: Pass 3 — Real-Life Workflow Testing
+**Completed:** 03-26-26 08:15:00 UTC
+- Added Pass 3 — Real-Life Workflow Testing with 16 new end-to-end scenario phases (PW-26 through PW-41):
+  - PW-26: Login & Auth Lifecycle (success, failure, rate limiting, logout, session persistence)
+  - PW-27: XML Patient Upload & Parse (upload CDA XML, verify 6 clinical sections, care gap auto-evaluation)
+  - PW-28: Inbox Lifecycle (view, hold, resolve, digest, API status verification)
+  - PW-29: Timer & Manual Entry (create entry, annotate E&M 99214, verify billing log)
+  - PW-30: E&M Calculator (test 3 MDM/time combinations, verify JSON endpoint)
+  - PW-31: Care Gap Lifecycle (address with documentation, verify status, reopen, decline, N/A)
+  - PW-32: Order Set CRUD (create, add items, execute mock, view history, delete)
+  - PW-33: On-Call Handoff (create note, share link, verify unauthenticated access, verify de-identification)
+  - PW-34: Lab Tracking & Alerts (add tracking, normal/alert/critical results, trend verification)
+  - PW-35: Schedule & Dashboard Integration (add entry, verify dashboard, API, search, duplicate detection)
+  - PW-36: Notification Lifecycle (send P1/P2, acknowledge, read-all, verify counts)
+  - PW-37: CCM Enrollment & Billing (enroll, log 25 min, verify billing roster at $62, disenroll)
+  - PW-38: Delayed Messages (create future message, verify pending, cancel)
+  - PW-39: Clinical Tools Suite (CS Tracker, ICD-10 search, BMI calculator, Prior Auth)
+  - PW-40: Admin Operations (panel access, user list, config, seed data, verify roster)
+  - PW-41: Cross-Workflow Integration (full clinical day simulation — login through logout)
+- Added Unattended Session Safety Protocol:
+  - Pre-flight checklist (snapshot, seed data, verify Pushover keys empty, verify Flask running)
+  - Per-phase snapshot/restore cycle
+  - Heartbeat logging (data/test_heartbeat.txt every 5 min)
+  - Max-error abort (5 consecutive failures per phase, 3 phases total)
+  - Hard safety rules (no code edits, no destructive admin tools, no raw SQL, test data only, no git ops)
+  - Recovery procedure and morning review checklist
+- Added Overnight Run Orchestration section (Copilot prompts for full run and single-phase)
+- Updated Part 4 tracker: 42 phases total (23 Pass 1 + 3 Pass 2 + 16 Pass 3)
+- Updated Part 5 quick reference with 6 new workflow test command examples
+- Bumped version from 2.0 to 3.0
+
+---
+
 ## CL-124 — TEST_PLAYWRIGHT.md v2.0: Two-Pass Audit + Visual/UX Testing
 **Completed:** 03-26-26 06:30:00 UTC
 - Removed duplicate PW-2 through PW-16 summary sections (old remnant from v1.0 partial replacement)
