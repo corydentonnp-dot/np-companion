@@ -6,6 +6,17 @@
 
 ---
 
+## CL-132 — Overnight Band 2 Checkpoint Verification
+**Completed:** 03-26-26 05:48:05 UTC
+- Ran full checkpoint test suite: `venv\Scripts\python.exe -m pytest tests/ -x -q`
+  - Result: 221 passed, 22 warnings.
+- Completed scoped Band 2 milestone commit:
+  - `8d90bc0` — doc consolidation, instruction merge, qa dissolution, prompt consolidation
+- Completed tracker bookkeeping commit:
+  - `b050652` — Band 2 checkpoint boxes marked complete in overnight tracker.
+
+---
+
 ## CL-131 — Overnight Band 2 A5/A6 Prompt Consolidation and Commands Fold
 **Completed:** 03-26-26 05:43:09 UTC
 - Prompt consolidation completed in `.github/prompts/`:
