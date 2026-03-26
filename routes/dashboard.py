@@ -144,129 +144,9 @@ def estimate_schedule_duration(user_id, appointments):
 
 
 # ======================================================================
-# Helper: Schedule Anomaly Analysis
+# (REMOVED) Helper: Schedule Anomaly Analysis — moved to app/services/schedule_service.py
+# analyze_schedule_anomalies is imported above
 # ======================================================================
-def analyze_schedule_anomalies(appointments):
-    """
-    Scan the day's appointments for scheduling issues.
-
-    Checks for:
-    - back_to_back_complex: Two complex visit types with no gap
-    - short_appointment: Less than 15 minutes for a visit type that usually
-      takes longer (new patient in 15 min, physical in 15 min, etc.)
-    - schedule_gap: A gap of 30+ minutes between appointments
-    - schedule_overlap: Overlapping appointments (double-booking)
-    - late_new_patient: A new patient scheduled in the last 2 slots of the day
-
-    Returns a list of dicts:
-        [{"type": "back_to_back_complex", "message": "...", "severity": "warning"}, ...]
-    """
-    anomalies = []
-
-    if len(appointments) < 1:
-        return anomalies
-
-    # Visit types that are considered "complex" (need more time)
-    complex_types = {
-        'new patient', 'physical', 'annual wellness', 'awv',
-        'comprehensive', 'complete physical', 'new pt',
-    }
-
-    # Visit types that should NOT be 15 minutes
-    needs_more_time = {
-        'new patient': 30,
-        'new pt': 30,
-        'physical': 30,
-        'annual wellness': 30,
-        'awv': 30,
-        'comprehensive': 30,
-        'complete physical': 30,
-    }
-
-    for i, appt in enumerate(appointments):
-        vtype = (appt.visit_type or '').lower().strip()
-
-        # --- Short appointment check ---
-        if vtype in needs_more_time:
-            min_expected = needs_more_time[vtype]
-            if (appt.duration_minutes or 15) < min_expected:
-                anomalies.append({
-                    'type': 'short_appointment',
-                    'message': (
-                        f'{appt.appointment_time} — "{appt.visit_type}" '
-                        f'booked for {appt.duration_minutes} min '
-                        f'(usually needs {min_expected}+ min)'
-                    ),
-                    'severity': 'warning',
-                })
-
-        # --- Back-to-back complex check ---
-        if i > 0:
-            prev_type = (appointments[i - 1].visit_type or '').lower().strip()
-            if vtype in complex_types and prev_type in complex_types:
-                anomalies.append({
-                    'type': 'back_to_back_complex',
-                    'message': (
-                        f'{appointments[i-1].appointment_time} & '
-                        f'{appt.appointment_time} — '
-                        f'back-to-back complex visits '
-                        f'("{appointments[i-1].visit_type}" → "{appt.visit_type}")'
-                    ),
-                    'severity': 'warning',
-                })
-
-        # --- Late new patient check ---
-        if appt.is_new_patient and i >= len(appointments) - 2 and len(appointments) > 3:
-            anomalies.append({
-                'type': 'late_new_patient',
-                'message': (
-                    f'{appt.appointment_time} — New patient '
-                    f'"{appt.patient_name}" scheduled in '
-                    f'last {"slot" if i == len(appointments) - 1 else "2 slots"} of the day'
-                ),
-                'severity': 'info',
-            })
-
-    # --- Gap detection (30+ minutes between appointments) ---
-    for i in range(1, len(appointments)):
-        try:
-            prev_time = datetime.strptime(
-                appointments[i - 1].appointment_time.strip(), '%H:%M'
-            )
-            curr_time = datetime.strptime(
-                appointments[i].appointment_time.strip(), '%H:%M'
-            )
-            prev_end = prev_time + timedelta(
-                minutes=appointments[i - 1].duration_minutes or 15
-            )
-            gap_minutes = (curr_time - prev_end).total_seconds() / 60
-
-            if gap_minutes >= 30:
-                anomalies.append({
-                    'type': 'schedule_gap',
-                    'message': (
-                        f'{int(gap_minutes)} min gap between '
-                        f'{appointments[i-1].appointment_time} and '
-                        f'{appointments[i].appointment_time}'
-                    ),
-                    'severity': 'info',
-                })
-            elif gap_minutes < 0:
-                overlap_min = abs(int(gap_minutes))
-                anomalies.append({
-                    'type': 'schedule_overlap',
-                    'message': (
-                        f'{appointments[i-1].appointment_time} and '
-                        f'{appointments[i].appointment_time} — '
-                        f'appointments overlap by {overlap_min} min'
-                    ),
-                    'severity': 'warning',
-                    'overlap_minutes': overlap_min,
-                })
-        except (ValueError, AttributeError):
-            continue
-
-    return anomalies
 
 
 # ======================================================================
@@ -398,7 +278,6 @@ def index():
     # F25a: PDMP overdue check
     pdmp_overdue = []
     try:
-        from routes.tools import get_overdue_pdmp_patients
         pdmp_overdue = get_overdue_pdmp_patients(current_user.id)
     except Exception:
         pass
