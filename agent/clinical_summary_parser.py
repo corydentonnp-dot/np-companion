@@ -523,7 +523,7 @@ def _trigger_new_med_education(user_id, mrn, new_meds):
     if not new_meds:
         return
     try:
-        from routes.intelligence import auto_draft_education_message
+        from app.services.education_service import auto_draft_education_message  # B1.18
         auto_draft_education_message(user_id, mrn, new_meds)
     except Exception as e:
         logger.warning(f'Trigger 2 (new-med education) failed for MRN hash {_hash_mrn(mrn)}: {e}')

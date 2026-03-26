@@ -373,8 +373,8 @@ class AgentService:
                 if not user.preferences.get('weekly_summary_email', False):
                     continue
                 try:
-                    from routes.metrics import _generate_weekly_summary
-                    summary = _generate_weekly_summary(user.id)
+                    from app.services.metrics_service import generate_weekly_summary
+                    summary = generate_weekly_summary(user.id)
                     self._send_weekly_email(user, summary)
                     logger.info(f'Weekly summary sent to {user.display_name or user.username}')
                 except Exception as e:
@@ -463,7 +463,7 @@ class AgentService:
                 if not user.preferences.get('monthly_billing_email', True):
                     continue
                 try:
-                    from routes.timer import _monthly_stats, RVU_TABLE
+                    from app.services.timer_service import monthly_stats, RVU_TABLE
                     from models.timelog import TimeLog
                     from datetime import date as dt_date
 
@@ -487,7 +487,7 @@ class AgentService:
                                 TimeLog.session_end.isnot(None))
                         .all()
                     )
-                    stats = _monthly_stats(sessions)
+                    stats = monthly_stats(sessions)
                     self._send_monthly_billing_email(user, rpt_year, rpt_month, stats)
                     logger.info(f'Monthly billing report sent to {user.display_name or user.username}')
                 except Exception as e:
