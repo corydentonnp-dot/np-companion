@@ -1,7 +1,7 @@
 # CareCompanion — Playwright MCP Browser Testing Guide
 
-**Version:** 1.0 — 03-25-26  
-**Purpose:** Step-by-step guide for setting up AI-driven browser testing via Playwright MCP, plus a 16-phase audit plan covering all pages in CareCompanion.
+**Version:** 2.0 — 03-26-26
+**Purpose:** Step-by-step guide for AI-driven browser testing via Playwright MCP. **Pass 1** (PW-0 through PW-22): functional audit of every interactive element. **Pass 2** (PW-23 through PW-25): visual/UX audit for aesthetics, hierarchy, balance, and theme resilience.
 
 ---
 
@@ -1045,14 +1045,345 @@ Run this checklist:
 
 ---
 
-### PW-2: Dashboard
+### PW-17: CCM Registry
 
-**URLs:**
-- `/dashboard`
+**URL:** `/ccm/registry`
 
-**Check Items:**
-- [ ] Dashboard loads without console errors
-- [ ] All widget sections render (Today's Schedule, Priority Patients, Agent Status, etc.)
+**Registry table:**
+- [ ] Enrolled patients list renders (or empty state message)
+- [ ] Status badge per patient (Active / Disenrolled) visible
+- [ ] Total enrolled count displayed
+
+**Enrollment:**
+- [ ] "Enroll Patient" button → opens enrollment form/modal
+  - [ ] MRN field — type `62815`
+  - [ ] Enrollment date picker → select today
+  - [ ] Qualifying conditions checkboxes → check at least 2
+  - [ ] Save → POST `/ccm/enroll`, patient added to registry
+  - [ ] Cancel → modal closes, no changes
+- [ ] Duplicate enrollment attempt → error message (not 500)
+
+**Per-patient actions:**
+- [ ] "Log Time" button → opens time logging form
+  - [ ] Minutes field — type `20`
+  - [ ] Activity dropdown — select "Care coordination"
+  - [ ] Date field — select today
+  - [ ] Notes textarea — type brief note
+  - [ ] Submit → POST `/ccm/{id}/log-time`, time entry saved
+- [ ] "Disenroll" button → confirmation prompt → confirmed → status changes to Disenrolled
+- [ ] CCM history expand → shows all logged time entries for patient
+- [ ] Monthly billing total visible per patient (sum of logged minutes)
+
+**URL:** `/api/patient/62815/ccm-status`
+- [ ] Returns JSON with enrollment status, total minutes this month, qualifying conditions
+
+---
+
+### PW-18: Help Center
+
+**URL:** `/help`
+
+**Help index:**
+- [ ] Feature guide cards render (or "no guides available" message)
+- [ ] Search field (`#help-search`) — type "billing" → results filter to billing-related guides
+- [ ] Clear search → all guides visible
+- [ ] Category grouping visible (Getting Started, Clinical, Billing, Admin, etc.)
+
+**URL:** `/help/{feature_id}` (click first available guide)
+- [ ] Guide content renders with formatted markdown
+- [ ] Table of contents sidebar (if long guide) → anchor links work
+- [ ] Back to Help link → navigates to `/help`
+- [ ] "Was this helpful?" feedback buttons → POST, feedback recorded
+
+**URL:** `/api/help/search?q=timer`
+- [ ] Returns JSON array of matching help items
+- [ ] Empty query returns all items (or error message)
+
+---
+
+### PW-19: Campaigns & ROI
+
+**URL:** `/campaigns`
+
+**Campaign list:**
+- [ ] Active campaigns render (or empty state)
+- [ ] Campaign card shows: name, target gap type, patient count, start/end dates
+- [ ] "New Campaign" button → opens creation form
+  - [ ] Campaign name field — type "Spring AWV Outreach"
+  - [ ] Gap type dropdown — select "AWV"
+  - [ ] Target population filter (age range, sex, payer) → set criteria
+  - [ ] Start date / End date pickers → set date range
+  - [ ] Create → POST, campaign created and appears in list
+- [ ] Campaign detail click → opens detail view
+  - [ ] Patient list for this campaign visible
+  - [ ] Contacted / Scheduled / Completed status per patient
+  - [ ] Mark Contacted button (per patient) → POST, status updates
+  - [ ] Mark Scheduled button → POST, status updates with appointment date
+
+**URL:** `/admin/billing-roi`
+- [ ] ROI dashboard renders (admin-only — non-admin redirected)
+- [ ] Revenue impact charts render (not blank canvas)
+- [ ] Campaign comparison table visible
+- [ ] Date range filter → change dates → data refreshes
+
+---
+
+### PW-20: Admin Extended
+
+**URL:** `/admin/med-catalog`
+
+**Medication catalog:**
+- [ ] Drug list table renders with columns: Drug Name, Class, Monitoring Required, Status
+- [ ] Search field — type "metformin" → table filters
+- [ ] "Add Override" button → opens override form
+  - [ ] Drug name field — type drug name
+  - [ ] Override type dropdown — select type
+  - [ ] Notes textarea — type justification
+  - [ ] Save → POST, override appears in list
+- [ ] Edit button (per drug) → inline edit activates
+- [ ] Toggle monitoring required → POST, flag updates
+- [ ] Bulk actions checkbox → select multiple → bulk action dropdown (Enable / Disable / Delete)
+
+**URL:** `/admin/rules-registry`
+
+**Rules table:**
+- [ ] Monitoring rules tab → monitoring rules list
+- [ ] Care gap rules tab → care gap rules list
+- [ ] Each rule row shows: Name, Type, Condition, Enabled toggle, Test button
+- [ ] Enabled toggle (per rule) → POST `/api/toggle-monitoring-rule/{id}` or `/api/toggle-caregap-rule/{id}`
+- [ ] "Test Rule" button (per rule) → POST `/api/test-monitoring-rule/{id}`, result appears in toast/modal
+- [ ] "Add Rule" button → opens rule builder form
+  - [ ] Rule name, type, conditions, actions fields → fill all
+  - [ ] Save → POST, rule added to list
+- [ ] Edit button (per rule) → opens pre-filled form
+- [ ] Delete button (per rule) → confirm → rule removed
+
+**URL:** `/admin/benchmarks`
+- [ ] Benchmark dashboard renders
+- [ ] "Run Benchmarks" button → POST `/admin/benchmarks/run`, progress indicator shown
+- [ ] Results table shows: Metric, Current Value, Target, Delta, Status
+- [ ] "Select Patients" link → `/admin/benchmarks/patients`
+  - [ ] Patient selection criteria form → set filters → submit → patient count updates
+
+**URL:** `/admin/sitemap`
+- [ ] Full site map renders with all routes grouped by blueprint
+- [ ] Each route shows: URL, method, auth required, role required
+
+---
+
+### PW-21: AI Assistant
+
+**AI Panel (global — available on any page):**
+
+- [ ] AI panel toggle button (in header or taskbar) → panel opens/slides in
+- [ ] HIPAA acknowledgment prompt appears on first use
+  - [ ] "I Acknowledge" button → POST `/api/ai/acknowledge-hipaa`, panel becomes usable
+  - [ ] "Cancel" → panel closes without acknowledging
+- [ ] Chat input field — type "What care gaps does patient 62815 have?"
+  - [ ] Submit → POST `/api/ai/chat`, response streams into panel
+  - [ ] Response renders formatted markdown
+- [ ] Follow-up question — type another message → conversation continues
+- [ ] "Clear Chat" button → conversation history cleared
+- [ ] Panel close button → panel dismissed, conversation preserved for re-open
+
+**URL:** `/api/ai/hipaa-status`
+- [ ] Returns JSON with `acknowledged: true/false`, `acknowledged_at` timestamp
+
+**Admin toggle:**
+- [ ] Navigate to `/admin/users` → AI toggle per user → disable AI for a user
+- [ ] Log in as that user → AI panel should show "AI disabled by administrator" message
+
+---
+
+### PW-22: Telehealth & Communication Log
+
+**URL:** `/patient/62815` (Communications tab or section)
+
+**Communication log:**
+- [ ] Communication history list renders (or "no communications" empty state)
+- [ ] "Log Communication" button → opens form
+  - [ ] Type dropdown — select "Phone Call" / "Video Visit" / "Portal Message" / "Text"
+  - [ ] Date/time field → select datetime
+  - [ ] Duration minutes field — type `15`
+  - [ ] Summary textarea — type brief summary
+  - [ ] Follow-up needed checkbox → check
+  - [ ] Save → POST `/api/patient/62815/communication-log`, entry appears in list
+- [ ] Each entry shows: Type icon, date, duration, summary preview
+- [ ] Entry click → expands to show full summary + follow-up status
+- [ ] "Mark Follow-up Complete" button (on entries with follow-up) → POST, status updates
+
+**URL:** `/api/patient/62815/communications`
+- [ ] Returns JSON array of communication entries sorted by date desc
+
+---
+
+## PASS 2 — Visual & UX Audit
+
+> **Run this AFTER Pass 1 (PW-0 through PW-22) is complete.** Every page must function correctly before evaluating aesthetics. Pass 2 uses screenshots to evaluate layout, hierarchy, balance, and theme resilience.
+
+---
+
+### PW-23: Information Hierarchy Audit
+
+> **Method:** For each page below, screenshot at **1920x1080**. Evaluate: "Can a provider get what they need in < 2 seconds without scrolling?" The **Primary Zone** (top ~600px) must contain the critical data. **Secondary** is one click/scroll away. **Tertiary** is in modals/expandable sections.
+
+**23-A. Dashboard (`/dashboard`)**
+
+| Zone | Must contain |
+|------|-------------|
+| **Primary** (visible, no scroll) | Today's schedule (patient names + times), active timer status, P1 alert badge count, agent status indicator |
+| **Secondary** (sub-panel or 1 scroll) | Billing anomalies, TCM alerts, widget management, scrape controls |
+| **Tertiary** (modal/expandable) | Add-to-schedule modal, anomaly detail panel, patient chart links |
+
+- [ ] Screenshot at 1920x1080 — schedule widget fully visible without scrolling
+- [ ] P1 badge visible in header area (not buried below fold)
+- [ ] Agent status indicator visible without scrolling
+- [ ] No critical info hidden behind a collapsed section that defaults to closed
+- [ ] Empty state: if no appointments, message visible — not blank white void
+
+**23-B. Patient Chart (`/patient/62815`)**
+
+| Zone | Must contain |
+|------|-------------|
+| **Primary** | Patient name + MRN + age/sex + allergy badge, active medications (top 5-10), active diagnoses (top 5-10) |
+| **Secondary** | Full medication list, full diagnosis list, lab results, vitals, sub-panel quick nav |
+| **Tertiary** | ICD-10 lookup modal, edit demographics form, diagnosis copy modal, PiP pop-outs |
+
+- [ ] Screenshot at 1920x1080 — patient header (name, MRN, age, sex, allergies) fully visible
+- [ ] Medication section visible without scrolling (at least first 5 items)
+- [ ] Diagnosis section visible without scrolling (at least first 5 items)
+- [ ] Sub-panel quick-nav links visible for jumping to sections
+- [ ] Allergy badge prominently colored (not same weight as regular text)
+
+**23-C. Billing Log (`/billing/log`)**
+
+| Zone | Must contain |
+|------|-------------|
+| **Primary** | Filter controls (date range + level + status), first 8-10 table rows with Date/MRN/Level/RVU/Status |
+| **Secondary** | Anomaly side panel, row detail expansion, rationale textarea |
+| **Tertiary** | Export PDF, E&M Calculator link, Monthly Report link |
+
+- [ ] Screenshot at 1920x1080 — filters AND first 8+ data rows visible together
+- [ ] Table headers visually distinct (navy background, white text)
+- [ ] Anomaly flags (warning badges) visible in table without hovering
+- [ ] Action buttons (Detail, Export) visible but not competing with data columns
+
+**23-D. Care Gaps Daily (`/caregap`)**
+
+| Zone | Must contain |
+|------|-------------|
+| **Primary** | Today's date, patient count with gaps, first 5-8 gap rows (patient name + gap type + status) |
+| **Secondary** | Address Now form, documentation textarea, date navigation buttons |
+| **Tertiary** | Panel view link, outreach link, CSV export |
+
+- [ ] Screenshot at 1920x1080 — date navigation + first 5 gap rows visible
+- [ ] Gap status badges color-coded (addressed=green, open=gold, declined=gray)
+- [ ] Action buttons (Address Now, Copy Doc, Decline) visible per row without horizontal scroll
+
+**23-E. Timer (`/timer`)**
+
+| Zone | Must contain |
+|------|-------------|
+| **Primary** | Active session card (patient, elapsed time, F2F time, recording badge), daily stats (session count, total time) |
+| **Secondary** | E&M distribution bar, previous sessions list, billing level dropdown |
+| **Tertiary** | Manual entry form, AWV checklist, E&M calculator widget |
+
+- [ ] Screenshot at 1920x1080 — active session card fully visible with live timer
+- [ ] Daily stats row (Sessions, Total Time, Avg, F2F) visible without scrolling
+- [ ] F2F toggle button prominently placed near active session (not buried)
+
+**23-F. Inbox (`/inbox`)**
+
+| Zone | Must contain |
+|------|-------------|
+| **Primary** | Unread count badge, first 8-10 message rows (sender, subject, date, priority), tab navigation |
+| **Secondary** | Message detail view, hold/resolve buttons, hold reason dropdown |
+| **Tertiary** | Digest tab, audit log tab |
+
+- [ ] Screenshot at 1920x1080 — tab bar + first 8 messages visible together
+- [ ] Unread count prominently displayed (badge, not just text)
+- [ ] Priority indicators visible in message rows (color or icon)
+
+---
+
+### PW-24: Visual Balance & Spacing
+
+> **Method:** Screenshot each page at 1920x1080. Evaluate the rubric below. Each item is a yes/no visual check.
+
+**Card & Layout Balance:**
+- [ ] Dashboard: widget cards are evenly spaced — no lopsided whitespace gaps
+- [ ] Patient chart: sections (meds, dx, labs) have equal visual weight when populated
+- [ ] Billing log: filter row and table occupy balanced proportions (filters ~15%, table ~85%)
+- [ ] Care gaps: gap rows are uniform height — no jagged row boundaries
+- [ ] Timer: stat blocks are evenly distributed across the grid row
+
+**Typography Hierarchy:**
+- [ ] Page titles (H1) are visibly larger than section headers (H2)
+- [ ] Section headers are visibly larger than body text
+- [ ] Labels (`form-label--sm`) are visibly smaller/lighter than input values
+- [ ] Badge text is smaller than surrounding body text
+- [ ] Stat values (`stat-value--md`) are the largest text on stat blocks
+
+**Color Consistency:**
+- [ ] Info badges use teal consistently across all pages
+- [ ] Warning/anomaly badges use gold consistently
+- [ ] Danger/error badges use red consistently
+- [ ] Success/complete badges use green consistently
+- [ ] Primary action buttons are teal on every page
+- [ ] Secondary/cancel buttons are outlined gray on every page
+- [ ] Sidebar active link highlighted in teal
+
+**Empty States:**
+- [ ] Dashboard with no schedule → shows "No appointments scheduled" message (not blank)
+- [ ] Patient chart with no medications → shows "No medications on file" (not blank)
+- [ ] Inbox with no messages → shows "Inbox is empty" (not blank)
+- [ ] Billing log with no entries for date range → shows "No entries found" (not blank)
+- [ ] Lab track with no tracked labs → shows "No labs being tracked" (not blank)
+- [ ] Care gaps with no gaps today → shows "No care gaps for today" (not blank)
+
+**Button Prominence:**
+- [ ] Primary actions (Save, Submit, Create) are teal filled buttons
+- [ ] Destructive actions (Delete, Remove) are red filled buttons
+- [ ] Secondary actions (Cancel, Back, Clear) are outlined or text-only
+- [ ] No page has two equally-weighted primary buttons competing for attention
+
+**Form Layout:**
+- [ ] Labels are positioned above inputs (not floating randomly)
+- [ ] Required field indicators (asterisk or visual cue) are present where applicable
+- [ ] Input focus ring visible when tabbing through form fields (teal glow)
+- [ ] Form groups have consistent vertical spacing
+
+---
+
+### PW-25: Theme Resilience Matrix
+
+> **Method:** For each theme, set it via Settings or URL parameter, then screenshot 3 high-density pages: Dashboard, Patient Chart, Billing Log. Verify readability and visual integrity.
+
+**Test matrix (10 themes x 3 pages = 30 screenshots):**
+
+| Theme | Dashboard | Patient Chart | Billing Log |
+|-------|-----------|--------------|-------------|
+| Light (default) | [ ] | [ ] | [ ] |
+| Dark | [ ] | [ ] | [ ] |
+| Modern | [ ] | [ ] | [ ] |
+| Fancy | [ ] | [ ] | [ ] |
+| Retro | [ ] | [ ] | [ ] |
+| Minimalist | [ ] | [ ] | [ ] |
+| Nature | [ ] | [ ] | [ ] |
+| Ocean | [ ] | [ ] | [ ] |
+| Sunset | [ ] | [ ] | [ ] |
+| Nord | [ ] | [ ] | [ ] |
+
+**Per-screenshot checks:**
+- [ ] All text readable (no white-on-white, no black-on-black)
+- [ ] Buttons visible and distinguishable from background
+- [ ] Table headers distinct from table body
+- [ ] Card borders/shadows visible (cards don't blend into page background)
+- [ ] Sidebar navigation items readable
+- [ ] Badges still color-coded (not all same color)
+- [ ] Input fields have visible borders
+- [ ] Modal overlays dim the background (not transparent)
+- [ ] Charts/graphs: axes and labels readable against chart background
 - [ ] Schedule widget shows today's appointments or "no appointments" message
 - [ ] Priority 1 patient alert badge shows/hides correctly
 - [ ] Agent status indicator reflects actual agent state
@@ -1435,26 +1766,39 @@ Run these checks AFTER completing PW-1 through PW-15.
 
 Mark each phase ✅ as it is completed and verified.
 
-| Phase | Focus Area | Status | Date Completed |
-|-------|------------|--------|----------------|
-| PW-1  | Login & Account Flows | ⬜ Not Started | — |
-| PW-2  | Dashboard | ⬜ Not Started | — |
-| PW-3  | Patient Roster & Chart | ⬜ Not Started | — |
-| PW-4  | Inbox | ⬜ Not Started | — |
-| PW-5  | Timer | ⬜ Not Started | — |
-| PW-6  | Billing Suite | ⬜ Not Started | — |
-| PW-7  | Care Gaps | ⬜ Not Started | — |
-| PW-8  | Orders & Order Sets | ⬜ Not Started | — |
-| PW-9  | Lab Track | ⬜ Not Started | — |
-| PW-10 | On-Call | ⬜ Not Started | — |
-| PW-11 | Clinical Tools | ⬜ Not Started | — |
-| PW-12 | Calculators | ⬜ Not Started | — |
-| PW-13 | Admin Panel | ⬜ Not Started | — |
-| PW-14 | Monitoring & Messaging | ⬜ Not Started | — |
-| PW-15 | Metrics & Benchmarks | ⬜ Not Started | — |
-| PW-16 | Cross-Cutting Checks | ⬜ Not Started | — |
+| Phase | Pass | Focus Area | Status | Date Completed |
+|-------|------|------------|--------|----------------|
+| PW-0  | 1 | Global Navigation | ⬜ Not Started | — |
+| PW-1  | 1 | Login & Account Flows | ⬜ Not Started | — |
+| PW-2  | 1 | Dashboard | ⬜ Not Started | — |
+| PW-3  | 1 | Patient Roster & Chart | ⬜ Not Started | — |
+| PW-4  | 1 | Inbox | ⬜ Not Started | — |
+| PW-5  | 1 | Timer | ⬜ Not Started | — |
+| PW-6  | 1 | Billing Suite | ⬜ Not Started | — |
+| PW-7  | 1 | Care Gaps | ⬜ Not Started | — |
+| PW-8  | 1 | Orders & Order Sets | ⬜ Not Started | — |
+| PW-9  | 1 | Lab Track | ⬜ Not Started | — |
+| PW-10 | 1 | On-Call | ⬜ Not Started | — |
+| PW-11 | 1 | Clinical Tools | ⬜ Not Started | — |
+| PW-12 | 1 | Calculators | ⬜ Not Started | — |
+| PW-13 | 1 | Admin Panel | ⬜ Not Started | — |
+| PW-14 | 1 | Monitoring & Messaging | ⬜ Not Started | — |
+| PW-15 | 1 | Metrics & Benchmarks | ⬜ Not Started | — |
+| PW-16 | 1 | Cross-Cutting Checks | ⬜ Not Started | — |
+| PW-17 | 1 | CCM Registry | ⬜ Not Started | — |
+| PW-18 | 1 | Help Center | ⬜ Not Started | — |
+| PW-19 | 1 | Campaigns & ROI | ⬜ Not Started | — |
+| PW-20 | 1 | Admin Extended (Med Catalog, Rules, Benchmarks) | ⬜ Not Started | — |
+| PW-21 | 1 | AI Assistant | ⬜ Not Started | — |
+| PW-22 | 1 | Telehealth & Communication Log | ⬜ Not Started | — |
+| PW-23 | 2 | Information Hierarchy Audit | ⬜ Not Started | — |
+| PW-24 | 2 | Visual Balance & Spacing | ⬜ Not Started | — |
+| PW-25 | 2 | Theme Resilience Matrix | ⬜ Not Started | — |
 
-**Progress:** 0/16 phases complete
+**Pass 1** = Functional (click every button, verify every route)
+**Pass 2** = Visual/UX (screenshot-based aesthetic evaluation)
+
+**Progress:** 0/26 phases complete
 
 ---
 
@@ -1471,6 +1815,9 @@ Mark each phase ✅ as it is completed and verified.
 | Test mobile | *"Resize browser to 375x812 and screenshot the dashboard"* |
 | Fix and verify | *"Fix the console error, then navigate back and confirm it's gone"* |
 | Full phase audit | *"Run PW-2: navigate to the dashboard, screenshot, check console, and report all issues"* |
+| Hierarchy check | *"Screenshot the dashboard at 1920x1080. Is the schedule visible without scrolling? Is the P1 badge visible?"* |
+| Theme test | *"Switch to the Ocean theme, then screenshot the dashboard, patient chart, and billing log"* |
+| Balance check | *"Screenshot the patient chart. Are medication and diagnosis sections evenly weighted? Any blank voids?"* |
 
 ### Key Test Credentials
 - **Admin login:** `CORY` / `ASDqwe123`

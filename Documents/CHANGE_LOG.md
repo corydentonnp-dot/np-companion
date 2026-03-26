@@ -6,6 +6,27 @@
 
 ---
 
+## CL-124 — TEST_PLAYWRIGHT.md v2.0: Two-Pass Audit + Visual/UX Testing
+**Completed:** 03-26-26 06:30:00 UTC
+- Removed duplicate PW-2 through PW-16 summary sections (old remnant from v1.0 partial replacement)
+- Added 6 new functional phases for previously untested routes:
+  - PW-17: CCM Registry (enroll, log time, disenroll, billing roster)
+  - PW-18: Help Center (search, feature guides, feedback)
+  - PW-19: Campaigns & ROI (campaign CRUD, admin billing ROI dashboard)
+  - PW-20: Admin Extended (Med Catalog, Rules Registry, Benchmarks Admin, Sitemap)
+  - PW-21: AI Assistant (HIPAA acknowledgment, chat panel, admin toggle)
+  - PW-22: Telehealth & Communication Log (log comms, follow-up tracking)
+- Added Pass 2 — Visual & UX Audit (3 new phases):
+  - PW-23: Information Hierarchy Audit — per-page Primary/Secondary/Tertiary zone definitions for 6 high-density pages
+  - PW-24: Visual Balance & Spacing — 25+ screenshot-verifiable checks (card spacing, typography hierarchy, color consistency, empty states, button prominence, form layout)
+  - PW-25: Theme Resilience Matrix — 10 themes x 3 pages = 30 screenshot checks
+- Updated Part 4 tracker: 26 phases total (23 Pass 1 functional + 3 Pass 2 visual), added Pass column
+- Updated Part 5 quick reference with Pass 2 Copilot prompt examples
+- Bumped version from 1.0 to 2.0
+- Files modified: `Documents/dev_guide/TEST_PLAYWRIGHT.md`
+
+---
+
 ## CL-123 — Rich Demo Patient XML Generation
 **Completed:** 07-10-25 04:15:00 UTC
 - Created `scripts/generate_demo_patients.py` — generates 15 CDA XML files with full clinical histories
