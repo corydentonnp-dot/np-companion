@@ -17,8 +17,10 @@ __pycache__/
 venv/
 .venv/
 
-# VS Code workspace settings
-.vscode/
+# VS Code workspace settings (exclude most, but allow shared settings)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 
 # Session cookies / serialized data
 *.pkl

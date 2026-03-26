@@ -1,0 +1,237 @@
+{
+    // ═══════════════════════════════════════════════════════════
+    // CPU-Optimized Settings for AI Autopilot Workflow
+    // User does NOT code directly — only interacts via Copilot Chat.
+    // Every setting here reduces CPU/memory/GPU overhead.
+    // ═══════════════════════════════════════════════════════════
+
+    // ── Editor: disable visual fluff ──────────────────────────
+    "editor.minimap.enabled": false,
+    "editor.minimap.autohide": "none",
+    "editor.renderWhitespace": "none",
+    "editor.guides.indentation": false,
+    "editor.guides.bracketPairs": false,
+    "editor.bracketPairColorization.enabled": false,
+    "editor.occurrencesHighlight": "off",
+    "editor.selectionHighlight": false,
+    "editor.renderLineHighlight": "none",
+    "editor.matchBrackets": "never",
+    "editor.folding": false,
+    "editor.glyphMargin": false,
+    "editor.codeLens": false,
+    "editor.hover.enabled": "off",
+    "editor.links": false,
+    "editor.colorDecorators": false,
+    "editor.lightbulb.enabled": "off",
+    "editor.stickyScroll.enabled": false,
+    "editor.inlayHints.enabled": "off",
+    "editor.parameterHints.enabled": false,
+    "editor.suggest.showStatusBar": false,
+    "editor.quickSuggestions": {
+        "other": "off",
+        "comments": "off",
+        "strings": "off"
+    },
+    "editor.suggestOnTriggerCharacters": false,
+    "editor.wordBasedSuggestions": "off",
+    "editor.acceptSuggestionOnCommitCharacter": false,
+    "editor.smoothScrolling": false,
+    "editor.cursorBlinking": "solid",
+    "editor.cursorSmoothCaretAnimation": "off",
+    "editor.scrollbar.vertical": "auto",
+    "editor.scrollbar.horizontal": "auto",
+    "editor.accessibilitySupport": "off",
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "editor.unicodeHighlight.invisibleCharacters": false,
+    "editor.linkedEditing": false,
+    "editor.definitionLinkOpensInPeek": false,
+    "editor.semanticHighlighting.enabled": false,
+    "editor.tokenColorCustomizations": {},
+
+    // ── Diff Editor ───────────────────────────────────────────
+    "diffEditor.codeLens": false,
+    "diffEditor.renderIndicators": false,
+
+    // ── Workbench: reduce animations & background work ────────
+    "workbench.editor.enablePreview": true,
+    "workbench.editor.enablePreviewFromQuickOpen": true,
+    "workbench.tips.enabled": false,
+    "workbench.startupEditor": "none",
+    "workbench.enableExperiments": false,
+    "workbench.list.smoothScrolling": false,
+    "workbench.reduceMotion": "on",
+    "workbench.tree.renderIndentGuides": "none",
+    "workbench.hover.delay": 1500,
+    "workbench.editor.limit.enabled": true,
+    "workbench.editor.limit.value": 5,
+    "workbench.editor.limit.perEditorGroup": true,
+    "workbench.editor.closeEmptyGroups": true,
+
+    // ── Terminal ──────────────────────────────────────────────
+    "terminal.integrated.smoothScrolling": false,
+    "terminal.integrated.gpuAcceleration": "off",
+    "terminal.integrated.shellIntegration.enabled": true,
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/venv": true,
+        "**/build": true,
+        "**/dist": true,
+        "**/*.pyc": true
+    },
+
+    // ── Search: limit scope ──────────────────────────────────
+    "search.exclude": {
+        "**/venv/**": true,
+        "**/build/**": true,
+        "**/dist/**": true,
+        "**/__pycache__/**": true,
+        "**/tesseract/**": true,
+        "**/.pytest_cache/**": true,
+        "**/data/logs/**": true,
+        "**/data/backups/**": true,
+        "**/data/clinical_summaries/**": true
+    },
+    "search.followSymlinks": false,
+    "search.maxResults": 5000,
+
+    // ── Git: reduce background polling ────────────────────────
+    "git.enabled": true,
+    "git.autorefresh": false,
+    "git.autofetch": false,
+    "git.decorations.enabled": false,
+    "git.enableStatusBarSync": false,
+
+    // ── Python / Pylance: minimal analysis ────────────────────
+    "python.analysis.diagnosticMode": "openFilesOnly",
+    "python.analysis.indexing": false,
+    "python.analysis.autoImportCompletions": false,
+    "python.analysis.completeFunctionParens": false,
+    "python.analysis.enablePytestSupport": false,
+    "python.analysis.autoSearchPaths": false,
+    "python.analysis.autoFormatStrings": false,
+
+    // ── Extensions: disable noisy features ────────────────────
+    "extensions.autoUpdate": false,
+    "extensions.autoCheckUpdates": false,
+    "update.mode": "manual",
+
+    // ── Telemetry: stop background data sends ─────────────────
+    "telemetry.telemetryLevel": "off",
+    "redhat.telemetry.enabled": false,
+
+    // ── Window / UI ──────────────────────────────────────────
+    "window.titleBarStyle": "native",
+    "breadcrumbs.enabled": false,
+    "outline.showVariables": false,
+
+    // ── Copilot Chat: keep this working well ─────────────────
+    "github.copilot.enable": {
+        "*": true
+    },
+
+    // ── Disable heavy extensions you don't use ────────────────
+    // Docker/containers: runs background watchers, not needed
+    "docker.showStartPage": false,
+    // Remote containers: disable auto-attach
+    "dev.containers.dockerComposePath": "",
+
+    // ── Emmet: not needed ─────────────────────────────────────
+    "emmet.showExpandedAbbreviation": "never",
+    "emmet.showSuggestionOnlyWhenEmpty": true,
+
+    // ── TypeScript/JS: not used in this project ───────────────
+    "js/ts.suggest.enabled": false,
+    "typescript.validate.enable": false,
+    "javascript.validate.enable": false,
+
+    // ── Notebook: not used ────────────────────────────────────
+    "notebook.cellToolbarLocation": {
+        "default": "hidden"
+    },
+
+    // ── Performance: explicit limits ──────────────────────────
+    "files.maxMemoryForLargeFilesMB": 256,
+    "editor.maxTokenizationLineLength": 5000,
+    "editor.largeFileOptimizations": true,
+
+    // ── Aggressive CPU reduction ──────────────────────────────
+    // Disable background extension host processes where possible
+    "extensions.experimental.affinity": {
+        "ms-python.vscode-pylance": 1,
+        "github.copilot-chat": 1
+    },
+    // Limit VS Code's own process priority  
+    "window.experimental.windowControlsOverlay.enabled": false,
+    // Disable GPU compositing — big CPU saver on low-end machines
+    // (terminal GPU already off above)
+    // Reduce editor re-rendering
+    "editor.renderControlCharacters": false,
+    "editor.rulers": [],
+    // No auto-save CPU spikes
+    "files.autoSave": "off",
+    // Reduce file watching aggressiveness
+    "files.watcherExclude": {
+        "**/venv/**": true,
+        "**/__pycache__/**": true,
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/build/**": true,
+        "**/dist/**": true,
+        "**/data/logs/**": true,
+        "**/data/backups/**": true,
+        "**/data/clinical_summaries/**": true,
+        "**/tesseract/**": true,
+        "**/.pytest_cache/**": true,
+        "**/static/**": true,
+        "**/.git/**": true
+    },
+    // Disable file decorations cpu work
+    "problems.decorations.enabled": false,
+    // PowerShell: disable heavy features
+    "powershell.integratedConsole.showOnStartup": false,
+    "powershell.scriptAnalysis.enable": false,
+
+    // ============================================================
+    // GitDoc -- Auto-commit + push on every save
+    // Docs: https://github.com/lostintangent/gitdoc
+    // Install: Extensions panel -> search "GitDoc" by Jonathan Carter
+    // ============================================================
+
+    // Auto-commit is always on. Toggle off with: Ctrl+Shift+P -> "GitDoc: Disable"
+    "gitdoc.enabled": true,
+
+    // Wait 30 seconds after the last save before committing.
+    // Prevents a commit per keystroke while actively editing.
+    "gitdoc.autoCommitDelay": 30000,
+
+    // Push to origin automatically after every commit.
+    "gitdoc.autoPush": "onCommit",
+
+    // Pull from origin automatically (keeps Computer 2 in sync).
+    "gitdoc.autoPull": "afterDelay",
+    "gitdoc.autoPullDelay": 60000,
+
+    // Commit message includes file name and timestamp.
+    "gitdoc.commitMessageFormat": "Auto-save: {filename} ({date})",
+
+    // Never auto-commit these -- they're high-churn runtime files
+    // that would pollute commit history with noise.
+    "gitdoc.excludePattern": [
+        "**/*.log",
+        "**/data/logs/**",
+        "**/data/backups/**",
+        "**/data/clinical_summaries/**",
+        "**/pytest_output.txt",
+        "**/test_out.txt",
+        "**/__pycache__/**",
+        "**/*.pyc",
+        "**/data/active_user.json",
+        "**/data/active_chart.json",
+        "**/data/changelog.json"
+    ],
+
+    // Show GitDoc enabled/disabled state in the VS Code status bar.
+    "gitdoc.statusBarItem": true
+}

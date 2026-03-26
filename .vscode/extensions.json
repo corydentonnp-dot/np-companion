@@ -1,0 +1,18 @@
+{
+    "recommendations": [
+        "ms-vscode.gitdoc",
+        "github.copilot-chat",
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+    ],
+    "unwantedRecommendations": [
+        "docker.docker",
+        "ms-azuretools.vscode-containers",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers",
+        "grapecity.gc-excelviewer",
+        "mechatroner.rainbow-csv",
+        "tomoki1207.pdf",
+        "nilssoderman.batch-runner"
+    ]
+}
