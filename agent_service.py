@@ -26,7 +26,7 @@ from agent.inbox_monitor import run_inbox_monitor
 from agent.inbox_digest import run_digest_job
 from agent.clinical_summary_parser import ClinicalSummaryHandler, poll_export_folder, start_xml_watcher
 from agent.notifier import check_callback_reminders
-from routes.labtrack import check_overdue_labs
+from app.services.labtrack_service import check_overdue_labs  # B1.12: moved from routes.labtrack
 
 # Optional desktop dependencies for tray/popup features.
 try:
