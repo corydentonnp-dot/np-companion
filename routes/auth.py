@@ -21,6 +21,7 @@ import time
 import webbrowser
 from datetime import datetime, timezone
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint, render_template, request, redirect,
@@ -105,6 +106,16 @@ def login():
         return redirect(url_for('auth.register'))
 
     if request.method == 'POST':
+        ip = request.remote_addr or 'unknown'
+        now = time.time()
+        record = _login_attempts.get(ip, {"count": 0, "locked_until": 0.0})
+
+        # Block IP if still in lockout window
+        if record["locked_until"] > now:
+            remaining = int(record["locked_until"] - now)
+            flash(f'Too many failed attempts. Try again in {remaining}s.', 'error')
+            return render_template('login.html')
+
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
 
@@ -119,15 +130,31 @@ def login():
                 )
                 return render_template('login.html')
 
+            # Successful login — clear attempt counter for this IP
+            _login_attempts.pop(ip, None)
             login_user(user, remember=True)
             user.last_login = datetime.now(timezone.utc)
             db.session.commit()
             _write_active_user(user)
 
+            # Validate next to prevent open redirect to external domains
             next_page = request.args.get('next')
+            if next_page:
+                parsed = urlparse(next_page)
+                if parsed.netloc or parsed.scheme:
+                    next_page = None
             return redirect(next_page or url_for('auth.dashboard_redirect'))
         else:
-            flash('Invalid username or password.', 'error')
+            record["count"] = record.get("count", 0) + 1
+            if record["count"] >= _LOGIN_MAX_ATTEMPTS:
+                record["locked_until"] = now + _LOGIN_LOCKOUT_SECONDS
+                record["count"] = 0
+                _login_attempts[ip] = record
+                flash(f'Too many failed attempts. Locked for {_LOGIN_LOCKOUT_SECONDS // 60} minutes.', 'error')
+            else:
+                _login_attempts[ip] = record
+                remaining_attempts = _LOGIN_MAX_ATTEMPTS - record["count"]
+                flash(f'Invalid username or password. ({remaining_attempts} attempt{"s" if remaining_attempts != 1 else ""} remaining)', 'error')
 
     return render_template('login.html')
 
@@ -796,6 +823,11 @@ def admin_toggle_ai(user_id):
 # ======================================================================
 # API — PIN verification (for auto-lock overlay in main.js)
 # ======================================================================
+
+# In-memory login attempt tracking by IP: {ip: {"count": int, "locked_until": float}}
+_login_attempts: dict = {}
+_LOGIN_MAX_ATTEMPTS = 5
+_LOGIN_LOCKOUT_SECONDS = 300  # 5 minutes
 
 # In-memory PIN attempt tracking: {user_id: {"count": int, "locked_until": float}}
 _pin_attempts: dict = {}

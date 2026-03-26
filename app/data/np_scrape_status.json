@@ -1,0 +1,10 @@
+{
+  "last_scrape_at": "2026-03-22T23:39:42.190391+00:00",
+  "status": "error",
+  "date_scraped": "2026-03-23",
+  "appointment_count": 0,
+  "errors": [
+    "Navigation replay failed"
+  ],
+  "duration_seconds": null
+}

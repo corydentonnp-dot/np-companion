@@ -279,6 +279,8 @@ function initSidebar() {
    ========================================================== */
 
 function initNotifications() {
+    // No session on login page — skip to avoid HTML redirect being parsed as JSON
+    if (document.body.getAttribute('data-user-id') === '0') return;
     var badge = document.getElementById('notification-count');
     var bell = document.getElementById('notification-bell');
     var dropdown = document.getElementById('notification-dropdown');
@@ -423,6 +425,8 @@ function escapeHtml(s) {
 var _p1SnoozedIds = {};
 
 function initP1Poll() {
+    // No session on login page — skip to avoid HTML redirect being parsed as JSON
+    if (document.body.getAttribute('data-user-id') === '0') return;
     function pollP1() {
         fetch('/api/notifications/p1')
             .then(function(res) { return res.json(); })
@@ -518,6 +522,8 @@ function initFlashMessages() {
    ========================================================== */
 
 function initAgentStatus() {
+    // No session on login page — skip to avoid HTML redirect being parsed as JSON
+    if (document.body.getAttribute('data-user-id') === '0') return;
     var dot = document.getElementById('agent-status');
     if (!dot) return;
 
@@ -602,6 +608,8 @@ function initAuthStatus() {
    ========================================================== */
 
 function initSetupStatus() {
+    // No session on login page — skip to avoid HTML redirect being parsed as JSON
+    if (document.body.getAttribute('data-user-id') === '0') return;
     var btn = document.getElementById('setup-btn');
     var badge = document.getElementById('setup-count');
     if (!btn || !badge) return;

@@ -1325,6 +1325,15 @@ select.form-input { -webkit-appearance: auto; }
 .text-xs       { font-size: 11px; }
 .overflow-auto { overflow-x: auto; }
 
+/* Form grid — 2-col by default */
+.form-grid      { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.form-grid--4col { grid-template-columns: repeat(4, 1fr); }
+
+/* Clickable table rows */
+.data-table__row--clickable { cursor: pointer; }
+.data-table__row--clickable:hover { background: var(--bg-muted, #f8fafc); }
+[data-theme="dark"] .data-table__row--clickable:hover { background: rgba(255,255,255,.04); }
+
 /* ---- Card variants ---- */
 .card--highlight-danger  { border-left: 4px solid var(--color-red, #ef4444); }
 .card--highlight-success { border-left: 4px solid #10b981; }
