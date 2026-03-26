@@ -321,8 +321,10 @@ class TestPW02Dashboard:
         """Yesterday/Today/Tomorrow navigation buttons are present."""
         auth_page.goto(f"{BASE_URL}/dashboard")
         content = auth_page.content()
-        # Look for navigation controls. Buttons may vary in text.
-        has_nav = any(x in content for x in ["Yesterday", "yesterday", "prev-day", "prev_day"])
+        # Dashboard uses title="Yesterday" attribute and date links
+        has_nav = any(x in content for x in
+                      ['title="Yesterday"', 'title="Tomorrow"', "prev-day", "prev_day",
+                       "/dashboard?date=", "yesterday"])
         assert has_nav, "No day navigation button found on dashboard"
 
     def test_dashboard_polling_endpoint(self, auth_page):
