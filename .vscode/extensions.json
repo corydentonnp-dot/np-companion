@@ -1,6 +1,6 @@
 {
     "recommendations": [
-        "ms-vscode.gitdoc",
+        "vsls-contrib.gitdoc",
         "github.copilot-chat",
         "ms-python.python",
         "ms-python.vscode-pylance"

@@ -169,7 +169,8 @@
     "editor.renderControlCharacters": false,
     "editor.rulers": [],
     // No auto-save CPU spikes
-    "files.autoSave": "off",
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 2000,
     // Reduce file watching aggressiveness
     "files.watcherExclude": {
         "**/venv/**": true,
