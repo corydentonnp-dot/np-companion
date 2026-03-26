@@ -32,6 +32,7 @@ venv/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+!.vscode/mcp.json
 
 # Session cookies / serialized data
 *.pkl
