@@ -649,7 +649,7 @@ CHRONIC_MONITORING_CODES = {
 # DEPRECATED: Legacy fallback only. New monitoring rules are populated
 # dynamically via MonitoringRuleEngine (Phase 23). This MAP is read only
 # when the monitoring_rule table is empty or migration hasn't run.
-# Do NOT add new entries here — seed them in migrations/seed_monitoring_rules.py
+# Do NOT add new entries here — seed them in migrations/seeds/seed_monitoring_rules.py
 # or let the DailyMed/VSAC waterfall populate them automatically.
 # MEDICATION_MONITORING_MAP: drug class → (lab CPT, interval months, rule code, Dx prefixes)
 MEDICATION_MONITORING_MAP = {

@@ -822,10 +822,10 @@ Run this checklist:
 - [ ] Calculator card click → navigates to correct detail page
 
 **URL:** `/calculators/bmi`
-- [ ] Height field — type `68` (inches)
-- [ ] Weight field — type `185` (lbs)
-- [ ] Calculate button → BMI result appears
-- [ ] Valid result: should be ~28.1
+- [x] Height field — type `68` (inches)
+- [x] Weight field — type `185` (lbs)
+- [x] Calculate button → BMI result appears
+- [x] Valid result: should be ~28.1
 - [ ] Clear/Reset → fields clear
 
 **URL:** `/calculators/egfr`
@@ -837,8 +837,8 @@ Run this checklist:
 - [ ] Score updates automatically or on Calculate click
 
 **URL:** `/calculators/wells-dvt`
-- [ ] Checkbox items → check several
-- [ ] Calculate → pre-test probability result appears
+- [x] Checkbox items → check several
+- [x] Calculate → pre-test probability result appears
 
 **URL:** `/calculators/heart-score`
 - [ ] Dropdown/radio items for each HEART component

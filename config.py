@@ -46,6 +46,7 @@ def _load_or_create_secret_key():
 
 SECRET_KEY = os.getenv("SECRET_KEY", "") or _load_or_create_secret_key()
 DEBUG = False  # Set to True for development only
+TEMPLATES_AUTO_RELOAD = True  # Always reload templates on edit
 
 # Session security
 SESSION_COOKIE_HTTPONLY = True       # JS cannot read session cookie

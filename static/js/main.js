@@ -566,6 +566,8 @@ function initAgentStatus() {
    ========================================================== */
 
 function initAuthStatus() {
+    // Skip polling on login/register pages — no session exists yet
+    if ((document.body.getAttribute('data-user-id') || '0') === '0') return;
     var dot = document.getElementById('auth-status');
     if (!dot) return;
 
@@ -1898,8 +1900,19 @@ function initDoubleSubmitGuard() {
    ========================================================== */
 function initFetchInterceptor() {
     var _origFetch = window.fetch;
+    /* Read CSRF token once from the meta tag injected by base.html */
+    var csrfMeta = document.head.querySelector('meta[name="csrf-token"]');
+    var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
     window.fetch = function (url, opts) {
-        return _origFetch.apply(this, arguments).then(function (response) {
+        /* Auto-inject X-CSRFToken on all state-changing requests so that
+           AJAX calls from free_widgets.js and other scripts don't 500. */
+        if (csrfToken && opts && opts.method &&
+                ['POST', 'PUT', 'DELETE', 'PATCH'].indexOf(opts.method.toUpperCase()) !== -1) {
+            opts = Object.assign({}, opts);
+            opts.headers = Object.assign({ 'X-CSRFToken': csrfToken }, opts.headers || {});
+        }
+        return _origFetch.call(this, url, opts).then(function (response) {
             if (response.status === 401) {
                 /* Session expired — show toast and redirect */
                 if (typeof showError === 'function') {

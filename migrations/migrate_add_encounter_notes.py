@@ -3,13 +3,8 @@ Migration: Add patient_encounter_notes table for prior encounter notes.
 
 Run: venv\Scripts\python.exe migrations/migrate_add_encounter_notes.py
 """
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from sqlalchemy import text
 
-from app import create_app
-from models import db
-
-app = create_app()
 
 CREATE_SQL = """
 CREATE TABLE IF NOT EXISTS patient_encounter_notes (
@@ -30,9 +25,22 @@ INDEX_SQL = [
     "CREATE INDEX IF NOT EXISTS ix_patient_encounter_notes_mrn ON patient_encounter_notes(mrn);",
 ]
 
-if __name__ == '__main__':
+
+def run_migration(app, db):
+    """Auto-run by app startup migration runner."""
     with app.app_context():
-        db.engine.execute(CREATE_SQL)
-        for idx in INDEX_SQL:
-            db.engine.execute(idx)
-        print("Migration complete: patient_encounter_notes table created.")
+        with db.engine.connect() as conn:
+            conn.execute(text(CREATE_SQL))
+            for idx in INDEX_SQL:
+                conn.execute(text(idx))
+            conn.commit()
+    print("Migration complete: patient_encounter_notes table created.")
+
+
+if __name__ == '__main__':
+    import os, sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from app import create_app
+    from models import db as _db
+    _app = create_app()
+    run_migration(_app, _db)

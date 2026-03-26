@@ -507,7 +507,7 @@
                         </td>
                         <td style="width:44px;text-align:center;">
                             <button class="btn btn-icon btn-sm" style="font-size:15px;color:var(--text-muted);"
-                                    onclick="openDeleteApptModal({{ appt.id }}, '{{ display_name|e }}', '{{ appt.patient_mrn|e }}')"
+                                    onclick="openDeleteApptModal({{ appt.id | tojson }}, '{{ display_name|e }}', '{{ appt.patient_mrn|e }}')"
                                     title="Remove appointment">🗑</button>
                         </td>
                     </tr>
@@ -1727,7 +1727,7 @@ function pollScrapeProgress() {
 (function() {
     var appts = [
         {% for a in appointments %}
-        { id: {{ a.id }}, time: {{ a.appointment_time|tojson }}, patient_name: {{ a.patient_name|tojson }}, patient_mrn: {{ (a.patient_mrn or '')|tojson }}, visit_type: {{ (a.visit_type or '')|tojson }}, reason: {{ (a.reason or '')|tojson }}, duration_minutes: {{ a.duration_minutes or 15 }}, is_new_patient: {{ 'true' if a.is_new_patient else 'false' }} }{{ ',' if not loop.last }}
+        { id: {{ a.id | tojson }}, time: {{ a.appointment_time|tojson }}, patient_name: {{ a.patient_name|tojson }}, patient_mrn: {{ (a.patient_mrn or '')|tojson }}, visit_type: {{ (a.visit_type or '')|tojson }}, reason: {{ (a.reason or '')|tojson }}, duration_minutes: {{ a.duration_minutes or 15 }}, is_new_patient: {{ 'true' if a.is_new_patient else 'false' }} }{{ ',' if not loop.last }}
         {% endfor %}
     ];
     if (window.ScheduleGrid) ScheduleGrid.init(appts);

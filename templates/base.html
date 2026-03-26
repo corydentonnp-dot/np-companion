@@ -1065,9 +1065,9 @@
 </div>
 {% endif %}
 
-<script src="{{ url_for('static', filename='js/error-handler.js') }}"></script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
-<script src="{{ url_for('static', filename='js/free_widgets.js') }}"></script>
+<script src="{{ url_for('static', filename='js/error-handler.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/main.js') }}?v={{ app_version }}"></script>
+<script src="{{ url_for('static', filename='js/free_widgets.js') }}?v={{ app_version }}"></script>
 <script>
 /* Route index for Command Palette (4.5) */
 window.__npRoutes = [
@@ -1105,6 +1105,7 @@ window.__npRoutes = [
 
 /* Preload help guide data for help popovers (PH44-9D) */
 window.__npHelp = {};
+{% if current_user.is_authenticated %}
 (function(){
     fetch('/api/help/items')
         .then(function(r){ return r.ok ? r.json() : []; })
@@ -1121,6 +1122,7 @@ window.__npHelp = {};
         })
         .catch(function(){});
 })();
+{% endif %}
 function restartServer(e) {
     e.preventDefault();
     if (!confirm('Restart the CareCompanion server? The page will reload in a few seconds.')) return;

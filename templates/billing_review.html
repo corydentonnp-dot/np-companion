@@ -148,7 +148,7 @@
 {% else %}
 <div class="card">
     <div class="card-body">
-        {{ empty_state('💰', 'No billing opportunities detected', 'This patient\\'s data may need a clinical summary refresh.', url_for('patient.chart', mrn=mrn), 'Refresh') }}
+        {{ empty_state('💰', 'No billing opportunities detected', "This patient's data may need a clinical summary refresh.", url_for('patient.chart', mrn=mrn), 'Refresh') }}
     </div>
 </div>
 {% endif %}

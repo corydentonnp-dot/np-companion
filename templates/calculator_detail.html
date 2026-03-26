@@ -233,9 +233,11 @@ function computeCalc(e){
 function showResult(data){
     var panel = document.getElementById('calc-result-panel');
     var hdr = document.getElementById('calc-result-header');
-    var score = data.score !== undefined ? data.score : data.result;
+    var score = data.score !== undefined ? data.score :
+                (data.result !== undefined ? data.result :
+                (data.score_value !== undefined ? data.score_value : undefined));
     if (score === null || score === undefined) score = '—';
-    var label = data.label || data.interpretation || '';
+    var label = data.label || data.interpretation || data.score_label || '';
     var color = data.color || getColorFromLabel(label);
 
     document.getElementById('calc-result-score').textContent = (typeof score === 'number') ? Math.round(score * 100) / 100 : score;
@@ -249,7 +251,7 @@ function showResult(data){
 
     // Breakdown
     var bd = document.getElementById('calc-result-breakdown');
-    var components = data.components || data.details || {};
+    var components = data.components || data.details || data.score_detail || {};
     if (Object.keys(components).length) {
         bd.innerHTML = '<strong>Components:</strong><br>' +
             Object.entries(components).map(function(e){ return e[0] + ': ' + e[1]; }).join('<br>');

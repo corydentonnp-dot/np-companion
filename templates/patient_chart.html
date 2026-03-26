@@ -78,7 +78,7 @@
                 <input type="text" id="demo-name" class="form-input form-input-sm" value="{{ record.patient_name if record else '' }}" style="width:160px;">
             </label>
             <label style="font-size:12px;">DOB:
-                <input type="date" id="demo-dob" class="form-input form-input-sm" value="{% if record and record.patient_dob and record.patient_dob|length >= 8 %}{{ record.patient_dob[:4] }}-{{ record.patient_dob[4:6] }}-{{ record.patient_dob[6:8] }}{% endif %}" style="width:140px;">
+                <input type="date" id="demo-dob" class="form-input form-input-sm" value="{% if record and record.patient_dob %}{% set dob = record.patient_dob %}{% if '-' in dob and dob|length == 10 %}{{ dob }}{% elif dob|length >= 8 %}{{ dob[:4] }}-{{ dob[4:6] }}-{{ dob[6:8] }}{% endif %}{% endif %}" style="width:140px;">
             </label>
             <label style="font-size:12px;">Sex:
                 <select id="demo-sex" class="form-input form-input-sm" style="width:80px;">
@@ -3077,7 +3077,7 @@ function checkPDMP() {
    ============================================================ */
 var _chartView = '{{ chart_view_mode }}';
 
-function setChartView(view) {
+function setChartView(view, persist) {
     _chartView = view;
     var tabsBtn = document.getElementById('view-tabs-btn');
     var gridBtn = document.getElementById('view-grid-btn');
@@ -3099,13 +3099,15 @@ function setChartView(view) {
             w.classList.remove('tab-visible');
         });
     }
-    /* Persist to both localStorage and server */
+    /* Persist to both localStorage and server — skip server call during initial restore */
     localStorage.setItem('chart_view_mode', view);
-    fetch('/settings/account/preference', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({key: 'chart_view_mode', value: view})
-    }).catch(function() {});
+    if (persist !== false) {
+        fetch('/settings/account/preference', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({key: 'chart_view_mode', value: view})
+        }).catch(function() {});
+    }
 }
 
 function switchTab(tabName, btn) {
@@ -3149,9 +3151,9 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-/* Initialize view on load */
+/* Initialize view on load — pass false to skip server POST (redundant on load) */
 (function() {
-    setChartView(_chartView);
+    setChartView(_chartView, false);
 })();
 
 /* ---- Phase 25.5: Telehealth stopwatch + save ---- */
@@ -3264,7 +3266,8 @@ function teleSave() {
 })();
 </script>
 <script>
-/* Deferred enrichment — fire after page render to avoid blocking chart load */
+/* Deferred enrichment — runs after window load so main.js CSRF interceptor is active */
+window.addEventListener('load', function() {
 (function(){
     fetch('/api/patient/{{ mrn }}/enrich', {method:'POST'}).catch(function(){});
 
@@ -3337,5 +3340,6 @@ function teleSave() {
     })
     .catch(function(){});
 })();
+}); /* end window.addEventListener('load', ...) */
 </script>
 {% endblock %}

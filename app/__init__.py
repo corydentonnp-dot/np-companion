@@ -15,6 +15,7 @@ from flask_bcrypt import Bcrypt
 from flask_compress import Compress
 from flask_login import LoginManager, current_user
 from flask_wtf.csrf import CSRFProtect
+from werkzeug.exceptions import HTTPException
 
 from models import db
 from utils.error_logger import log_http_error, log_exception, log_startup_error
@@ -250,6 +251,18 @@ def create_app(testing=False):
 	})
 	app.logger.info('Structured logging initialised — %s', log_dir)
 
+	@app.route('/favicon.ico')
+	def favicon():
+		# Serve the inline SVG favicon as an actual .ico-compatible response
+		from flask import Response
+		svg = (
+			"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"
+			"<rect width='32' height='32' rx='6' fill='#177a6b'/>"
+			"<text x='16' y='22' font-family='Arial,sans-serif' font-size='14' font-weight='700' "
+			"fill='white' text-anchor='middle'>CC</text></svg>"
+		)
+		return Response(svg, mimetype='image/svg+xml')
+
 	@app.errorhandler(404)
 	def page_not_found(error):
 		return render_template('errors/404.html'), 404
@@ -264,6 +277,10 @@ def create_app(testing=False):
 
 	@app.errorhandler(Exception)
 	def unhandled_exception(error):
+		# Let HTTP exceptions (400, 403, 404, etc.) return their proper status
+		# codes instead of being re-wrapped as 500.
+		if isinstance(error, HTTPException):
+			return error
 		db.session.rollback()
 		tb = traceback.format_exc()
 		app.logger.error('Unhandled exception:\n%s', tb)
