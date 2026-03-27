@@ -204,35 +204,35 @@ Run this checklist:
 **URL:** Any page while logged in
 
 **Sidebar links — test each navigates correctly:**
-- [ ] CareCompanion logo → `/dashboard`
-- [ ] Dashboard → `/dashboard`
-- [ ] Patients → `/patients`
-- [ ] Inbox → `/inbox`
-- [ ] Timer → `/timer`
-- [ ] Billing → `/billing/log`
-- [ ] Care Gaps → `/caregap`
-- [ ] Orders → `/orders`
-- [ ] Lab Track → `/labtrack`
-- [ ] On-Call → `/oncall`
-- [ ] Tools → `/tools`
-- [ ] Calculators → `/calculators`
-- [ ] Metrics → `/metrics`
-- [ ] Bonus → `/bonus`
-- [ ] Messages → `/messages`
-- [ ] Notifications → `/notifications`
-- [ ] Settings → `/settings`
-- [ ] Admin (admin-only) → `/admin`
+- [x] CareCompanion logo → `/dashboard`
+- [x] Dashboard → `/dashboard`
+- [x] Patients → `/patients`
+- [x] Inbox → `/inbox`
+- [x] Timer → `/timer`
+- [x] Billing → `/billing/log`
+- [x] Care Gaps → `/caregap`
+- [x] Orders → `/orders`
+- [x] Lab Track → `/labtrack`
+- [x] On-Call → `/oncall`
+- [x] Tools → `/tools`
+- [x] Calculators → `/calculators`
+- [x] Metrics → `/metrics`
+- [x] Bonus → `/bonus`
+- [x] Messages → `/messages`
+- [x] Notifications → `/notifications`
+- [x] Settings → `/settings`
+- [x] Admin (admin-only) → `/admin`
 
 **Header / Global Controls:**
-- [ ] Dark mode toggle switches theme and persists on reload
-- [ ] Auto-lock timer displays and counts down
-- [ ] Agent status indicator shows correct state
-- [ ] Priority 1 badge (if visible) links to relevant page
-- [ ] User display name shown in header
+- [x] Dark mode toggle switches theme and persists on reload
+- [S] Auto-lock timer displays and counts down
+- [x] Agent status indicator shows correct state
+- [S] Priority 1 badge (if visible) links to relevant page
+- [x] User display name shown in header
 
 **Console check after navigation:**
-- [ ] Zero `SyntaxError` or `TypeError` errors
-- [ ] Zero 404s for static assets
+- [F] Zero `SyntaxError` or `TypeError` errors
+- [x] Zero 404s for static assets
 
 ---
 
@@ -241,56 +241,56 @@ Run this checklist:
 **URL:** `/login`
 
 **Form: Login (POST /login)**
-- [ ] Username field (`#username`) — type `CORY`, verify accepted
-- [ ] Password field (`#password`) — type `ASDqwe123`, verify accepted
-- [ ] Password show/hide toggle button — click, verify password becomes visible; click again, hidden
-- [ ] Sign In button — click with valid creds → should redirect to `/dashboard`
-- [ ] Sign In button shows "Signing in…" loading state while submitting (disable + text change)
+- [x] Username field (`#username`) — type `CORY`, verify accepted
+- [x] Password field (`#password`) — type `ASDqwe123`, verify accepted
+- [x] Password show/hide toggle button — click, verify password becomes visible; click again, hidden
+- [x] Sign In button — click with valid creds → should redirect to `/dashboard`
+- [x] Sign In button shows "Signing in…" loading state while submitting (disable + text change)
 
 **Error handling:**
-- [ ] Submit with blank username → error message appears (not 500)
-- [ ] Submit with wrong password → "Invalid credentials" message appears
-- [ ] Submit wrong password 5× → lockout message appears (rate limiting)
-- [ ] Add `?next=http://evil.com` to URL → after login, redirects to `/dashboard` not external URL
+- [x] Submit with blank username → error message appears (not 500)
+- [x] Submit with wrong password → "Invalid credentials" message appears
+- [x] Submit wrong password 5× → lockout message appears (rate limiting)
+- [x] Add `?next=http://evil.com` to URL → after login, redirects to `/dashboard` not external URL
 
 **URL:** `/register`
-- [ ] Registration form renders (or shows "disabled" message if not active)
-- [ ] If active: username, password, confirm password, role fields present
-- [ ] Submit with mismatched passwords → validation error
+- [x] Registration form renders (or shows "disabled" message if not active)
+- [x] If active: username, password, confirm password, role fields present
+- [x] Submit with mismatched passwords → validation error
 
 **URL:** `/onboarding`
-- [ ] Onboarding wizard renders step 1
-- [ ] Next button advances to step 2
+- [F] Onboarding wizard renders step 1
+- [S] Next button advances to step 2
 
 **URL:** `/settings` (profile section)
 
 **Form: Profile (POST /settings/profile)**
-- [ ] Display name field — edit, save → persists on reload
-- [ ] Email field — edit, save → persists on reload
-- [ ] Username field — read-only (cannot change)
-- [ ] Role field — read-only
+- [x] Display name field — edit, save → persists on reload
+- [x] Email field — edit, save → persists on reload
+- [x] Username field — read-only (cannot change)
+- [x] Role field — read-only
 
 **Form: Change Password (POST /settings/password)**
-- [ ] Current password field
-- [ ] New password field
-- [ ] Confirm password field
-- [ ] Submit with wrong current password → error message
-- [ ] Submit with mismatched new passwords → validation error
-- [ ] Submit with valid inputs → success flash message
+- [x] Current password field
+- [x] New password field
+- [x] Confirm password field
+- [x] Submit with wrong current password → error message
+- [x] Submit with mismatched new passwords → validation error
+- [x] Submit with valid inputs → success flash message
 
 **Form: Set PIN (POST /settings/pin)**
-- [ ] 4-digit PIN input
-- [ ] Set PIN button → success message
+- [x] 4-digit PIN input
+- [x] Set PIN button → success message
 
 **URL:** `/settings/account`
-- [ ] Account page loads with correct role label
-- [ ] Any editable fields present → test save
+- [x] Account page loads with correct role label
+- [x] Any editable fields present → test save
 
 **URL:** `/settings/notifications`
-- [ ] Notification settings form renders
-- [ ] Toggle each notification type checkbox
-- [ ] Save button → success flash message
-- [ ] Reload page → verify saved state persists
+- [x] Notification settings form renders
+- [x] Toggle each notification type checkbox
+- [x] Save button → success flash message
+- [x] Reload page → verify saved state persists
 
 ---
 
@@ -299,31 +299,31 @@ Run this checklist:
 **URL:** `/dashboard`
 
 **Schedule widget:**
-- [ ] "Yesterday ←" button → updates schedule to previous day
-- [ ] "Today" button → resets to today
-- [ ] "→ Tomorrow" button → shows next day's schedule
-- [ ] Grid/Table view toggle → switches layout, persists in localStorage on reload
-- [ ] "Add to Schedule" button → opens add patient modal
-  - [ ] MRN search typeahead — type `62815`, verify patient appears in dropdown
-  - [ ] Keyboard nav: ArrowDown selects, Enter confirms
-  - [ ] Submit → patient added to schedule
-  - [ ] Duplicate MRN on same day → error (not silent duplicate)
-- [ ] Scrape Tomorrow button → changes to "Scraping…" state; resets after 60s timeout
-- [ ] Drag-and-drop patient card to reorder (if grid mode)
-- [ ] Patient row click → navigates to patient chart
+- [x] "Yesterday ←" button → updates schedule to previous day
+- [x] "Today" button → resets to today
+- [x] "→ Tomorrow" button → shows next day's schedule
+- [x] Grid/Table view toggle → switches layout, persists in localStorage on reload
+- [x] "Add to Schedule" button → opens add patient modal
+  - [x] MRN search typeahead — type `62815`, verify patient appears in dropdown
+  - [x] Keyboard nav: ArrowDown selects, Enter confirms
+  - [x] Submit → patient added to schedule
+  - [x] Duplicate MRN on same day → error (not silent duplicate)
+- [x] Scrape Tomorrow button → changes to "Scraping…" state; resets after 60s timeout
+- [x] Drag-and-drop patient card to reorder (if grid mode)
+- [x] Patient row click → navigates to patient chart
 
 **Widgets:**
-- [ ] Tier toggles (Action / Awareness / Review) → collapse/expand sections
-- [ ] "Accept high-priority billing" batch button → fires request
-- [ ] Dismiss anomaly button → hides anomaly card
-- [ ] My Patients "All" tab → shows all imported patients
-- [ ] My Patients "Claimed" tab → shows only claimed patients
-- [ ] TCM alert dismiss button (X) → banner dismissed
-- [ ] Manage Widgets button (header) → opens widget management UI
+- [x] Tier toggles (Action / Awareness / Review) → collapse/expand sections
+- [S] "Accept high-priority billing" batch button → fires request
+- [S] Dismiss anomaly button → hides anomaly card
+- [x] My Patients "All" tab → shows all imported patients
+- [x] My Patients "Claimed" tab → shows only claimed patients
+- [x] TCM alert dismiss button (X) → banner dismissed
+- [x] Manage Widgets button (header) → opens widget management UI
 
 **Agent / polling:**
-- [ ] Agent status indicator updates → verify no console errors from polling (10s interval)
-- [ ] Priority 1 badge count matches visible P1 patients
+- [x] Agent status indicator updates → verify no console errors from polling (10s interval)
+- [x] Priority 1 badge count matches visible P1 patients
 
 ---
 
@@ -332,51 +332,51 @@ Run this checklist:
 **URL:** `/patients`
 
 **Roster:**
-- [ ] "All Patients" tab → shows all imported patients
-- [ ] "My Patients" tab → shows only claimed patients
-- [ ] Search field (`#roster-search`) — type partial name → list filters live
-- [ ] Search by MRN — type `62815` → correct patient shown
-- [ ] Column sort: Name header click → sorts A→Z; click again → Z→A
-- [ ] Column sort: DOB header → sorts chronologically
-- [ ] Patient row click → navigates to `/patient/62815`
+- [x] "All Patients" tab → shows all imported patients
+- [x] "My Patients" tab → shows only claimed patients
+- [x] Search field (`#roster-search`) — type partial name → list filters live
+- [x] Search by MRN — type `62815` → correct patient shown
+- [x] Column sort: Name header click → sorts A→Z; click again → Z→A
+- [x] Column sort: DOB header → sorts chronologically
+- [x] Patient row click → navigates to `/patient/62815`
 
 **URL:** `/patient/62815`
 
 **Chart header:**
-- [ ] Patient name, DOB, MRN, age, sex all visible
-- [ ] Portal status badge visible
-- [ ] Cell phone displayed
+- [F] Patient name, DOB, MRN, age, sex all visible
+- [S] Portal status badge visible
+- [S] Cell phone displayed
 
 **Tabs — click each, verify content loads:**
-- [ ] Overview tab → medications, problems, allergies visible
-- [ ] Labs tab → lab results list or "none on file"
-- [ ] Billing tab → billing opportunities for this patient
-- [ ] Notes tab → progress notes list
-- [ ] Calculators tab → calculator widget
+- [x] Overview tab → medications, problems, allergies visible
+- [x] Labs tab → lab results list or "none on file"
+- [x] Billing tab → billing opportunities for this patient
+- [x] Notes tab → progress notes list
+- [x] Calculators tab → calculator widget
 
 **Inline actions:**
-- [ ] "Claim Patient" button → POST, patient now shows in "My Patients"
-- [ ] "Edit Demographics" toggle → reveals inline form with name/DOB/phone/email fields
-  - [ ] Edit a field, save → data updates
-  - [ ] Cancel → reverts to original
-- [ ] ICD-10 Lookup button → opens modal
-  - [ ] Search field — type "diabetes" → results appear
-  - [ ] Click result → code populated in field
-  - [ ] Close modal → modal dismissed
-- [ ] "Add Diagnosis" button → opens ICD-10 lookup modal
-- [ ] "Copy Diagnoses" button → opens column picker modal
-  - [ ] Select columns via checkboxes
-  - [ ] Copy → clipboard contains formatted text
-- [ ] Medication item double-click → inline edit activates
-- [ ] Medication filter tabs (Active / Inactive / All) → filters list
-- [ ] Chart view mode dropdown → change to Compact → layout updates
+- [x] "Claim Patient" button → POST, patient now shows in "My Patients"
+- [x] "Edit Demographics" toggle → reveals inline form with name/DOB/phone/email fields
+  - [x] Edit a field, save → data updates
+  - [x] Cancel → reverts to original
+- [x] ICD-10 Lookup button → opens modal
+  - [x] Search field — type "diabetes" → results appear
+  - [S] Click result → code populated in field
+  - [x] Close modal → modal dismissed
+- [x] "Add Diagnosis" button → opens ICD-10 lookup modal
+- [x] "Copy Diagnoses" button → opens column picker modal
+  - [S] Select columns via checkboxes
+  - [x] Copy → clipboard contains formatted text
+- [x] Medication item double-click → inline edit activates
+- [x] Medication filter tabs (Active / Inactive / All) → filters list
+- [x] Chart view mode dropdown → change to Compact → layout updates
 
 **URL:** `/patient/62815/detail`
-- [ ] Refresh button → reloads patient info card
-- [ ] "View full chart" link → navigates to `/patient/62815`
+- [F] Refresh button → reloads patient info card
+- [F] "View full chart" link → navigates to `/patient/62815`
 
 **Unknown MRN:**
-- [ ] Navigate to `/patient/00000` → 404 or empty state (not 500)
+- [x] Navigate to `/patient/00000` → 404 or empty state (not 500)
 
 ---
 
@@ -385,27 +385,27 @@ Run this checklist:
 **URL:** `/inbox`
 
 **Tabs:**
-- [ ] Inbox tab → message list loads
-- [ ] Held Items tab → held messages list
-- [ ] Audit Log tab → audit entries list
-- [ ] Digest tab → digest period buttons visible
+- [x] Inbox tab → message list loads
+- [F] Held Items tab → held messages list
+- [F] Audit Log tab → audit entries list
+- [F] Digest tab → digest period buttons visible
 
 **Per message:**
-- [ ] Click message row → detail view expands
-- [ ] Hold button → hold reason dropdown appears
-  - [ ] Select hold reason from dropdown
-  - [ ] Confirm → message moves to Held Items tab
-- [ ] Resolve button → POST, message removed from inbox
-- [ ] Unread count badge matches visible unread items
+- [S] Click message row → detail view expands
+- [S] Hold button → hold reason dropdown appears
+  - [S] Select hold reason from dropdown
+  - [S] Confirm → message moves to Held Items tab
+- [S] Resolve button → POST, message removed from inbox
+- [x] Unread count badge matches visible unread items
 
 **Digest tab:**
-- [ ] 8h button → digest for last 8 hours loads
-- [ ] 24h button → digest for last 24 hours
-- [ ] 72h button → digest for last 72 hours
-- [ ] 168h button → weekly digest
+- [S] 8h button → digest for last 8 hours loads
+- [S] 24h button → digest for last 24 hours
+- [S] 72h button → digest for last 72 hours
+- [S] 168h button → weekly digest
 
 **Polling:**
-- [ ] Wait 60s without action → `/api/inbox-status` is called, no console errors
+- [x] Wait 60s without action → `/api/inbox-status` is called, no console errors
 
 ---
 
@@ -444,7 +444,7 @@ Run this checklist:
 - [ ] Status updates every 3s → no console errors
 
 **URL:** `/timer/room-widget` (no login required)
-- [ ] Widget loads WITHOUT authentication (no redirect to login)
+- [x] Widget loads WITHOUT authentication (no redirect to login)
 - [ ] Room states visible
 - [ ] Room toggle endpoint responding
 
@@ -472,35 +472,35 @@ Run this checklist:
 - [ ] Rationale textarea (per session) → type text, submit → saved
 
 **URL:** `/billing/review`
-- [ ] Each pending claim row visible
-- [ ] Capture button (per row) → POST, row removed from pending
-- [ ] Dismiss button (per row) → POST, row removed
+- [F] Each pending claim row visible
+- [F] Capture button (per row) → POST, row removed from pending
+- [F] Dismiss button (per row) → POST, row removed
 
 **URL:** `/billing/em-calculator`
-- [ ] MDM complexity dropdown → select all options in sequence
-- [ ] Total minutes input → type 30
-- [ ] Calculate button → recommended code appears
+- [x] MDM complexity dropdown → select all options in sequence
+- [x] Total minutes input → type 30
+- [x] Calculate button → recommended code appears
 
 **URL:** `/billing/monthly`
-- [ ] Month picker → select previous month → charts update
-- [ ] Previous month navigation button → charts update
-- [ ] Next month navigation button → charts update
-- [ ] 3 charts render (not blank): E&M distribution, prior month comparison, 6-month trend
+- [F] Month picker → select previous month → charts update
+- [F] Previous month navigation button → charts update
+- [F] Next month navigation button → charts update
+- [F] 3 charts render (not blank): E&M distribution, prior month comparison, 6-month trend
 
 **URL:** `/billing/opportunity-report`
-- [ ] Month selector → change month → report refreshes
-- [ ] Charts render (not blank)
+- [x] Month selector → change month → report refreshes
+- [x] Charts render (not blank)
 
 **URL:** `/billing/benchmarks`
-- [ ] Month navigation buttons → data updates
-- [ ] Benchmark toggle checkbox → shows/hides comparison lines on chart
-- [ ] Chart renders 7-month trend
+- [x] Month navigation buttons → data updates
+- [x] Benchmark toggle checkbox → shows/hides comparison lines on chart
+- [x] Chart renders 7-month trend
 
 **URL:** `/billing/why-not`
-- [ ] Missed opportunity list renders or "none" message
+- [F] Missed opportunity list renders or "none" message
 
 **URL:** `/billing/monthly-revenue`
-- [ ] Revenue chart renders (not blank canvas)
+- [F] Revenue chart renders (not blank canvas)
 
 ---
 
@@ -524,7 +524,7 @@ Run this checklist:
 - [ ] "N/A" button → POST, gap marked not applicable
 
 **URL:** `/caregap/panel`
-- [ ] Summary tab → summary counts visible
+- [x] Summary tab → summary counts visible
 - [ ] Spreadsheet tab → full patient table visible
 - [ ] Claimed tab → claimed-only patients visible
 - [ ] Filter form: min_age=40, max_age=65, sex=Female → submit → table filters
@@ -533,14 +533,14 @@ Run this checklist:
 - [ ] Outreach link per gap type → navigates to outreach view
 
 **URL:** `/caregap/outreach` (or `/caregap/panel/outreach?gap_type=...`)
-- [ ] Patient list renders
+- [x] Patient list renders
 - [ ] View Gaps link per patient → navigates to patient care gap view
 - [ ] Export CSV button → file downloads
 
 **URL:** `/caregap/patient/62815`
-- [ ] "Personalized" toggle → filters to relevant gaps
-- [ ] "All Applicable" toggle → shows all gaps
-- [ ] Print Patient Handout link → opens print view
+- [F] "Personalized" toggle → filters to relevant gaps
+- [F] "All Applicable" toggle → shows all gaps
+- [F] Print Patient Handout link → opens print view
 - [ ] Address Now / Copy Doc / Decline / N/A buttons (same as daily view)
 - [ ] "Reopen" button (on addressed gaps) → reopens gap
 
@@ -574,8 +574,8 @@ Run this checklist:
 - [ ] Dismiss button → banner disappears
 
 **URL:** `/orders/master`
-- [ ] Order list table renders
-- [ ] Add Order form: order_name, order_tab, category fields → fill all → submit → new row appears
+- [F] Order list table renders
+- [F] Add Order form: order_name, order_tab, category fields → fill all → submit → new row appears
 - [ ] Delete button (per order) → confirm → order removed
 
 ---
@@ -837,8 +837,8 @@ Run this checklist:
 - [ ] Score updates automatically or on Calculate click
 
 **URL:** `/calculators/wells-dvt`
-- [x] Checkbox items → check several
-- [x] Calculate → pre-test probability result appears
+- [F] Checkbox items → check several
+- [F] Calculate → pre-test probability result appears
 
 **URL:** `/calculators/heart-score`
 - [ ] Dropdown/radio items for each HEART component

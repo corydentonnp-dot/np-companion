@@ -56,7 +56,7 @@
         <form style="margin-bottom:16px;display:flex;gap:8px;align-items:end;">
             <div>
                 <label style="font-size:12px;">Lookback (hours)</label>
-                <select name="hours" class="form-control" style="width:120px;" onchange="this.form.submit()">
+                <select name="hours" class="form-control" style="width:120px;" onchange="csrfSubmit(this.form)">
                     {% for h in [8, 12, 24, 48, 72, 168] %}
                     <option value="{{ h }}" {{ 'selected' if digest_hours == h }}>{{ h }}h{% if h == 24 %} (1d){% elif h == 48 %} (2d){% elif h == 72 %} (3d){% elif h == 168 %} (7d){% endif %}</option>
                     {% endfor %}

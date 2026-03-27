@@ -1253,6 +1253,15 @@ function adminUpdateAll(e) {
         }
     }, true);
 
+    /* csrfSubmit — safe drop-in for this.form.submit() in onchange/onclick handlers.
+       form.submit() bypasses the 'submit' event listener, so we fire the event first
+       to trigger CSRF injection, then submit. */
+    window.csrfSubmit = function(form) {
+        var ev = new Event('submit', { bubbles: true, cancelable: true });
+        form.dispatchEvent(ev);
+        if (!ev.defaultPrevented) { form.submit(); }
+    };
+
     /* Override fetch to auto-include X-CSRFToken header on unsafe methods */
     var _origFetch = window.fetch;
     window.fetch = function(url, opts) {

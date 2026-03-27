@@ -48,6 +48,14 @@ audit_pw*.png
 # Build output
 dist/
 build/
+
+# Local test credentials (development only — CHANGE BEFORE DEPLOYMENT)
+# Username: CORY
+# Password: ASDqwe123
+# PIN: 2868
+# These are local test credentials used during development and must be
+# changed to new values before any production deployment.
+data/test_credentials.local
 *.ico
 
 # Environment file

@@ -296,7 +296,7 @@
                     <td>{{ '%d:%02d' % (s.face_to_face_seconds // 60, s.face_to_face_seconds % 60) if s.face_to_face_seconds else '--' }}</td>
                     <td>
                         <form method="POST" action="/timer/{{ s.id }}/annotate" style="display:inline;">
-                            <select name="billed_level" class="form-control" style="width:90px;font-size:12px;padding:2px 4px;" onchange="this.form.submit()">
+                            <select name="billed_level" class="form-control" style="width:90px;font-size:12px;padding:2px 4px;" onchange="csrfSubmit(this.form)">
                                 <option value="">--</option>
                                 {% for lvl in billing_levels %}
                                 <option value="{{ lvl }}" {{ 'selected' if s.billed_level == lvl else '' }}>{{ lvl }}</option>
@@ -378,14 +378,14 @@ function promptNote(id) {
     input.value = note;
     form.appendChild(input);
     document.body.appendChild(form);
-    form.submit();
+    csrfSubmit(form);
 }
 
 function promptComplex(id) {
     var note = prompt('Complexity notes (optional):');
     if (note === null) return;
     document.getElementById('complex-notes-' + id).value = note;
-    document.getElementById('complex-form-' + id).submit();
+    csrfSubmit(document.getElementById('complex-form-' + id));
 }
 
 // F14a — Inline E&M calculator
@@ -418,7 +418,7 @@ function useThisLevel() {
         for (var i = 0; i < sel.options.length; i++) {
             if (sel.options[i].value === _emSuggestedCode) {
                 sel.selectedIndex = i;
-                sel.form.submit();
+                csrfSubmit(sel.form);
                 return;
             }
         }

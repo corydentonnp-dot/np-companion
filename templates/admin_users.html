@@ -247,7 +247,7 @@ function submitDeactivation() {
         form.appendChild(dateInput);
     }
     document.body.appendChild(form);
-    form.submit();
+    csrfSubmit(form);
 }
 
 /* ---- Send Notification ---- */
